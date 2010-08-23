@@ -1,0 +1,15 @@
+{
+  "name" : "strata",
+  "description" : "Evented I/O B-tree",
+  "url" : "http://bigeasy.github.com/strata",
+  "keywords" : ["btree", "database", "json"],
+  "author" : "Alan Gutierrez <alan@blogometer.com>",
+  "contributors" : [],
+  "licenses" : ["MIT"],
+  "dependencies" : [],
+  "lib" : "lib",
+  "main" : "./lib/strata-evented",
+  "version" : "0.0.1",
+  "directories" : { "test": "./vows" },
+  "engines" : { "node": "> 0.2.0" }
+}
