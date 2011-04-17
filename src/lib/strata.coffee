@@ -24,10 +24,14 @@ class module.exports.MemoryIO
   compare: (left, right) ->
     if left < right then -1 else if left > right then 1 else 0
 
+comparator = (a, b) ->
+  if a < b then -1 else if a > b then 1 else 0
+
 class module.exports.Strata
   constructor: (options) ->
     @leafSize = options.leafSize or 12
     @branchSize = options.branchSize or 12
+    @comparator or= comparator
     throw new Error("I/O Strategy is required.") unless @io = options.io
     throw new Error("Root address is required.") unless @rootAddress = options.rootAddress
     @locks = { shared: {}, exclusive: {} }
@@ -48,6 +52,8 @@ class module.exports.Strata
     mutation.levels.push mutation.parentLevel
     parentLevel.lock mutation, @_initialTest
   
+  # Perform the root decision with only a read lock obtained. If it decides to
+  # mutate the root, we will
   _initialTest: (mutation) ->
     mutation.childLevel = new Level(false)
     mutation.levels.push mutation.childLevel
@@ -56,8 +62,6 @@ class module.exports.Strata
       mutation.parentLevel.upgrade mutation.childLevel, @_initialTestAgain
 
   _initialTestAgain: (mutation) ->
-    parentLevel = mutation.levels[0]
-    parent = @io.root @rootAddress
     if not mutation.initial.call this, mutation
       mutation.rewind 0
     @_tierDecision mutation
