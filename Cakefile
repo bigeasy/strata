@@ -55,19 +55,18 @@ task "gitignore", "create a .gitignore for node-ec2 based on git branch", ->
                 lib-cov
                 .DS_Store
                 **/.DS_Store
+                lib/*
                 
                 '''
 
     if branch is "gh-pages"
       gitignore += '''
-                   lib/*
                    '''
     else if branch is "master"
       gitignore += '''
                    documentation
                    site
                    index.html
-                   lib/*
                    '''
     fs.writeFile(".gitignore", gitignore)
 
