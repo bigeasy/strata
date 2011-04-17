@@ -60,16 +60,14 @@ task "gitignore", "create a .gitignore for node-ec2 based on git branch", ->
 
     if branch is "gh-pages"
       gitignore += '''
-                   lib/packet.js
-                   lib/pattern.js
+                   lib/*
                    '''
     else if branch is "master"
       gitignore += '''
                    documentation
                    site
                    index.html
-                   lib/packet.js
-                   lib/pattern.js
+                   lib/*
                    '''
     fs.writeFile(".gitignore", gitignore)
 
