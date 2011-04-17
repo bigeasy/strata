@@ -4,23 +4,19 @@ class Mutation
     @decisions = { root, initial, subsequent, swap, penultimate }
 
 class Level
-  constructor: (exclusive) ->
-    @lock = if exclusive then @lockExclusive else @lockShared
-  lockExclusive: (mutation, tier, callback) ->
-    strata = mutation.strata
-    locks = strata.locks
-    if locks.exclusive[tier.id] or locks.shared[tier.id]
-      @exclusiveQueue.push [ mutation, tier, callback ]
+  constructor: (@exclusive) ->
+  lock: (strata, mutation, tier, callback) ->
+    @tierId = tier.id
+    locks = (strata.locks[@tierId] or= [ [] ])
+    if @exclusive
+      locks.push [ @lockCallback = [ callback, strata, mutation ] ]
+      locks.push []
+      if locks.length is 3 and locks[0].length is 0
+        callback.call strata
     else
-      strata.locks.exclusive[tier.id]++
-      callback()
-  lockShared: (mutation, tier, callback) ->
-    strata = mutation.strata
-    if locks.exclusive[tier.id]
-      @sharedQueue.push [ mutation, tier, callback ]
-    else
-      strata.locks.shared[tier.id]++
-      callback()
+      locks[locks.length - 1].push @lockCallback = [ callback, strata, mutation ]
+      if locks.length is 1
+        callback.call strata
 
 class module.exports.MemoryIO
   root: (map) -> map
@@ -36,11 +32,16 @@ class module.exports.Strata
     throw new Error("Root address is required.") unless @rootAddress = options.rootAddress
     @locks = { shared: {}, exclusive: {} }
 
-  add: (object, callback) ->
+  insert: (object, callback) ->
     fields = @io.fields object
-    @_mutation new Mutation(this, @_shouldDrainRoot)
+    @_generalized new Mutation(@, @_shouldDrainRoot, @_shouldSplitInner, @_never, @_howToInsertLeaf, object, callback)
 
-  generalized: (mutation) ->
+  # Both `insert` and `remove` use this generalized mutation method that
+  # implements locking the proper tiers during the descent of the tree to find
+  # the leaf to mutate.
+  #
+  # This generalized mutation will insert or remove a single item.
+  _generalized: (mutation) ->
     mutation.levels.push new Level(false)
     mutation.parent = @io.root @rootAddress
     mutation.parentLevel = new Level(false)
@@ -76,6 +77,75 @@ class module.exports.Strata
       mutation.levels.push mutation.childLevel
       mutation.shift @_tierDescend
 
+  # When `_operate` is invoked, all the necessary locks have been obtained and
+  # we are able to mutate the tree with impunity.
+  _operate: (mutation) ->
+    # Run through levels, bottom to top, performing the operations at for level.
+    mutation.levels.reverse()
+    mutation.levelQueue = mutation.levels.slice(0)
+    operation = mutation.leafOperation
+    operation.shift().apply @, operation.concat mutation, @_leafDirty
+
+  # The leaf operation may or may not alter the leaf. If it doesn't, all of the
+  # operations to split or merge the inner tiers are moot, because we didn't
+  # make the changes to the leaf that we expected.
+  _leafDirty: (mutation) ->
+    if mutation.dirtied
+      @_operateOnLevel mutation
+    else
+      @_unlock mutation
+
+  _operateOnLevel: (mutation) ->
+    if mutation.levelQueue.length is 0
+      @_unlock mutation
+    else
+      @_operateOnOperation mutation
+
+  _operateOnOperation: (mutation) ->
+    if mutation.levelQueue[0].length is 0
+      mutation.levelQueue.shift()
+      @_operateOnLevel mutation
+    else
+      operation = mutation.levelQueue[0].operations.pop()
+      operation.shift().apply @, operation.concat mutation, @_operateOnOperation
+
+  # Inovke the blocker method, used for testing locks, if it exists, otherwise
+  # release all locks.
+  _unlock: (mutation) ->
+    if mutation.blocker
+      mutation.blocker, => @_releaseLocks(mutation)
+    else
+      @_releaseLocks(mutation)
+      
+  # When we release the locks, we send the first waiting operations we encounter
+  # forward on the next tick. We don't have to keep track of this, because the
+  # first waiting operations will always be in top most level. 
+  _releaseLocks: (mutation) ->
+    # For each level locked by the mutation.
+    for level in mutation.levels
+      # Get the lock callback queue.
+      queue = @_locks[level.tierId]
+
+      # Remove the lock callback from the callback list..
+      first = queue[0]
+      for i in (0...first.length)
+        if first[i] is level.lockCallback
+          first.splice(i, 0)
+          break
+
+      # Schedule the continuation for the next tick.
+      if first.length is 0 and queue.length isnt 1
+        queue.shift()
+        continuation = queue[0]
+        process.nextTick => @_lockContinue(continuation)
+
+    # We can tell the user that the operation succeeded on the next tick.
+    process.nextTick -> mutation.callback mutation.dirtied
+
+  _lockContinue: (continuation) ->
+    for callback in continuation
+      callback.shift().apply callback.shift(), callback
+
   _find: (tier, sought) ->
     
   _testInnerTier: (mutation, decision, leaveExclusive, next) ->
@@ -104,6 +174,11 @@ class module.exports.Strata
     else
       false
 
+  # Shorthand to allocate a new inner tier.
+  _newInnerTier: (mutation, leafChildren) ->
+    inner = @io.allocate false, leafChildren
+    inner.leafChildren = true
+
   # To split the root, we copy the contents of the root into two children,
   # splitting the contents between the children, then make the two children the
   # only two nodes of the root tier. The address of the root tier does not
@@ -113,6 +188,37 @@ class module.exports.Strata
   # single branch to the parent, this operation will empty the root into two
   # separate tiers, creating an almost empty root each time it is split.
   _drainRoot: (mutation) ->
+    # Create new left and right inner tiers.
+    left = @_newInnerTier mutation, root.leafChildren
+    right = @_newInnerTier mutation, root.leafChildren
+
+    # Find the partition index and move the branches up to the partition
+    # into the left inner tier. Move the branches at and after the partiion
+    # into the right inner tier.
+    partition = root.lenth / 2
+    fullSize = root.length
+    for i in [0...partition]
+      left.push root[i]
+    for i in [partition...root.length]
+      right.push root[i]
+
+    # Empty the root.
+    root.length = 0
+
+    # The left-most pivot or the right inner tier is null.
+    pivot = right[0].record
+    right[0].record = null
+
+    # Add the branches to the new left and right inner tiers to the now
+    # empty root tier.
+    root.push { pivot: null, left.address }
+    root.push { pivot, right.address }
+
+    # Set the child type of the root tier to inner.
+    root.leafChildren = false
+
+    # Stage the dirty tiers for write.
+    @io.dirty root, left, right
 
   # Determine if the root inner tier should be filled with contents of a two
   # extra remaining inner tier children. When an root inner tier has only one
