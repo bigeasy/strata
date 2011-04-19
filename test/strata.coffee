@@ -1,9 +1,8 @@
-{Strata, MemoryIO}    = require "strata"
+{TwerpTest} = require "twerp"
+{Strata, InMemory}    = require "../lib/strata"
 
 class exports.PacketTest extends TwerpTest
-  "test: add an item": (done) ->
-    strata = new Strata(new MemoryIO(), [])
-    strata.insert('a')
-    strata.find('a')
+  "test: construct strata": (done) ->
+    strata = new Strata
     @ok strata
     done 1

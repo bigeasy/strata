@@ -18,32 +18,32 @@ class Level
       if locks.length is 1
         callback.call strata
 
-class module.exports.MemoryIO
-  root: (map) -> map
-  fields: (object) -> object
-  compare: (left, right) ->
-    if left < right then -1 else if left > right then 1 else 0
+# The in memory I/O strategy uses the list itself as an address, and
+# dereferences an address by returning it, since it is the list itself.
+class module.exports.InMemory
+  constructor: (@rootAddress) -> @rootAddress or= []
+  root: -> @rootAddress
 
+# Default comparator is good only for strings, use a - b for numbers.
 comparator = (a, b) ->
   if a < b then -1 else if a > b then 1 else 0
 
+# Default extractor returns the value as hole, i.e. tree of integers.
 extractor = (a) -> a
 
 class module.exports.Strata
   # Construct the Strata from the options.
   constructor: (options) ->
+    options       or= {}
     @locks          = {}
-    @leafSize       = options.leafSize or 12
-    @branchSize     = options.branchSize or 12
-    @comparator   or= comparator
-    @extractor    or= extractor
-    if not @io = options.io
-      throw new Error("I/O Strategy is required.")
-    if not @rootAddress = options.rootAddress
-      throw new Error("Root address is required.")
+    @leafSize       = options.leafSize    or 12
+    @branchSize     = options.branchSize  or 12
+    @comparator     = options.comparator  or comparator
+    @extractor      = options.extractor   or extractor
+    @io             = options.io          or new module.exports.InMemory
 
   insert: (object, callback) ->
-    fields = @io.fields object
+    fields = @extractor object
     @_generalized new Mutation(@, object, @_shouldDrainRoot, @_shouldSplitInner, @_never, @_howToInsertLeaf, callback)
 
   # Both `insert` and `remove` use this generalized mutation method that
@@ -123,7 +123,7 @@ class module.exports.Strata
   # release all locks.
   _unlock: (mutation) ->
     if mutation.blocker
-      mutation.blocker, => @_releaseLocks(mutation)
+      mutation.blocker => @_releaseLocks(mutation)
     else
       @_releaseLocks(mutation)
       
@@ -138,7 +138,7 @@ class module.exports.Strata
 
       # Remove the lock callback from the callback list..
       first = queue[0]
-      for i in (0...first.length)
+      for i in [0...first.length]
         if first[i] is level.lockCallback
           first.splice(i, 0)
           break
@@ -185,9 +185,9 @@ class module.exports.Strata
       false
 
   # Shorthand to allocate a new inner tier.
-  _newInnerTier: (mutation, leafChildren) ->
-    inner = @io.allocate false, leafChildren
-    inner.leafChildren = true
+  _newInnerTier: (mutation, penultimate) ->
+    inner = @io.allocate false, penultimate
+    inner.penultimate = true
 
   # To split the root, we copy the contents of the root into two children,
   # splitting the contents between the children, then make the two children the
@@ -199,8 +199,8 @@ class module.exports.Strata
   # separate tiers, creating an almost empty root each time it is split.
   _drainRoot: (mutation) ->
     # Create new left and right inner tiers.
-    left = @_newInnerTier mutation, root.leafChildren
-    right = @_newInnerTier mutation, root.leafChildren
+    left = @_newInnerTier mutation, root.penultimate
+    right = @_newInnerTier mutation, root.penultimate
 
     # Find the partition index and move the branches up to the partition
     # into the left inner tier. Move the branches at and after the partiion
@@ -221,11 +221,11 @@ class module.exports.Strata
 
     # Add the branches to the new left and right inner tiers to the now
     # empty root tier.
-    root.push { pivot: null, left.address }
-    root.push { pivot, right.address }
+    root.push { pivot: null, address: left.address }
+    root.push { pivot, address: right.address }
 
     # Set the child type of the root tier to inner.
-    root.leafChildren = false
+    root.penultimate = false
 
     # Stage the dirty tiers for write.
     @io.dirty root, left, right
@@ -235,7 +235,7 @@ class module.exports.Strata
   # inner tier child, the contents of that inner tier child becomes the root of
   # the b-tree.
   _shouldFillRoot: (mutation) ->
-    if not root.leafChildren and root.length is 2
+    if not root.penultimate and root.length is 2
       first = mutation.io.load root[0].childAddress
       second = mutation.io.load root[1].childAddress
       if first.length + second.length is @innerSize
@@ -433,7 +433,7 @@ class module.exports.Strata
     child = structure.getStorage().load(mutation.getStash(), parent.getChildAddress(branch))
     levelOfChild.lockAndAdd(child)
     if child.getSize() == structure.getInnerSize()
-      levelOfParent.operations.add(new SplitInner<T, A>(parent, child))
+      levelOfParent.operations.add(new SplitInner(parent, child))
       return true
     return false
 
