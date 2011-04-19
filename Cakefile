@@ -62,7 +62,7 @@ task "gitignore", "create a .gitignore for node-ec2 based on git branch", ->
     if branch is "gh-pages"
       gitignore += '''
                    '''
-    else if branch is "master"
+    else if branch is "javascript"
       gitignore += '''
                    documentation
                    site
