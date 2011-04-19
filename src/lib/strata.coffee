@@ -1,7 +1,7 @@
 class Mutation
-  constructor: (@strata, root, initial, subsequent, swap, penultimate) ->
+  constructor: (@strata, @object, @fields, initial, subsequent, swap, penultimate, @callback) ->
     @levels = []
-    @decisions = { root, initial, subsequent, swap, penultimate }
+    @decisions = { initial, subsequent, swap, penultimate }
 
 class Level
   constructor: (@exclusive) ->
@@ -27,18 +27,24 @@ class module.exports.MemoryIO
 comparator = (a, b) ->
   if a < b then -1 else if a > b then 1 else 0
 
+extractor = (a) -> a
+
 class module.exports.Strata
+  # Construct the Strata from the options.
   constructor: (options) ->
-    @leafSize = options.leafSize or 12
-    @branchSize = options.branchSize or 12
-    @comparator or= comparator
-    throw new Error("I/O Strategy is required.") unless @io = options.io
-    throw new Error("Root address is required.") unless @rootAddress = options.rootAddress
-    @locks = { shared: {}, exclusive: {} }
+    @locks          = {}
+    @leafSize       = options.leafSize or 12
+    @branchSize     = options.branchSize or 12
+    @comparator   or= comparator
+    @extractor    or= extractor
+    if not @io = options.io
+      throw new Error("I/O Strategy is required.")
+    if not @rootAddress = options.rootAddress
+      throw new Error("Root address is required.")
 
   insert: (object, callback) ->
     fields = @io.fields object
-    @_generalized new Mutation(@, @_shouldDrainRoot, @_shouldSplitInner, @_never, @_howToInsertLeaf, object, callback)
+    @_generalized new Mutation(@, object, @_shouldDrainRoot, @_shouldSplitInner, @_never, @_howToInsertLeaf, callback)
 
   # Both `insert` and `remove` use this generalized mutation method that
   # implements locking the proper tiers during the descent of the tree to find
@@ -57,7 +63,7 @@ class module.exports.Strata
   _initialTest: (mutation) ->
     mutation.childLevel = new Level(false)
     mutation.levels.push mutation.childLevel
-    if mutation.initial.call this, mutation
+    if mutation.decisions.initial.call this, mutation
       mutation.parentLevel.operations.clear()
       mutation.parentLevel.upgrade mutation.childLevel, @_initialTestAgain
 
@@ -68,9 +74,9 @@ class module.exports.Strata
 
   _tierDecision: (mutation) ->
     if mutation.parent.penultimate
-      @_testInnerTier mutation, mutation.penultimate, 1, @_operate
+      @_testInnerTier mutation, mutation.decisions.penultimate, 1, @_operate
     else
-      @_testInnerTier mutation, mutation.subsequent, 0, @_tierDescend
+      @_testInnerTier mutation, mutation.decisions.subsequent, 0, @_tierDescend
 
   _tierDescend: (mutation) ->
     branch = @_find(mutation.parent, mutation.sought)
@@ -154,7 +160,7 @@ class module.exports.Strata
     
   _testInnerTier: (mutation, decision, leaveExclusive, next) ->
     tiers = decision.test.call mutation
-    keys = mutation.swap.test.call mutation
+    keys = mutation.decisions.swap.test.call mutation
     if tiers or keys
       if not (mutation.parentLevel.exclusive and mutation.childLevel.exclusive)
         mutation.parentLevel.upgrade mutation.childLevel, =>
