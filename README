@@ -2,13 +2,13 @@ STRATA
 
 An Evented I/O B-tree for Node.js.
 
-    Home: http://bigeasy.github.com/strata
-    Source: http://github.com/bigeasy/strata
-    Documentation: http://github.com/bigeasy/strata/wiki
+    Home:           http://bigeasy.github.com/strata
+    Source:         http://github.com/bigeasy/strata
+    Documentation:  http://github.com/bigeasy/strata/wiki
 
-    Issues: http://bigeasy.lighthouseapp.com/projects/28908
+    Issues:         http://bigeasy.lighthouseapp.com/projects/28908
 
-    License: The MIT License
+    License:        The MIT License
 
 PURPOSE
 
