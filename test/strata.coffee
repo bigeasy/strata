@@ -6,3 +6,10 @@ class exports.PacketTest extends TwerpTest
     strata = new Strata
     @ok strata
     done 1
+
+  "test: insert object": (done) ->
+    strata = new Strata
+    @ok strata
+    strata.insert 1, (altered) =>
+      @ok altered
+      done 2
