@@ -5,6 +5,7 @@ class Mutation
   constructor: (@strata, @object, @fields, initial, subsequent, swap, penultimate, @callback) ->
     @levels = []
     @decisions = { initial, subsequent, swap, penultimate }
+    @exclusive = false
 
 class Level
   # Construct a new level. The `exclusive` pararameter determines how this level
@@ -12,25 +13,27 @@ class Level
   constructor: (@exclusive) ->
     @operations = []
     @locks = []
-  lock: (strata, mutation, tier, callback) ->
-    locks = (strata.locks[tier.address] or= [ [] ])
-    if @exclusive
-      throw new Error "already locked" if @locks.length
-      lock = [ callback, strata, mutation ]
-      lock.address = tier.address
-      @locks.push lock
-      locks.push [ lock ]
-      locks.push []
-      if locks[0].length is 0
-        locks.shift()
-        callback.call strata, mutation
-    else
-      lock = [ callback, strata, mutation ]
-      lock.address = tier.address
-      @locks.push lock
-      locks[locks.length - 1].push lock
-      if locks.length is 1
-        callback.call strata, mutation
+  lock: (strata, mutation, address, callback) ->
+    # TODO Will it matter if we load before we lock? We probably have to.
+    strata.io.load strata, mutation, address, (mutation, tier) =>
+      locks = (strata.locks[tier.address] or= [ [] ])
+      if @exclusive
+        throw new Error "already locked" if @locks.length
+        lock = [ callback, strata, mutation, tier ]
+        lock.address = tier.address
+        @locks.push lock
+        locks.push [ lock ]
+        locks.push []
+        if locks[0].length is 0
+          locks.shift()
+          callback.call strata, mutation, tier
+      else
+        lock = [ callback, strata, mutation, tier ]
+        lock.address = tier.address
+        @locks.push lock
+        locks[locks.length - 1].push lock
+        if locks.length is 1
+          callback.call strata, mutation, tier
 
   # Remove the lock callback from the callback list..
   release: (strata) ->
@@ -107,9 +110,8 @@ class module.exports.InMemory
 
     address
 
-  load: (strata, splat..., address, callback) ->
-    splat.push @tiers[address]
-    callback.apply strata, splat
+  load: (strata, mutation, address, callback) ->
+    callback.apply strata, [ mutation, @tiers[address] ]
 
   dirty: ->
 
@@ -151,52 +153,41 @@ class module.exports.Strata
   #
   # This generalized mutation will insert or remove a single item.
   _generalized: (mutation) ->
-    mutation.levels.push new Level(false)
-    @io.load @, mutation, @rootAddress, @_rootLoaded
+    mutation.levels.unshift new Level
+    mutation.levels[0].lock @, mutation, @rootAddress, @_rootLoaded
 
+  # Perform the root decision with only a read lock obtained.
   _rootLoaded: (mutation, root) ->
-    mutation.parentLevel = new Level(false)
-    mutation.parentLevel.tier = root
-    mutation.levels.push mutation.parentLevel
-    mutation.parentLevel.lock @, mutation, mutation.parentLevel.tier, @_initialTest
-  
-  # Perform the root decision with only a read lock obtained. If it decides to
-  # mutate the root, we will
-  _initialTest: (mutation) ->
-    mutation.childLevel = new Level(false)
-    mutation.levels.push mutation.childLevel
-    if mutation.decisions.initial.call @, mutation
-      mutation.parentLevel.operations.clear()
-      mutation.parentLevel.upgrade mutation.childLevel, @_initialTestAgain
-    else
-      @_tierDecision mutation
-
-  _initialTestAgain: (mutation) ->
-    if not mutation.initial.call @, mutation
-      mutation.rewind 0
+    mutation.levels[0].tier = root
+    mutation.decisions.initial.call @, mutation
     @_tierDecision mutation
 
   # Determine if we need to lock a tier. We have different criteria for inner
   # tiers with inner tier children then for penultimate inner tiers with leaf
   # tier children.
-  # 
-  # When we encounter a penultimate tier, we continue on to peform the
-  # operations. Otherwise, we make another decision using the next inner tier
-  # child.
   _tierDecision: (mutation) ->
-    if mutation.parentLevel.tier.penultimate
-      @_testInnerTier mutation, mutation.decisions.penultimate, 1, @_operate
+    if mutation.level[0].tier.penultimate
+      @_testInnerTier mutation, mutation.decisions.penultimate, @_operate
     else
-      @_testInnerTier mutation, mutation.decisions.subsequent, 0, @_tierDescend
+      @_testInnerTier mutation, mutation.decisions.subsequent, @_tierDescend
+
+  # Perform decisions related to the inner tier.
+  _testInnerTier: (mutation, decision, next) ->
+    mutation.decisions.swap.call @, mutation
+    if not decision.call @, mutation
+      for level in mutation.levels
+        level.operations = level.operations.filter (operation) ->
+          operation isnt "swap"
+    next.call @, mutation
 
   _tierDescend: (mutation) ->
     branch = @_find(mutation.parentLevel.tier, mutation.sought)
     @io.load mutation.parent, branch, (child) =>
       mutation.parent = child
       mutation.parentLevel = mutation.childLevel
-      mutation.childLevel = new Level(mutation.parentLevel.exclusive)
+      mutation.childLevel = new Level()
       mutation.levels.push mutation.childLevel
-      mutation.shift @_tierDecision
+      @_tierDecision mutation
 
   # When `_operate` is invoked, all the necessary locks have been obtained and
   # we are able to mutate the tree with impunity.
@@ -281,52 +272,12 @@ class module.exports.Strata
         low--
       return low
     return low - 1
-    
-  _testInnerTier: (mutation, decision, leaveExclusive, next) ->
-    tiers = decision.call @, mutation
-    keys = mutation.decisions.swap.call @, mutation
-    if tiers or keys
-      if not (mutation.parentLevel.exclusive and mutation.childLevel.exclusive)
-        mutation.parentLevel.upgrade mutation.childLevel, =>
-          mutation.parentLevel.operations.clear()
-          mutation.childLevel.operations.clear()
-          @_testInnerTier mutation, leaveExclusive, next
-      else if not tiers
-        mutation.rewind leaveExclusive
-        next.call @, mutation
-      else
-        next.call @, mutation
-    else
-      @_rewind mutation, leaveExclusive
-      next.call @, mutation
-
-  _rewind: (mutation, leaveExclusive) ->
-    count = mutation.levels.length - leaveExclusive
-    if count > 0
-      unlock = true
-      index = 0
-      for ignored in  [0...count]
-        level = mutation.levels[index]
-        level.operations = level.operations.filter (operation) ->
-          not operation.isSplitOrMerge
-        unlock = unlock or level.operations.length is 0
-        if unlock
-          if mutation.levels.length <= 3
-            level.downgrade(@)
-            index++
-          else
-            level.release()
-            levels.splice(index, 1)
-        else
-          index++
 
   # If the root is full, we add a root split operation to the operation stack.
   _shouldDrainRoot: (mutation) ->
-    if @innerSize is mutation.parentLevel.tier.size()
-      mutation.parentLevel.operations.add @_splitRoot
-      true
-    else
-      false
+    console.log "_shouldDrainRoot"
+    if @innerSize is mutation.levels[0].tier.size()
+      mutation.levels[0].operations.push "splitRoot"
 
   # Shorthand to allocate a new inner tier.
   _newInnerTier: (mutation, penultimate) ->
@@ -572,6 +523,7 @@ class module.exports.Strata
     return false
  
   _shouldSplitInner: (mutation) ->
+    console.log "_shouldSplitInner"
     structure = mutation.getStructure()
     branch = parent.find(mutation.getComparable())
     child = structure.getStorage().load(mutation.getStash(), parent.getChildAddress(branch))
@@ -586,13 +538,14 @@ class module.exports.Strata
   # Determine if the leaf that will hold the inserted value is full and ready
   # to split, if it is full and part of linked list of b+tree leaves of
   # duplicate index values, or it it can be inserted without splitting.
+  #
+  # TODO Now there is a chance that this might already be in a split state. What
+  # do we do? Do we create a new plan as we decend to test the current plan?
   _howToInsertLeaf: (mutation) ->
-    # By default, return false.
-    split = true
 
     # Find the branch that navigates to the leaf child.
     branch = @_find mutation.parentLevel.tier, mutation.fields
-    leaf = @io.load @, mutation, mutation.parentLevel.tier.get(branch).address, @_inspectLeafForSplitLoaded
+    @io.load @, mutation, mutation.parentLevel.tier.get(branch).address, @_inspectLeafForSplitLoaded
 
   # After load, lock the leaf exclusively.
   _inspectLeafForSplitLoaded: (mutation, leaf) ->
