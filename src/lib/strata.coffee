@@ -1,11 +1,26 @@
 # Glossary:
-#  * Descent - What we call an attempt to traverse the tree, which may be
-#              paused because it encounters a lock on a tier.
+#  * Descent - What we call an attempt to move from a parent node to a child
+#              node in  the tree, which may be paused because it encounters a
+#              lock on a tier.
 class Mutation
   constructor: (@strata, @object, @fields, initial, subsequent, swap, penultimate, @callback) ->
-    @levels = []
     @decisions = { initial, subsequent, swap, penultimate }
-    @exclusive = false
+    @parent = new Level
+    @child = new Level
+    @exclusive = []
+    @plan = []
+
+  # Descend the tree, optionally starting an exclusive descent. Once the descent
+  # is exclusive, all subsequent descents are exclusive.
+  descend: (exclusive) ->
+    @plan.unshift { operations: [] }
+    if @exclusive.length > 1
+      @parent.release(strata)
+    exclusive or= @exclusive.length > 0
+    @parent = @child
+    @child = new Level(exclusive)
+    if exclusive
+      @exclusive.release(strata)
 
 class Level
   # Construct a new level. The `exclusive` pararameter determines how this level
@@ -13,6 +28,7 @@ class Level
   constructor: (@exclusive) ->
     @operations = []
     @locks = []
+
   lock: (strata, mutation, address, callback) ->
     # TODO Will it matter if we load before we lock? We probably have to.
     strata.io.load strata, mutation, address, (mutation, tier) =>
@@ -134,11 +150,12 @@ class module.exports.Strata
     @io             = options.io          or new module.exports.InMemory
     @_initialize(options.rootAddress)
 
-  _initialize: (@rootAddress) ->
-    if not @rootAddress
-      @rootAddress = @io.allocate false, true, @innerSize
-      # TODO: Rethink construction API.
-      @io.load @, @rootAddress, @_createRoot
+  # TODO: Construction and allocation of the root tier may require an
+  # asynchronous load, so we may need a factory method.
+  _initialize: (@_rootAddress) ->
+    if not @_rootAddress
+      @_rootAddress = @io.allocate false, true, @innerSize
+      @io.load @, @_rootAddress, @_createRoot, ->
 
   _createRoot: (root) ->
     root.push { pivot: null, address: @io.allocate true, false, @leafSize }
@@ -153,12 +170,12 @@ class module.exports.Strata
   #
   # This generalized mutation will insert or remove a single item.
   _generalized: (mutation) ->
-    mutation.levels.unshift new Level
-    mutation.levels[0].lock @, mutation, @rootAddress, @_rootLoaded
+    mutation.descend false
+    mutation.child.lock @, mutation, @_rootAddress, @_rootLoaded
 
   # Perform the root decision with only a read lock obtained.
   _rootLoaded: (mutation, root) ->
-    mutation.levels[0].tier = root
+    mutation.child.tier = root
     mutation.decisions.initial.call @, mutation
     @_tierDecision mutation
 
@@ -166,7 +183,7 @@ class module.exports.Strata
   # tiers with inner tier children then for penultimate inner tiers with leaf
   # tier children.
   _tierDecision: (mutation) ->
-    if mutation.level[0].tier.penultimate
+    if mutation.levels[0].tier.penultimate
       @_testInnerTier mutation, mutation.decisions.penultimate, @_operate
     else
       @_testInnerTier mutation, mutation.decisions.subsequent, @_tierDescend
@@ -275,9 +292,9 @@ class module.exports.Strata
 
   # If the root is full, we add a root split operation to the operation stack.
   _shouldDrainRoot: (mutation) ->
+    if @innerSize is mutation.child.tier.size()
+      mutation.plan[0].operations.push "splitRoot"
     console.log "_shouldDrainRoot"
-    if @innerSize is mutation.levels[0].tier.size()
-      mutation.levels[0].operations.push "splitRoot"
 
   # Shorthand to allocate a new inner tier.
   _newInnerTier: (mutation, penultimate) ->
@@ -542,7 +559,7 @@ class module.exports.Strata
   # TODO Now there is a chance that this might already be in a split state. What
   # do we do? Do we create a new plan as we decend to test the current plan?
   _howToInsertLeaf: (mutation) ->
-
+    console.log mutation
     # Find the branch that navigates to the leaf child.
     branch = @_find mutation.parentLevel.tier, mutation.fields
     @io.load @, mutation, mutation.parentLevel.tier.get(branch).address, @_inspectLeafForSplitLoaded
