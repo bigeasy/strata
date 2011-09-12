@@ -3,7 +3,7 @@
 #              node in  the tree, which may be paused because it encounters a
 #              lock on a tier.
 class Mutation
-  constructor: (@strata, @object, @fields, initial, subsequent, swap, penultimate, @callback) ->
+  constructor: (@strata, @object, @fields, initial, subsequent, swap, penultimate, @callback, @previous) ->
     @decisions = { initial, subsequent, swap, penultimate }
     @parent = new Level
     @child = new Level
@@ -13,14 +13,23 @@ class Mutation
   # Descend the tree, optionally starting an exclusive descent. Once the descent
   # is exclusive, all subsequent descents are exclusive.
   descend: (exclusive) ->
-    @plan.unshift { operations: [] }
-    if @exclusive.length > 1
+    # Add a new level to the plan.
+    @plan.unshift { operations: [], addresses: [] }
+
+    # Two or more exclusive levels mean that the parent is exclusive.
+    if @exclusive.length < 1
       @parent.release(strata)
+
+    # Any items in the exclusive level array means we are now locking exclusive.
     exclusive or= @exclusive.length > 0
+
+    # Make child a parent.
     @parent = @child
     @child = new Level(exclusive)
+
+    # Add the new child to the list of exclusive levels.
     if exclusive
-      @exclusive.release(strata)
+      @exclusive.push(@child)
 
 class Level
   # Construct a new level. The `exclusive` pararameter determines how this level
