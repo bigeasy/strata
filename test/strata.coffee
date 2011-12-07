@@ -10,6 +10,6 @@ class exports.PacketTest extends TwerpTest
   "test: insert object": (done) ->
     strata = new Strata
     @ok strata
-    strata.insert 1, (altered) =>
+    strata.insert 1, (error, altered) =>
       @ok altered
       done 2

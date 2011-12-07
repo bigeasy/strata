@@ -1,3 +1,5 @@
+fs = require "fs"
+
 # Glossary:
 #  * Descent - What we call an attempt to move from a parent node to a child
 #              node in  the tree, which may be paused because it encounters a
@@ -108,6 +110,13 @@ class Level
 
 # The in memory I/O strategy uses the list itself as an address, and
 # dereferences an address by returning it, since it is the list itself.
+class module.exports.InFile
+  constructor: (file, _) ->
+    @nextTierId = 0
+    @tiers = {}
+
+# The in memory I/O strategy uses the list itself as an address, and
+# dereferences an address by returning it, since it is the list itself.
 class module.exports.InMemory
   # These methods implement the getter and setter interfaces of the tiers
   # created by this I/O strategy.
@@ -152,12 +161,65 @@ class module.exports.Strata
   constructor: (options) ->
     options       or= {}
     @locks          = {}
+    @cache          = {}
+    @head           = { segment: -1 }
+    @head.next = @head.previous = @head
     @leafSize       = options.leafSize    or 12
-    @innerSize      = options.innerSize   or 12
+    @innerSize      = options.branchSize   or 12
     @comparator     = options.comparator  or comparator
     @extractor      = options.extractor   or extractor
-    @io             = options.io          or new module.exports.InMemory
-    @_initialize(options.rootAddress)
+    @directory      = options.directory
+    @nextSegment    = 0
+
+  create: (_) ->
+    try
+      stat = fs.stat @directory, _
+      if not stat.isDirectory()
+        throw new Error "database #{@directory} is not a directory."
+    catch e
+      throw e if e.code isnt "ENOENT"
+      fs.mkdir @directory, 0755, _
+    root = @_allocate _
+    leaf = @_allocate _
+    @_appendSegment root, leaf.segment, _
+
+  _allocate: (_) ->
+    segment = @nextSegment++
+    padding = "00000000".substring(0, 8 - String(segment).length)
+    filename = "#{@directory}/segment#{padding}#{segment}"
+    fd = fs.open filename, "w+", 0600, _
+    buffer = new Buffer(4)
+    buffer.writeInt32BE(0, 0)
+    fs.write fd, buffer, 0, buffer.length, 0, _
+    @_link({ fd, segment, objects: [] })
+
+  _appendSegment: (inner, segment, _) ->
+    console.log { inner }
+    inner.objects.push(segment)
+    @_writeInner inner, _
+
+  _writeInner: (inner, _) ->
+    length = inner.objects.length
+    buffer = new Buffer((1 + length) * 4)
+    buffer.writeInt32BE(0, length)
+    for i in [1...length]
+      buffer.writeInt32BE(i * 4, @objects[i - 1])
+    written = fs.write inner.fd, buffer, 0, buffer.length, 0, _
+    throw new Error "incomplete write" if written isnt buffer.length
+
+  _link: (entry) ->
+    next = @head.next
+    entry.next = next
+    next.previous = entry
+    @head.next = entry
+    entry.previous = @head
+    entry
+
+  _unlink: (entry) ->
+    { next, previous } = entry
+    next.previous = previous
+    previous.next = next
+    entry
 
   # TODO: Construction and allocation of the root tier may require an
   # asynchronous load, so we may need a factory method.
@@ -171,6 +233,8 @@ class module.exports.Strata
 
   insert: (object, callback) ->
     fields = @extractor object
+    console.log { fields }
+    process.exit 1
     @_generalized new Mutation(@, object, fields, @_shouldDrainRoot, @_shouldSplitInner, @_never, @_howToInsertLeaf, callback)
 
   # Both `insert` and `remove` use this generalized mutation method that
