@@ -161,7 +161,7 @@ class module.exports.Strata
   constructor: (options) ->
     options       or= {}
     @locks          = {}
-    @cache          = {}
+    @_cache         = {}
     @head           = { segment: -1 }
     @head.next = @head.previous = @head
     @leafSize       = options.leafSize    or 12
@@ -179,31 +179,66 @@ class module.exports.Strata
     catch e
       throw e if e.code isnt "ENOENT"
       fs.mkdir @directory, 0755, _
-    root = @_allocate _
-    leaf = @_allocate _
+    root = @_allocate true, _
+    leaf = @_allocate false, _
     @_appendSegment root, leaf.segment, _
 
-  _allocate: (_) ->
-    segment = @nextSegment++
+  open: (_) ->
+    try
+      stat = fs.stat @directory, _
+      if not stat.isDirectory()
+        throw new Error "database #{@directory} is not a directory."
+    catch e
+      if e.code isnt "ENOENT"
+        throw new Error "database #{@directory} does not exist."
+      else
+        throw e
+    @_load 0, _
+    
+  _load: (segment, _) ->
+    if not entry = @_cache[segment]
+      filename = @_filename 0
+      fd = fs.open filename, "r+", _
+
+      buffer = new Buffer((1 + @leafSize) * 4)
+      fs.read fd, buffer, 0, buffer.length, 0, _
+
+      header      = buffer.readInt32BE(0)
+      penultimate = header < 0
+      size        = Math.abs header
+      objects     = []
+
+      for i in [0...size]
+        objects.push(buffer.readInt32BE((i + 1) * 4))
+
+      entry = @_link({ fd, penultimate, segment, objects })
+    entry
+
+  _filename: (segment) ->
     padding = "00000000".substring(0, 8 - String(segment).length)
-    filename = "#{@directory}/segment#{padding}#{segment}"
+    "#{@directory}/segment#{padding}#{segment}"
+
+  _allocate: (penultimate, _) ->
+    segment = @nextSegment++
+    filename = @_filename segment
     fd = fs.open filename, "w+", 0600, _
     buffer = new Buffer(4)
     buffer.writeInt32BE(0, 0)
     fs.write fd, buffer, 0, buffer.length, 0, _
-    @_link({ fd, segment, objects: [] })
+    @_cache[segment] = @_link({ fd, penultimate, segment, objects: [] })
 
   _appendSegment: (inner, segment, _) ->
-    console.log { inner }
     inner.objects.push(segment)
     @_writeInner inner, _
 
   _writeInner: (inner, _) ->
-    length = inner.objects.length
-    buffer = new Buffer((1 + length) * 4)
-    buffer.writeInt32BE(0, length)
-    for i in [1...length]
-      buffer.writeInt32BE(i * 4, @objects[i - 1])
+    size = inner.objects.length
+    header = if inner.penultimate then -size else size
+    buffer = new Buffer((1 + size) * 4)
+    console.log header
+    buffer.writeInt32BE(header, 0)
+    for i in [1..size]
+      buffer.writeInt32BE(inner.objects[i - 1], i * 4)
     written = fs.write inner.fd, buffer, 0, buffer.length, 0, _
     throw new Error "incomplete write" if written isnt buffer.length
 
