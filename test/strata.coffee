@@ -2,6 +2,10 @@
 {Strata, InMemory}    = require "../lib/strata"
 
 class exports.PacketTest extends TwerpTest
+  "test: read leaf": (done) ->
+    strata = new Strata
+    strata._loadLeaves 
+
   "test: construct strata": (done) ->
     strata = new Strata
     @ok strata

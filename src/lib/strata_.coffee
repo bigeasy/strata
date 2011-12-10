@@ -1,17 +1,34 @@
+{extend} = require("coffee-script/lib/helpers")
 fs = require "fs"
+
+die = (splat...) ->
+  console.log.apply null, splat if splat.length
+  process.exit 1
+say = (splat...) -> console.log.apply null, splat
+
+class Decisions
+  constructor: (@initial, @subsequent, @swap, @penultimate) ->
 
 # Glossary:
 #  * Descent - What we call an attempt to move from a parent node to a child
 #              node in  the tree, which may be paused because it encounters a
 #              lock on a tier.
 class Mutation
-  constructor: (@strata, @object, @fields, initial, subsequent, swap, penultimate, @callback, @previous) ->
-    @decisions = { initial, subsequent, swap, penultimate }
-    @parent = new Level
-    @child = new Level
-    @exclusive = []
-    @plan = []
+  # The constructure always felt like a dangerous place to be doing anything
+  # meaningful in C++ or Java.
+  constructor: (@strata, @object, @fields, @operation) ->
+    @io         = @strata._io
+    @options    = @strata._options
 
+    @parent     = { operations: [], locks: [] }
+    @child      = { operations: [], locks: [] }
+    @exclusive  = []
+    @pivots     = []
+
+    { @extractor, @comparator } = @options
+
+    @fields     = @extractor @object if @object?
+  
   # Descend the tree, optionally starting an exclusive descent. Once the descent
   # is exclusive, all subsequent descents are exclusive.
   descend: (exclusive) ->
@@ -20,18 +37,84 @@ class Mutation
 
     # Two or more exclusive levels mean that the parent is exclusive.
     if @exclusive.length < 1
-      @parent.release(strata)
+      @strata._release @parent
 
     # Any items in the exclusive level array means we are now locking exclusive.
     exclusive or= @exclusive.length > 0
 
     # Make child a parent.
     @parent = @child
-    @child = new Level(exclusive)
+    @child = { operations: [], locks: [], exclusive }
 
     # Add the new child to the list of exclusive levels.
     if exclusive
       @exclusive.push(@child)
+
+  _branchExtractor: (fields) -> fields
+
+  # Search for a value in a tier, returning the  index of the value or else
+  # where it should be inserted.
+  #
+  # There is some magic here, long forgotten at the time of documentation. The
+  # tree beneath each branch in an inner tier contains records whose value is
+  # equal to or greater than the pivot. Thus, the pivot of the first record on
+  # an inner tier is null, indicating that that is the branch for all values
+  # less than the value of the first branch with a real pivot.
+  #
+  # TODO: Reading through the code, this does not take this into account, and
+  # will problably send items that belong in the least value tree into the three
+  # that follows it. I'll clean this up with unit testing.
+  find: (tier, low, extractor, sought, _) ->
+    size = tier.addresses.length
+    high = size - 1
+    while low < high
+      mid = (low + high) >>> 1
+      compare = @comparator sought, extractor @_record tier, mid, _
+      if compare > 0
+        low = mid + 1
+      else
+        high = mid
+    if low < size
+      while low != 0 && @comparator(sought, @extractor tier.record(low - 1)) == 0
+        low--
+      return low
+    return low - 1
+
+  mutate: (_) ->
+    address = 0
+    parent = null
+    loop
+      child = @io.lock exclusive, 0, false, _
+      if not exclusive
+        for pivot in @pivots
+          if pivot.apply @, child
+            @io.release child, _
+            exclusive = true
+            @io.lock exclusive, 0, false, _
+      break if child.penultimate or address is @soughtAddress
+
+    @[@operation.method].call this, parent, child, _
+
+  insertSorted: (parent, child, _) ->
+    branch = @find child, 1, @_branchExtractor, @fields, _
+    leaves = @io.lock true, child.addresses[branch], true, _
+
+    addresses = leaves.addresses
+
+    # Insert the object value sorted.
+    for i in [0...addresses.length]
+      before = leaf.record(i)
+      if @comparator(mutation.fields, @extract before) <= 0
+        break
+
+    address = @io.writeInsert leaves, @object, i
+    addresses.splice i, 0, address
+
+  get: (parent, child, _) ->
+    branch = @find child, 1, @_branchExtractor, @fields, _
+    leaves = @io.lock true, child.addresses[branch], true, _
+    address = @find leaves, 0, @extractor, @fields, _
+    leaves.objects[address]
 
 class Level
   # Construct a new level. The `exclusive` pararameter determines how this level
@@ -39,46 +122,6 @@ class Level
   constructor: (@exclusive) ->
     @operations = []
     @locks = []
-
-  lock: (strata, mutation, address, callback) ->
-    # TODO Will it matter if we load before we lock? We probably have to.
-    strata.io.load strata, mutation, address, (mutation, tier) =>
-      locks = (strata.locks[tier.address] or= [ [] ])
-      if @exclusive
-        throw new Error "already locked" if @locks.length
-        lock = [ callback, strata, mutation, tier ]
-        lock.address = tier.address
-        @locks.push lock
-        locks.push [ lock ]
-        locks.push []
-        if locks[0].length is 0
-          locks.shift()
-          callback.call strata, mutation, tier
-      else
-        lock = [ callback, strata, mutation, tier ]
-        lock.address = tier.address
-        @locks.push lock
-        locks[locks.length - 1].push lock
-        if locks.length is 1
-          callback.call strata, mutation, tier
-
-  # Remove the lock callback from the callback list..
-  release: (strata) ->
-    while @locks.length
-      lock = @locks.shift()
-      locks = strata.locks[lock.address]
-      first = locks[0]
-      for i in [0...first.length]
-        if first[i] is lock
-          first.splice(i, 1)
-          break
-      # Schedule the continuation for the next tick.
-      if first.length is 0 and locks.length isnt 1
-        locks.shift()
-        @_resume strata, locks[0] if locks[0].length
-
-  _resume: (strata, continuations) ->
-    process.nextTick -> strata._lockContinue(continuations)
 
   # Convert lock to read lock and tell anyone waiting that they can go ahead.
   #
@@ -108,47 +151,6 @@ class Level
       true
     false
 
-# The in memory I/O strategy uses the list itself as an address, and
-# dereferences an address by returning it, since it is the list itself.
-class module.exports.InFile
-  constructor: (file, _) ->
-    @nextTierId = 0
-    @tiers = {}
-
-# The in memory I/O strategy uses the list itself as an address, and
-# dereferences an address by returning it, since it is the list itself.
-class module.exports.InMemory
-  # These methods implement the getter and setter interfaces of the tiers
-  # created by this I/O strategy.
-  _array:
-    get: (index) -> @[index]
-    set: (object, index) -> @[index] = object
-    size: -> @length
-    pivot: (index) -> @[index].pivot
-    record: (index) -> @[index]
-
-  constructor: () ->
-    @nextTierId = 0
-    @tiers = {}
-
-  allocate: (inner, penultimate, size) ->
-    address = @nextTierId++
-
-    tier = @tiers[address] = []
-
-    tier[k] = v for k, v of @_array
-    tier.record = @_array.pivot if inner
-
-    tier.address = address
-    tier.penultimate = penultimate
-
-    address
-
-  load: (strata, mutation, address, callback) ->
-    callback.apply strata, [ mutation, @tiers[address] ]
-
-  dirty: ->
-
 # Default comparator is good only for strings, use a - b for numbers.
 comparator = (a, b) ->
   if a < b then -1 else if a > b then 1 else 0
@@ -156,20 +158,13 @@ comparator = (a, b) ->
 # Default extractor returns the value as hole, i.e. tree of integers.
 extractor = (a) -> a
 
-class module.exports.Strata
-  # Construct the Strata from the options.
-  constructor: (options) ->
-    options       or= {}
-    @locks          = {}
-    @_cache         = {}
-    @head           = { segment: -1 }
-    @head.next = @head.previous = @head
-    @leafSize       = options.leafSize    or 12
-    @innerSize      = options.branchSize   or 12
-    @comparator     = options.comparator  or comparator
-    @extractor      = options.extractor   or extractor
-    @directory      = options.directory
-    @nextSegment    = 0
+class IO
+  constructor: (@directory) ->
+    @cache          = {}
+    @head           = { address: -1 }
+    @head.next      = @head
+    @head.previous  = @head
+    @nextAddress    = 0
 
   create: (_) ->
     try
@@ -179,9 +174,10 @@ class module.exports.Strata
     catch e
       throw e if e.code isnt "ENOENT"
       fs.mkdir @directory, 0755, _
-    root = @_allocate true, _
-    leaf = @_allocate false, _
-    @_appendSegment root, leaf.segment, _
+    root = @_allocateBranches true
+    leaf = @_allocateLeaves(_)
+    root.addresses.push leaf.address
+    @_writeBranches root, "", _
 
   open: (_) ->
     try
@@ -193,56 +189,12 @@ class module.exports.Strata
         throw new Error "database #{@directory} does not exist."
       else
         throw e
-    @_load 0, _
-    
-  _load: (segment, _) ->
-    if not entry = @_cache[segment]
-      filename = @_filename 0
-      fd = fs.open filename, "r+", _
+    for file in fs.readdir @directory, _
+      if match = /^segment(\d+)$/.exec file
+        address = parseInt match[1], 10
+        @nextAddress = address + 1 if address > @nextAddress
 
-      buffer = new Buffer((1 + @leafSize) * 4)
-      fs.read fd, buffer, 0, buffer.length, 0, _
-
-      header      = buffer.readInt32BE(0)
-      penultimate = header < 0
-      size        = Math.abs header
-      objects     = []
-
-      for i in [0...size]
-        objects.push(buffer.readInt32BE((i + 1) * 4))
-
-      entry = @_link({ fd, penultimate, segment, objects })
-    entry
-
-  _filename: (segment) ->
-    padding = "00000000".substring(0, 8 - String(segment).length)
-    "#{@directory}/segment#{padding}#{segment}"
-
-  _allocate: (penultimate, _) ->
-    segment = @nextSegment++
-    filename = @_filename segment
-    fd = fs.open filename, "w+", 0600, _
-    buffer = new Buffer(4)
-    buffer.writeInt32BE(0, 0)
-    fs.write fd, buffer, 0, buffer.length, 0, _
-    @_cache[segment] = @_link({ fd, penultimate, segment, objects: [] })
-
-  _appendSegment: (inner, segment, _) ->
-    inner.objects.push(segment)
-    @_writeInner inner, _
-
-  _writeInner: (inner, _) ->
-    size = inner.objects.length
-    header = if inner.penultimate then -size else size
-    buffer = new Buffer((1 + size) * 4)
-    console.log header
-    buffer.writeInt32BE(header, 0)
-    for i in [1..size]
-      buffer.writeInt32BE(inner.objects[i - 1], i * 4)
-    written = fs.write inner.fd, buffer, 0, buffer.length, 0, _
-    throw new Error "incomplete write" if written isnt buffer.length
-
-  _link: (entry) ->
+  link: (entry) ->
     next = @head.next
     entry.next = next
     next.previous = entry
@@ -250,78 +202,230 @@ class module.exports.Strata
     entry.previous = @head
     entry
 
-  _unlink: (entry) ->
+  unlink: (entry) ->
     { next, previous } = entry
     next.previous = previous
     previous.next = next
     entry
 
-  # TODO: Construction and allocation of the root tier may require an
-  # asynchronous load, so we may need a factory method.
-  _initialize: (@_rootAddress) ->
-    if not @_rootAddress
-      @_rootAddress = @io.allocate false, true, @innerSize
-      @io.load @, @_rootAddress, @_createRoot, ->
+  lock: (exclusive, address, leaf, callback) ->
+    if not tier = @cache[address]
+      tier = @link({ leaf, address, objects: {}, addresses: [], locks: [[]] })
+    locks = tier.locks
+    if tier.loaded
+      lock = callback
+    else
+      lock = (error, tier) =>
+        if error
+          callback error
+        else if tier.loaded
+          callback null, tier
+        else if leaf
+          @readLeaves tier, callback
+        else
+          @readBranches tier, callback
+    if exclusive
+      throw new Error "already locked" unless locks.length % 2
+      locks.push [ lock ]
+      locks.push []
+      if locks[0].length is 0
+        locks.shift()
+        lock(null, tier)
+    else
+      locks[locks.length - 1].push lock
+      if locks.length is 1
+        lock(null, tier)
 
-  _createRoot: (root) ->
-    root.push { pivot: null, address: @io.allocate true, false, @leafSize }
+  resume: (tier, continuations) ->
+    process.nextTick =>
+      for callback in continuations
+        callback(null, tier)
+
+  # Remove the lock callback from the callback list..
+  release: (tier) ->
+    running = tier.locks[0]
+    running.shift()
+    if running.length is 0 and locks.length isnt 1
+      locks.shift()
+      @resume tier, locks[0] if locks[0].length
+
+  filename: (address) ->
+    padding = "00000000".substring(0, 8 - String(address).length)
+    "#{@directory}/segment#{padding}#{address}"
+
+  allocateBranches: (penultimate) ->
+    address = @nextAddress++
+    tier = @_link({ penultimate, address, addresses: [], objects: {} })
+    @cache[address] = tier
+
+  allocateLeaves: (_) ->
+    address = @nextAddress++
+    filename = @filename address
+    fs.writeFile filename, "", "utf8", _
+    @cache[address] = @_link({ leaves: true, address, objects: [] })
+
+  readLeaves: (tier, _) ->
+    filename = @filename tier.address
+    stat = fs.stat filename, _
+    fd = fs.open filename, "r+", _
+
+    # Obviously, while all this is going on, I could end up writing to the
+    # leaf, because it is not actually locked. First lock, then load. The
+    # entry object needs to be linked, then loaded.
+    line      = ""
+    offset    = -1
+    end       = stat.size
+    eol       = stat.size
+    splices   = []
+    addresses = []
+    objects   = {}
+    buffer    = new Buffer(1024)
+    while end
+      end     = eol
+      start   = end - buffer.length
+      start   = 0 if start < 0
+      read    = fs.read fd, buffer, 0, buffer.length, start, _
+      end    -= read
+      offset  = read
+      if buffer[--read] isnt 0x0A
+        throw new Error "corrupt leaves"
+      eos     = read + 1
+      stop    = if start is 0 then 0 else -1
+      while read != 0
+        read = read - 1
+        if buffer[read] is 0x0A or read is stop
+          record = JSON.parse buffer.toString("utf8", read, eos)
+          eos   = read + 1
+          index = record.shift()
+          if index is 0
+            [ addresses, end ] = [ record, 0 ]
+            break
+          else
+            splices.push [ index, start + read ]
+            if index > 0
+              objects[start + read] = record.shift()
+      eol = start + eos
+    splices.reverse()
+    for splice in splices
+      [ index, address ] = splice
+      if index > 0
+        addresses.splice(index - 1, 0, address)
+      else
+        addresses.splice(-(index + 1), 1)
+    tier = extend tier, { addresses, objects }
+
+  # TODO: Move link to head always, to maintain MRU.
+  readBranches: (tier, _) ->
+    filename = @filename tier.address
+    tier.addresses = JSON.parse fs.readFile filename, "utf8", _
+    tier.penultimate = tier.addresses.pop()
+    tier.loaded = true
+    tier
+
+  # Write the branches to a file as a JSON string. The penultimate flag is
+  # pushed onto the end of the objects array for serialization, and popped
+  # before the function returns.
+  writeBranches: (tier, suffix, _) ->
+    filename = "#{@filename tier.address}#{suffix}"
+    tier.addresses.push tier.penultimate
+    serialized = JSON.stringify(tier.addresses) + "\n"
+    fs.writeFile filename, serialized, "utf8", _
+    tier.addresses.pop()
+
+  _writeJSON: (tier, _) ->
+    if not tier.out
+      filename = @filename tier.address
+      tier.position = fs.stat(filename, _).size
+      tier.out = fs.createWriteStream filename,
+        flags: "a"
+        encoding: "utf8"
+        mode: 0666
+    json            = JSON.stringify record
+    position        = tier.position
+    tier.position  += Buffer.byteLength(json, "utf8") + 1
+    tier.write(json)
+    tier.write("\n")
+    position
+
+  writeInsert: (tier, object, index, _) ->
+    @_writeJSON tier, [ index + 1, object ], _
+
+  writeDelete: (tier, index, _) ->
+    @_writeJSON tier, [ -(index + 1) ], _
+
+  writeAddresses: (tier, addresses, _) ->
+    @_writeJSON tier, [ 0, addresses ], _
+
+class exports.Strata
+  # Construct the Strata from the options.
+  constructor: (options) ->
+    defaults =
+      leafSize: 12
+      branchSize: 12
+      comparator: comparator
+      extractor: extractor
+    @_options       = extend defaults, options
+    @_io            = new IO options.directory
+
+  create: (_) -> @_io.create(_)
+
+  open: (_) -> @_io.open(_)
+
+  get: (fields, callback) ->
+    operation = method: "get"
+    mutation = new Mutation(@, null, fields, operation)
+    mutation.mutate callback
 
   insert: (object, callback) ->
-    fields = @extractor object
-    console.log { fields }
-    process.exit 1
-    @_generalized new Mutation(@, object, fields, @_shouldDrainRoot, @_shouldSplitInner, @_never, @_howToInsertLeaf, callback)
+    operation = method: "insertSorted"
+    mutation = new Mutation(@, object, null, operation)
+    mutation.mutate callback
 
   # Both `insert` and `remove` use this generalized mutation method that
   # implements locking the proper tiers during the descent of the tree to find
   # the leaf to mutate.
   #
   # This generalized mutation will insert or remove a single item.
-  _generalized: (mutation) ->
+  _generalized: (mutation, _) ->
     mutation.descend false
-    mutation.child.lock @, mutation, @_rootAddress, @_rootLoaded
 
-  # Perform the root decision with only a read lock obtained.
-  _rootLoaded: (mutation, root) ->
-    mutation.child.tier = root
-    mutation.decisions.initial.call @, mutation
-    @_tierDecision mutation
+    tier = mutation.parent.tier = @_lock mutation.parent, 0, false, _
 
-  # Determine if we need to lock a tier. We have different criteria for inner
-  # tiers with inner tier children then for penultimate inner tiers with leaf
-  # tier children.
-  _tierDecision: (mutation) ->
-    if mutation.levels[0].tier.penultimate
-      @_testInnerTier mutation, mutation.decisions.penultimate, @_operate
-    else
-      @_testInnerTier mutation, mutation.decisions.subsequent, @_tierDescend
+    # Perform the root decision with only a read lock obtained.
+    mutation.decisions.initial.call @, mutation, _
 
-  # Perform decisions related to the inner tier.
-  _testInnerTier: (mutation, decision, next) ->
-    mutation.decisions.swap.call @, mutation
-    if not decision.call @, mutation
-      for level in mutation.levels
-        level.operations = level.operations.filter (operation) ->
-          operation isnt "swap"
-    next.call @, mutation
+    # Determine if we need to lock a tier. We have different criteria for inner
+    # tiers with inner tier children then for penultimate inner tiers with leaf
+    # tier children.
+    loop
+      { decisions, parent } = mutation
+      break if parent.tier.penultimate
+      say { child }
+      @_testInnerTier mutation, decisions.subsequent, "swap", _
+      branch = @_find(mutation.parent.tier, mutation.sought)
+      mutation.descend false
+      branch.child.tier = @_load branch.address, false, _
 
-  _tierDescend: (mutation) ->
-    branch = @_find(mutation.parentLevel.tier, mutation.sought)
-    @io.load mutation.parent, branch, (child) =>
-      mutation.parent = child
-      mutation.parentLevel = mutation.childLevel
-      mutation.childLevel = new Level()
-      mutation.levels.push mutation.childLevel
-      @_tierDecision mutation
+    # Make decisions based on the penultimate level.
+    @_testInnerTier mutation, decisions.penultimate, "", _
 
-  # When `_operate` is invoked, all the necessary locks have been obtained and
-  # we are able to mutate the tree with impunity.
-  _operate: (mutation) ->
+    # All the necessary locks have been obtained and we are able to mutate the
+    # tree with impunity.
+
     # Run through levels, bottom to top, performing the operations at for level.
     mutation.levels.reverse()
     mutation.levelQueue = mutation.levels.slice(0)
     operation = mutation.leafOperation
     operation.shift().apply @, operation.concat mutation, @_leafDirty
+      
+  # Perform decisions related to the inner tier.
+  _testInnerTier: (mutation, decision, exclude, _) ->
+    mutation.decisions.swap.call @, mutation
+    # If no split/merge, then clear all actions except for swap.
+    if not decision.call @, mutation, _
+      for step in mutation.plan
+        step.operations = step.operations.filter (operation) ->
+          operation isnt exclude
 
   # The leaf operation may or may not alter the leaf. If it doesn't, all of the
   # operations to split or merge the inner tiers are moot, because we didn't
@@ -365,44 +469,20 @@ class module.exports.Strata
     # We can tell the user that the operation succeeded on the next tick.
     process.nextTick -> mutation.callback.call null, mutation.dirtied
 
-  _lockContinue: (continuation) ->
-    for callback in continuation
-      callback.shift().apply callback.shift(), callback
+  _resume: (continuations) ->
 
-  # Search for a value in a tier, returning the  index of the value or else
-  # where it should be inserted.
-  #
-  # There is some magic here, long forgotten at the time of documentation. The
-  # tree benieth each branch in an inner tier contains records whose value is
-  # equal to or greater than the pivot. Thus, the pivot of the first record on
-  # an inner tier is null, indicating that that is the branch for all values
-  # less than the value of the first branch with a real pivot.
-  #
-  # TODO: Reading through the code, this does not take this into account, and
-  # will problably send items that belong in the least value tree into the three
-  # that follows it. I'll clean this up with unit testing.
-  _find: (tier, sought) ->
-    size = tier.size()
-    low = 1
-    high = size - 1
-    while low < high
-      mid = (low + high) >>> 1
-      compare = @comparator sought, @extractor tier.record(mid)
-      if compare > 0
-        low = mid + 1
-      else
-        high = mid
-    if low < size
-      while low != 0 && @comparator(sought, @extractor tier.record(low - 1)) == 0
-        low--
-      return low
-    return low - 1
+  _record: (tier, index, _) ->
+    if tier.leaf
+      process.exit 1
+    else
+      process.exit 1
 
   # If the root is full, we add a root split operation to the operation stack.
-  _shouldDrainRoot: (mutation) ->
-    if @innerSize is mutation.child.tier.size()
-      mutation.plan[0].operations.push "splitRoot"
-    console.log "_shouldDrainRoot"
+  _shouldDrainRoot: (mutation, _) ->
+    if @innerSize is mutation.parent.tier.objects.length
+      mutation.plan[0].push
+        operation: "_splitRoot",
+        addresses: [ mutation.parent.tier.address ]
 
   # Shorthand to allocate a new inner tier.
   _newInnerTier: (mutation, penultimate) ->
@@ -666,27 +746,21 @@ class module.exports.Strata
   #
   # TODO Now there is a chance that this might already be in a split state. What
   # do we do? Do we create a new plan as we decend to test the current plan?
-  _howToInsertLeaf: (mutation) ->
-    console.log mutation
+  _howToInsertLeaf: (mutation, _) ->
     # Find the branch that navigates to the leaf child.
-    branch = @_find mutation.parentLevel.tier, mutation.fields
-    @io.load @, mutation, mutation.parentLevel.tier.get(branch).address, @_inspectLeafForSplitLoaded
+    branch = @_find mutation.parent.tier, mutation.fields, _
+    address = mutation.parent.tier.addresses[branch]
+    
+    # Lock the leaf exclusively.
+    mutation.child.exclusive = true
+    leaf = @_lock mutation.child, address, true, _
+    mutation.child.tier = leaf
 
-  # After load, lock the leaf exclusively.
-  _inspectLeafForSplitLoaded: (mutation, leaf) ->
-    # Lock the child level exclusively.
-    mutation.childLevel.tier = leaf
-    mutation.childLevel.exclusive = true
-    mutation.childLevel.lock @, mutation, leaf, @_inspectLeafForSplitLocked
-
-  # After the leaf is locked exclusively, try to figure out how to insert.
-  _inspectLeafForSplitLocked: (mutation) ->
-    leaf = mutation.childLevel.tier
     # If the leaf size is equal to the maximum leaf size, then we either
     # have a leaf that must split or a leaf that is full of objects that
     # have the same index value. Otherwise, we have a leaf that has a free
     # slot.
-    if leaf.size() is @leafSize
+    if leaf.addresses.length is @leafSize
       # If the index value of the first value is equal to the index value
       # of the last value, then we have a linked list of duplicate index
       # values. Otherwise, we have a full page that can split.
@@ -718,23 +792,6 @@ class module.exports.Strata
 
     # Let the caller know if we've added a split operation.
     split
-
-  _insertSorted: (leaf, mutation, next) ->
-    # Insert the object value sorted.
-    for i in [0...leaf.size()]
-      before = leaf.record(i)
-      if @comparator(mutation.fields, @extract before) <= 0
-        leaf.splice i, 0, mutation.object
-        break
-
-    # If we got to the end, then we need to append the object value.
-    if i is leaf.size()
-      leaf.push mutation.object
-
-    mutation.dirtied = true
-
-    # Success.
-    next.call @, mutation
 
 # Mark the operations that split or merge the tree. These are the operations we
 # cancel if split or merge is not necessary, because a decendent tier will not

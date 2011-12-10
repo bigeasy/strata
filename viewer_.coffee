@@ -5,7 +5,9 @@
 parser = new OptionParser [
   [ "-f", "--file [NAME]", "strata file" ]
   [ "-c", "--create", "create database" ]
-  [ "-a", "--add [VALUE]", "a string value to add" ]
+  [ "-a", "--alpha [VALUE]", "add letters of the alphabet" ]
+  [ "-g", "--get [VALUE]", "get a value" ]
+  [ "-i", "--insert [VALUE]", "a string value to insert" ]
   [ "-d", "--delete [VALUE]", "a string value to delete" ]
   [ "-h", "--help", "display help" ]
 ]
@@ -27,5 +29,9 @@ view = (_) ->
     strata.create(_)
   else
     strata.open(_)
+  if value = options.insert
+    strata.insert value, _
+  else if value = options.get
+    console.log strata.get value, _
 
 view (error) -> throw error if error
