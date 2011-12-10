@@ -64,21 +64,28 @@ class Mutation
   # TODO: Reading through the code, this does not take this into account, and
   # will problably send items that belong in the least value tree into the three
   # that follows it. I'll clean this up with unit testing.
-  find: (tier, low, extractor, sought, _) ->
+  find: (tier, _) ->
     size = tier.addresses.length
-    high = size - 1
-    while low < high
+    if tier.leaf
+      [ low, high, offset ] = [ 0, size - 1, 0 ]
+    else if size is 1
+      return 0
+    else
+      [ low, high, offset ] = [ 1, size - 1, 1 ]
+    { comparator, fields, io } = @
+    loop
       mid = (low + high) >>> 1
-      compare = @comparator sought, extractor @_record tier, mid, _
+      compare = comparator fields, io.key(tier, mid, _)
+      if compare is 0
+        break
       if compare > 0
         low = mid + 1
       else
-        high = mid
-    if low < size
-      while low != 0 && @comparator(sought, @extractor tier.record(low - 1)) == 0
-        low--
-      return low
-    return low - 1
+        high = mid - 1
+    if compare is 0
+      while mid != 0 && comparator(fields, io.key(tier, mid - 1, _)) == 0
+        mid--
+    return mid
 
   mutate: (_) ->
     address = 0
@@ -96,25 +103,25 @@ class Mutation
     @[@operation.method].call this, parent, child, _
 
   insertSorted: (parent, child, _) ->
-    branch = @find child, 1, @_branchExtractor, @fields, _
+    branch = @find child, _
     leaves = @io.lock true, child.addresses[branch], true, _
 
     addresses = leaves.addresses
 
     # Insert the object value sorted.
     for i in [0...addresses.length]
-      before = leaf.record(i)
-      if @comparator(mutation.fields, @extract before) <= 0
+      key = @io.key(leaves, i, _)
+      if @comparator(@fields, key) <= 0
         break
 
     address = @io.writeInsert leaves, @object, i
     addresses.splice i, 0, address
 
   get: (parent, child, _) ->
-    branch = @find child, 1, @_branchExtractor, @fields, _
+    branch = @find child, _
     leaves = @io.lock true, child.addresses[branch], true, _
-    address = @find leaves, 0, @extractor, @fields, _
-    leaves.objects[address]
+    address = @find leaves, _
+    leaves.cache[leaves.addresses[address]]
 
 class Level
   # Construct a new level. The `exclusive` pararameter determines how this level
@@ -159,7 +166,7 @@ comparator = (a, b) ->
 extractor = (a) -> a
 
 class IO
-  constructor: (@directory) ->
+  constructor: (@directory, @extractor) ->
     @cache          = {}
     @head           = { address: -1 }
     @head.next      = @head
@@ -210,7 +217,7 @@ class IO
 
   lock: (exclusive, address, leaf, callback) ->
     if not tier = @cache[address]
-      tier = @link({ leaf, address, objects: {}, addresses: [], locks: [[]] })
+      tier = @link({ leaf, address, cache: {}, addresses: [], locks: [[]] })
     locks = tier.locks
     if tier.loaded
       lock = callback
@@ -255,14 +262,14 @@ class IO
 
   allocateBranches: (penultimate) ->
     address = @nextAddress++
-    tier = @_link({ penultimate, address, addresses: [], objects: {} })
+    tier = @_link({ penultimate, address, addresses: [], cache: {} })
     @cache[address] = tier
 
   allocateLeaves: (_) ->
     address = @nextAddress++
     filename = @filename address
     fs.writeFile filename, "", "utf8", _
-    @cache[address] = @_link({ leaves: true, address, objects: [] })
+    @cache[address] = @_link({ leaves: true, address, cache: [] })
 
   readLeaves: (tier, _) ->
     filename = @filename tier.address
@@ -278,7 +285,7 @@ class IO
     eol       = stat.size
     splices   = []
     addresses = []
-    objects   = {}
+    cache     = {}
     buffer    = new Buffer(1024)
     while end
       end     = eol
@@ -303,7 +310,7 @@ class IO
           else
             splices.push [ index, start + read ]
             if index > 0
-              objects[start + read] = record.shift()
+              cache[start + read] = record.shift()
       eol = start + eos
     splices.reverse()
     for splice in splices
@@ -312,7 +319,52 @@ class IO
         addresses.splice(index - 1, 0, address)
       else
         addresses.splice(-(index + 1), 1)
-    tier = extend tier, { addresses, objects }
+    tier = extend tier, { addresses, cache }
+
+  object: (tier, index, _) ->
+    address = tier.addresses[index]
+    if not object = tier.cache[address]
+      if not tier.in
+        filename = @filename tier.address
+        tier.in = fd.open filename, "r", _
+      if not tier.position
+        filename = @filename tier.address
+        tier.position = fs.stat(filename, _).size
+      length = 1024
+      loop
+        buffer = new Buffer(length)
+        read = fs.read tier.in, buffer, 0, buffer.length, address, _
+        for offset in [0...read]
+          if buffer[offset] is 0xA0
+            json = JSON.parse buffer.toString("utf8", 0, offset + 1)
+            break
+        if length > tier.position - address
+          throw new Error "cannot find end of record."
+        length *= 2
+      object = tier.cache[address] = json.pop()
+    object
+
+  key: (tier, index, _) ->
+    if tier.leaf
+      @extractor @object tier, index, _
+    else
+      address = tier.addresses[index]
+      if not key = tier.cache[address]
+        # Here's something to consdier. The only time we lock the leaf is during
+        # descent, to read in the key.
+        #
+        # If this leaf tier is locked exclusively, we are not the ones holding the
+        # lock, because that would mean that we are locking the inner tier, we
+        # would already have traversed the inner tier, the key would be in the
+        # cache.
+        #
+        # If this leaf tier has an exclusive lock pending, it is not a lock that
+        # we are waiting for, so we can append a shared lock and wait for multiple
+        # exclusive and shared locks to clear.
+        leaf  = @lock false, address, true, _
+        key   = tier.cache[address] = @extractor @object leaf, 0, _
+        @release leaf
+      key
 
   # TODO: Move link to head always, to maintain MRU.
   readBranches: (tier, _) ->
@@ -332,19 +384,29 @@ class IO
     fs.writeFile filename, serialized, "utf8", _
     tier.addresses.pop()
 
-  _writeJSON: (tier, _) ->
+  _drain: (tier, callback) ->
+    tier.out.once "drain", -> callback()
+
+  _writeJSON: (tier, object, _) ->
     if not tier.out
       filename = @filename tier.address
-      tier.position = fs.stat(filename, _).size
       tier.out = fs.createWriteStream filename,
         flags: "a"
         encoding: "utf8"
         mode: 0666
-    json            = JSON.stringify record
+    if not tier.position
+      filename = @filename tier.address
+      tier.position = fs.stat(filename, _).size
+
+    json            = JSON.stringify object
     position        = tier.position
     tier.position  += Buffer.byteLength(json, "utf8") + 1
-    tier.write(json)
-    tier.write("\n")
+
+    buffered = tier.out.write(json)
+    buffered = tier.out.write("\n") && buffered
+
+    @_drain(tier, _) if buffered
+
     position
 
   writeInsert: (tier, object, index, _) ->
@@ -365,7 +427,7 @@ class exports.Strata
       comparator: comparator
       extractor: extractor
     @_options       = extend defaults, options
-    @_io            = new IO options.directory
+    @_io            = new IO options.directory, @_options.extractor
 
   create: (_) -> @_io.create(_)
 
