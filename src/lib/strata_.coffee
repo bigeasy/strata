@@ -1,23 +1,40 @@
+# A Streamline.js friendly evented I/O b-tree for node.js.
+#
+# ## Purpose
+# 
+# Implements a file backed b-tree.
+
+# Requried node.js libraries.
+fs = require "fs"
+
+# Copy values from one hash into another.
 extend = (to, from) ->
   to[key] = value for key, value of from
   to
 
-fs = require "fs"
-
+# Useful for command debugging. If you don't see them called in the code, it
+# means the code is absolutely bug free.
 die = (splat...) ->
   console.log.apply null, splat if splat.length
   process.exit 1
 say = (splat...) -> console.log.apply null, splat
 
-class Decisions
-  constructor: (@initial, @subsequent, @swap, @penultimate) ->
+# Default comparator is good only for strings, use a - b for numbers.
+comparator = (a, b) ->
+  if a < b then -1 else if a > b then 1 else 0
+
+# Default extractor returns the value as hole, i.e. tree of integers.
+extractor = (a) -> a
 
 # Glossary:
+# 
 #  * Descent - What we call an attempt to move from a parent node to a child
 #              node in  the tree, which may be paused because it encounters a
 #              lock on a tier.
+
+#              
 class Mutation
-  # The constructure always felt like a dangerous place to be doing anything
+  # The constructor always felt like a dangerous place to be doing anything
   # meaningful in C++ or Java.
   constructor: (@strata, @object, @key, @operation) ->
     @io         = @strata._io
@@ -35,6 +52,8 @@ class Mutation
   
   # Descend the tree, optionally starting an exclusive descent. Once the descent
   # is exclusive, all subsequent descents are exclusive.
+
+  # `mutation.descend(exclusive)` 
   descend: (exclusive) ->
     # Add a new level to the plan.
     @plan.unshift { operations: [], addresses: [] }
@@ -66,6 +85,8 @@ class Mutation
   # TODO: Reading through the code, this does not take this into account, and
   # will problably send items that belong in the least value tree into the three
   # that follows it. I'll clean this up with unit testing.
+
+  # `mutation.find(tier, key, callback)`
   find: (tier, key, _) ->
     size = tier.addresses.length
     if tier.leaf
@@ -106,6 +127,8 @@ class Mutation
   # value, as long as we let go of it immediately. This allows us to read from
   # leaf pages to get branch values.
   # TODO: Rename this descend.
+
+  # `mutation.mutate(callback)`
   mutate: (_) ->
     parent = null
 
@@ -261,13 +284,6 @@ class Level
       locks.shift()
       true
     false
-
-# Default comparator is good only for strings, use a - b for numbers.
-comparator = (a, b) ->
-  if a < b then -1 else if a > b then 1 else 0
-
-# Default extractor returns the value as hole, i.e. tree of integers.
-extractor = (a) -> a
 
 class LeafIO
   constructor: (@filename) ->
