@@ -1,6 +1,5 @@
-{TwerpTest} = require "twerp"
 {Strata, InMemory}    = require "./lib/strata"
-{OptionParser}  = require "coffee-script/lib/optparse"
+{OptionParser}  = require "coffee-script/lib/coffee-script/optparse"
 
 parser = new OptionParser [
   [ "-f", "--file [NAME]", "strata file" ]

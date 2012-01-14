@@ -1,4 +1,7 @@
-{extend} = require("coffee-script/lib/helpers")
+extend = (to, from) ->
+  to[key] = value for key, value of from
+  to
+
 fs = require "fs"
 
 die = (splat...) ->
@@ -16,18 +19,19 @@ class Decisions
 class Mutation
   # The constructure always felt like a dangerous place to be doing anything
   # meaningful in C++ or Java.
-  constructor: (@strata, @object, @fields, @operation) ->
+  constructor: (@strata, @object, @key, @operation) ->
     @io         = @strata._io
     @options    = @strata._options
 
     @parent     = { operations: [], locks: [] }
     @child      = { operations: [], locks: [] }
     @exclusive  = []
+    @shared     = []
     @pivots     = []
 
     { @extractor, @comparator } = @options
 
-    @fields     = @extractor @object if @object?
+    @key        = @extractor @object if @object? and not key?
   
   # Descend the tree, optionally starting an exclusive descent. Once the descent
   # is exclusive, all subsequent descents are exclusive.
@@ -50,8 +54,6 @@ class Mutation
     if exclusive
       @exclusive.push(@child)
 
-  _branchExtractor: (fields) -> fields
-
   # Search for a value in a tier, returning the  index of the value or else
   # where it should be inserted.
   #
@@ -64,18 +66,18 @@ class Mutation
   # TODO: Reading through the code, this does not take this into account, and
   # will problably send items that belong in the least value tree into the three
   # that follows it. I'll clean this up with unit testing.
-  find: (tier, _) ->
+  find: (tier, key, _) ->
     size = tier.addresses.length
     if tier.leaf
-      [ low, high, offset ] = [ 0, size - 1, 0 ]
+      [ low, high, leaf ] = [ 0, size - 1, true ]
     else if size is 1
       return 0
     else
-      [ low, high, offset ] = [ 1, size - 1, 1 ]
-    { comparator, fields, io } = @
+      [ low, high ] = [ 1, size - 1 ]
+    { comparator, io } = @
     loop
       mid = (low + high) >>> 1
-      compare = comparator fields, io.key(tier, mid, _)
+      compare = comparator key, io.key(tier, mid, _)
       if compare is 0
         break
       if compare > 0
@@ -83,45 +85,147 @@ class Mutation
       else
         high = mid - 1
     if compare is 0
-      while mid != 0 && comparator(fields, io.key(tier, mid - 1, _)) == 0
-        mid--
-    return mid
+      if leaf
+        while mid != 0 && comparator(key, io.key(tier, mid - 1, _)) == 0
+          mid--
+      mid
+    else if branches
+      mid - 1
+    else
+      mid
 
+  hasKey: (tier, _) ->
+    for key in @operation.keys or []
+      die { key }
+      branch = @find(tier, key, _)
+      if tier.cache[branch] is key
+        return true
+    false
+
+  # TODO: We are always allowed to get a shared lock on any leaf page and read a
+  # value, as long as we let go of it immediately. This allows us to read from
+  # leaf pages to get branch values.
+  # TODO: Rename this descend.
   mutate: (_) ->
-    address = 0
     parent = null
-    loop
-      child = @io.lock exclusive, 0, false, _
-      if not exclusive
-        for pivot in @pivots
-          if pivot.apply @, child
-            @io.release child, _
-            exclusive = true
-            @io.lock exclusive, 0, false, _
-      break if child.penultimate or address is @soughtAddress
 
-    @[@operation.method].call this, parent, child, _
+    @shared.push child = @io.lock false, 0, false, _
+    if @operation.keys and (child.addresses.length is 1 or @hasKey(child, _))
+      @exclusive.push @io.upgrade @shared.pop(), _
+
+    # TODO: Flag for go left.
+    while not child.penultimate or child.address is @soughtAddress
+      process.exit 1
+
+    # TODO: Flag for shared or exclusive. If exclusive, leave parent locked, if
+    # shared, then unlock parent.
+
+    mutation = @[@operation.method].call this, parent, child, _
+
+    @io.release tier for tier in @shared
+    @io.release tier for tier in @exclusive
+
+    mutation.mutate _ if mutation
 
   insertSorted: (parent, child, _) ->
-    branch = @find child, _
-    leaves = @io.lock true, child.addresses[branch], true, _
+    branch = @find child, @key, _
+    @exclusive.push leaves = @io.lock true, child.addresses[branch], true, _
 
     addresses = leaves.addresses
 
     # Insert the object value sorted.
     for i in [0...addresses.length]
       key = @io.key(leaves, i, _)
-      if @comparator(@fields, key) <= 0
+      if @comparator(@key, key) <= 0
         break
 
-    address = @io.writeInsert leaves, @object, i
+    address = leaves.io.writeInsert @object, i, _
     addresses.splice i, 0, address
 
+    if addresses.length > @options.leafSize and not @homogenous(leaves, _)
+      keys = []
+      process.nextTick _
+      # Opportunity to deadlock.
+      keys.push key = @io.key leaves, 0, _
+      if leaves.right
+        keys.push @io.key leaves.right, 0, _
+      operation =
+        method: "splitLeaf"
+        keys: keys
+      new Mutation(@strata, null, key, operation)
+  
+  # If the leaf tier is now at the maximum size, we test to see if the leaf tier
+  # is filled with an identical key value, and if not, we split the leaf tier.
+  homogenous: (tier, _) ->
+    { io, comparator } = @
+    first = io.key(tier, 0, _)
+    last = io.key(tier, tier.addresses.length - 1, _)
+    comparator(first, last) is 0
+
   get: (parent, child, _) ->
-    branch = @find child, _
-    leaves = @io.lock true, child.addresses[branch], true, _
-    address = @find leaves, _
+    branch = @find child, @key, _
+    @shared.push leaves = @io.lock false, child.addresses[branch], true, _
+    address = @find leaves, @key, _
     leaves.cache[leaves.addresses[address]]
+
+  splitLeaf: (parent, child, _) ->
+    branch = @find child, @key, _
+    @exclusive.push leaves = @io.lock true, child.addresses[branch], true, _
+
+    # See that nothing has changed since we last descended.
+    { comparator: c, io, options: { leafSize: length } } = @
+    return if c(io.key(leaves, 0, _), @key) isnt 0
+    return if @homogenous(leaves, _)
+    return if leaves.addresses.length < @options.leafSize
+
+    # We might have let things go for so long, that we're going to have to split
+    # the page into more than two pages.
+    partitions = Math.floor leaves.addresses.length / @options.leafSize
+    while (partitions * @options.leafSize) <= leaves.addresses.length
+      # Find a partition.
+      mid = Math.floor leaves.addresses.length / (partitions + 1)
+      key = io.key leaves, mid, _
+      [ before, after ] = [ mid - 1, mid + 1 ]
+      while not partition
+        if before > 0 and c(io.key(leaves, before, _), key) isnt 0
+          partition = before + 1
+        else if after <= length and c(io.key(leaves, after, _)) isnt 0
+          partition = after
+        else
+          --before
+          ++after
+
+      key = io.key leaves, partition, _
+      pivot = @find(child, key, _) + 1
+
+      addresses = leaves.addresses.splice(partition)
+      right = io.allocateLeaves(addresses, leaves.right)
+
+      leaves.right = right.address
+
+      child.addresses.splice(pivot, 0, right.address)
+
+      # Append an operation indciator. This would be a record that describes all
+      # the participants in the rewrite, in the order in which they are supposed
+      # to be rewritten. When found, we look at the last item in the list, then
+      # load that, and ensure that the last record is a complete operation
+      # record. If it is, we know that all of the temporary pages were written.
+      @io.rewriteLeaves(leaves, _)
+      @io.rewriteLeaves(right, _)
+
+      @io.rewriteBranches(child, _)
+
+      @io.relink(right, _)
+      @io.relink(leaves, _)
+      @io.relink(child, _)
+
+      --paritions
+
+  mergeLeaf: (parent, child, _) ->
+    [ key, rightKey ] = @operation.keys
+    compare = @comparator(full, leftKey = @io.key(child, 0, _))
+    if compare is 0
+      return if leftKey isnt key
 
 class Level
   # Construct a new level. The `exclusive` pararameter determines how this level
@@ -165,6 +269,64 @@ comparator = (a, b) ->
 # Default extractor returns the value as hole, i.e. tree of integers.
 extractor = (a) -> a
 
+class LeafIO
+  constructor: (@filename) ->
+
+  _drain: (callback) -> @out.once "drain", -> callback()
+
+  _writeJSON: (object, _) ->
+    @out or= fs.createWriteStream @filename,
+      flags: "a"
+      encoding: "utf8"
+      mode: 0666
+    @position or= fs.stat(@filename, _).size
+
+    json            = JSON.stringify object
+    position        = @position
+    @position      += Buffer.byteLength(json, "utf8") + 1
+
+    buffered = @out.write(json)
+    buffered = @out.write("\n") && buffered
+
+    position
+
+  writeInsert: (object, index, _) ->
+    @_writeJSON [ index + 1, object ], _
+
+  writeDelete: (index, _) ->
+    @_writeJSON [ -(index + 1) ], _
+
+  writeAddresses: (right, addresses, _) ->
+    @_writeJSON [ 0, right, addresses ], _
+
+  _readJSON: (buffer, read) ->
+    for offset in [0...read]
+      if buffer[offset] is 0x0A
+        return JSON.parse buffer.toString("utf8", 0, offset + 1)
+
+  readObject: (address, _) ->
+    @in or= fs.open @filename, "r", _
+    @position or= fs.stat(@filename, _).size
+    length = 1024
+    loop
+      buffer = new Buffer(length)
+      read = fs.read @in, buffer, 0, buffer.length, address, _
+      if json = @_readJSON(buffer, read)
+        break
+      if length > @position - address
+        throw new Error "cannot find end of record."
+      length *= 2
+    json.pop()
+
+  _closeOut: (callback) ->
+    @out.once "close", -> callback()
+    @out.destroySoon()
+
+  close: (_) ->
+    @close(@in, _) if @in
+    @_closeOut(_) if @out
+    @position = @in = @out = null
+
 class IO
   constructor: (@directory, @extractor) ->
     @cache          = {}
@@ -182,7 +344,7 @@ class IO
       throw e if e.code isnt "ENOENT"
       fs.mkdir @directory, 0755, _
     root = @_allocateBranches true
-    leaf = @_allocateLeaves(_)
+    leaf = @_allocateLeaves([])
     root.addresses.push leaf.address
     @_writeBranches root, "", _
 
@@ -217,7 +379,8 @@ class IO
 
   lock: (exclusive, address, leaf, callback) ->
     if not tier = @cache[address]
-      tier = @link({ leaf, address, cache: {}, addresses: [], locks: [[]] })
+      @cache[address] = tier =
+        @link({ leaf, address, cache: {}, addresses: [], locks: [[]] })
     locks = tier.locks
     if tier.loaded
       lock = callback
@@ -250,26 +413,37 @@ class IO
 
   # Remove the lock callback from the callback list..
   release: (tier) ->
-    running = tier.locks[0]
+    locks = tier.locks
+    running = locks[0]
     running.shift()
+    say { locks }
     if running.length is 0 and locks.length isnt 1
       locks.shift()
       @resume tier, locks[0] if locks[0].length
+      
+  upgrade: (tier, _) ->
+    @release tier
+    @lock true, tier.address, false, _
 
-  filename: (address) ->
+  filename: (address, suffix) ->
+    suffix or= ""
     padding = "00000000".substring(0, 8 - String(address).length)
-    "#{@directory}/segment#{padding}#{address}"
+    "#{@directory}/segment#{padding}#{address}#{suffix}"
 
   allocateBranches: (penultimate) ->
     address = @nextAddress++
-    tier = @_link({ penultimate, address, addresses: [], cache: {} })
+    tier = @link({ penultimate, address, addresses: [], cache: {} })
     @cache[address] = tier
 
-  allocateLeaves: (_) ->
+  allocateLeaves: (addresses, right) ->
     address = @nextAddress++
-    filename = @filename address
-    fs.writeFile filename, "", "utf8", _
-    @cache[address] = @_link({ leaves: true, address, cache: [] })
+    @cache[address] = @link
+      leaf: true
+      address: address
+      addresses: addresses
+      cache: {}
+      right: right
+      io: new LeafIO @filename address
 
   readLeaves: (tier, _) ->
     filename = @filename tier.address
@@ -319,37 +493,35 @@ class IO
         addresses.splice(index - 1, 0, address)
       else
         addresses.splice(-(index + 1), 1)
-    tier = extend tier, { addresses, cache }
+    fs.close fd, _
+    loaded = true
+    io = new LeafIO @filename tier.address
+    tier = extend tier, { addresses, cache, loaded, io }
 
+  # Going forward, every will story keys, so that when we encounter a record, we
+  # don't have to run the extractor, plus we get some caching.
+  #
+  # Or maybe just three arrays, key, object and address? I'm talking about using
+  # each key as an object cache, by adding an object member to the key. But,
+  # they cache container is a hash table, which is a compactish representation,
+  # so why not make it yet anohter hash table? The logic gets a lot easier.
   object: (tier, index, _) ->
     address = tier.addresses[index]
     if not object = tier.cache[address]
-      if not tier.in
-        filename = @filename tier.address
-        tier.in = fd.open filename, "r", _
-      if not tier.position
-        filename = @filename tier.address
-        tier.position = fs.stat(filename, _).size
-      length = 1024
-      loop
-        buffer = new Buffer(length)
-        read = fs.read tier.in, buffer, 0, buffer.length, address, _
-        for offset in [0...read]
-          if buffer[offset] is 0xA0
-            json = JSON.parse buffer.toString("utf8", 0, offset + 1)
-            break
-        if length > tier.position - address
-          throw new Error "cannot find end of record."
-        length *= 2
-      object = tier.cache[address] = json.pop()
+      object = tier.cache[address] = tier.io.readObject address, _
     object
 
-  key: (tier, index, _) ->
-    if tier.leaf
-      @extractor @object tier, index, _
+  key: (tierOrAddress, index, _) ->
+    if typeof tierOrAddress is "number"
+      leaf  = @lock false, tierOrAddress, true, _
+      key = @extractor @object leaf, index, _
+      @release leaf
+      key
+    else if tierOrAddress.leaf
+      @extractor @object tierOrAddress, index, _
     else
-      address = tier.addresses[index]
-      if not key = tier.cache[address]
+      address = tierOrAddress.addresses[index]
+      if not key = tierOrAddress.cache[address]
         # Here's something to consdier. The only time we lock the leaf is during
         # descent, to read in the key.
         #
@@ -361,9 +533,7 @@ class IO
         # If this leaf tier has an exclusive lock pending, it is not a lock that
         # we are waiting for, so we can append a shared lock and wait for multiple
         # exclusive and shared locks to clear.
-        leaf  = @lock false, address, true, _
-        key   = tier.cache[address] = @extractor @object leaf, 0, _
-        @release leaf
+        key = tierOrAddress.cache[address] = @key address, 0, _
       key
 
   # TODO: Move link to head always, to maintain MRU.
@@ -378,45 +548,37 @@ class IO
   # pushed onto the end of the objects array for serialization, and popped
   # before the function returns.
   writeBranches: (tier, suffix, _) ->
-    filename = "#{@filename tier.address}#{suffix}"
-    tier.addresses.push tier.penultimate
-    serialized = JSON.stringify(tier.addresses) + "\n"
-    fs.writeFile filename, serialized, "utf8", _
-    tier.addresses.pop()
+    filename = @filename(tier.address, suffix)
+    record [ tier.penultimate, tier.next, tier.addresses ]
+    json = JSON.stringify(record) + "\n"
+    fs.writeFile filename, json, "utf8", _
 
-  _drain: (tier, callback) ->
-    tier.out.once "drain", -> callback()
+  rewriteBranches: (tier, _) ->
+    @writeBranches(tier, ".new", _)
 
-  _writeJSON: (tier, object, _) ->
-    if not tier.out
-      filename = @filename tier.address
-      tier.out = fs.createWriteStream filename,
-        flags: "a"
-        encoding: "utf8"
-        mode: 0666
-    if not tier.position
-      filename = @filename tier.address
-      tier.position = fs.stat(filename, _).size
+  rewriteLeaves: (tier, _) ->
+    io = new LeafIO @filename(tier.address, ".new")
+    addresses = []
+    cache = {}
+    for i in [0...tier.addresses.length]
+      object = @object tier, i, _
+      address = io.writeInsert(object, i, _)
+      addresses.push address
+      cache[address] = object
+    io.writeAddresses(tier.right, addresses, _)
+    io.close(_)
+    tier.addresses = addresses
+    tier.cache = cache
+    tier
 
-    json            = JSON.stringify object
-    position        = tier.position
-    tier.position  += Buffer.byteLength(json, "utf8") + 1
-
-    buffered = tier.out.write(json)
-    buffered = tier.out.write("\n") && buffered
-
-    @_drain(tier, _) if buffered
-
-    position
-
-  writeInsert: (tier, object, index, _) ->
-    @_writeJSON tier, [ index + 1, object ], _
-
-  writeDelete: (tier, index, _) ->
-    @_writeJSON tier, [ -(index + 1) ], _
-
-  writeAddresses: (tier, addresses, _) ->
-    @_writeJSON tier, [ 0, addresses ], _
+  relink: (tier, _) ->
+    replacement = @filename(tier.address, ".new")
+    stat = fs.stat replacement, _
+    if not stat.isFile()
+      throw new Error "not a file"
+    permanent = @filename(tier.address)
+    fs.unlink permanent, _
+    fs.rename replacement, permanent, _
 
 class exports.Strata
   # Construct the Strata from the options.
@@ -433,9 +595,9 @@ class exports.Strata
 
   open: (_) -> @_io.open(_)
 
-  get: (fields, callback) ->
+  get: (key, callback) ->
     operation = method: "get"
-    mutation = new Mutation(@, null, fields, operation)
+    mutation = new Mutation(@, null, key, operation)
     mutation.mutate callback
 
   insert: (object, callback) ->
@@ -462,7 +624,6 @@ class exports.Strata
     loop
       { decisions, parent } = mutation
       break if parent.tier.penultimate
-      say { child }
       @_testInnerTier mutation, decisions.subsequent, "swap", _
       branch = @_find(mutation.parent.tier, mutation.sought)
       mutation.descend false
@@ -545,11 +706,6 @@ class exports.Strata
       mutation.plan[0].push
         operation: "_splitRoot",
         addresses: [ mutation.parent.tier.address ]
-
-  # Shorthand to allocate a new inner tier.
-  _newInnerTier: (mutation, penultimate) ->
-    inner = @io.allocate true, @innerSize
-    inner.penultimate = true
 
   # To split the root, we copy the contents of the root into two children,
   # splitting the contents between the children, then make the two children the
