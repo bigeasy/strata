@@ -711,6 +711,12 @@ class IO
 
   # TODO Ensure that you close the current tier I/O. Also, you must also be very
   # much locked before you use this, but I'm sure you know that.
+  
+  # Compact a leaf tier file by writing it to a temporary file that will become
+  # the permanent file. All of records referenced by the current address array a
+  # appended to a new leaf tier file using insert objects. An address array
+  # object is appended to the end of new leaf tier file. The new file will load
+  # quickly, because the address array object will be found immediately.
   rewriteLeaves: (tier, _) ->
     io = new LeafIO @filename(tier.address, ".new")
     addresses = []
