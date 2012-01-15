@@ -31,6 +31,9 @@ extractor = (a) -> a
 #  * Descent - What we call an attempt to move from a parent node to a child
 #              node in  the tree, which may be paused because it encounters a
 #              lock on a tier.
+#  * Record - A JSON object stored in the b-tree.
+#  * Object - JavaScript objects are referred to as objects in this
+#             documentation and are not to be confused with actual records.
 
 #              
 class Mutation
@@ -285,65 +288,177 @@ class Level
       true
     false
 
+# ### Leaf Tier Files
+#
+# A leaf tier maintains an array of file positions called an address array. A
+# file position in the address array references a record in the leaf tier file
+# by its file position. The addresses in the address array are sorted by the
+# the sort order of the referenced records according to the sort order of the
+# b-tree.
+#
+# A leaf tier file contains JSON objects, one object on each line.
+#
+# There are three types of objects in a leaf tier file, insert objects, delete
+# objects, and address array objects.
+#
+# An insert object contains a *record* and the index in the address array where
+# the record's address would be inserted to preserve the sort order of the
+# address array.
+#
+# Beginning with an empty array and reading from the start of the file, the leaf
+# tier address array is reconstituted by reading the object at the current
+# position in the file, then inserting the position of the current object into
+# the address array at the index in the insert object.
+#
+# We record a deletion by appending a delete object. A delete object contains
+# an index in the address array that should be deleted. When reading the leaf
+# tier from the start of the file, we insert an address into the address array
+# when we encounter an insert object, and we delete an address when we encounter
+# a delete object.
+#
+# On occasion, we can store an address array object, An address array object
+# contains the address array itself.  We store a copy of a constructed address
+# array object in the leaf tier file so that we can read a large leaf tier file
+# quickly.
+#
+# When we read a leaf tier file, if we read from the back of the file toward the
+# front, we can read backward until we find an address array object. Then we can
+# read forward to the end of the file, applying the inserts and deletes that
+# occured after we wrote the address array object. 
+# 
+# When a leaf tier file is large, stashing the constructed address array at the
+# end means that the leaf tier can be loaded quickly, because we will only have
+# to read backwards a few entries to find a mostly completed address array. We
+# can then read forward from the array to amend the address array with the
+# inserts and deletes that occured after it was written.
+#
+# Not all of the records will be loaded when we go backwards, but we have their
+# file position from the address array, so we can jump to them and load them as
+# we need them. That is, if we need them, because owing to binary search, we
+# might only need a few records out of a great many records to find the record
+# we're looking for.
+#
+# Over time, a leaf tier file can grow fat with deleted records &mdash; an
+# insert object and a subsequent delete object. We vacuum a leaf tier file by
+# writing it to a new leaf tier file.
+
+# `LeafIO` &mdash; Keeps track of a file descriptor opened for append, and the
+# append file position. The `LeafIO` class does *not* contain all methods
+# relating to leaf tier file I/O. You can find more leaf tier file methods in
+# the `IO` class below.
+#
+# TODO Rename `RecordIO`.
 class LeafIO
+  # Construct a leaf file tier writer for the given file name.
   constructor: (@filename) ->
+    @length = 1024
 
-  _drain: (callback) -> @out.once "drain", -> callback()
+  # #### Leaf Tier File Object Format
+  #
+  # Each leaf tier object is a JSON array. The first element of the array is an
+  # integer.
+  #
+  # If the integer is greater than zero, it indicates an insert object.  The
+  # integer is the one based index into the zero based address array, indicating
+  # the index where the position of the current insert object should be
+  # inserted. The second element of the leaf tier object array is the record
+  # object.
 
-  _writeJSON: (object, _) ->
-    @out or= fs.createWriteStream @filename,
-      flags: "a"
-      encoding: "utf8"
-      mode: 0666
-    @position or= fs.stat(@filename, _).size
-
-    json            = JSON.stringify object
-    position        = @position
-    @position      += Buffer.byteLength(json, "utf8") + 1
-
-    buffered = @out.write(json)
-    buffered = @out.write("\n") && buffered
-
-    position
-
+  # Write an insert object.
   writeInsert: (object, index, _) ->
     @_writeJSON [ index + 1, object ], _
 
+  # If the integer is less than zero, it indicates a delete object. The absolute
+  # value of the integer is the one based index into the zero based addrss
+  # array, indicating the index of address array element that should be deleted.
+  # There are no other elements in the leaf tier object array.
+
+  # Write a delete object.
   writeDelete: (index, _) ->
     @_writeJSON [ -(index + 1) ], _
+  
+  # If the integer is zero, it indicates an address array object. The integer
+  # value of zero is used only as an indicator. The second element is the
+  # address of the leaf tier to the right of current leaf tier. The third
+  # element of the leaf tier object array is the address array.
 
+  # Write an address array object.
   writeAddresses: (right, addresses, _) ->
     @_writeJSON [ 0, right, addresses ], _
 
+  # Append an object to the leaf tier file as a single line of JSON.
+  _writeJSON: (object, _) ->
+    @position     or= fs.stat(@filename, _).size
+    @fd           or= fs.open @filename, "a+", 0644, _
+
+    json            = JSON.stringify object
+    position        = @position
+    length          = Buffer.byteLength(json, "utf8")
+    buffer          = new Buffer(length + 1)
+    offset          = 0
+
+    # Write may be interrupted by a signal, so we keep track of how many bytes
+    # are actually written and write the difference if we come up short.
+    do
+      count = buffer.length - offset
+      written = fs.write @fd, buffer, offset, count, @position, _
+      @position += written
+      offset += written
+    while offset != buffer.length
+
+    # What's the point if it doesn't make it to disk?
+    fs.fsync @fd, _
+
+    # Return the file position of the inserted record.
+    position
+
+  # Each line is terminated by a newline. In case your concerned that this
+  # simple search will mistake a byte inside a multi-byte character for a
+  # newline, have a look at
+  # [UTF-8](http://en.wikipedia.org/wiki/UTF-8#Description). All bytes
+  # participating in a multi-byte character have their leading bit set, all
+  # single-byte characters have their leading bit unset.
+
+  # Search for the newline that separates JSON records.
   _readJSON: (buffer, read) ->
     for offset in [0...read]
       if buffer[offset] is 0x0A
         return JSON.parse buffer.toString("utf8", 0, offset + 1)
 
+  # Jump to a position in the file and read a specific object. Because objects
+  # are cached in memory by a leaf tier, we're not going to get a request to
+  # read an object that has been written to the current write stream. When we
+  # read in a leaf tier, we'll cache any objects we encounter prior to read the
+  # ordering array.
+  #
+  # Note how we allow we keep track of the minimum buffer size that will
+  # accommodate the largest possible buffer.
   readObject: (address, _) ->
-    @in or= fs.open @filename, "r", _
+    @fd or= fs.open @filename, "a+", _
     @position or= fs.stat(@filename, _).size
-    length = 1024
     loop
-      buffer = new Buffer(length)
+      buffer = new Buffer(@length)
       read = fs.read @in, buffer, 0, buffer.length, address, _
       if json = @_readJSON(buffer, read)
         break
-      if length > @position - address
+      if @length > @position - address
         throw new Error "cannot find end of record."
-      length *= 2
+      @length += @length >>> 1
     json.pop()
 
-  _closeOut: (callback) ->
-    @out.once "close", -> callback()
-    @out.destroySoon()
-
+  # Close the file descriptor if it is open and reset the file descriptor and
+  # append position.
   close: (_) ->
-    @close(@in, _) if @in
-    @_closeOut(_) if @out
-    @position = @in = @out = null
+    @close(@fd, _) if @fd
+    @position = @fd = null
 
+# ### Branch Tier Files
+#
+# A branch tier file contains an array of object addresses 
+
+#
 class IO
+  # Set directory and extractor. Initialze cache and MRU list.
   constructor: (@directory, @extractor) ->
     @cache          = {}
     @head           = { address: -1 }
@@ -351,7 +466,11 @@ class IO
     @head.previous  = @head
     @nextAddress    = 0
 
+  # Create the database detroying any exisiting database.
+
+  # &mdash;
   create: (_) ->
+    # Create the directory if it doesn't exist.
     try
       stat = fs.stat @directory, _
       if not stat.isDirectory()
@@ -359,11 +478,16 @@ class IO
     catch e
       throw e if e.code isnt "ENOENT"
       fs.mkdir @directory, 0755, _
-    root = @_allocateBranches true
-    leaf = @_allocateLeaves([])
+    # Create a root branch with a single empty leaf.
+    root = @allocateBranches true
+    leaf = @allocateLeaves([])
     root.addresses.push leaf.address
-    @_writeBranches root, "", _
+    # Write the root branch.
+    @writeBranches root, "", _
 
+  # Open an existing database.
+  
+  # &mdash;
   open: (_) ->
     try
       stat = fs.stat @directory, _
@@ -379,6 +503,7 @@ class IO
         address = parseInt match[1], 10
         @nextAddress = address + 1 if address > @nextAddress
 
+  # Link tier to the head of the MRU list.
   link: (entry) ->
     next = @head.next
     entry.next = next
@@ -387,12 +512,14 @@ class IO
     entry.previous = @head
     entry
 
+  # Unlnk a tier from the MRU list.
   unlink: (entry) ->
     { next, previous } = entry
     next.previous = previous
     previous.next = next
     entry
 
+  # TODO Move down, bring read and write up.
   lock: (exclusive, address, leaf, callback) ->
     if not tier = @cache[address]
       @cache[address] = tier =
@@ -552,23 +679,25 @@ class IO
         key = tierOrAddress.cache[address] = @key address, 0, _
       key
 
-  # TODO: Move link to head always, to maintain MRU.
-  readBranches: (tier, _) ->
-    filename = @filename tier.address
-    tier.addresses = JSON.parse fs.readFile filename, "utf8", _
-    tier.penultimate = tier.addresses.pop()
-    tier.loaded = true
-    tier
-
-  # Write the branches to a file as a JSON string. The penultimate flag is
-  # pushed onto the end of the objects array for serialization, and popped
-  # before the function returns.
+  # Write the branches to a file as a JSON string. We tuck the tier properties
+  # into an object before we serialize it, so that it is easy deserialize.
   writeBranches: (tier, suffix, _) ->
-    filename = @filename(tier.address, suffix)
-    record [ tier.penultimate, tier.next, tier.addresses ]
+    filename = @filename tier.address, suffix
+    record = [ tier.penultimate, tier.next, tier.addresses ]
     json = JSON.stringify(record) + "\n"
     fs.writeFile filename, json, "utf8", _
 
+  # Read branches from a brach tier file and assign the tier properties to the
+  # given tier object.
+  #
+  # TODO: Move link to head always, to maintain MRU.
+  readBranches: (tier, _) ->
+    filename = @filename tier.address
+    json = fs.readFile filename, "utf8", _
+    [ penultimate, next, addresses ] = JSON.parse json
+    extend tier, { penultimate, next, addresses }
+
+  # TODO Consider: can't I always just rewrite and link?
   rewriteBranches: (tier, _) ->
     @writeBranches(tier, ".new", _)
 
@@ -587,6 +716,9 @@ class IO
     tier.cache = cache
     tier
 
+  # Move a new branch tier file into place. Unlink the existing branch tier
+  # file, then rename the new branch tier file to the permanent name of the
+  # branch tier file.
   relink: (tier, _) ->
     replacement = @filename(tier.address, ".new")
     stat = fs.stat replacement, _
