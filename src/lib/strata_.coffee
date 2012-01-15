@@ -388,8 +388,8 @@ class LeafIO
 
   # Append an object to the leaf tier file as a single line of JSON.
   _writeJSON: (object, _) ->
-    @position     or= fs.stat(@filename, _).size
     @fd           or= fs.open @filename, "a+", 0644, _
+    @position     or= fs.stat(@filename, _).size
 
     json            = JSON.stringify object
     position        = @position
@@ -397,14 +397,17 @@ class LeafIO
     buffer          = new Buffer(length + 1)
     offset          = 0
 
+    # Write JSON and newline.
+    buffer.write json
+    buffer[length] = 0x0A
+
     # Write may be interrupted by a signal, so we keep track of how many bytes
     # are actually written and write the difference if we come up short.
-    do
+    while offset != buffer.length
       count = buffer.length - offset
       written = fs.write @fd, buffer, offset, count, @position, _
       @position += written
       offset += written
-    while offset != buffer.length
 
     # What's the point if it doesn't make it to disk?
     fs.fsync @fd, _
@@ -449,7 +452,7 @@ class LeafIO
   # Close the file descriptor if it is open and reset the file descriptor and
   # append position.
   close: (_) ->
-    @close(@fd, _) if @fd
+    fs.close(@fd, _) if @fd
     @position = @fd = null
 
 # ### Branch Tier Files
@@ -480,10 +483,12 @@ class IO
       fs.mkdir @directory, 0755, _
     # Create a root branch with a single empty leaf.
     root = @allocateBranches true
-    leaf = @allocateLeaves([])
+    leaf = @allocateLeaves([], -1)
     root.addresses.push leaf.address
     # Write the root branch.
     @writeBranches root, "", _
+    @rewriteLeaves leaf, _
+    @relink leaf, _
 
   # Open an existing database.
   
@@ -502,6 +507,9 @@ class IO
       if match = /^segment(\d+)$/.exec file
         address = parseInt match[1], 10
         @nextAddress = address + 1 if address > @nextAddress
+
+  # TODO Very soon.
+  close: (_) ->
 
   # Link tier to the head of the MRU list.
   link: (entry) ->
@@ -683,7 +691,7 @@ class IO
   # into an object before we serialize it, so that it is easy deserialize.
   writeBranches: (tier, suffix, _) ->
     filename = @filename tier.address, suffix
-    record = [ tier.penultimate, tier.next, tier.addresses ]
+    record = [ tier.penultimate, tier.next?.address, tier.addresses ]
     json = JSON.stringify(record) + "\n"
     fs.writeFile filename, json, "utf8", _
 
@@ -701,6 +709,8 @@ class IO
   rewriteBranches: (tier, _) ->
     @writeBranches(tier, ".new", _)
 
+  # TODO Ensure that you close the current tier I/O. Also, you must also be very
+  # much locked before you use this, but I'm sure you know that.
   rewriteLeaves: (tier, _) ->
     io = new LeafIO @filename(tier.address, ".new")
     addresses = []
@@ -712,9 +722,7 @@ class IO
       cache[address] = object
     io.writeAddresses(tier.right, addresses, _)
     io.close(_)
-    tier.addresses = addresses
-    tier.cache = cache
-    tier
+    extend tier, { addresses, cache }
 
   # Move a new branch tier file into place. Unlink the existing branch tier
   # file, then rename the new branch tier file to the permanent name of the
@@ -725,7 +733,10 @@ class IO
     if not stat.isFile()
       throw new Error "not a file"
     permanent = @filename(tier.address)
-    fs.unlink permanent, _
+    try
+      fs.unlink permanent, _
+    catch e
+      throw e unless e.code is "ENOENT"
     fs.rename replacement, permanent, _
 
 class exports.Strata
@@ -742,6 +753,8 @@ class exports.Strata
   create: (_) -> @_io.create(_)
 
   open: (_) -> @_io.open(_)
+
+  close: (_) -> @_io.close(_)
 
   get: (key, callback) ->
     operation = method: "get"
