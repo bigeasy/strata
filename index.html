@@ -1,1 +1,1216 @@
-Hello, World! Submodules work!
+<!DOCTYPE html>  <html> <head>   <title>strata_.coffee</title>   <meta http-equiv="content-type" content="text/html; charset=UTF-8">   <link rel="stylesheet" media="all" href="docco.css" /> </head> <body>   <div id="container">     <div id="background"></div>          <table cellpadding="0" cellspacing="0">       <thead>         <tr>           <th class="docs">             <h1>               strata_.coffee             </h1>           </th>           <th class="code">           </th>         </tr>       </thead>       <tbody>                               <tr id="section-1">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-1">&#182;</a>               </div>               <p>A Streamline.js friendly evented I/O b-tree for node.js.</p>
+
+<h2>Purpose</h2>
+
+<p>Implements a file backed <a href="http://en.wikipedia.org/wiki/B-tree">b-tree</a>.</p>
+
+<p>TK Points to cover as far as advocacy goes.</p>
+
+<ul>
+<li>Concurrency.</li>
+<li>Flexiblity of ordering.</li>
+<li>Atomicity.</li>
+<li>A database primitive, for use as if it were a programming primitive like an
+array or an associative array.</li>
+<li>Standard Node.js API.</li>
+</ul>
+
+<p>But this isn't important at the moment.</p>
+
+<h2>Terminology</h2>
+
+<p>We refer to the nodes in our b-tree as <em>pages</em>. The term node conjures an
+image of a discrete component in a linked data structure that contains one,
+maybe two or three, values. Nodes in a b-tree contain hundreds or thousands of
+values. They are indexed. They are read from disk. They are allowed to fall
+out of memory when they have not been recently referenced. These are behaviors
+that conjure an image of a page of values.</p>
+
+<p>Otherwise, we use common teriminology for <em>order</em>, <em>depth</em>, <em>parent</em>, <em>child</em>,
+<em>split</em> and <em>merge</em>. There is no hard and fast definition for all the terms. A
+leaf is a fuzzy concept in b-tree literature, for example. We call a page that
+contains records a <em>leaf page</em>. We call a non-leaf page a <em>branch page</em>.</p>
+
+<p>The term <em>b-tree</em> itself may not be correct. There are different names for
+b-tree that reflect the variations of implementation, but those distinctions
+have blurred over the years. Our implemenation may be considered a b+tree,
+since pages are linked, and records are stored only in the leaves.</p>
+
+<p>Terms specific to our implementation will be introduced as they are
+encountered in the document. </p>
+
+<h2>What is a b-tree?</h2>
+
+<p>This documentation assumes that you understand the theory behind the b-tree,
+and know the variations of implementation. If you are interested in learning
+about b-trees, this document could be a learning aid for you, but you should
+start with the Wikipedia articles on
+<a href="http://en.wikipedia.org/wiki/B-tree">B-trees</a> and
+<a href="http://en.wikipedia.org/wiki/B%2B_tree">B+trees</a>. </p>
+
+<h2>What flavor of b-tree is this?</h2>
+
+<p>Strata is a b-tree with leaf pages that contain records ordered by the
+collation order of the tree, indexed for retrieval in constant time, so that
+they can be found using binary search. Branch pages contain links to other
+pages, and do not store records themselves. Leaf pages are linked in ascending
+order to ease the implementation of cursors.</p>
+
+<p>There is a maximum size for a page, that limits the number of links, in the
+case of branch pages, or records in the case of leaf pages. When the maximum
+size is reached which point a node is split. When two sibling pages next to
+each other contain keys or records that combined are the less than than
+maximum size they are merged.</p>
+
+<p>The tree always has a root branch page. The order of the tree increases when
+the root branch is split. It decreases when the root branch is merged. The
+split of the root branch is a different operation from the split of a non-root
+branch, because the root branch does not have siblings.</p>
+
+<h2>Implementation</h2>
+
+<p>The b-tree has two types of pages. Leaf pages and branch pages.</p>
+
+<h3>Leaf Pages</h3>
+
+<p>Leaf pages contain records.</p>
+
+<p>In the abstract, a leaf page is an array data structure with zero based
+integer index. The elements of the structure contain records. Given an
+integer, the leaf page will return the record stored at element in the array.
+This lookup is performed in constant time.</p>
+
+<p>The records in the record array are ordered according to the collation of the
+b-tree. Because of this, and because a lookup takes constant time, we can search
+for a record in a leaf page using binary search in logorithmic time.</p>
+
+<p>The first record of every leaf page must be unique in relation to the first
+record of every other leaf page. The b-tree will accept records that are
+dupcliates according to the collation. When we split a page, we cannot cannot
+choose a partition that has the same value as the first record, since that
+would violate the unique first record constraint.</p>
+
+<p>If a page reaches the maximum leaf page size, filled with records that have
+the same value according to the collation, the leaf page is cannot split,
+since no suitable partition exists. The page will be allowed to grow beyond
+the maximum page size.</p>
+
+<h3>Branch Pages</h3>
+
+<p>Branch pages contain links to other pages. To find the a record in the b-tree,
+we first use branch pages to find the leaf page that contains our record.</p>
+
+<p>All pages are identified by a unique page address. The page address is an
+integer assigned to the page when the page is created. Branch pages link to
+other pages by storing the address of the referenced page in an array of page
+addresses. This array of page addresses is essentially an <em>array of children</em>.</p>
+
+<p>A branch page orders its children according to the b-tree collation using a
+record obtained from a leaf page as a <em>key</em>. A branch page always has one more
+children than the number of keys. Keys are unique. A key used in a branch page
+will not equal another key used in any branch page according to the collation.</p>
+
+<p>There are two special types of branch pages, the root page, and penultimate
+pages.</p>
+
+<h4>Root Branch Page</h4>
+
+<p>The root page is the first page we consult to find the desired leaf page. Our
+b-tree always contains a root page. The b-tree is never so empty that the root
+page disappears. The root page always has the same address.</p>
+
+<p>TK move. Until the root branch page is split, it is both the root branch page
+and a penultimate branch page.</p>
+
+<h4>Penultimate Branch Pages</h4>
+
+<p>A penultimate branch page is a branch page whose children are leaf pages. If a
+branch page is not penultimate, then its children are branch pages.</p>
+
+<p>In a penultimate branch page, the array of children is ordered by the b-tree
+collation using a first record in the referenced leaf page for ordering. That
+is, the first record of the leaf page is used as the key associated with a
+page address in a penultimate branch page.</p>
+
+<p>The non-leaf nodes of a b-tree have the property that the number of node
+children is one greater than the number of keys. We obtain this property by
+treating the first child as the left child of the entire page, and excluding
+its key from the search. We search the subsequent keys to find the first key
+that is grater than or equal to the record sought. Essentially, when we
+encouter a key that is greater than our sought record, we know that the record
+is contained in the leaf page child associated with the key before it.
+Although it sounds linear, we are able to perform this search using binary
+search in logorithmic time.</p>
+
+<p>By ignoring the key of the first leaf page, the penultimate branch page has a
+number of children that is one greater than the number of keys.</p>
+
+<p>Notice that, when we are inserting a record into a leaf page other than the
+left leaf page, we add it to a leaf page whose key is equal to or greater than
+the penultimate branch key, so that the first record does not change, and
+therefore that penultimate branch key does not change. The exception is the
+left leaf page, which accepts all the records less than the first key, and
+therefore may accept a record less than its current least record.</p>
+
+<p>An insertion can only insert a into the left most leaf page of a penumltimate
+branch page a record less than the least record of the leaf page.</p>
+
+<h4>Interior Branch Pages</h4>
+
+<p>A branch page whose children are other branch pages is called an interior
+branch page.</p>
+
+<p>Like the penultimate branch page, we treat the first child of an interior
+branch page as the left child of the entire page. Like the penultimate branch
+page the subsequent children have an associated key that is the first record
+of a leaf page.</p>
+
+<p>The key is obtained by decending the sub-tree referenced by the child. We
+first visit the branch page referneced by the child. We then visit left
+children recursively, visiting the left child of the child, and the left child
+of any subsquently visited children, until we reach a leaf page.  The first
+record of that leaf page is the key to associate with the child address in the
+address array of the interior branch page.</p>
+
+<p>It is the nature of the b-tree that keys move up to the higher levels of the
+tree as pages split, while preserving the collation order of the keys. When a
+branch page splits, a key from the middle of the page is chosen as a
+partition. The partition is used as the key for the right half of the split
+page in the parent page.</p>
+
+<p>Our implementation does not store the keys, as you may have noticed, but
+decends down to the leaf page to fetch the record to use as a key. </p>
+
+<p>We start from a penultimate page as a root page. When a leaf page fills, we
+split it, creating a new right leaf page. The penultimate page uses the first
+record of the new right page as the key to associate with that page.</p>
+
+<p>When the root penultimate page is full we split it, so that the root page is
+an interior page with two children, which are two penultimate pages. The tree
+now contains a root interior branch page, with a left penultimate branch page
+and a right penultimate branch page.</p>
+
+<p>The root interior branch page has one key. Prior to split, that key was
+associated with the address of a child leaf page. After split, the key is
+associated with the right penultimate branch page. The leaf page is now the
+left child of the right penultimate branch page.</p>
+
+<p>When we visit the root interior page, to obtain the key to associate with the
+right penultimate page, we visit the right penultimate page, then we visit its
+left child, the leaf page whose first record is the key.</p>
+
+<h3>Keys and First Records</h3>
+
+<p>We said that it is only possible for an insertion to insert a into the left
+most child leaf page of a penumltimate branch page a record less than the least
+record. We can say about a tree rooted by an interor branch page, that an
+insertion is only able to insert into the left most leaf page in the <em>entire
+tree</em> a record less than the least record.</p>
+
+<p>Using our example tree with one root interior page, with two penultimate
+branch page children, we cannot insert a record into the right penultimate
+branch page that will displace the first record of its left most child branch,
+because that first record is the key for the right penultimate branch page.
+When we insert a record that is less than the key, the search for a leaf page
+to store the record goes to the left of the key. It cannot descend into the
+right penultimate branch page, so it is impossible for it be inserted into
+left child of the right penultimate branch page, so the first record left
+child of the penultimate branch page will never be displaced by an insertion.</p>
+
+<p>Only if we insert a record that is less than least key of the left penultimate
+page do we face the possibility of displacing the first record of a leaf page,
+and that leaf page is the left most leaf page in the entire tree.</p>
+
+<p>This maintains a property of the b-tree that for every leaf page except the
+left most leaf page, there exists a unique branch page key derived from the
+first record of the page.</p>
+
+<p>As above, you can find the first record used to derive a key by visting the
+child and going left. You can find the leaf page to the left of the leaf page
+used to derive a page branch key, by visiting the child to the left of the key
+and going right.</p>
+
+<p>NOTE Literate programming has finally materialized with Docco and
+CoffeeScript.</p>
+
+<p>When the root page splits, it becomes an interior branch page. Until it splits
+it is both the root page and a penultimate page.</p>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-2">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-2">&#182;</a>               </div>               <p>Requried node.js libraries.</p>             </td>             <td class="code">               <div class="highlight"><pre><span class="nv">fs = </span><span class="nx">require</span> <span class="s2">&quot;fs&quot;</span></pre></div>             </td>           </tr>                               <tr id="section-3">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-3">&#182;</a>               </div>               <p>Copy values from one hash into another.</p>             </td>             <td class="code">               <div class="highlight"><pre><span class="nv">extend = </span><span class="nf">(to, from) -&gt;</span>
+  <span class="nx">to</span><span class="p">[</span><span class="nx">key</span><span class="p">]</span> <span class="o">=</span> <span class="nx">value</span> <span class="k">for</span> <span class="nx">key</span><span class="p">,</span> <span class="nx">value</span> <span class="k">of</span> <span class="nx">from</span>
+  <span class="nx">to</span></pre></div>             </td>           </tr>                               <tr id="section-4">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-4">&#182;</a>               </div>               <p>Useful for command debugging. If you don't see them called in the code, it
+means the code is absolutely bug free.</p>             </td>             <td class="code">               <div class="highlight"><pre><span class="nv">die = </span><span class="nf">(splat...) -&gt;</span>
+  <span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">.</span><span class="nx">apply</span> <span class="kc">null</span><span class="p">,</span> <span class="nx">splat</span> <span class="k">if</span> <span class="nx">splat</span><span class="p">.</span><span class="nx">length</span>
+  <span class="nx">process</span><span class="p">.</span><span class="nx">exit</span> <span class="mi">1</span>
+<span class="nv">say = </span><span class="nf">(splat...) -&gt;</span> <span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">.</span><span class="nx">apply</span> <span class="kc">null</span><span class="p">,</span> <span class="nx">splat</span></pre></div>             </td>           </tr>                               <tr id="section-5">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-5">&#182;</a>               </div>               <h3>Collation</h3>
+
+<p>A b-tree has a client defined collation. The collation is determined by the
+combination of an extractor and a comparator. The extractor is used to
+extract or calculate from the stored record the fields values pertient to the
+collation. The comparator is used to order records by comparing the extracted
+fields.</p>
+
+<p>The extractor allows us to cache the fields pertinent to the collation. It may
+be the case that records have large fields that are not pertinent to the
+collation. If we are only using the record as a point of reference while
+searchng the tree, we allow the record to fall out of the cache, and hold onto
+only the pertient fields. </p>
+
+<p>This strategy wouldn't work if extraction and comparison were the same
+function. By making them separate functions, we can cache the intermediate
+extraction step.</p>
+
+<p>Additionally, the comparitor is pretty easily generalized, while the exractor
+is invariably specialized.</p>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-6">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-6">&#182;</a>               </div>               <p>Default comparator is good only for strings, use a - b for numbers.</p>             </td>             <td class="code">               <div class="highlight"><pre><span class="nv">comparator = </span><span class="nf">(a, b) -&gt;</span>
+  <span class="k">if</span> <span class="nx">a</span> <span class="o">&lt;</span> <span class="nx">b</span> <span class="k">then</span> <span class="o">-</span><span class="mi">1</span> <span class="k">else</span> <span class="k">if</span> <span class="nx">a</span> <span class="o">&gt;</span> <span class="nx">b</span> <span class="k">then</span> <span class="mi">1</span> <span class="k">else</span> <span class="mi">0</span></pre></div>             </td>           </tr>                               <tr id="section-7">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-7">&#182;</a>               </div>               <p>Default extractor returns the value as hole, i.e. tree of integers.</p>             </td>             <td class="code">               <div class="highlight"><pre><span class="nv">extractor = </span><span class="nf">(a) -&gt;</span> <span class="nx">a</span></pre></div>             </td>           </tr>                               <tr id="section-8">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-8">&#182;</a>               </div>               <h2>Page Storage</h2>
+
+<p>A <em>leaf page file</em> contains insert objects, delete objects and address array
+objects, stored as JSON, one object per line, as described above. The JSON
+objects stored on behalf of the client are called <em>records</em> and they are
+contained within the insert objects.</p>
+
+<p>A <em>branch page file</em> contains a single JSON object stored on a single line
+that contains the array of child page addresses.</p>
+
+<p>The <code>IO</code> class manages the wholesale reading and writing of page files. The
+<code>RecordIO</code> class manages the insertion and deletion of individual records in a
+leaf page file.</p>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-9">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-9">&#182;</a>               </div>                            </td>             <td class="code">               <div class="highlight"><pre><span class="k">class</span> <span class="nx">IO</span></pre></div>             </td>           </tr>                               <tr id="section-10">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-10">&#182;</a>               </div>               <p>Each page is stored in its own file. The files are all kept in a single
+directory. The directory is specified by the client when the database object
+is constructed.</p>
+
+<p>The <code>IO</code> class needs the <code>extractor</code> to extract keys from records. It does
+not store the <code>extractor</code>, of course.</p>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-11">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-11">&#182;</a>               </div>               <p>Set directory and extractor. Initialze the page cache and MRU list.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">constructor: </span><span class="nf">(@directory, @extractor) -&gt;</span>
+    <span class="vi">@cache          = </span><span class="p">{}</span>
+    <span class="vi">@head           = </span><span class="p">{</span> <span class="nv">address: </span><span class="o">-</span><span class="mi">1</span> <span class="p">}</span>
+    <span class="vi">@head.next      = </span><span class="nx">@head</span>
+    <span class="vi">@head.previous  = </span><span class="nx">@head</span>
+    <span class="vi">@nextAddress    = </span><span class="mi">0</span></pre></div>             </td>           </tr>                               <tr id="section-12">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-12">&#182;</a>               </div>               <p>Pages are identified by an integer page address. The page address is a number
+that is incremented as new pages are created. A page file has a file name that
+includes the page address.  When we load a page, we first derive the file name
+from the page address, then we load the file.</p>
+
+<p>The <code>filename</code> method accepts a suffix, so that we can create replacement
+files. Instead of overwriting an existing page file, we create a replacement
+with the suffix <code>.new</code>. We then delete the existing file and rename the
+replacement file using the <code>relink</code> method. This two step write is part of
+our crash recovery strategy.</p>
+
+<p>We always write out entire branch page files. Leaf pages files are updated
+by appending, but on occasion we rewrite them to vaccum deleted records.</p>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-13">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-13">&#182;</a>               </div>               <p>Create a file name for a given address with an optional suffix.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">filename: </span><span class="nf">(address, suffix) -&gt;</span>
+    <span class="nx">suffix</span> <span class="o">or=</span> <span class="s2">&quot;&quot;</span>
+    <span class="nv">padding = </span><span class="s2">&quot;00000000&quot;</span><span class="p">.</span><span class="nx">substring</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">8</span> <span class="o">-</span> <span class="nb">String</span><span class="p">(</span><span class="nx">address</span><span class="p">).</span><span class="nx">length</span><span class="p">)</span>
+    <span class="s2">&quot;#{@directory}/segment#{padding}#{address}#{suffix}&quot;</span></pre></div>             </td>           </tr>                               <tr id="section-14">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-14">&#182;</a>               </div>               <p>Move a replacement page file into place. Unlink the existing page file, then
+rename the new page file to the permanent name of the page file.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">relink: </span><span class="nf">(page, _) -&gt;</span>
+    <span class="nv">replacement = </span><span class="nx">@filename</span><span class="p">(</span><span class="nx">page</span><span class="p">.</span><span class="nx">address</span><span class="p">,</span> <span class="s2">&quot;.new&quot;</span><span class="p">)</span>
+    <span class="nv">stat = </span><span class="nx">fs</span><span class="p">.</span><span class="nx">stat</span> <span class="nx">replacement</span><span class="p">,</span> <span class="nx">_</span>
+    <span class="k">if</span> <span class="o">not</span> <span class="nx">stat</span><span class="p">.</span><span class="nx">isFile</span><span class="p">()</span>
+      <span class="k">throw</span> <span class="k">new</span> <span class="nb">Error</span> <span class="s2">&quot;not a file&quot;</span>
+    <span class="nv">permanent = </span><span class="nx">@filename</span><span class="p">(</span><span class="nx">page</span><span class="p">.</span><span class="nx">address</span><span class="p">)</span>
+    <span class="k">try</span>
+      <span class="nx">fs</span><span class="p">.</span><span class="nx">unlink</span> <span class="nx">permanent</span><span class="p">,</span> <span class="nx">_</span>
+    <span class="k">catch</span> <span class="nx">e</span>
+      <span class="k">throw</span> <span class="nx">e</span> <span class="nx">unless</span> <span class="nx">e</span><span class="p">.</span><span class="nx">code</span> <span class="o">is</span> <span class="s2">&quot;ENOENT&quot;</span>
+    <span class="nx">fs</span><span class="p">.</span><span class="nx">rename</span> <span class="nx">replacement</span><span class="p">,</span> <span class="nx">permanent</span><span class="p">,</span> <span class="nx">_</span></pre></div>             </td>           </tr>                               <tr id="section-15">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-15">&#182;</a>               </div>               <p>We create a new branch pages in memory. They do not exist on disk until they
+are first written.</p>
+
+<p>A new branch page is given the next unused page number.</p>
+
+<p>In memory, a branch page is an array of child page addresses. It keeps track
+of its key and whether or not it is a penultimate branch page. The cache is
+used to cache the keys associated with the child page addresses. The cache
+maps the address of a child page to a key extracted from the first record of
+the leaf page referenced by the child page address.</p>
+
+<p>Our in memory is also cached and added as a node an MRU list. We must make
+sure that each page has only one in memory representation, because the in
+memory page is used for locking.</p>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-16">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-16">&#182;</a>               </div>                            </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">allocateBranches: </span><span class="nf">(penultimate) -&gt;</span>
+    <span class="nv">address = </span><span class="nx">@nextAddress</span><span class="o">++</span>
+    <span class="nv">link = </span><span class="nx">@link</span><span class="p">({</span> <span class="nx">penultimate</span><span class="p">,</span> <span class="nx">address</span><span class="p">,</span> <span class="nv">addresses: </span><span class="p">[],</span> <span class="nv">cache: </span><span class="p">{}</span> <span class="p">})</span>
+    <span class="nx">@cache</span><span class="p">[</span><span class="nx">address</span><span class="p">]</span> <span class="o">=</span> <span class="nx">link</span></pre></div>             </td>           </tr>                               <tr id="section-17">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-17">&#182;</a>               </div>               <p>We write the branch page to a file as a single JSON object on a single line.
+We tuck the page properties into an object, and then serialize that object.
+We do not store the branch page keys. They are looked up as needed as
+described in the b-tree overview above.</p>
+
+<p>We always write a page branch first to a replacement file, then move it
+until place using <code>relink</code>.</p>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-18">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-18">&#182;</a>               </div>                            </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">rewriteBranches: </span><span class="nf">(page, _) -&gt;</span>
+    <span class="nx">link</span> <span class="nx">unlink</span> <span class="nx">page</span>
+    <span class="nv">filename = </span><span class="nx">@filename</span> <span class="nx">page</span><span class="p">.</span><span class="nx">address</span><span class="p">,</span> <span class="s2">&quot;.new&quot;</span>
+    <span class="nv">record = </span><span class="p">[</span> <span class="nx">page</span><span class="p">.</span><span class="nx">penultimate</span><span class="p">,</span> <span class="nx">page</span><span class="p">.</span><span class="nx">next</span><span class="o">?</span><span class="p">.</span><span class="nx">address</span><span class="p">,</span> <span class="nx">page</span><span class="p">.</span><span class="nx">addresses</span> <span class="p">]</span>
+    <span class="nv">json = </span><span class="nx">JSON</span><span class="p">.</span><span class="nx">stringify</span><span class="p">(</span><span class="nx">record</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;\n&quot;</span>
+    <span class="nx">fs</span><span class="p">.</span><span class="nx">writeFile</span> <span class="nx">filename</span><span class="p">,</span> <span class="nx">json</span><span class="p">,</span> <span class="s2">&quot;utf8&quot;</span><span class="p">,</span> <span class="nx">_</span></pre></div>             </td>           </tr>                               <tr id="section-19">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-19">&#182;</a>               </div>               <p>To read a branch page we read the entire page and evaluate it as JSON. We
+did not store the branch page keys. They are looked up as needed as
+described in the b-tree overview above.</p>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-20">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-20">&#182;</a>               </div>                            </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">readBranches: </span><span class="nf">(page, _) -&gt;</span>
+    <span class="nx">link</span> <span class="nx">unlink</span> <span class="nx">page</span>
+    <span class="nv">filename = </span><span class="nx">@filename</span> <span class="nx">page</span><span class="p">.</span><span class="nx">address</span>
+    <span class="nv">json = </span><span class="nx">fs</span><span class="p">.</span><span class="nx">readFile</span> <span class="nx">filename</span><span class="p">,</span> <span class="s2">&quot;utf8&quot;</span><span class="p">,</span> <span class="nx">_</span>
+    <span class="p">[</span> <span class="nx">penultimate</span><span class="p">,</span> <span class="nx">next</span><span class="p">,</span> <span class="nx">addresses</span> <span class="p">]</span> <span class="o">=</span> <span class="nx">JSON</span><span class="p">.</span><span class="nx">parse</span> <span class="nx">json</span>
+    <span class="nx">extend</span> <span class="nx">page</span><span class="p">,</span> <span class="p">{</span> <span class="nx">penultimate</span><span class="p">,</span> <span class="nx">next</span><span class="p">,</span> <span class="nx">addresses</span> <span class="p">}</span></pre></div>             </td>           </tr>                               <tr id="section-21">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-21">&#182;</a>               </div>               <p>After creating a database object, the client will either open the existing
+database, or create a new database.</p>             </td>             <td class="code">               <div class="highlight"><pre>  </pre></div>             </td>           </tr>                               <tr id="section-22">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-22">&#182;</a>               </div>               <p>Create the database detroying any exisiting database.</p>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-23">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-23">&#182;</a>               </div>               <p>&mdash;</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">create: </span><span class="nf">(_) -&gt;</span></pre></div>             </td>           </tr>                               <tr id="section-24">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-24">&#182;</a>               </div>               <p>Create the directory if it doesn't exist.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="k">try</span>
+      <span class="nv">stat = </span><span class="nx">fs</span><span class="p">.</span><span class="nx">stat</span> <span class="nx">@directory</span><span class="p">,</span> <span class="nx">_</span>
+      <span class="k">if</span> <span class="o">not</span> <span class="nx">stat</span><span class="p">.</span><span class="nx">isDirectory</span><span class="p">()</span>
+        <span class="k">throw</span> <span class="k">new</span> <span class="nb">Error</span> <span class="s2">&quot;database #{@directory} is not a directory.&quot;</span>
+    <span class="k">catch</span> <span class="nx">e</span>
+      <span class="k">throw</span> <span class="nx">e</span> <span class="k">if</span> <span class="nx">e</span><span class="p">.</span><span class="nx">code</span> <span class="o">isnt</span> <span class="s2">&quot;ENOENT&quot;</span>
+      <span class="nx">fs</span><span class="p">.</span><span class="nx">mkdir</span> <span class="nx">@directory</span><span class="p">,</span> <span class="mi">0755</span><span class="p">,</span> <span class="nx">_</span></pre></div>             </td>           </tr>                               <tr id="section-25">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-25">&#182;</a>               </div>               <p>Create a root branch with a single empty leaf.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nv">root = </span><span class="nx">@allocateBranches</span> <span class="kc">true</span>
+    <span class="nv">leaf = </span><span class="nx">@allocateLeaves</span><span class="p">([],</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="nx">root</span><span class="p">.</span><span class="nx">addresses</span><span class="p">.</span><span class="nx">push</span> <span class="nx">leaf</span><span class="p">.</span><span class="nx">address</span></pre></div>             </td>           </tr>                               <tr id="section-26">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-26">&#182;</a>               </div>               <p>Write the root branch.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nx">@writeBranches</span> <span class="nx">root</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="nx">_</span>
+    <span class="nx">@rewriteLeaves</span> <span class="nx">leaf</span><span class="p">,</span> <span class="nx">_</span>
+    <span class="nx">@relink</span> <span class="nx">leaf</span><span class="p">,</span> <span class="nx">_</span></pre></div>             </td>           </tr>                               <tr id="section-27">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-27">&#182;</a>               </div>               <p>Open an existing database.</p>             </td>             <td class="code">               <div class="highlight"><pre>  </pre></div>             </td>           </tr>                               <tr id="section-28">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-28">&#182;</a>               </div>               <p>&mdash;</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">open: </span><span class="nf">(_) -&gt;</span>
+    <span class="k">try</span>
+      <span class="nv">stat = </span><span class="nx">fs</span><span class="p">.</span><span class="nx">stat</span> <span class="nx">@directory</span><span class="p">,</span> <span class="nx">_</span>
+      <span class="k">if</span> <span class="o">not</span> <span class="nx">stat</span><span class="p">.</span><span class="nx">isDirectory</span><span class="p">()</span>
+        <span class="k">throw</span> <span class="k">new</span> <span class="nb">Error</span> <span class="s2">&quot;database #{@directory} is not a directory.&quot;</span>
+    <span class="k">catch</span> <span class="nx">e</span>
+      <span class="k">if</span> <span class="nx">e</span><span class="p">.</span><span class="nx">code</span> <span class="o">isnt</span> <span class="s2">&quot;ENOENT&quot;</span>
+        <span class="k">throw</span> <span class="k">new</span> <span class="nb">Error</span> <span class="s2">&quot;database #{@directory} does not exist.&quot;</span>
+      <span class="k">else</span>
+        <span class="k">throw</span> <span class="nx">e</span>
+    <span class="k">for</span> <span class="nx">file</span> <span class="k">in</span> <span class="nx">fs</span><span class="p">.</span><span class="nx">readdir</span> <span class="nx">@directory</span><span class="p">,</span> <span class="nx">_</span>
+      <span class="k">if</span> <span class="nv">match = </span><span class="sr">/^segment(\d+)$/</span><span class="p">.</span><span class="nx">exec</span> <span class="nx">file</span>
+        <span class="nv">address = </span><span class="nb">parseInt</span> <span class="nx">match</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="mi">10</span>
+        <span class="vi">@nextAddress = </span><span class="nx">address</span> <span class="o">+</span> <span class="mi">1</span> <span class="k">if</span> <span class="nx">address</span> <span class="o">&gt;</span> <span class="nx">@nextAddress</span></pre></div>             </td>           </tr>                               <tr id="section-29">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-29">&#182;</a>               </div>               <p>TODO Very soon.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">close: </span><span class="nf">(_) -&gt;</span></pre></div>             </td>           </tr>                               <tr id="section-30">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-30">&#182;</a>               </div>               <p>A branch page file contains a single object that includes the array of page
+addresses that reference the branch page's children.</p>
+
+<p>The branch page file also stores a penultimate flag, and the address of the
+next sibling of the branch
+page.
+The keys associated with the child addresses are not stored in the
+branch page.</p>
+
+<p>Put another way, each branch element in a branch page represents a leaf page.
+The leaf pages are sorted by the tree collation. The object value used to sort
+the branch page is first element in the sorted leaf page.</p>
+
+<p>TODO Okay, what? I'm forgetting that I need the addresses to inner tiers as
+well as to leaf tiers, both, when the tier is not penultimate. Descending is
+not going to work, that is going to load the entire tree into memory quickly.</p>
+
+<p>Hmm... Maybe not. Tree four deep means loading only a particular path. It
+ensures that we read lock our way down the tree to get our record. Although, I
+believe I thought long and hard about this, and jumping down to the leaves
+wasn't a problem.</p>
+
+<p>We only need to store the sorted array of the leaf tier addresses in our
+branch tier, since we can obtain the object used to collate the address</p>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-31">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-31">&#182;</a>               </div>               <p>Link tier to the head of the MRU list.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">link: </span><span class="nf">(entry) -&gt;</span>
+    <span class="nv">next = </span><span class="nx">@head</span><span class="p">.</span><span class="nx">next</span>
+    <span class="nv">entry.next = </span><span class="nx">next</span>
+    <span class="nv">next.previous = </span><span class="nx">entry</span>
+    <span class="vi">@head.next = </span><span class="nx">entry</span>
+    <span class="nv">entry.previous = </span><span class="nx">@head</span>
+    <span class="nx">entry</span></pre></div>             </td>           </tr>                               <tr id="section-32">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-32">&#182;</a>               </div>               <p>Unlnk a tier from the MRU list.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">unlink: </span><span class="nf">(entry) -&gt;</span>
+    <span class="p">{</span> <span class="nx">next</span><span class="p">,</span> <span class="nx">previous</span> <span class="p">}</span> <span class="o">=</span> <span class="nx">entry</span>
+    <span class="nv">next.previous = </span><span class="nx">previous</span>
+    <span class="nv">previous.next = </span><span class="nx">next</span>
+    <span class="nx">entry</span>
+
+  <span class="nv">allocateLeaves: </span><span class="nf">(addresses, right) -&gt;</span>
+    <span class="nv">address = </span><span class="nx">@nextAddress</span><span class="o">++</span>
+    <span class="nx">@cache</span><span class="p">[</span><span class="nx">address</span><span class="p">]</span> <span class="o">=</span> <span class="nx">@link</span>
+      <span class="nv">leaf: </span><span class="kc">true</span>
+      <span class="nv">address: </span><span class="nx">address</span>
+      <span class="nv">addresses: </span><span class="nx">addresses</span>
+      <span class="nv">cache: </span><span class="p">{}</span>
+      <span class="nv">right: </span><span class="nx">right</span>
+      <span class="nv">io: </span><span class="k">new</span> <span class="nx">LeafIO</span> <span class="nx">@filename</span> <span class="nx">address</span></pre></div>             </td>           </tr>                               <tr id="section-33">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-33">&#182;</a>               </div>               <p>Going forward, every will story keys, so that when we encounter a record, we
+don't have to run the extractor, plus we get some caching.</p>
+
+<p>Or maybe just three arrays, key, object and address? I'm talking about using
+each key as an object cache, by adding an object member to the key. But,
+they cache container is a hash table, which is a compactish representation,
+so why not make it yet anohter hash table? The logic gets a lot easier.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">object: </span><span class="nf">(tier, index, _) -&gt;</span>
+    <span class="nv">address = </span><span class="nx">tier</span><span class="p">.</span><span class="nx">addresses</span><span class="p">[</span><span class="nx">index</span><span class="p">]</span>
+    <span class="k">if</span> <span class="o">not</span> <span class="nv">object = </span><span class="nx">tier</span><span class="p">.</span><span class="nx">cache</span><span class="p">[</span><span class="nx">address</span><span class="p">]</span>
+      <span class="nv">object = </span><span class="nx">tier</span><span class="p">.</span><span class="nx">cache</span><span class="p">[</span><span class="nx">address</span><span class="p">]</span> <span class="o">=</span> <span class="nx">tier</span><span class="p">.</span><span class="nx">io</span><span class="p">.</span><span class="nx">readObject</span> <span class="nx">address</span><span class="p">,</span> <span class="nx">_</span>
+    <span class="nx">object</span>
+
+  <span class="nv">key: </span><span class="nf">(tierOrAddress, index, _) -&gt;</span>
+    <span class="k">if</span> <span class="k">typeof</span> <span class="nx">tierOrAddress</span> <span class="o">is</span> <span class="s2">&quot;number&quot;</span>
+      <span class="nv">leaf  = </span><span class="nx">@lock</span> <span class="kc">false</span><span class="p">,</span> <span class="nx">tierOrAddress</span><span class="p">,</span> <span class="kc">true</span><span class="p">,</span> <span class="nx">_</span>
+      <span class="nv">key = </span><span class="nx">@extractor</span> <span class="nx">@object</span> <span class="nx">leaf</span><span class="p">,</span> <span class="nx">index</span><span class="p">,</span> <span class="nx">_</span>
+      <span class="nx">@release</span> <span class="nx">leaf</span>
+      <span class="nx">key</span>
+    <span class="k">else</span> <span class="k">if</span> <span class="nx">tierOrAddress</span><span class="p">.</span><span class="nx">leaf</span>
+      <span class="nx">@extractor</span> <span class="nx">@object</span> <span class="nx">tierOrAddress</span><span class="p">,</span> <span class="nx">index</span><span class="p">,</span> <span class="nx">_</span>
+    <span class="k">else</span>
+      <span class="nv">address = </span><span class="nx">tierOrAddress</span><span class="p">.</span><span class="nx">addresses</span><span class="p">[</span><span class="nx">index</span><span class="p">]</span>
+      <span class="k">if</span> <span class="o">not</span> <span class="nv">key = </span><span class="nx">tierOrAddress</span><span class="p">.</span><span class="nx">cache</span><span class="p">[</span><span class="nx">address</span><span class="p">]</span></pre></div>             </td>           </tr>                               <tr id="section-34">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-34">&#182;</a>               </div>               <p>Here's something to consdier. The only time we lock the leaf is during
+descent, to read in the key.</p>
+
+<p>If this leaf tier is locked exclusively, we are not the ones holding the
+lock, because that would mean that we are locking the inner tier, we
+would already have traversed the inner tier, the key would be in the
+cache.</p>
+
+<p>If this leaf tier has an exclusive lock pending, it is not a lock that
+we are waiting for, so we can append a shared lock and wait for multiple
+exclusive and shared locks to clear.</p>             </td>             <td class="code">               <div class="highlight"><pre>        <span class="nv">key = </span><span class="nx">tierOrAddress</span><span class="p">.</span><span class="nx">cache</span><span class="p">[</span><span class="nx">address</span><span class="p">]</span> <span class="o">=</span> <span class="nx">@key</span> <span class="nx">address</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="nx">_</span>
+      <span class="nx">key</span></pre></div>             </td>           </tr>                               <tr id="section-35">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-35">&#182;</a>               </div>               <p>TODO Consider: can't I always just rewrite and link?</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">rewriteBranches: </span><span class="nf">(tier, _) -&gt;</span>
+    <span class="nx">@writeBranches</span><span class="p">(</span><span class="nx">tier</span><span class="p">,</span> <span class="s2">&quot;.new&quot;</span><span class="p">,</span> <span class="nx">_</span><span class="p">)</span></pre></div>             </td>           </tr>                               <tr id="section-36">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-36">&#182;</a>               </div>               <p>TODO Ensure that you close the current tier I/O. Also, you must also be very
+much locked before you use this, but I'm sure you know that.</p>             </td>             <td class="code">               <div class="highlight"><pre>  </pre></div>             </td>           </tr>                               <tr id="section-37">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-37">&#182;</a>               </div>               <p>Compact a leaf tier file by writing it to a temporary file that will become
+the permanent file. All of records referenced by the current address array a
+appended to a new leaf tier file using insert objects. An address array
+object is appended to the end of new leaf tier file. The new file will load
+quickly, because the address array object will be found immediately.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">rewriteLeaves: </span><span class="nf">(tier, _) -&gt;</span>
+    <span class="nv">io = </span><span class="k">new</span> <span class="nx">LeafIO</span> <span class="nx">@filename</span><span class="p">(</span><span class="nx">tier</span><span class="p">.</span><span class="nx">address</span><span class="p">,</span> <span class="s2">&quot;.new&quot;</span><span class="p">)</span>
+    <span class="nv">addresses = </span><span class="p">[]</span>
+    <span class="nv">cache = </span><span class="p">{}</span>
+    <span class="k">for</span> <span class="nx">i</span> <span class="k">in</span> <span class="p">[</span><span class="mi">0</span><span class="p">...</span><span class="nx">tier</span><span class="p">.</span><span class="nx">addresses</span><span class="p">.</span><span class="nx">length</span><span class="p">]</span>
+      <span class="nv">object = </span><span class="nx">@object</span> <span class="nx">tier</span><span class="p">,</span> <span class="nx">i</span><span class="p">,</span> <span class="nx">_</span>
+      <span class="nv">address = </span><span class="nx">io</span><span class="p">.</span><span class="nx">writeInsert</span><span class="p">(</span><span class="nx">object</span><span class="p">,</span> <span class="nx">i</span><span class="p">,</span> <span class="nx">_</span><span class="p">)</span>
+      <span class="nx">addresses</span><span class="p">.</span><span class="nx">push</span> <span class="nx">address</span>
+      <span class="nx">cache</span><span class="p">[</span><span class="nx">address</span><span class="p">]</span> <span class="o">=</span> <span class="nx">object</span>
+    <span class="nx">io</span><span class="p">.</span><span class="nx">writeAddresses</span><span class="p">(</span><span class="nx">tier</span><span class="p">.</span><span class="nx">right</span><span class="p">,</span> <span class="nx">addresses</span><span class="p">,</span> <span class="nx">_</span><span class="p">)</span>
+    <span class="nx">io</span><span class="p">.</span><span class="nx">close</span><span class="p">(</span><span class="nx">_</span><span class="p">)</span>
+    <span class="nx">extend</span> <span class="nx">tier</span><span class="p">,</span> <span class="p">{</span> <span class="nx">addresses</span><span class="p">,</span> <span class="nx">cache</span> <span class="p">}</span>
+
+  <span class="nv">readLeaves: </span><span class="nf">(tier, _) -&gt;</span>
+    <span class="nv">filename = </span><span class="nx">@filename</span> <span class="nx">tier</span><span class="p">.</span><span class="nx">address</span>
+    <span class="nv">stat = </span><span class="nx">fs</span><span class="p">.</span><span class="nx">stat</span> <span class="nx">filename</span><span class="p">,</span> <span class="nx">_</span>
+    <span class="nv">fd = </span><span class="nx">fs</span><span class="p">.</span><span class="nx">open</span> <span class="nx">filename</span><span class="p">,</span> <span class="s2">&quot;r+&quot;</span><span class="p">,</span> <span class="nx">_</span></pre></div>             </td>           </tr>                               <tr id="section-38">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-38">&#182;</a>               </div>               <p>Obviously, while all this is going on, I could end up writing to the
+leaf, because it is not actually locked. First lock, then load. The
+entry object needs to be linked, then loaded.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nv">line      = </span><span class="s2">&quot;&quot;</span>
+    <span class="nv">offset    = </span><span class="o">-</span><span class="mi">1</span>
+    <span class="nv">end       = </span><span class="nx">stat</span><span class="p">.</span><span class="nx">size</span>
+    <span class="nv">eol       = </span><span class="nx">stat</span><span class="p">.</span><span class="nx">size</span>
+    <span class="nv">splices   = </span><span class="p">[]</span>
+    <span class="nv">addresses = </span><span class="p">[]</span>
+    <span class="nv">cache     = </span><span class="p">{}</span>
+    <span class="nv">buffer    = </span><span class="k">new</span> <span class="nx">Buffer</span><span class="p">(</span><span class="mi">1024</span><span class="p">)</span>
+    <span class="k">while</span> <span class="nx">end</span>
+      <span class="nv">end     = </span><span class="nx">eol</span>
+      <span class="nv">start   = </span><span class="nx">end</span> <span class="o">-</span> <span class="nx">buffer</span><span class="p">.</span><span class="nx">length</span>
+      <span class="nv">start   = </span><span class="mi">0</span> <span class="k">if</span> <span class="nx">start</span> <span class="o">&lt;</span> <span class="mi">0</span>
+      <span class="nv">read    = </span><span class="nx">fs</span><span class="p">.</span><span class="nx">read</span> <span class="nx">fd</span><span class="p">,</span> <span class="nx">buffer</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="nx">buffer</span><span class="p">.</span><span class="nx">length</span><span class="p">,</span> <span class="nx">start</span><span class="p">,</span> <span class="nx">_</span>
+      <span class="nx">end</span>    <span class="o">-=</span> <span class="nx">read</span>
+      <span class="nv">offset  = </span><span class="nx">read</span>
+      <span class="k">if</span> <span class="nx">buffer</span><span class="p">[</span><span class="o">--</span><span class="nx">read</span><span class="p">]</span> <span class="o">isnt</span> <span class="mh">0x0A</span>
+        <span class="k">throw</span> <span class="k">new</span> <span class="nb">Error</span> <span class="s2">&quot;corrupt leaves&quot;</span>
+      <span class="nv">eos     = </span><span class="nx">read</span> <span class="o">+</span> <span class="mi">1</span>
+      <span class="nv">stop    = </span><span class="k">if</span> <span class="nx">start</span> <span class="o">is</span> <span class="mi">0</span> <span class="k">then</span> <span class="mi">0</span> <span class="k">else</span> <span class="o">-</span><span class="mi">1</span>
+      <span class="k">while</span> <span class="nx">read</span> <span class="o">!=</span> <span class="mi">0</span>
+        <span class="nv">read = </span><span class="nx">read</span> <span class="o">-</span> <span class="mi">1</span>
+        <span class="k">if</span> <span class="nx">buffer</span><span class="p">[</span><span class="nx">read</span><span class="p">]</span> <span class="o">is</span> <span class="mh">0x0A</span> <span class="o">or</span> <span class="nx">read</span> <span class="o">is</span> <span class="nx">stop</span>
+          <span class="nv">record = </span><span class="nx">JSON</span><span class="p">.</span><span class="nx">parse</span> <span class="nx">buffer</span><span class="p">.</span><span class="nx">toString</span><span class="p">(</span><span class="s2">&quot;utf8&quot;</span><span class="p">,</span> <span class="nx">read</span><span class="p">,</span> <span class="nx">eos</span><span class="p">)</span>
+          <span class="nv">eos   = </span><span class="nx">read</span> <span class="o">+</span> <span class="mi">1</span>
+          <span class="nv">index = </span><span class="nx">record</span><span class="p">.</span><span class="nx">shift</span><span class="p">()</span>
+          <span class="k">if</span> <span class="nx">index</span> <span class="o">is</span> <span class="mi">0</span>
+            <span class="p">[</span> <span class="nx">addresses</span><span class="p">,</span> <span class="nx">end</span> <span class="p">]</span> <span class="o">=</span> <span class="p">[</span> <span class="nx">record</span><span class="p">,</span> <span class="mi">0</span> <span class="p">]</span>
+            <span class="k">break</span>
+          <span class="k">else</span>
+            <span class="nx">splices</span><span class="p">.</span><span class="nx">push</span> <span class="p">[</span> <span class="nx">index</span><span class="p">,</span> <span class="nx">start</span> <span class="o">+</span> <span class="nx">read</span> <span class="p">]</span>
+            <span class="k">if</span> <span class="nx">index</span> <span class="o">&gt;</span> <span class="mi">0</span>
+              <span class="nx">cache</span><span class="p">[</span><span class="nx">start</span> <span class="o">+</span> <span class="nx">read</span><span class="p">]</span> <span class="o">=</span> <span class="nx">record</span><span class="p">.</span><span class="nx">shift</span><span class="p">()</span>
+      <span class="nv">eol = </span><span class="nx">start</span> <span class="o">+</span> <span class="nx">eos</span>
+    <span class="nx">splices</span><span class="p">.</span><span class="nx">reverse</span><span class="p">()</span>
+    <span class="k">for</span> <span class="nx">splice</span> <span class="k">in</span> <span class="nx">splices</span>
+      <span class="p">[</span> <span class="nx">index</span><span class="p">,</span> <span class="nx">address</span> <span class="p">]</span> <span class="o">=</span> <span class="nx">splice</span>
+      <span class="k">if</span> <span class="nx">index</span> <span class="o">&gt;</span> <span class="mi">0</span>
+        <span class="nx">addresses</span><span class="p">.</span><span class="nx">splice</span><span class="p">(</span><span class="nx">index</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="nx">address</span><span class="p">)</span>
+      <span class="k">else</span>
+        <span class="nx">addresses</span><span class="p">.</span><span class="nx">splice</span><span class="p">(</span><span class="o">-</span><span class="p">(</span><span class="nx">index</span> <span class="o">+</span> <span class="mi">1</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="nx">fs</span><span class="p">.</span><span class="nx">close</span> <span class="nx">fd</span><span class="p">,</span> <span class="nx">_</span>
+    <span class="nv">loaded = </span><span class="kc">true</span>
+    <span class="nv">io = </span><span class="k">new</span> <span class="nx">LeafIO</span> <span class="nx">@filename</span> <span class="nx">tier</span><span class="p">.</span><span class="nx">address</span>
+    <span class="nv">tier = </span><span class="nx">extend</span> <span class="nx">tier</span><span class="p">,</span> <span class="p">{</span> <span class="nx">addresses</span><span class="p">,</span> <span class="nx">cache</span><span class="p">,</span> <span class="nx">loaded</span><span class="p">,</span> <span class="nx">io</span> <span class="p">}</span></pre></div>             </td>           </tr>                               <tr id="section-39">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-39">&#182;</a>               </div>               <p>TODO Move down, bring read and write up.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">lock: </span><span class="nf">(exclusive, address, leaf, callback) -&gt;</span>
+    <span class="k">if</span> <span class="o">not</span> <span class="nv">tier = </span><span class="nx">@cache</span><span class="p">[</span><span class="nx">address</span><span class="p">]</span>
+      <span class="nx">@cache</span><span class="p">[</span><span class="nx">address</span><span class="p">]</span> <span class="o">=</span> <span class="nv">tier =</span>
+        <span class="nx">@link</span><span class="p">({</span> <span class="nx">leaf</span><span class="p">,</span> <span class="nx">address</span><span class="p">,</span> <span class="nv">cache: </span><span class="p">{},</span> <span class="nv">addresses: </span><span class="p">[],</span> <span class="nv">locks: </span><span class="p">[[]]</span> <span class="p">})</span>
+    <span class="nv">locks = </span><span class="nx">tier</span><span class="p">.</span><span class="nx">locks</span>
+    <span class="k">if</span> <span class="nx">tier</span><span class="p">.</span><span class="nx">loaded</span>
+      <span class="nv">lock = </span><span class="nx">callback</span>
+    <span class="k">else</span>
+      <span class="nv">lock = </span><span class="p">(</span><span class="nx">error</span><span class="p">,</span> <span class="nx">tier</span><span class="p">)</span> <span class="o">=&gt;</span>
+        <span class="k">if</span> <span class="nx">error</span>
+          <span class="nx">callback</span> <span class="nx">error</span>
+        <span class="k">else</span> <span class="k">if</span> <span class="nx">tier</span><span class="p">.</span><span class="nx">loaded</span>
+          <span class="nx">callback</span> <span class="kc">null</span><span class="p">,</span> <span class="nx">tier</span>
+        <span class="k">else</span> <span class="k">if</span> <span class="nx">leaf</span>
+          <span class="nx">@readLeaves</span> <span class="nx">tier</span><span class="p">,</span> <span class="nx">callback</span>
+        <span class="k">else</span>
+          <span class="nx">@readBranches</span> <span class="nx">tier</span><span class="p">,</span> <span class="nx">callback</span>
+    <span class="k">if</span> <span class="nx">exclusive</span>
+      <span class="k">throw</span> <span class="k">new</span> <span class="nb">Error</span> <span class="s2">&quot;already locked&quot;</span> <span class="nx">unless</span> <span class="nx">locks</span><span class="p">.</span><span class="nx">length</span> <span class="o">%</span> <span class="mi">2</span>
+      <span class="nx">locks</span><span class="p">.</span><span class="nx">push</span> <span class="p">[</span> <span class="nx">lock</span> <span class="p">]</span>
+      <span class="nx">locks</span><span class="p">.</span><span class="nx">push</span> <span class="p">[]</span>
+      <span class="k">if</span> <span class="nx">locks</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="nx">length</span> <span class="o">is</span> <span class="mi">0</span>
+        <span class="nx">locks</span><span class="p">.</span><span class="nx">shift</span><span class="p">()</span>
+        <span class="nx">lock</span><span class="p">(</span><span class="kc">null</span><span class="p">,</span> <span class="nx">tier</span><span class="p">)</span>
+    <span class="k">else</span>
+      <span class="nx">locks</span><span class="p">[</span><span class="nx">locks</span><span class="p">.</span><span class="nx">length</span> <span class="o">-</span> <span class="mi">1</span><span class="p">].</span><span class="nx">push</span> <span class="nx">lock</span>
+      <span class="k">if</span> <span class="nx">locks</span><span class="p">.</span><span class="nx">length</span> <span class="o">is</span> <span class="mi">1</span>
+        <span class="nx">lock</span><span class="p">(</span><span class="kc">null</span><span class="p">,</span> <span class="nx">tier</span><span class="p">)</span>
+
+  <span class="nv">resume: </span><span class="nf">(tier, continuations) -&gt;</span>
+    <span class="nx">process</span><span class="p">.</span><span class="nx">nextTick</span> <span class="o">=&gt;</span>
+      <span class="k">for</span> <span class="nx">callback</span> <span class="k">in</span> <span class="nx">continuations</span>
+        <span class="nx">callback</span><span class="p">(</span><span class="kc">null</span><span class="p">,</span> <span class="nx">tier</span><span class="p">)</span></pre></div>             </td>           </tr>                               <tr id="section-40">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-40">&#182;</a>               </div>               <p>Remove the lock callback from the callback list..</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">release: </span><span class="nf">(tier) -&gt;</span>
+    <span class="nv">locks = </span><span class="nx">tier</span><span class="p">.</span><span class="nx">locks</span>
+    <span class="nv">running = </span><span class="nx">locks</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="nx">running</span><span class="p">.</span><span class="nx">shift</span><span class="p">()</span>
+    <span class="nx">say</span> <span class="p">{</span> <span class="nx">locks</span> <span class="p">}</span>
+    <span class="k">if</span> <span class="nx">running</span><span class="p">.</span><span class="nx">length</span> <span class="o">is</span> <span class="mi">0</span> <span class="o">and</span> <span class="nx">locks</span><span class="p">.</span><span class="nx">length</span> <span class="o">isnt</span> <span class="mi">1</span>
+      <span class="nx">locks</span><span class="p">.</span><span class="nx">shift</span><span class="p">()</span>
+      <span class="nx">@resume</span> <span class="nx">tier</span><span class="p">,</span> <span class="nx">locks</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="nx">locks</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="nx">length</span>
+      
+  <span class="nv">upgrade: </span><span class="nf">(tier, _) -&gt;</span>
+    <span class="nx">@release</span> <span class="nx">tier</span>
+    <span class="nx">@lock</span> <span class="kc">true</span><span class="p">,</span> <span class="nx">tier</span><span class="p">.</span><span class="nx">address</span><span class="p">,</span> <span class="kc">false</span><span class="p">,</span> <span class="nx">_</span></pre></div>             </td>           </tr>                               <tr id="section-41">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-41">&#182;</a>               </div>               <p>Glossary:</p>
+
+<ul>
+<li>Descent - What we call an attempt to move from a parent node to a child
+         node in  the tree, which may be paused because it encounters a
+         lock on a tier.</li>
+<li>Record - A JSON object stored in the b-tree.</li>
+<li>Object - JavaScript objects are referred to as objects in this
+        documentation and are not to be confused with actual records.</li>
+</ul>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-42">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-42">&#182;</a>               </div>                            </td>             <td class="code">               <div class="highlight"><pre><span class="k">class</span> <span class="nx">Mutation</span></pre></div>             </td>           </tr>                               <tr id="section-43">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-43">&#182;</a>               </div>               <p>The constructor always felt like a dangerous place to be doing anything
+meaningful in C++ or Java.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">constructor: </span><span class="nf">(@strata, @object, @key, @operation) -&gt;</span>
+    <span class="vi">@io         = </span><span class="nx">@strata</span><span class="p">.</span><span class="nx">_io</span>
+    <span class="vi">@options    = </span><span class="nx">@strata</span><span class="p">.</span><span class="nx">_options</span>
+
+    <span class="vi">@parent     = </span><span class="p">{</span> <span class="nv">operations: </span><span class="p">[],</span> <span class="nv">locks: </span><span class="p">[]</span> <span class="p">}</span>
+    <span class="vi">@child      = </span><span class="p">{</span> <span class="nv">operations: </span><span class="p">[],</span> <span class="nv">locks: </span><span class="p">[]</span> <span class="p">}</span>
+    <span class="vi">@exclusive  = </span><span class="p">[]</span>
+    <span class="vi">@shared     = </span><span class="p">[]</span>
+    <span class="vi">@pivots     = </span><span class="p">[]</span>
+
+    <span class="p">{</span> <span class="nx">@extractor</span><span class="p">,</span> <span class="nx">@comparator</span> <span class="p">}</span> <span class="o">=</span> <span class="nx">@options</span>
+
+    <span class="vi">@key        = </span><span class="nx">@extractor</span> <span class="nx">@object</span> <span class="k">if</span> <span class="nx">@object</span><span class="o">?</span> <span class="o">and</span> <span class="o">not</span> <span class="nx">key</span><span class="o">?</span>
+  </pre></div>             </td>           </tr>                               <tr id="section-44">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-44">&#182;</a>               </div>               <p>Descend the tree, optionally starting an exclusive descent. Once the descent
+is exclusive, all subsequent descents are exclusive.</p>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-45">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-45">&#182;</a>               </div>               <p><code>mutation.descend(exclusive)</code> </p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">descend: </span><span class="nf">(exclusive) -&gt;</span></pre></div>             </td>           </tr>                               <tr id="section-46">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-46">&#182;</a>               </div>               <p>Add a new level to the plan.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nx">@plan</span><span class="p">.</span><span class="nx">unshift</span> <span class="p">{</span> <span class="nv">operations: </span><span class="p">[],</span> <span class="nv">addresses: </span><span class="p">[]</span> <span class="p">}</span></pre></div>             </td>           </tr>                               <tr id="section-47">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-47">&#182;</a>               </div>               <p>Two or more exclusive levels mean that the parent is exclusive.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="k">if</span> <span class="nx">@exclusive</span><span class="p">.</span><span class="nx">length</span> <span class="o">&lt;</span> <span class="mi">1</span>
+      <span class="nx">@strata</span><span class="p">.</span><span class="nx">_release</span> <span class="nx">@parent</span></pre></div>             </td>           </tr>                               <tr id="section-48">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-48">&#182;</a>               </div>               <p>Any items in the exclusive level array means we are now locking exclusive.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nx">exclusive</span> <span class="o">or=</span> <span class="nx">@exclusive</span><span class="p">.</span><span class="nx">length</span> <span class="o">&gt;</span> <span class="mi">0</span></pre></div>             </td>           </tr>                               <tr id="section-49">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-49">&#182;</a>               </div>               <p>Make child a parent.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="vi">@parent = </span><span class="nx">@child</span>
+    <span class="vi">@child = </span><span class="p">{</span> <span class="nv">operations: </span><span class="p">[],</span> <span class="nv">locks: </span><span class="p">[],</span> <span class="nx">exclusive</span> <span class="p">}</span></pre></div>             </td>           </tr>                               <tr id="section-50">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-50">&#182;</a>               </div>               <p>Add the new child to the list of exclusive levels.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="k">if</span> <span class="nx">exclusive</span>
+      <span class="nx">@exclusive</span><span class="p">.</span><span class="nx">push</span><span class="p">(</span><span class="nx">@child</span><span class="p">)</span></pre></div>             </td>           </tr>                               <tr id="section-51">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-51">&#182;</a>               </div>               <p>Search for a value in a tier, returning the  index of the value or else
+where it should be inserted.</p>
+
+<p>There is some magic here, long forgotten at the time of documentation. The
+tree beneath each branch in an inner tier contains records whose value is
+equal to or greater than the pivot. Thus, the pivot of the first record on
+an inner tier is null, indicating that that is the branch for all values
+less than the value of the first branch with a real pivot.</p>
+
+<p>TODO: Reading through the code, this does not take this into account, and
+will problably send items that belong in the least value tree into the three
+that follows it. I'll clean this up with unit testing.</p>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-52">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-52">&#182;</a>               </div>               <p><code>mutation.find(tier, key, callback)</code></p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">find: </span><span class="nf">(tier, key, _) -&gt;</span>
+    <span class="nv">size = </span><span class="nx">tier</span><span class="p">.</span><span class="nx">addresses</span><span class="p">.</span><span class="nx">length</span>
+    <span class="k">if</span> <span class="nx">tier</span><span class="p">.</span><span class="nx">leaf</span>
+      <span class="p">[</span> <span class="nx">low</span><span class="p">,</span> <span class="nx">high</span><span class="p">,</span> <span class="nx">leaf</span> <span class="p">]</span> <span class="o">=</span> <span class="p">[</span> <span class="mi">0</span><span class="p">,</span> <span class="nx">size</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="kc">true</span> <span class="p">]</span>
+    <span class="k">else</span> <span class="k">if</span> <span class="nx">size</span> <span class="o">is</span> <span class="mi">1</span>
+      <span class="k">return</span> <span class="mi">0</span>
+    <span class="k">else</span>
+      <span class="p">[</span> <span class="nx">low</span><span class="p">,</span> <span class="nx">high</span> <span class="p">]</span> <span class="o">=</span> <span class="p">[</span> <span class="mi">1</span><span class="p">,</span> <span class="nx">size</span> <span class="o">-</span> <span class="mi">1</span> <span class="p">]</span>
+    <span class="p">{</span> <span class="nx">comparator</span><span class="p">,</span> <span class="nx">io</span> <span class="p">}</span> <span class="o">=</span> <span class="nx">@</span>
+    <span class="nx">loop</span>
+      <span class="nv">mid = </span><span class="p">(</span><span class="nx">low</span> <span class="o">+</span> <span class="nx">high</span><span class="p">)</span> <span class="o">&gt;&gt;&gt;</span> <span class="mi">1</span>
+      <span class="nv">compare = </span><span class="nx">comparator</span> <span class="nx">key</span><span class="p">,</span> <span class="nx">io</span><span class="p">.</span><span class="nx">key</span><span class="p">(</span><span class="nx">tier</span><span class="p">,</span> <span class="nx">mid</span><span class="p">,</span> <span class="nx">_</span><span class="p">)</span>
+      <span class="k">if</span> <span class="nx">compare</span> <span class="o">is</span> <span class="mi">0</span>
+        <span class="k">break</span>
+      <span class="k">if</span> <span class="nx">compare</span> <span class="o">&gt;</span> <span class="mi">0</span>
+        <span class="nv">low = </span><span class="nx">mid</span> <span class="o">+</span> <span class="mi">1</span>
+      <span class="k">else</span>
+        <span class="nv">high = </span><span class="nx">mid</span> <span class="o">-</span> <span class="mi">1</span>
+    <span class="k">if</span> <span class="nx">compare</span> <span class="o">is</span> <span class="mi">0</span>
+      <span class="k">if</span> <span class="nx">leaf</span>
+        <span class="k">while</span> <span class="nx">mid</span> <span class="o">!=</span> <span class="mi">0</span> <span class="o">&amp;&amp;</span> <span class="nx">comparator</span><span class="p">(</span><span class="nx">key</span><span class="p">,</span> <span class="nx">io</span><span class="p">.</span><span class="nx">key</span><span class="p">(</span><span class="nx">tier</span><span class="p">,</span> <span class="nx">mid</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="nx">_</span><span class="p">))</span> <span class="o">==</span> <span class="mi">0</span>
+          <span class="nx">mid</span><span class="o">--</span>
+      <span class="nx">mid</span>
+    <span class="k">else</span> <span class="k">if</span> <span class="nx">branches</span>
+      <span class="nx">mid</span> <span class="o">-</span> <span class="mi">1</span>
+    <span class="k">else</span>
+      <span class="nx">mid</span>
+
+  <span class="nv">hasKey: </span><span class="nf">(tier, _) -&gt;</span>
+    <span class="k">for</span> <span class="nx">key</span> <span class="k">in</span> <span class="nx">@operation</span><span class="p">.</span><span class="nx">keys</span> <span class="o">or</span> <span class="p">[]</span>
+      <span class="nx">die</span> <span class="p">{</span> <span class="nx">key</span> <span class="p">}</span>
+      <span class="nv">branch = </span><span class="nx">@find</span><span class="p">(</span><span class="nx">tier</span><span class="p">,</span> <span class="nx">key</span><span class="p">,</span> <span class="nx">_</span><span class="p">)</span>
+      <span class="k">if</span> <span class="nx">tier</span><span class="p">.</span><span class="nx">cache</span><span class="p">[</span><span class="nx">branch</span><span class="p">]</span> <span class="o">is</span> <span class="nx">key</span>
+        <span class="k">return</span> <span class="kc">true</span>
+    <span class="kc">false</span></pre></div>             </td>           </tr>                               <tr id="section-53">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-53">&#182;</a>               </div>               <p>TODO: We are always allowed to get a shared lock on any leaf page and read a
+value, as long as we let go of it immediately. This allows us to read from
+leaf pages to get branch values.
+TODO: Rename this descend.</p>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-54">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-54">&#182;</a>               </div>               <p><code>mutation.mutate(callback)</code></p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">mutate: </span><span class="nf">(_) -&gt;</span>
+    <span class="nv">parent = </span><span class="kc">null</span>
+
+    <span class="nx">@shared</span><span class="p">.</span><span class="nx">push</span> <span class="nv">child = </span><span class="nx">@io</span><span class="p">.</span><span class="nx">lock</span> <span class="kc">false</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="kc">false</span><span class="p">,</span> <span class="nx">_</span>
+    <span class="k">if</span> <span class="nx">@operation</span><span class="p">.</span><span class="nx">keys</span> <span class="o">and</span> <span class="p">(</span><span class="nx">child</span><span class="p">.</span><span class="nx">addresses</span><span class="p">.</span><span class="nx">length</span> <span class="o">is</span> <span class="mi">1</span> <span class="o">or</span> <span class="nx">@hasKey</span><span class="p">(</span><span class="nx">child</span><span class="p">,</span> <span class="nx">_</span><span class="p">))</span>
+      <span class="nx">@exclusive</span><span class="p">.</span><span class="nx">push</span> <span class="nx">@io</span><span class="p">.</span><span class="nx">upgrade</span> <span class="nx">@shared</span><span class="p">.</span><span class="nx">pop</span><span class="p">(),</span> <span class="nx">_</span></pre></div>             </td>           </tr>                               <tr id="section-55">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-55">&#182;</a>               </div>               <p>TODO: Flag for go left.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="k">while</span> <span class="o">not</span> <span class="nx">child</span><span class="p">.</span><span class="nx">penultimate</span> <span class="o">or</span> <span class="nx">child</span><span class="p">.</span><span class="nx">address</span> <span class="o">is</span> <span class="nx">@soughtAddress</span>
+      <span class="nx">process</span><span class="p">.</span><span class="nx">exit</span> <span class="mi">1</span></pre></div>             </td>           </tr>                               <tr id="section-56">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-56">&#182;</a>               </div>               <p>TODO: Flag for shared or exclusive. If exclusive, leave parent locked, if
+shared, then unlock parent.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nv">mutation = </span><span class="nx">@</span><span class="p">[</span><span class="nx">@operation</span><span class="p">.</span><span class="nx">method</span><span class="p">].</span><span class="nx">call</span> <span class="k">this</span><span class="p">,</span> <span class="nx">parent</span><span class="p">,</span> <span class="nx">child</span><span class="p">,</span> <span class="nx">_</span>
+
+    <span class="nx">@io</span><span class="p">.</span><span class="nx">release</span> <span class="nx">tier</span> <span class="k">for</span> <span class="nx">tier</span> <span class="k">in</span> <span class="nx">@shared</span>
+    <span class="nx">@io</span><span class="p">.</span><span class="nx">release</span> <span class="nx">tier</span> <span class="k">for</span> <span class="nx">tier</span> <span class="k">in</span> <span class="nx">@exclusive</span>
+
+    <span class="nx">mutation</span><span class="p">.</span><span class="nx">mutate</span> <span class="nx">_</span> <span class="k">if</span> <span class="nx">mutation</span>
+
+  <span class="nv">insertSorted: </span><span class="nf">(parent, child, _) -&gt;</span>
+    <span class="nv">branch = </span><span class="nx">@find</span> <span class="nx">child</span><span class="p">,</span> <span class="nx">@key</span><span class="p">,</span> <span class="nx">_</span>
+    <span class="nx">@exclusive</span><span class="p">.</span><span class="nx">push</span> <span class="nv">leaves = </span><span class="nx">@io</span><span class="p">.</span><span class="nx">lock</span> <span class="kc">true</span><span class="p">,</span> <span class="nx">child</span><span class="p">.</span><span class="nx">addresses</span><span class="p">[</span><span class="nx">branch</span><span class="p">],</span> <span class="kc">true</span><span class="p">,</span> <span class="nx">_</span>
+
+    <span class="nv">addresses = </span><span class="nx">leaves</span><span class="p">.</span><span class="nx">addresses</span></pre></div>             </td>           </tr>                               <tr id="section-57">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-57">&#182;</a>               </div>               <p>Insert the object value sorted.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="k">for</span> <span class="nx">i</span> <span class="k">in</span> <span class="p">[</span><span class="mi">0</span><span class="p">...</span><span class="nx">addresses</span><span class="p">.</span><span class="nx">length</span><span class="p">]</span>
+      <span class="nv">key = </span><span class="nx">@io</span><span class="p">.</span><span class="nx">key</span><span class="p">(</span><span class="nx">leaves</span><span class="p">,</span> <span class="nx">i</span><span class="p">,</span> <span class="nx">_</span><span class="p">)</span>
+      <span class="k">if</span> <span class="nx">@comparator</span><span class="p">(</span><span class="nx">@key</span><span class="p">,</span> <span class="nx">key</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">0</span>
+        <span class="k">break</span>
+
+    <span class="nv">address = </span><span class="nx">leaves</span><span class="p">.</span><span class="nx">io</span><span class="p">.</span><span class="nx">writeInsert</span> <span class="nx">@object</span><span class="p">,</span> <span class="nx">i</span><span class="p">,</span> <span class="nx">_</span>
+    <span class="nx">addresses</span><span class="p">.</span><span class="nx">splice</span> <span class="nx">i</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="nx">address</span>
+
+    <span class="k">if</span> <span class="nx">addresses</span><span class="p">.</span><span class="nx">length</span> <span class="o">&gt;</span> <span class="nx">@options</span><span class="p">.</span><span class="nx">leafSize</span> <span class="o">and</span> <span class="o">not</span> <span class="nx">@homogenous</span><span class="p">(</span><span class="nx">leaves</span><span class="p">,</span> <span class="nx">_</span><span class="p">)</span>
+      <span class="nv">keys = </span><span class="p">[]</span>
+      <span class="nx">process</span><span class="p">.</span><span class="nx">nextTick</span> <span class="nx">_</span></pre></div>             </td>           </tr>                               <tr id="section-58">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-58">&#182;</a>               </div>               <p>Opportunity to deadlock.</p>             </td>             <td class="code">               <div class="highlight"><pre>      <span class="nx">keys</span><span class="p">.</span><span class="nx">push</span> <span class="nv">key = </span><span class="nx">@io</span><span class="p">.</span><span class="nx">key</span> <span class="nx">leaves</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="nx">_</span>
+      <span class="k">if</span> <span class="nx">leaves</span><span class="p">.</span><span class="nx">right</span>
+        <span class="nx">keys</span><span class="p">.</span><span class="nx">push</span> <span class="nx">@io</span><span class="p">.</span><span class="nx">key</span> <span class="nx">leaves</span><span class="p">.</span><span class="nx">right</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="nx">_</span>
+      <span class="nv">operation =</span>
+        <span class="nv">method: </span><span class="s2">&quot;splitLeaf&quot;</span>
+        <span class="nv">keys: </span><span class="nx">keys</span>
+      <span class="k">new</span> <span class="nx">Mutation</span><span class="p">(</span><span class="nx">@strata</span><span class="p">,</span> <span class="kc">null</span><span class="p">,</span> <span class="nx">key</span><span class="p">,</span> <span class="nx">operation</span><span class="p">)</span>
+  </pre></div>             </td>           </tr>                               <tr id="section-59">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-59">&#182;</a>               </div>               <p>If the leaf tier is now at the maximum size, we test to see if the leaf tier
+is filled with an identical key value, and if not, we split the leaf tier.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">homogenous: </span><span class="nf">(tier, _) -&gt;</span>
+    <span class="p">{</span> <span class="nx">io</span><span class="p">,</span> <span class="nx">comparator</span> <span class="p">}</span> <span class="o">=</span> <span class="nx">@</span>
+    <span class="nv">first = </span><span class="nx">io</span><span class="p">.</span><span class="nx">key</span><span class="p">(</span><span class="nx">tier</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="nx">_</span><span class="p">)</span>
+    <span class="nv">last = </span><span class="nx">io</span><span class="p">.</span><span class="nx">key</span><span class="p">(</span><span class="nx">tier</span><span class="p">,</span> <span class="nx">tier</span><span class="p">.</span><span class="nx">addresses</span><span class="p">.</span><span class="nx">length</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="nx">_</span><span class="p">)</span>
+    <span class="nx">comparator</span><span class="p">(</span><span class="nx">first</span><span class="p">,</span> <span class="nx">last</span><span class="p">)</span> <span class="o">is</span> <span class="mi">0</span>
+
+  <span class="nv">get: </span><span class="nf">(parent, child, _) -&gt;</span>
+    <span class="nv">branch = </span><span class="nx">@find</span> <span class="nx">child</span><span class="p">,</span> <span class="nx">@key</span><span class="p">,</span> <span class="nx">_</span>
+    <span class="nx">@shared</span><span class="p">.</span><span class="nx">push</span> <span class="nv">leaves = </span><span class="nx">@io</span><span class="p">.</span><span class="nx">lock</span> <span class="kc">false</span><span class="p">,</span> <span class="nx">child</span><span class="p">.</span><span class="nx">addresses</span><span class="p">[</span><span class="nx">branch</span><span class="p">],</span> <span class="kc">true</span><span class="p">,</span> <span class="nx">_</span>
+    <span class="nv">address = </span><span class="nx">@find</span> <span class="nx">leaves</span><span class="p">,</span> <span class="nx">@key</span><span class="p">,</span> <span class="nx">_</span>
+    <span class="nx">leaves</span><span class="p">.</span><span class="nx">cache</span><span class="p">[</span><span class="nx">leaves</span><span class="p">.</span><span class="nx">addresses</span><span class="p">[</span><span class="nx">address</span><span class="p">]]</span>
+
+  <span class="nv">splitLeaf: </span><span class="nf">(parent, child, _) -&gt;</span>
+    <span class="nv">branch = </span><span class="nx">@find</span> <span class="nx">child</span><span class="p">,</span> <span class="nx">@key</span><span class="p">,</span> <span class="nx">_</span>
+    <span class="nx">@exclusive</span><span class="p">.</span><span class="nx">push</span> <span class="nv">leaves = </span><span class="nx">@io</span><span class="p">.</span><span class="nx">lock</span> <span class="kc">true</span><span class="p">,</span> <span class="nx">child</span><span class="p">.</span><span class="nx">addresses</span><span class="p">[</span><span class="nx">branch</span><span class="p">],</span> <span class="kc">true</span><span class="p">,</span> <span class="nx">_</span></pre></div>             </td>           </tr>                               <tr id="section-60">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-60">&#182;</a>               </div>               <p>See that nothing has changed since we last descended.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="p">{</span> <span class="nv">comparator: </span><span class="nx">c</span><span class="p">,</span> <span class="nx">io</span><span class="p">,</span> <span class="nv">options: </span><span class="p">{</span> <span class="nv">leafSize: </span><span class="nx">length</span> <span class="p">}</span> <span class="p">}</span> <span class="o">=</span> <span class="nx">@</span>
+    <span class="k">return</span> <span class="k">if</span> <span class="nx">c</span><span class="p">(</span><span class="nx">io</span><span class="p">.</span><span class="nx">key</span><span class="p">(</span><span class="nx">leaves</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="nx">_</span><span class="p">),</span> <span class="nx">@key</span><span class="p">)</span> <span class="o">isnt</span> <span class="mi">0</span>
+    <span class="k">return</span> <span class="k">if</span> <span class="nx">@homogenous</span><span class="p">(</span><span class="nx">leaves</span><span class="p">,</span> <span class="nx">_</span><span class="p">)</span>
+    <span class="k">return</span> <span class="k">if</span> <span class="nx">leaves</span><span class="p">.</span><span class="nx">addresses</span><span class="p">.</span><span class="nx">length</span> <span class="o">&lt;</span> <span class="nx">@options</span><span class="p">.</span><span class="nx">leafSize</span></pre></div>             </td>           </tr>                               <tr id="section-61">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-61">&#182;</a>               </div>               <p>We might have let things go for so long, that we're going to have to split
+the page into more than two pages.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nv">partitions = </span><span class="nb">Math</span><span class="p">.</span><span class="nx">floor</span> <span class="nx">leaves</span><span class="p">.</span><span class="nx">addresses</span><span class="p">.</span><span class="nx">length</span> <span class="o">/</span> <span class="nx">@options</span><span class="p">.</span><span class="nx">leafSize</span>
+    <span class="k">while</span> <span class="p">(</span><span class="nx">partitions</span> <span class="o">*</span> <span class="nx">@options</span><span class="p">.</span><span class="nx">leafSize</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="nx">leaves</span><span class="p">.</span><span class="nx">addresses</span><span class="p">.</span><span class="nx">length</span></pre></div>             </td>           </tr>                               <tr id="section-62">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-62">&#182;</a>               </div>               <p>Find a partition.</p>             </td>             <td class="code">               <div class="highlight"><pre>      <span class="nv">mid = </span><span class="nb">Math</span><span class="p">.</span><span class="nx">floor</span> <span class="nx">leaves</span><span class="p">.</span><span class="nx">addresses</span><span class="p">.</span><span class="nx">length</span> <span class="o">/</span> <span class="p">(</span><span class="nx">partitions</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+      <span class="nv">key = </span><span class="nx">io</span><span class="p">.</span><span class="nx">key</span> <span class="nx">leaves</span><span class="p">,</span> <span class="nx">mid</span><span class="p">,</span> <span class="nx">_</span>
+      <span class="p">[</span> <span class="nx">before</span><span class="p">,</span> <span class="nx">after</span> <span class="p">]</span> <span class="o">=</span> <span class="p">[</span> <span class="nx">mid</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="nx">mid</span> <span class="o">+</span> <span class="mi">1</span> <span class="p">]</span>
+      <span class="k">while</span> <span class="o">not</span> <span class="nx">partition</span>
+        <span class="k">if</span> <span class="nx">before</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="o">and</span> <span class="nx">c</span><span class="p">(</span><span class="nx">io</span><span class="p">.</span><span class="nx">key</span><span class="p">(</span><span class="nx">leaves</span><span class="p">,</span> <span class="nx">before</span><span class="p">,</span> <span class="nx">_</span><span class="p">),</span> <span class="nx">key</span><span class="p">)</span> <span class="o">isnt</span> <span class="mi">0</span>
+          <span class="nv">partition = </span><span class="nx">before</span> <span class="o">+</span> <span class="mi">1</span>
+        <span class="k">else</span> <span class="k">if</span> <span class="nx">after</span> <span class="o">&lt;=</span> <span class="nx">length</span> <span class="o">and</span> <span class="nx">c</span><span class="p">(</span><span class="nx">io</span><span class="p">.</span><span class="nx">key</span><span class="p">(</span><span class="nx">leaves</span><span class="p">,</span> <span class="nx">after</span><span class="p">,</span> <span class="nx">_</span><span class="p">))</span> <span class="o">isnt</span> <span class="mi">0</span>
+          <span class="nv">partition = </span><span class="nx">after</span>
+        <span class="k">else</span>
+          <span class="o">--</span><span class="nx">before</span>
+          <span class="o">++</span><span class="nx">after</span>
+
+      <span class="nv">key = </span><span class="nx">io</span><span class="p">.</span><span class="nx">key</span> <span class="nx">leaves</span><span class="p">,</span> <span class="nx">partition</span><span class="p">,</span> <span class="nx">_</span>
+      <span class="nv">pivot = </span><span class="nx">@find</span><span class="p">(</span><span class="nx">child</span><span class="p">,</span> <span class="nx">key</span><span class="p">,</span> <span class="nx">_</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
+
+      <span class="nv">addresses = </span><span class="nx">leaves</span><span class="p">.</span><span class="nx">addresses</span><span class="p">.</span><span class="nx">splice</span><span class="p">(</span><span class="nx">partition</span><span class="p">)</span>
+      <span class="nv">right = </span><span class="nx">io</span><span class="p">.</span><span class="nx">allocateLeaves</span><span class="p">(</span><span class="nx">addresses</span><span class="p">,</span> <span class="nx">leaves</span><span class="p">.</span><span class="nx">right</span><span class="p">)</span>
+
+      <span class="nv">leaves.right = </span><span class="nx">right</span><span class="p">.</span><span class="nx">address</span>
+
+      <span class="nx">child</span><span class="p">.</span><span class="nx">addresses</span><span class="p">.</span><span class="nx">splice</span><span class="p">(</span><span class="nx">pivot</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="nx">right</span><span class="p">.</span><span class="nx">address</span><span class="p">)</span></pre></div>             </td>           </tr>                               <tr id="section-63">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-63">&#182;</a>               </div>               <p>Append an operation indciator. This would be a record that describes all
+the participants in the rewrite, in the order in which they are supposed
+to be rewritten. When found, we look at the last item in the list, then
+load that, and ensure that the last record is a complete operation
+record. If it is, we know that all of the temporary pages were written.</p>             </td>             <td class="code">               <div class="highlight"><pre>      <span class="nx">@io</span><span class="p">.</span><span class="nx">rewriteLeaves</span><span class="p">(</span><span class="nx">leaves</span><span class="p">,</span> <span class="nx">_</span><span class="p">)</span>
+      <span class="nx">@io</span><span class="p">.</span><span class="nx">rewriteLeaves</span><span class="p">(</span><span class="nx">right</span><span class="p">,</span> <span class="nx">_</span><span class="p">)</span>
+
+      <span class="nx">@io</span><span class="p">.</span><span class="nx">rewriteBranches</span><span class="p">(</span><span class="nx">child</span><span class="p">,</span> <span class="nx">_</span><span class="p">)</span>
+
+      <span class="nx">@io</span><span class="p">.</span><span class="nx">relink</span><span class="p">(</span><span class="nx">right</span><span class="p">,</span> <span class="nx">_</span><span class="p">)</span>
+      <span class="nx">@io</span><span class="p">.</span><span class="nx">relink</span><span class="p">(</span><span class="nx">leaves</span><span class="p">,</span> <span class="nx">_</span><span class="p">)</span>
+      <span class="nx">@io</span><span class="p">.</span><span class="nx">relink</span><span class="p">(</span><span class="nx">child</span><span class="p">,</span> <span class="nx">_</span><span class="p">)</span>
+
+      <span class="o">--</span><span class="nx">paritions</span>
+
+  <span class="nv">mergeLeaf: </span><span class="nf">(parent, child, _) -&gt;</span>
+    <span class="p">[</span> <span class="nx">key</span><span class="p">,</span> <span class="nx">rightKey</span> <span class="p">]</span> <span class="o">=</span> <span class="nx">@operation</span><span class="p">.</span><span class="nx">keys</span>
+    <span class="nv">compare = </span><span class="nx">@comparator</span><span class="p">(</span><span class="nx">full</span><span class="p">,</span> <span class="nv">leftKey = </span><span class="nx">@io</span><span class="p">.</span><span class="nx">key</span><span class="p">(</span><span class="nx">child</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="nx">_</span><span class="p">))</span>
+    <span class="k">if</span> <span class="nx">compare</span> <span class="o">is</span> <span class="mi">0</span>
+      <span class="k">return</span> <span class="k">if</span> <span class="nx">leftKey</span> <span class="o">isnt</span> <span class="nx">key</span>
+
+<span class="k">class</span> <span class="nx">Level</span></pre></div>             </td>           </tr>                               <tr id="section-64">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-64">&#182;</a>               </div>               <p>Construct a new level. The <code>exclusive</code> pararameter determines how this level
+locks tiers when asked to lock tiers.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">constructor: </span><span class="nf">(@exclusive) -&gt;</span>
+    <span class="vi">@operations = </span><span class="p">[]</span>
+    <span class="vi">@locks = </span><span class="p">[]</span></pre></div>             </td>           </tr>                               <tr id="section-65">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-65">&#182;</a>               </div>               <p>Convert lock to read lock and tell anyone waiting that they can go ahead.</p>
+
+<p>We give the next tick a copy of just the continuations to fire, excluding
+our own continuation which we're about to add. (TODO rename continuations?) </p>
+
+<p>If you're wondering, no, you're not going to fire the continuations twice.
+They are only ever fired by the decent that holds the exclusive lock. This
+level will be removed from the level list, so we won't grab at it when the
+operations are over.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">downgrade: </span><span class="nf">(strata) -&gt;</span>
+    <span class="k">if</span> <span class="nx">@exclusive</span>
+      <span class="k">while</span> <span class="nx">@locks</span><span class="p">.</span><span class="nx">length</span>
+        <span class="nv">lock = </span><span class="nx">@locks</span><span class="p">.</span><span class="nx">shift</span><span class="p">()</span>
+        <span class="nv">locks = </span><span class="nx">strata</span><span class="p">.</span><span class="nx">locks</span><span class="p">[</span><span class="nx">lock</span><span class="p">.</span><span class="nx">address</span><span class="p">]</span>
+        <span class="k">throw</span> <span class="s2">&quot;not locked by me&quot;</span> <span class="k">if</span> <span class="nx">locks</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">isnt</span> <span class="nx">lock</span>
+        <span class="nx">locks</span><span class="p">.</span><span class="nx">shift</span><span class="p">()</span>
+        <span class="nx">@_resume</span> <span class="nx">strata</span><span class="p">,</span> <span class="nx">locks</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="nx">slice</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+        <span class="nx">locks</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="nx">push</span> <span class="nx">lock</span>
+      <span class="vi">@exclusive = </span><span class="kc">false</span>
+  </pre></div>             </td>           </tr>                               <tr id="section-66">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-66">&#182;</a>               </div>               <p>Unused.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">advance: </span><span class="nf">(strata) -&gt;</span>
+    <span class="nv">locks = </span><span class="nx">strata</span><span class="p">.</span><span class="nx">locks</span><span class="p">[</span><span class="nx">@tier</span><span class="p">.</span><span class="nx">id</span><span class="p">]</span>
+    <span class="k">if</span> <span class="nx">locks</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="nx">length</span> <span class="o">is</span> <span class="mi">0</span> <span class="o">and</span> <span class="nx">locks</span><span class="p">.</span><span class="nx">length</span> <span class="o">isnt</span> <span class="mi">1</span>
+      <span class="nx">locks</span><span class="p">.</span><span class="nx">shift</span><span class="p">()</span>
+      <span class="kc">true</span>
+    <span class="kc">false</span></pre></div>             </td>           </tr>                               <tr id="section-67">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-67">&#182;</a>               </div>               <h3>B-Tree Structure</h3>
+
+<p>We call page of the b-tree, ah, maybe we stop using the word tier, start using
+the word page, because we're not going to have to reduce the ambiguity with
+some sort of subdivided binary file structure.</p>
+
+<p>NOTE Come back and look at this. It is succinct.</p>
+
+<p>There are two types of pages. Branch pages and leaf pages.</p>
+
+<p>Leaf pages store the records. They maintain the collation</p>
+
+<p>Leaf pages are all uniformly the same.</p>
+
+<h3>Leaf Tier Files</h3>
+
+<p>A leaf tier maintains an array of file positions called an address array. A
+file position in the address array references a record in the leaf tier file
+by its file position. The addresses in the address array are sorted by the
+the sort order of the referenced records according to the sort order of the
+b-tree.</p>
+
+<p>A leaf tier file contains JSON objects, one object on each line.</p>
+
+<p>There are three types of objects in a leaf tier file, insert objects, delete
+objects, and address array objects.</p>
+
+<p>An insert object contains a <em>record</em> and the index in the address array where
+the record's address would be inserted to preserve the sort order of the
+address array.</p>
+
+<p>Beginning with an empty array and reading from the start of the file, the leaf
+tier address array is reconstituted by reading the object at the current
+position in the file, then inserting the position of the current object into
+the address array at the index in the insert object.</p>
+
+<p>We record a deletion by appending a delete object. A delete object contains
+an index in the address array that should be deleted. When reading the leaf
+tier from the start of the file, we insert an address into the address array
+when we encounter an insert object, and we delete an address when we encounter
+a delete object.</p>
+
+<p>On occasion, we can store an address array object, An address array object
+contains the address array itself.  We store a copy of a constructed address
+array object in the leaf tier file so that we can read a large leaf tier file
+quickly.</p>
+
+<p>When we read a leaf tier file, if we read from the back of the file toward the
+front, we can read backward until we find an address array object. Then we can
+read forward to the end of the file, applying the inserts and deletes that
+occured after we wrote the address array object. </p>
+
+<p>When a leaf tier file is large, stashing the constructed address array at the
+end means that the leaf tier can be loaded quickly, because we will only have
+to read backwards a few entries to find a mostly completed address array. We
+can then read forward from the array to amend the address array with the
+inserts and deletes that occured after it was written.</p>
+
+<p>Not all of the records will be loaded when we go backwards, but we have their
+file position from the address array, so we can jump to them and load them as
+we need them. That is, if we need them, because owing to binary search, we
+might only need a few records out of a great many records to find the record
+we're looking for.</p>
+
+<p>Over time, a leaf tier file can grow fat with deleted records &mdash; an
+insert object and a subsequent delete object. We vacuum a leaf tier file by
+writing it to a new leaf tier file.</p>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-68">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-68">&#182;</a>               </div>               <p><code>LeafIO</code> &mdash; Keeps track of a file descriptor opened for append, and the
+append file position. The <code>LeafIO</code> class does <em>not</em> contain all methods
+relating to leaf tier file I/O. You can find more leaf tier file methods in
+the <code>IO</code> class below.</p>
+
+<p>TODO Rename <code>RecordIO</code>.</p>             </td>             <td class="code">               <div class="highlight"><pre><span class="k">class</span> <span class="nx">LeafIO</span></pre></div>             </td>           </tr>                               <tr id="section-69">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-69">&#182;</a>               </div>               <p>Construct a leaf file tier writer for the given file name.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">constructor: </span><span class="nf">(@filename) -&gt;</span>
+    <span class="vi">@length = </span><span class="mi">1024</span></pre></div>             </td>           </tr>                               <tr id="section-70">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-70">&#182;</a>               </div>               <h4>Leaf Tier File Object Format</h4>
+
+<p>Each leaf tier object is a JSON array. The first element of the array is an
+integer.</p>
+
+<p>If the integer is greater than zero, it indicates an insert object.  The
+integer is the one based index into the zero based address array, indicating
+the index where the position of the current insert object should be
+inserted. The second element of the leaf tier object array is the record
+object.</p>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-71">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-71">&#182;</a>               </div>               <p>Write an insert object.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">writeInsert: </span><span class="nf">(object, index, _) -&gt;</span>
+    <span class="nx">@_writeJSON</span> <span class="p">[</span> <span class="nx">index</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="nx">object</span> <span class="p">],</span> <span class="nx">_</span></pre></div>             </td>           </tr>                               <tr id="section-72">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-72">&#182;</a>               </div>               <p>If the integer is less than zero, it indicates a delete object. The absolute
+value of the integer is the one based index into the zero based addrss
+array, indicating the index of address array element that should be deleted.
+There are no other elements in the leaf tier object array.</p>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-73">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-73">&#182;</a>               </div>               <p>Write a delete object.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">writeDelete: </span><span class="nf">(index, _) -&gt;</span>
+    <span class="nx">@_writeJSON</span> <span class="p">[</span> <span class="o">-</span><span class="p">(</span><span class="nx">index</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="p">],</span> <span class="nx">_</span>
+  </pre></div>             </td>           </tr>                               <tr id="section-74">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-74">&#182;</a>               </div>               <p>If the integer is zero, it indicates an address array object. The integer
+value of zero is used only as an indicator. The second element is the
+address of the leaf tier to the right of current leaf tier. The third
+element of the leaf tier object array is the address array.</p>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-75">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-75">&#182;</a>               </div>               <p>Write an address array object.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">writeAddresses: </span><span class="nf">(right, addresses, _) -&gt;</span>
+    <span class="nx">@_writeJSON</span> <span class="p">[</span> <span class="mi">0</span><span class="p">,</span> <span class="nx">right</span><span class="p">,</span> <span class="nx">addresses</span> <span class="p">],</span> <span class="nx">_</span></pre></div>             </td>           </tr>                               <tr id="section-76">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-76">&#182;</a>               </div>               <p>Append an object to the leaf tier file as a single line of JSON.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">_writeJSON: </span><span class="nf">(object, _) -&gt;</span>
+    <span class="nx">@fd</span>           <span class="o">or=</span> <span class="nx">fs</span><span class="p">.</span><span class="nx">open</span> <span class="nx">@filename</span><span class="p">,</span> <span class="s2">&quot;a+&quot;</span><span class="p">,</span> <span class="mi">0644</span><span class="p">,</span> <span class="nx">_</span>
+    <span class="nx">@position</span>     <span class="o">or=</span> <span class="nx">fs</span><span class="p">.</span><span class="nx">stat</span><span class="p">(</span><span class="nx">@filename</span><span class="p">,</span> <span class="nx">_</span><span class="p">).</span><span class="nx">size</span>
+
+    <span class="nv">json            = </span><span class="nx">JSON</span><span class="p">.</span><span class="nx">stringify</span> <span class="nx">object</span>
+    <span class="nv">position        = </span><span class="nx">@position</span>
+    <span class="nv">length          = </span><span class="nx">Buffer</span><span class="p">.</span><span class="nx">byteLength</span><span class="p">(</span><span class="nx">json</span><span class="p">,</span> <span class="s2">&quot;utf8&quot;</span><span class="p">)</span>
+    <span class="nv">buffer          = </span><span class="k">new</span> <span class="nx">Buffer</span><span class="p">(</span><span class="nx">length</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="nv">offset          = </span><span class="mi">0</span></pre></div>             </td>           </tr>                               <tr id="section-77">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-77">&#182;</a>               </div>               <p>Write JSON and newline.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nx">buffer</span><span class="p">.</span><span class="nx">write</span> <span class="nx">json</span>
+    <span class="nx">buffer</span><span class="p">[</span><span class="nx">length</span><span class="p">]</span> <span class="o">=</span> <span class="mh">0x0A</span></pre></div>             </td>           </tr>                               <tr id="section-78">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-78">&#182;</a>               </div>               <p>Write may be interrupted by a signal, so we keep track of how many bytes
+are actually written and write the difference if we come up short.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="k">while</span> <span class="nx">offset</span> <span class="o">!=</span> <span class="nx">buffer</span><span class="p">.</span><span class="nx">length</span>
+      <span class="nv">count = </span><span class="nx">buffer</span><span class="p">.</span><span class="nx">length</span> <span class="o">-</span> <span class="nx">offset</span>
+      <span class="nv">written = </span><span class="nx">fs</span><span class="p">.</span><span class="nx">write</span> <span class="nx">@fd</span><span class="p">,</span> <span class="nx">buffer</span><span class="p">,</span> <span class="nx">offset</span><span class="p">,</span> <span class="nx">count</span><span class="p">,</span> <span class="nx">@position</span><span class="p">,</span> <span class="nx">_</span>
+      <span class="nx">@position</span> <span class="o">+=</span> <span class="nx">written</span>
+      <span class="nx">offset</span> <span class="o">+=</span> <span class="nx">written</span></pre></div>             </td>           </tr>                               <tr id="section-79">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-79">&#182;</a>               </div>               <p>What's the point if it doesn't make it to disk?</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nx">fs</span><span class="p">.</span><span class="nx">fsync</span> <span class="nx">@fd</span><span class="p">,</span> <span class="nx">_</span></pre></div>             </td>           </tr>                               <tr id="section-80">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-80">&#182;</a>               </div>               <p>Return the file position of the inserted record.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nx">position</span></pre></div>             </td>           </tr>                               <tr id="section-81">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-81">&#182;</a>               </div>               <p>Each line is terminated by a newline. In case your concerned that this
+simple search will mistake a byte inside a multi-byte character for a
+newline, have a look at
+<a href="http://en.wikipedia.org/wiki/UTF-8#Description">UTF-8</a>. All bytes
+participating in a multi-byte character have their leading bit set, all
+single-byte characters have their leading bit unset.</p>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-82">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-82">&#182;</a>               </div>               <p>Search for the newline that separates JSON records.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">_readJSON: </span><span class="nf">(buffer, read) -&gt;</span>
+    <span class="k">for</span> <span class="nx">offset</span> <span class="k">in</span> <span class="p">[</span><span class="mi">0</span><span class="p">...</span><span class="nx">read</span><span class="p">]</span>
+      <span class="k">if</span> <span class="nx">buffer</span><span class="p">[</span><span class="nx">offset</span><span class="p">]</span> <span class="o">is</span> <span class="mh">0x0A</span>
+        <span class="k">return</span> <span class="nx">JSON</span><span class="p">.</span><span class="nx">parse</span> <span class="nx">buffer</span><span class="p">.</span><span class="nx">toString</span><span class="p">(</span><span class="s2">&quot;utf8&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="nx">offset</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span></pre></div>             </td>           </tr>                               <tr id="section-83">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-83">&#182;</a>               </div>               <p>Jump to a position in the file and read a specific object. Because objects
+are cached in memory by a leaf tier, we're not going to get a request to
+read an object that has been written to the current write stream. When we
+read in a leaf tier, we'll cache any objects we encounter prior to read the
+ordering array.</p>
+
+<p>Note how we allow we keep track of the minimum buffer size that will
+accommodate the largest possible buffer.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">readObject: </span><span class="nf">(address, _) -&gt;</span>
+    <span class="nx">@fd</span> <span class="o">or=</span> <span class="nx">fs</span><span class="p">.</span><span class="nx">open</span> <span class="nx">@filename</span><span class="p">,</span> <span class="s2">&quot;a+&quot;</span><span class="p">,</span> <span class="nx">_</span>
+    <span class="nx">@position</span> <span class="o">or=</span> <span class="nx">fs</span><span class="p">.</span><span class="nx">stat</span><span class="p">(</span><span class="nx">@filename</span><span class="p">,</span> <span class="nx">_</span><span class="p">).</span><span class="nx">size</span>
+    <span class="nx">loop</span>
+      <span class="nv">buffer = </span><span class="k">new</span> <span class="nx">Buffer</span><span class="p">(</span><span class="nx">@length</span><span class="p">)</span>
+      <span class="nv">read = </span><span class="nx">fs</span><span class="p">.</span><span class="nx">read</span> <span class="nx">@</span><span class="k">in</span><span class="p">,</span> <span class="nx">buffer</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="nx">buffer</span><span class="p">.</span><span class="nx">length</span><span class="p">,</span> <span class="nx">address</span><span class="p">,</span> <span class="nx">_</span>
+      <span class="k">if</span> <span class="nv">json = </span><span class="nx">@_readJSON</span><span class="p">(</span><span class="nx">buffer</span><span class="p">,</span> <span class="nx">read</span><span class="p">)</span>
+        <span class="k">break</span>
+      <span class="k">if</span> <span class="nx">@length</span> <span class="o">&gt;</span> <span class="nx">@position</span> <span class="o">-</span> <span class="nx">address</span>
+        <span class="k">throw</span> <span class="k">new</span> <span class="nb">Error</span> <span class="s2">&quot;cannot find end of record.&quot;</span>
+      <span class="nx">@length</span> <span class="o">+=</span> <span class="nx">@length</span> <span class="o">&gt;&gt;&gt;</span> <span class="mi">1</span>
+    <span class="nx">json</span><span class="p">.</span><span class="nx">pop</span><span class="p">()</span></pre></div>             </td>           </tr>                               <tr id="section-84">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-84">&#182;</a>               </div>               <p>Close the file descriptor if it is open and reset the file descriptor and
+append position.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">close: </span><span class="nf">(_) -&gt;</span>
+    <span class="nx">fs</span><span class="p">.</span><span class="nx">close</span><span class="p">(</span><span class="nx">@fd</span><span class="p">,</span> <span class="nx">_</span><span class="p">)</span> <span class="k">if</span> <span class="nx">@fd</span>
+    <span class="vi">@position = @fd = </span><span class="kc">null</span>
+<span class="k">class</span> <span class="nx">exports</span><span class="p">.</span><span class="nx">Strata</span></pre></div>             </td>           </tr>                               <tr id="section-85">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-85">&#182;</a>               </div>               <p>Construct the Strata from the options.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">constructor: </span><span class="nf">(options) -&gt;</span>
+    <span class="nv">defaults =</span>
+      <span class="nv">leafSize: </span><span class="mi">12</span>
+      <span class="nv">branchSize: </span><span class="mi">12</span>
+      <span class="nv">comparator: </span><span class="nx">comparator</span>
+      <span class="nv">extractor: </span><span class="nx">extractor</span>
+    <span class="vi">@_options       = </span><span class="nx">extend</span> <span class="nx">defaults</span><span class="p">,</span> <span class="nx">options</span>
+    <span class="vi">@_io            = </span><span class="k">new</span> <span class="nx">IO</span> <span class="nx">options</span><span class="p">.</span><span class="nx">directory</span><span class="p">,</span> <span class="nx">@_options</span><span class="p">.</span><span class="nx">extractor</span>
+
+  <span class="nv">create: </span><span class="nf">(_) -&gt;</span> <span class="nx">@_io</span><span class="p">.</span><span class="nx">create</span><span class="p">(</span><span class="nx">_</span><span class="p">)</span>
+
+  <span class="nv">open: </span><span class="nf">(_) -&gt;</span> <span class="nx">@_io</span><span class="p">.</span><span class="nx">open</span><span class="p">(</span><span class="nx">_</span><span class="p">)</span>
+
+  <span class="nv">close: </span><span class="nf">(_) -&gt;</span> <span class="nx">@_io</span><span class="p">.</span><span class="nx">close</span><span class="p">(</span><span class="nx">_</span><span class="p">)</span>
+
+  <span class="nv">get: </span><span class="nf">(key, callback) -&gt;</span>
+    <span class="nv">operation = method: </span><span class="s2">&quot;get&quot;</span>
+    <span class="nv">mutation = </span><span class="k">new</span> <span class="nx">Mutation</span><span class="p">(</span><span class="nx">@</span><span class="p">,</span> <span class="kc">null</span><span class="p">,</span> <span class="nx">key</span><span class="p">,</span> <span class="nx">operation</span><span class="p">)</span>
+    <span class="nx">mutation</span><span class="p">.</span><span class="nx">mutate</span> <span class="nx">callback</span>
+
+  <span class="nv">insert: </span><span class="nf">(object, callback) -&gt;</span>
+    <span class="nv">operation = method: </span><span class="s2">&quot;insertSorted&quot;</span>
+    <span class="nv">mutation = </span><span class="k">new</span> <span class="nx">Mutation</span><span class="p">(</span><span class="nx">@</span><span class="p">,</span> <span class="nx">object</span><span class="p">,</span> <span class="kc">null</span><span class="p">,</span> <span class="nx">operation</span><span class="p">)</span>
+    <span class="nx">mutation</span><span class="p">.</span><span class="nx">mutate</span> <span class="nx">callback</span></pre></div>             </td>           </tr>                               <tr id="section-86">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-86">&#182;</a>               </div>               <p>Both <code>insert</code> and <code>remove</code> use this generalized mutation method that
+implements locking the proper tiers during the descent of the tree to find
+the leaf to mutate.</p>
+
+<p>This generalized mutation will insert or remove a single item.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">_generalized: </span><span class="nf">(mutation, _) -&gt;</span>
+    <span class="nx">mutation</span><span class="p">.</span><span class="nx">descend</span> <span class="kc">false</span>
+
+    <span class="nv">tier = mutation.parent.tier = </span><span class="nx">@_lock</span> <span class="nx">mutation</span><span class="p">.</span><span class="nx">parent</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="kc">false</span><span class="p">,</span> <span class="nx">_</span></pre></div>             </td>           </tr>                               <tr id="section-87">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-87">&#182;</a>               </div>               <p>Perform the root decision with only a read lock obtained.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nx">mutation</span><span class="p">.</span><span class="nx">decisions</span><span class="p">.</span><span class="nx">initial</span><span class="p">.</span><span class="nx">call</span> <span class="nx">@</span><span class="p">,</span> <span class="nx">mutation</span><span class="p">,</span> <span class="nx">_</span></pre></div>             </td>           </tr>                               <tr id="section-88">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-88">&#182;</a>               </div>               <p>Determine if we need to lock a tier. We have different criteria for inner
+tiers with inner tier children then for penultimate inner tiers with leaf
+tier children.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nx">loop</span>
+      <span class="p">{</span> <span class="nx">decisions</span><span class="p">,</span> <span class="nx">parent</span> <span class="p">}</span> <span class="o">=</span> <span class="nx">mutation</span>
+      <span class="k">break</span> <span class="k">if</span> <span class="nx">parent</span><span class="p">.</span><span class="nx">tier</span><span class="p">.</span><span class="nx">penultimate</span>
+      <span class="nx">@_testInnerTier</span> <span class="nx">mutation</span><span class="p">,</span> <span class="nx">decisions</span><span class="p">.</span><span class="nx">subsequent</span><span class="p">,</span> <span class="s2">&quot;swap&quot;</span><span class="p">,</span> <span class="nx">_</span>
+      <span class="nv">branch = </span><span class="nx">@_find</span><span class="p">(</span><span class="nx">mutation</span><span class="p">.</span><span class="nx">parent</span><span class="p">.</span><span class="nx">tier</span><span class="p">,</span> <span class="nx">mutation</span><span class="p">.</span><span class="nx">sought</span><span class="p">)</span>
+      <span class="nx">mutation</span><span class="p">.</span><span class="nx">descend</span> <span class="kc">false</span>
+      <span class="nv">branch.child.tier = </span><span class="nx">@_load</span> <span class="nx">branch</span><span class="p">.</span><span class="nx">address</span><span class="p">,</span> <span class="kc">false</span><span class="p">,</span> <span class="nx">_</span></pre></div>             </td>           </tr>                               <tr id="section-89">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-89">&#182;</a>               </div>               <p>Make decisions based on the penultimate level.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nx">@_testInnerTier</span> <span class="nx">mutation</span><span class="p">,</span> <span class="nx">decisions</span><span class="p">.</span><span class="nx">penultimate</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="nx">_</span></pre></div>             </td>           </tr>                               <tr id="section-90">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-90">&#182;</a>               </div>               <p>All the necessary locks have been obtained and we are able to mutate the
+tree with impunity.</p>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-91">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-91">&#182;</a>               </div>               <p>Run through levels, bottom to top, performing the operations at for level.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nx">mutation</span><span class="p">.</span><span class="nx">levels</span><span class="p">.</span><span class="nx">reverse</span><span class="p">()</span>
+    <span class="nv">mutation.levelQueue = </span><span class="nx">mutation</span><span class="p">.</span><span class="nx">levels</span><span class="p">.</span><span class="nx">slice</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+    <span class="nv">operation = </span><span class="nx">mutation</span><span class="p">.</span><span class="nx">leafOperation</span>
+    <span class="nx">operation</span><span class="p">.</span><span class="nx">shift</span><span class="p">().</span><span class="nx">apply</span> <span class="nx">@</span><span class="p">,</span> <span class="nx">operation</span><span class="p">.</span><span class="nx">concat</span> <span class="nx">mutation</span><span class="p">,</span> <span class="nx">@_leafDirty</span>
+      </pre></div>             </td>           </tr>                               <tr id="section-92">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-92">&#182;</a>               </div>               <p>Perform decisions related to the inner tier.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">_testInnerTier: </span><span class="nf">(mutation, decision, exclude, _) -&gt;</span>
+    <span class="nx">mutation</span><span class="p">.</span><span class="nx">decisions</span><span class="p">.</span><span class="nx">swap</span><span class="p">.</span><span class="nx">call</span> <span class="nx">@</span><span class="p">,</span> <span class="nx">mutation</span></pre></div>             </td>           </tr>                               <tr id="section-93">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-93">&#182;</a>               </div>               <p>If no split/merge, then clear all actions except for swap.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="k">if</span> <span class="o">not</span> <span class="nx">decision</span><span class="p">.</span><span class="nx">call</span> <span class="nx">@</span><span class="p">,</span> <span class="nx">mutation</span><span class="p">,</span> <span class="nx">_</span>
+      <span class="k">for</span> <span class="nx">step</span> <span class="k">in</span> <span class="nx">mutation</span><span class="p">.</span><span class="nx">plan</span>
+        <span class="nv">step.operations = </span><span class="nx">step</span><span class="p">.</span><span class="nx">operations</span><span class="p">.</span><span class="nx">filter</span> <span class="nf">(operation) -&gt;</span>
+          <span class="nx">operation</span> <span class="o">isnt</span> <span class="nx">exclude</span></pre></div>             </td>           </tr>                               <tr id="section-94">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-94">&#182;</a>               </div>               <p>The leaf operation may or may not alter the leaf. If it doesn't, all of the
+operations to split or merge the inner tiers are moot, because we didn't
+make the changes to the leaf that we expected.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">_leafDirty: </span><span class="nf">(mutation) -&gt;</span>
+    <span class="k">if</span> <span class="nx">mutation</span><span class="p">.</span><span class="nx">dirtied</span>
+      <span class="nx">@_operateOnLevel</span> <span class="nx">mutation</span>
+    <span class="k">else</span>
+      <span class="nx">@_unlock</span> <span class="nx">mutation</span>
+
+  <span class="nv">_operateOnLevel: </span><span class="nf">(mutation) -&gt;</span>
+    <span class="k">if</span> <span class="nx">mutation</span><span class="p">.</span><span class="nx">levelQueue</span><span class="p">.</span><span class="nx">length</span> <span class="o">is</span> <span class="mi">0</span>
+      <span class="nx">@_unlock</span> <span class="nx">mutation</span>
+    <span class="k">else</span>
+      <span class="nx">@_operateOnOperation</span> <span class="nx">mutation</span>
+
+  <span class="nv">_operateOnOperation: </span><span class="nf">(mutation) -&gt;</span>
+    <span class="k">if</span> <span class="nx">mutation</span><span class="p">.</span><span class="nx">levelQueue</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="nx">operations</span><span class="p">.</span><span class="nx">length</span> <span class="o">is</span> <span class="mi">0</span>
+      <span class="nx">mutation</span><span class="p">.</span><span class="nx">levelQueue</span><span class="p">.</span><span class="nx">shift</span><span class="p">()</span>
+      <span class="nx">@_operateOnLevel</span> <span class="nx">mutation</span>
+    <span class="k">else</span>
+      <span class="nv">operation = </span><span class="nx">mutation</span><span class="p">.</span><span class="nx">levelQueue</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="nx">operations</span><span class="p">.</span><span class="nx">pop</span><span class="p">()</span>
+      <span class="nx">operation</span><span class="p">.</span><span class="nx">shift</span><span class="p">().</span><span class="nx">apply</span> <span class="nx">@</span><span class="p">,</span> <span class="nx">operation</span><span class="p">.</span><span class="nx">concat</span> <span class="nx">mutation</span><span class="p">,</span> <span class="nx">@_operateOnOperation</span></pre></div>             </td>           </tr>                               <tr id="section-95">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-95">&#182;</a>               </div>               <p>Inovke the blocker method, used for testing locks, if it exists, otherwise
+release all locks.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">_unlock: </span><span class="nf">(mutation) -&gt;</span>
+    <span class="k">if</span> <span class="nx">mutation</span><span class="p">.</span><span class="nx">blocker</span>
+      <span class="nx">mutation</span><span class="p">.</span><span class="nx">blocker</span> <span class="o">=&gt;</span> <span class="nx">@_releaseLocks</span><span class="p">(</span><span class="nx">mutation</span><span class="p">)</span>
+    <span class="k">else</span>
+      <span class="nx">@_releaseLocks</span><span class="p">(</span><span class="nx">mutation</span><span class="p">)</span>
+      </pre></div>             </td>           </tr>                               <tr id="section-96">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-96">&#182;</a>               </div>               <p>When we release the locks, we send the first waiting operations we encounter
+forward on the next tick. We don't have to keep track of this, because the
+first waiting operations will always be in top most level. </p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">_releaseLocks: </span><span class="nf">(mutation) -&gt;</span></pre></div>             </td>           </tr>                               <tr id="section-97">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-97">&#182;</a>               </div>               <p>For each level locked by the mutation.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="k">for</span> <span class="nx">level</span> <span class="k">in</span> <span class="nx">mutation</span><span class="p">.</span><span class="nx">levels</span>
+      <span class="nx">level</span><span class="p">.</span><span class="nx">release</span><span class="p">(</span><span class="nx">@</span><span class="p">)</span></pre></div>             </td>           </tr>                               <tr id="section-98">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-98">&#182;</a>               </div>               <p>We can tell the user that the operation succeeded on the next tick.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nx">process</span><span class="p">.</span><span class="nx">nextTick</span> <span class="o">-&gt;</span> <span class="nx">mutation</span><span class="p">.</span><span class="nx">callback</span><span class="p">.</span><span class="nx">call</span> <span class="kc">null</span><span class="p">,</span> <span class="nx">mutation</span><span class="p">.</span><span class="nx">dirtied</span>
+
+  <span class="nv">_resume: </span><span class="nf">(continuations) -&gt;</span>
+
+  <span class="nv">_record: </span><span class="nf">(tier, index, _) -&gt;</span>
+    <span class="k">if</span> <span class="nx">tier</span><span class="p">.</span><span class="nx">leaf</span>
+      <span class="nx">process</span><span class="p">.</span><span class="nx">exit</span> <span class="mi">1</span>
+    <span class="k">else</span>
+      <span class="nx">process</span><span class="p">.</span><span class="nx">exit</span> <span class="mi">1</span></pre></div>             </td>           </tr>                               <tr id="section-99">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-99">&#182;</a>               </div>               <p>If the root is full, we add a root split operation to the operation stack.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">_shouldDrainRoot: </span><span class="nf">(mutation, _) -&gt;</span>
+    <span class="k">if</span> <span class="nx">@innerSize</span> <span class="o">is</span> <span class="nx">mutation</span><span class="p">.</span><span class="nx">parent</span><span class="p">.</span><span class="nx">tier</span><span class="p">.</span><span class="nx">objects</span><span class="p">.</span><span class="nx">length</span>
+      <span class="nx">mutation</span><span class="p">.</span><span class="nx">plan</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="nx">push</span>
+        <span class="nv">operation: </span><span class="s2">&quot;_splitRoot&quot;</span><span class="p">,</span>
+        <span class="nv">addresses: </span><span class="p">[</span> <span class="nx">mutation</span><span class="p">.</span><span class="nx">parent</span><span class="p">.</span><span class="nx">tier</span><span class="p">.</span><span class="nx">address</span> <span class="p">]</span></pre></div>             </td>           </tr>                               <tr id="section-100">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-100">&#182;</a>               </div>               <p>To split the root, we copy the contents of the root into two children,
+splitting the contents between the children, then make the two children the
+only two nodes of the root tier. The address of the root tier does not
+change, only the contents.</p>
+
+<p>While a split at lower levels will create two half empty tiers and add a
+single branch to the parent, this operation will empty the root into two
+separate tiers, creating an almost empty root each time it is split.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">_drainRoot: </span><span class="nf">(mutation) -&gt;</span></pre></div>             </td>           </tr>                               <tr id="section-101">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-101">&#182;</a>               </div>               <p>Create new left and right inner tiers.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nv">left = </span><span class="nx">@_newInnerTier</span> <span class="nx">mutation</span><span class="p">,</span> <span class="nx">root</span><span class="p">.</span><span class="nx">penultimate</span>
+    <span class="nv">right = </span><span class="nx">@_newInnerTier</span> <span class="nx">mutation</span><span class="p">,</span> <span class="nx">root</span><span class="p">.</span><span class="nx">penultimate</span></pre></div>             </td>           </tr>                               <tr id="section-102">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-102">&#182;</a>               </div>               <p>Find the partition index and move the branches up to the partition
+into the left inner tier. Move the branches at and after the partiion
+into the right inner tier.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nv">partition = </span><span class="nx">root</span><span class="p">.</span><span class="nx">lenth</span> <span class="o">/</span> <span class="mi">2</span>
+    <span class="nv">fullSize = </span><span class="nx">root</span><span class="p">.</span><span class="nx">length</span>
+    <span class="k">for</span> <span class="nx">i</span> <span class="k">in</span> <span class="p">[</span><span class="mi">0</span><span class="p">...</span><span class="nx">partition</span><span class="p">]</span>
+      <span class="nx">left</span><span class="p">.</span><span class="nx">push</span> <span class="nx">root</span><span class="p">[</span><span class="nx">i</span><span class="p">]</span>
+    <span class="k">for</span> <span class="nx">i</span> <span class="k">in</span> <span class="p">[</span><span class="nx">partition</span><span class="p">...</span><span class="nx">root</span><span class="p">.</span><span class="nx">length</span><span class="p">]</span>
+      <span class="nx">right</span><span class="p">.</span><span class="nx">push</span> <span class="nx">root</span><span class="p">[</span><span class="nx">i</span><span class="p">]</span></pre></div>             </td>           </tr>                               <tr id="section-103">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-103">&#182;</a>               </div>               <p>Empty the root.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nv">root.length = </span><span class="mi">0</span></pre></div>             </td>           </tr>                               <tr id="section-104">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-104">&#182;</a>               </div>               <p>The left-most pivot or the right inner tier is null.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nv">pivot = </span><span class="nx">right</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="nx">record</span>
+    <span class="nx">right</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="nv">record = </span><span class="kc">null</span></pre></div>             </td>           </tr>                               <tr id="section-105">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-105">&#182;</a>               </div>               <p>Add the branches to the new left and right inner tiers to the now
+empty root tier.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nx">root</span><span class="p">.</span><span class="nx">push</span> <span class="p">{</span> <span class="nv">pivot: </span><span class="kc">null</span><span class="p">,</span> <span class="nv">address: </span><span class="nx">left</span><span class="p">.</span><span class="nx">address</span> <span class="p">}</span>
+    <span class="nx">root</span><span class="p">.</span><span class="nx">push</span> <span class="p">{</span> <span class="nx">pivot</span><span class="p">,</span> <span class="nv">address: </span><span class="nx">right</span><span class="p">.</span><span class="nx">address</span> <span class="p">}</span></pre></div>             </td>           </tr>                               <tr id="section-106">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-106">&#182;</a>               </div>               <p>Set the child type of the root tier to inner.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nv">root.penultimate = </span><span class="kc">false</span></pre></div>             </td>           </tr>                               <tr id="section-107">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-107">&#182;</a>               </div>               <p>Stage the dirty tiers for write.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nx">@io</span><span class="p">.</span><span class="nx">dirty</span> <span class="nx">root</span><span class="p">,</span> <span class="nx">left</span><span class="p">,</span> <span class="nx">right</span></pre></div>             </td>           </tr>                               <tr id="section-108">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-108">&#182;</a>               </div>               <p>Determine if the root inner tier should be filled with contents of a two
+extra remaining inner tier children. When an root inner tier has only one
+inner tier child, the contents of that inner tier child becomes the root of
+the b-tree.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">_shouldFillRoot: </span><span class="nf">(mutation) -&gt;</span>
+    <span class="k">if</span> <span class="o">not</span> <span class="nx">root</span><span class="p">.</span><span class="nx">penultimate</span> <span class="o">and</span> <span class="nx">root</span><span class="p">.</span><span class="nx">length</span> <span class="o">is</span> <span class="mi">2</span>
+      <span class="nv">first = </span><span class="nx">mutation</span><span class="p">.</span><span class="nx">io</span><span class="p">.</span><span class="nx">load</span> <span class="nx">root</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="nx">childAddress</span>
+      <span class="nv">second = </span><span class="nx">mutation</span><span class="p">.</span><span class="nx">io</span><span class="p">.</span><span class="nx">load</span> <span class="nx">root</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="nx">childAddress</span>
+      <span class="k">if</span> <span class="nx">first</span><span class="p">.</span><span class="nx">length</span> <span class="o">+</span> <span class="nx">second</span><span class="p">.</span><span class="nx">length</span> <span class="o">is</span> <span class="nx">@innerSize</span>
+        <span class="nx">mutations</span><span class="p">.</span><span class="nx">parentLevel</span><span class="p">.</span><span class="nx">operations</span><span class="p">.</span><span class="nx">add</span> <span class="nx">@_fillRoot</span>
+        <span class="k">return</span> <span class="kc">true</span>
+    <span class="kc">false</span></pre></div>             </td>           </tr>                               <tr id="section-109">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-109">&#182;</a>               </div>               <p>Determines whether to merge two inner tiers into one tier or else to delete
+an inner tier that has only one child tier but is either the only child tier
+or its siblings are already full.</p>
+
+<p><strong>Only Children</strong></p>
+
+<p>It is possible that an inner tier may have only one child leaf or inner
+tier. This occurs in the case where the siblings of of inner tier are at
+capacity. A merge occurs when two children are combined. The nodes from the
+child to the right are combined with the nodes from the child to the left.
+The parent branch that referenced the right child is deleted.</p>
+
+<p>If it is the case that a tier is next to full siblings, as leaves are
+deleted from that tier, it will not be a candidate to merge with a sibling
+until it reaches a size of one. At that point, it could merge with a sibling
+if a deletion were to cause its size to reach zero.</p>
+
+<p>However, the single child of that tier has no siblings with which it can
+merge. A tier with a single child cannot reach a size of zero by merging.</p>
+
+<p>If were where to drain the subtree of an inner tier with a single child of
+every leaf, we would merge its leaf tiers and merge its inner tiers until we
+had subtree that consisted solely of inner tiers with one child and a leaf
+with one item. At that point, when we delete the last item, we need to
+delete the chain of tiers with only children.</p>
+
+<p>We deleting any child that is size of one that cannot merge with a sibling.
+Deletion means freeing the child and removing the branch that references it.</p>
+
+<p>The only leaf child will not have a sibling with which it can merge,
+however. We won't be able to copy leaf items from a right leaf to a left
+leaf. This means we won't be able to update the linked list of leaves,
+unless we go to the left of the only child. But, going to the left of the
+only child requires knowing that we must go to the left.</p>
+
+<p>We are not going to know which left to take the first time down, though. The
+actual pivot is not based on the number of children. It might be above the
+point where the list of only children begins. As always, it is a pivot whose
+value matches the first item in the leaf, in this case the only item in the
+leaf.</p>
+
+<p>Here's how it works.</p>
+
+<p>On the way down, we look for a branch that has an inner tier that is size of
+one. If so, we set a flag in the mutator to note that we are now deleting.</p>
+
+<p>If we encounter an inner tier has more than one child on the way down we are
+not longer in the deleting state.</p>
+
+<p>When we reach the leaf, if it has a size of one and we are in the deleting
+state, then we look in the mutator for a left leaf variable and an is left
+most flag. More on those later as neither are set.</p>
+
+<p>We tell the mutator that we have a last item and that the action has failed,
+by setting the fail action. Failure means we try again.</p>
+
+<p>On the retry, as we descend the tree, we have the last item variable set in
+the mutator.</p>
+
+<p>Note that we are descending the tree again. Because we are a concurrent data
+structure, the structure of the tree may change. I'll get to that. For now,
+let's assume that it has not changed.</p>
+
+<p>If it has not changed, then we are going to encounter a pivot that has our
+last item. When we encounter this pivot, we are going to go left. Going left
+means that we descend to the child of the branch before the branch of the
+pivot. We then follow each rightmost branch of each inner tier until we reach
+the right most leaf. That leaf is the leaf before the leaf that is about to
+be removed. We store this in the mutator.</p>
+
+<p>Of course, the leaf to be removed may be the left most leaf in the entire
+data structure. In that case, we set a variable named left most in the
+mutator.</p>
+
+<p>When we go left, we lock every inner tier and the leaf tier exclusive, to
+prevent it from being changed by another query in another thread. We always
+lock from left to right.</p>
+
+<p>Now we continue our descent. Eventually, we reach out chain of inner tiers
+with only one child. That chain may only be one level deep, but there will be
+such a chain.</p>
+
+<p>Now we can add a remove leaf operation to the list of operations in the
+parent level. This operation will link the next leaf of the left leaf to the
+next leaf of the remove leaf, reserving our linked list of leaves. It will
+take place after the normal remove operation, so that if the remove operation
+fails (because the item to remove does not actually exist) then the leave
+removal does not occur.</p>
+
+<p>I revisited this logic after a year and it took me a while to convince myself
+that it was not a misunderstanding on my earlier self's part, that these
+linked lists of otherwise empty tiers are a natural occurrence.</p>
+
+<p>The could be addressed by linking the inner tiers and thinking harder, but
+that would increase the size of the project.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">_shouldMergeInner: </span><span class="nf">(mutation) -&gt;</span></pre></div>             </td>           </tr>                               <tr id="section-110">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-110">&#182;</a>               </div>               <p>Find the child tier.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nv">branch = </span><span class="nx">@_find</span> <span class="nx">parent</span><span class="p">,</span> <span class="nx">mutation</span><span class="p">.</span><span class="nx">fields</span>
+    <span class="nv">child = </span><span class="nx">@_pool</span><span class="p">.</span><span class="nx">load</span> <span class="nx">parent</span><span class="p">[</span><span class="nx">branch</span><span class="p">].</span><span class="nx">childAddress</span></pre></div>             </td>           </tr>                               <tr id="section-111">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-111">&#182;</a>               </div>               <p>If we are on our way down to remove the last item of a leaf tier that is
+an only child, then we need to find the leaf to the left of the only child
+leaf tier. This means that we need to detect the branch that uses the the
+value of the last item in the only child leaf as a pivot. When we detect
+it we then navigate each right most branch of the tier referenced by the
+branch before it to find the leaf to the left of the only child leaf. We
+then make note of it so we can link it around the only child that is go be
+removed.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nv">lockLeft = </span><span class="nx">mutation</span><span class="p">.</span><span class="nx">onlyChild</span> <span class="o">and</span> <span class="nx">pivot</span><span class="o">?</span> <span class="o">and</span> <span class="o">not</span> <span class="nx">mutation</span><span class="p">.</span><span class="nx">leftLeaf</span><span class="o">?</span>
+    <span class="k">if</span> <span class="nx">lockLeft</span>
+      <span class="nv">lockLeft = </span><span class="nx">@comparison</span><span class="p">(</span><span class="nx">mutation</span><span class="p">.</span><span class="nx">fields</span><span class="p">,</span> <span class="nx">@io</span><span class="p">.</span><span class="nx">fields</span> <span class="nx">pivot</span><span class="p">)</span> <span class="o">is</span> <span class="mi">0</span>
+    <span class="k">if</span> <span class="nx">lockLeft</span></pre></div>             </td>           </tr>                               <tr id="section-112">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-112">&#182;</a>               </div>               <p>FIXME You need to hold these exclusive locks, so add an operation that
+is uncancelable, but does nothing.</p>             </td>             <td class="code">               <div class="highlight"><pre>      <span class="nv">index = </span><span class="nx">parent</span><span class="p">.</span><span class="nx">getIndexOfChildAddress</span><span class="p">(</span><span class="nx">child</span><span class="p">.</span><span class="nx">getAddress</span><span class="p">())</span> <span class="o">-</span> <span class="mi">1</span>
+      <span class="nv">inner = </span><span class="nx">parent</span>
+      <span class="k">while</span> <span class="o">not</span> <span class="nx">inner</span><span class="p">.</span><span class="nx">childLeaf</span>
+        <span class="nv">inner = </span><span class="nx">pool</span><span class="p">.</span><span class="nx">load</span><span class="p">(</span><span class="nx">mutation</span><span class="p">.</span><span class="nx">getStash</span><span class="p">(),</span> <span class="nx">inner</span><span class="p">.</span><span class="nx">getChildAddress</span><span class="p">(</span><span class="nx">index</span><span class="p">))</span>
+        <span class="nx">levelOfParent</span><span class="p">.</span><span class="nx">lockAndAdd</span><span class="p">(</span><span class="nx">inner</span><span class="p">)</span>
+        <span class="nv">index = </span><span class="nx">inner</span><span class="p">.</span><span class="nx">getSize</span><span class="p">()</span> <span class="o">-</span> <span class="mi">1</span>
+      <span class="nv">leaf = </span><span class="nx">pool</span><span class="p">.</span><span class="nx">load</span><span class="p">(</span><span class="nx">mutation</span><span class="p">.</span><span class="nx">getStash</span><span class="p">(),</span> <span class="nx">inner</span><span class="p">.</span><span class="nx">getChildAddress</span><span class="p">(</span><span class="nx">index</span><span class="p">))</span>
+      <span class="nx">levelOfParent</span><span class="p">.</span><span class="nx">lockAndAdd</span><span class="p">(</span><span class="nx">leaf</span><span class="p">)</span>
+      <span class="nx">mutation</span><span class="p">.</span><span class="nx">setLeftLeaf</span><span class="p">(</span><span class="nx">leaf</span><span class="p">)</span></pre></div>             </td>           </tr>                               <tr id="section-113">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-113">&#182;</a>               </div>               <p>When we detect an inner tier with an only child, we note that we have
+begun to descend a list of tiers with only one child.  Tiers with only one
+child are deleted rather than merged. If we encounter a tier with children
+with siblings, we are no longer deleting.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="k">if</span> <span class="nx">child</span><span class="p">.</span><span class="nx">length</span> <span class="o">is</span> <span class="mi">1</span>
+      <span class="nv">mutation.deleting = </span><span class="kc">true</span>
+      <span class="nx">levelOfParent</span><span class="p">.</span><span class="nx">operations</span><span class="p">.</span><span class="nx">push</span> <span class="nx">@_removeInner</span><span class="p">(</span><span class="nx">parent</span><span class="p">,</span> <span class="nx">child</span><span class="p">)</span>
+      <span class="k">return</span> <span class="kc">true</span></pre></div>             </td>           </tr>                               <tr id="section-114">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-114">&#182;</a>               </div>               <p>Determine if we can merge with either sibling.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nv">listToMerge = </span><span class="p">[]</span>
+
+    <span class="nv">index = </span><span class="nx">parent</span><span class="p">.</span><span class="nx">getIndexOfChildAddress</span><span class="p">(</span><span class="nx">child</span><span class="p">.</span><span class="nx">getAddress</span><span class="p">())</span>
+    <span class="k">if</span> <span class="nx">index</span> <span class="o">!=</span> <span class="mi">0</span>
+      <span class="nv">left = </span><span class="nx">pool</span><span class="p">.</span><span class="nx">load</span><span class="p">(</span><span class="nx">mutation</span><span class="p">.</span><span class="nx">getStash</span><span class="p">(),</span> <span class="nx">parent</span><span class="p">.</span><span class="nx">getChildAddress</span><span class="p">(</span><span class="nx">index</span> <span class="o">-</span> <span class="mi">1</span><span class="p">))</span>
+      <span class="nx">levelOfChild</span><span class="p">.</span><span class="nx">lockAndAdd</span><span class="p">(</span><span class="nx">left</span><span class="p">)</span>
+      <span class="nx">levelOfChild</span><span class="p">.</span><span class="nx">lockAndAdd</span><span class="p">(</span><span class="nx">child</span><span class="p">)</span>
+      <span class="k">if</span> <span class="nx">left</span><span class="p">.</span><span class="nx">getSize</span><span class="p">()</span> <span class="o">+</span> <span class="nx">child</span><span class="p">.</span><span class="nx">getSize</span><span class="p">()</span> <span class="o">&lt;=</span> <span class="nx">structure</span><span class="p">.</span><span class="nx">getInnerSize</span><span class="p">()</span>
+        <span class="nx">listToMerge</span><span class="p">.</span><span class="nx">add</span><span class="p">(</span><span class="nx">left</span><span class="p">)</span>
+        <span class="nx">listToMerge</span><span class="p">.</span><span class="nx">add</span><span class="p">(</span><span class="nx">child</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="nx">index</span> <span class="o">is</span> <span class="mi">0</span>
+      <span class="nx">levelOfChild</span><span class="p">.</span><span class="nx">lockAndAdd</span><span class="p">(</span><span class="nx">child</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="nx">listToMerge</span><span class="p">.</span><span class="nx">isEmpty</span><span class="p">()</span> <span class="o">&amp;&amp;</span> <span class="nx">index</span> <span class="o">!=</span> <span class="nx">parent</span><span class="p">.</span><span class="nx">getSize</span><span class="p">()</span> <span class="o">-</span> <span class="mi">1</span>
+      <span class="nv">right = </span><span class="nx">pool</span><span class="p">.</span><span class="nx">load</span><span class="p">(</span><span class="nx">mutation</span><span class="p">.</span><span class="nx">getStash</span><span class="p">(),</span> <span class="nx">parent</span><span class="p">.</span><span class="nx">getChildAddress</span><span class="p">(</span><span class="nx">index</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))</span>
+      <span class="nx">levelOfChild</span><span class="p">.</span><span class="nx">lockAndAdd</span><span class="p">(</span><span class="nx">right</span><span class="p">)</span>
+      <span class="k">if</span> <span class="p">(</span><span class="nx">child</span><span class="p">.</span><span class="nx">getSize</span><span class="p">()</span> <span class="o">+</span> <span class="nx">right</span><span class="p">.</span><span class="nx">getSize</span><span class="p">()</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">==</span> <span class="nx">structure</span><span class="p">.</span><span class="nx">getInnerSize</span><span class="p">()</span>
+        <span class="nx">listToMerge</span><span class="p">.</span><span class="nx">add</span><span class="p">(</span><span class="nx">child</span><span class="p">)</span>
+        <span class="nx">listToMerge</span><span class="p">.</span><span class="nx">add</span><span class="p">(</span><span class="nx">right</span><span class="p">)</span></pre></div>             </td>           </tr>                               <tr id="section-115">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-115">&#182;</a>               </div>               <p>Add the merge operation.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="k">if</span> <span class="nx">listToMerge</span><span class="p">.</span><span class="nx">size</span><span class="p">()</span> <span class="o">!=</span> <span class="mi">0</span></pre></div>             </td>           </tr>                               <tr id="section-116">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-116">&#182;</a>               </div>               <p>If the parent or ancestors have only children and we are creating
+a chain of delete operations, we have to cancel those delete
+operations. We cannot delete an inner tier as the result of a
+merge, we have to allow this subtree of nearly empty tiers to
+exist. We rewind all the operations above us, but we leave the
+top two tiers locked exclusively.</p>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-117">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-117">&#182;</a>               </div>               <p>FIXME I'm not sure that rewind is going to remove all the
+operations. The number here indicates that two levels are
+supposed to be left locked exclusive, but I don't see in rewind,
+how the operations are removed.</p>             </td>             <td class="code">               <div class="highlight"><pre>      <span class="k">if</span> <span class="nx">mutation</span><span class="p">.</span><span class="nx">deleting</span>
+        <span class="nx">mutation</span><span class="p">.</span><span class="nx">rewind</span> <span class="mi">2</span>
+        <span class="nv">mutation.deleting = </span><span class="kc">false</span>
+
+      <span class="nx">levelOfParent</span><span class="p">.</span><span class="nx">operations</span><span class="p">.</span><span class="nx">push</span> <span class="k">new</span> <span class="nx">MergeInner</span><span class="p">(</span><span class="nx">parent</span><span class="p">,</span> <span class="nx">listToMerge</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="nx">listToMerge</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="mi">1</span><span class="p">))</span>
+
+      <span class="k">return</span> <span class="kc">true</span></pre></div>             </td>           </tr>                               <tr id="section-118">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-118">&#182;</a>               </div>               <p>When we encounter an inner tier without an only child, then we are no
+longer deleting. Returning false will cause the Query to rewind the
+exclusive locks and cancel the delete operations, so the delete
+action is reset.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nv">mutation.deleting = </span><span class="kc">false</span>
+
+    <span class="k">return</span> <span class="kc">false</span>
+ 
+  <span class="nv">_shouldSplitInner: </span><span class="nf">(mutation) -&gt;</span>
+    <span class="nx">console</span><span class="p">.</span><span class="nx">log</span> <span class="s2">&quot;_shouldSplitInner&quot;</span>
+    <span class="nv">structure = </span><span class="nx">mutation</span><span class="p">.</span><span class="nx">getStructure</span><span class="p">()</span>
+    <span class="nv">branch = </span><span class="nx">parent</span><span class="p">.</span><span class="nx">find</span><span class="p">(</span><span class="nx">mutation</span><span class="p">.</span><span class="nx">getComparable</span><span class="p">())</span>
+    <span class="nv">child = </span><span class="nx">structure</span><span class="p">.</span><span class="nx">getStorage</span><span class="p">().</span><span class="nx">load</span><span class="p">(</span><span class="nx">mutation</span><span class="p">.</span><span class="nx">getStash</span><span class="p">(),</span> <span class="nx">parent</span><span class="p">.</span><span class="nx">getChildAddress</span><span class="p">(</span><span class="nx">branch</span><span class="p">))</span>
+    <span class="nx">levelOfChild</span><span class="p">.</span><span class="nx">lockAndAdd</span><span class="p">(</span><span class="nx">child</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nx">child</span><span class="p">.</span><span class="nx">getSize</span><span class="p">()</span> <span class="o">==</span> <span class="nx">structure</span><span class="p">.</span><span class="nx">getInnerSize</span><span class="p">()</span>
+      <span class="nx">levelOfParent</span><span class="p">.</span><span class="nx">operations</span><span class="p">.</span><span class="nx">add</span><span class="p">(</span><span class="k">new</span> <span class="nx">SplitInner</span><span class="p">(</span><span class="nx">parent</span><span class="p">,</span> <span class="nx">child</span><span class="p">))</span>
+      <span class="k">return</span> <span class="kc">true</span>
+    <span class="k">return</span> <span class="kc">false</span>
+
+  <span class="nv">_never: </span><span class="o">-&gt;</span> <span class="kc">false</span></pre></div>             </td>           </tr>                               <tr id="section-119">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-119">&#182;</a>               </div>               <p>Determine if the leaf that will hold the inserted value is full and ready
+to split, if it is full and part of linked list of b+tree leaves of
+duplicate index values, or it it can be inserted without splitting.</p>
+
+<p>TODO Now there is a chance that this might already be in a split state. What
+do we do? Do we create a new plan as we decend to test the current plan?</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">_howToInsertLeaf: </span><span class="nf">(mutation, _) -&gt;</span></pre></div>             </td>           </tr>                               <tr id="section-120">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-120">&#182;</a>               </div>               <p>Find the branch that navigates to the leaf child.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nv">branch = </span><span class="nx">@_find</span> <span class="nx">mutation</span><span class="p">.</span><span class="nx">parent</span><span class="p">.</span><span class="nx">tier</span><span class="p">,</span> <span class="nx">mutation</span><span class="p">.</span><span class="nx">fields</span><span class="p">,</span> <span class="nx">_</span>
+    <span class="nv">address = </span><span class="nx">mutation</span><span class="p">.</span><span class="nx">parent</span><span class="p">.</span><span class="nx">tier</span><span class="p">.</span><span class="nx">addresses</span><span class="p">[</span><span class="nx">branch</span><span class="p">]</span>
+    </pre></div>             </td>           </tr>                               <tr id="section-121">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-121">&#182;</a>               </div>               <p>Lock the leaf exclusively.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nv">mutation.child.exclusive = </span><span class="kc">true</span>
+    <span class="nv">leaf = </span><span class="nx">@_lock</span> <span class="nx">mutation</span><span class="p">.</span><span class="nx">child</span><span class="p">,</span> <span class="nx">address</span><span class="p">,</span> <span class="kc">true</span><span class="p">,</span> <span class="nx">_</span>
+    <span class="nv">mutation.child.tier = </span><span class="nx">leaf</span></pre></div>             </td>           </tr>                               <tr id="section-122">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-122">&#182;</a>               </div>               <p>If the leaf size is equal to the maximum leaf size, then we either
+have a leaf that must split or a leaf that is full of objects that
+have the same index value. Otherwise, we have a leaf that has a free
+slot.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="k">if</span> <span class="nx">leaf</span><span class="p">.</span><span class="nx">addresses</span><span class="p">.</span><span class="nx">length</span> <span class="o">is</span> <span class="nx">@leafSize</span></pre></div>             </td>           </tr>                               <tr id="section-123">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-123">&#182;</a>               </div>               <p>If the index value of the first value is equal to the index value
+of the last value, then we have a linked list of duplicate index
+values. Otherwise, we have a full page that can split.</p>             </td>             <td class="code">               <div class="highlight"><pre>      <span class="nv">first = </span><span class="nx">@extractor</span> <span class="nx">leaf</span><span class="p">.</span><span class="nx">record</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+      <span class="k">if</span> <span class="nx">@compartor</span><span class="p">(</span><span class="nx">first</span><span class="p">,</span> <span class="nx">@extractor</span> <span class="nx">leaf</span><span class="p">.</span><span class="nx">record</span><span class="p">(</span><span class="nx">leaf</span><span class="p">.</span><span class="nx">size</span><span class="p">()</span> <span class="o">-</span> <span class="mi">1</span><span class="p">))</span> <span class="o">is</span> <span class="mi">0</span></pre></div>             </td>           </tr>                               <tr id="section-124">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-124">&#182;</a>               </div>               <p>If the inserted value is less than the current value, create
+a new page to the left of the leaf, if it is greater create a
+new page to the right of the leaf. If it is equal, append the
+leaf to the linked list of duplicate index values.</p>             </td>             <td class="code">               <div class="highlight"><pre>        <span class="nv">compare = </span><span class="nx">@comparator</span> <span class="nx">mutation</span><span class="p">.</span><span class="nx">fields</span><span class="p">,</span> <span class="nx">first</span></pre></div>             </td>           </tr>                               <tr id="section-125">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-125">&#182;</a>               </div>               <p>TODO We will never split left! The inserted value is never less than
+the first value in the leaf! Assert this and get rid of the left
+split.</p>             </td>             <td class="code">               <div class="highlight"><pre>        <span class="k">if</span> <span class="nx">compare</span> <span class="o">&lt;</span> <span class="mi">0</span>
+          <span class="nv">mutation.leafOperation = </span><span class="p">[</span> <span class="nx">@_splitLinkedListLeft</span><span class="p">,</span> <span class="nx">parent</span> <span class="p">]</span>
+        <span class="k">else</span> <span class="k">if</span> <span class="nx">compare</span> <span class="o">&gt;</span> <span class="mi">0</span>
+          <span class="nv">mutation.leafOperation = </span><span class="p">[</span> <span class="nx">@_splitLinkedListRight</span><span class="p">,</span> <span class="nx">parent</span> <span class="p">]</span>
+        <span class="k">else</span>
+          <span class="nv">mutation.leafOperation = </span><span class="p">[</span> <span class="nx">@_insertLinkedList</span><span class="p">,</span> <span class="nx">leaf</span> <span class="p">]</span>
+          <span class="nv">split = </span><span class="kc">false</span>
+      <span class="k">else</span></pre></div>             </td>           </tr>                               <tr id="section-126">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-126">&#182;</a>               </div>               <p>Insert the value and then split the leaf.</p>             </td>             <td class="code">               <div class="highlight"><pre>        <span class="nx">parentLevel</span><span class="p">.</span><span class="nx">operations</span><span class="p">.</span><span class="nx">push</span> <span class="p">[</span> <span class="nx">@_splitLeaf</span><span class="p">,</span> <span class="nx">parent</span> <span class="p">]</span>
+        <span class="nv">mutation.leafOperation = </span><span class="p">[</span> <span class="nx">@_insertSorted</span><span class="p">,</span> <span class="nx">parent</span> <span class="p">]</span>
+    <span class="k">else</span></pre></div>             </td>           </tr>                               <tr id="section-127">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-127">&#182;</a>               </div>               <p>No split and the value is inserted into leaf.</p>             </td>             <td class="code">               <div class="highlight"><pre>      <span class="nv">mutation.leafOperation = </span><span class="p">[</span> <span class="nx">@_insertSorted</span><span class="p">,</span> <span class="nx">leaf</span> <span class="p">]</span>
+      <span class="nv">split = </span><span class="kc">false</span></pre></div>             </td>           </tr>                               <tr id="section-128">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-128">&#182;</a>               </div>               <p>Let the caller know if we've added a split operation.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nx">split</span></pre></div>             </td>           </tr>                               <tr id="section-129">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-129">&#182;</a>               </div>               <p>Mark the operations that split or merge the tree. These are the operations we
+cancel if split or merge is not necessary, because a decendent tier will not
+split or merge.</p>
+
+<p>That is, splits and merges ripple up from the leaves, so if
+the root, say is empty and ready to merge, we will lock it to merge it, but if
+it has an inner tier child that is not ready to merge, we remove the root
+merge operation. If there are no other operations in the tier we can unlock it.</p>
+
+<p>Swap operations are not cancelable.</p>             </td>             <td class="code">               <div class="highlight"><pre><span class="k">for</span> <span class="nx">operation</span> <span class="k">in</span> <span class="s2">&quot;_drainRoot&quot;</span><span class="p">.</span><span class="nx">split</span> <span class="sr">/\n/</span>
+  <span class="nx">module</span><span class="p">.</span><span class="nx">exports</span><span class="p">.</span><span class="nx">Strata</span><span class="p">.</span><span class="nx">prototype</span><span class="p">[</span><span class="nx">operation</span><span class="p">].</span><span class="nv">isSplitOrMerge = </span><span class="kc">true</span>
+
+</pre></div>             </td>           </tr>                </tbody>     </table>   </div> </body> </html> 
