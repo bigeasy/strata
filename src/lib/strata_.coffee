@@ -2,7 +2,237 @@
 #
 # ## Purpose
 # 
-# Implements a file backed b-tree.
+# Implements a file backed [b-tree](http://en.wikipedia.org/wiki/B-tree).
+#
+# TK Points to cover as far as advocacy goes.
+#
+#  * Concurrency.
+#  * Flexiblity of ordering.
+#  * Atomicity.
+#  * A database primitive, for use as if it were a programming primitive like an
+#  array or an associative array.
+#  * Standard Node.js API.
+#
+# But this isn't important at the moment.
+#
+# ### Terminology
+#
+# We refer to the nodes in our b-tree as *pages*. The term node conjures an
+# image of a discrete component in a linked data structure that contains one,
+# maybe two or three, values. Nodes in a b-tree contain hundreds or thousands of
+# values. They are indexed. They are read from disk. They are allowed to fall
+# out of memory when they have not been recently referenced. These are behaviors
+# that conjure an image of a page of values.
+#
+# Otherwise, we use common teriminology for *order*, *depth*, *parent*, *child*,
+# *split* and *merge*. There is no hard and fast definition for all the terms. A
+# leaf is a fuzzy concept in b-tree literature, for example. We call a page that
+# contains records a *leaf page*. We call a non-leaf page a *branch page*.
+#
+# The term *b-tree* itself may not be correct. There are different names for
+# b-tree that reflect the variations of implementation, but those distinctions
+# have blurred over the years. Our implemenation may be considered a b+tree,
+# since pages are linked, and records are stored only in the leaves.
+#
+# Terms specific to our implementation will be introduced as they are
+# encountered in the document. 
+#
+# ### What is a b-tree?
+#
+# This documentation assumes that you understand the theory behind the b-tree,
+# and know the variations of implementation. If you are interested in learning
+# about b-trees, this document could be a learning aid for you, but you should
+# start with the Wikipedia articles on
+# [B-trees](http://en.wikipedia.org/wiki/B-tree) and
+# [B+trees](http://en.wikipedia.org/wiki/B%2B_tree). 
+#
+# ### What flavor of b-tree is this?
+#
+# Strata is a b-tree with leaf pages that contain records ordered by the
+# collation order of the tree, indexed for retrieval in constant time, so that
+# they can be found using binary search. Branch pages contain links to other
+# pages, and do not store records themselves. Leaf pages are linked in ascending
+# order to ease the implementation of cursors.
+#
+# There is a maximum size for a page, that limits the number of links, in the
+# case of branch pages, or records in the case of leaf pages. When the maximum
+# size is reached which point a node is split. When two sibling pages next to
+# each other contain keys or records that combined are the less than than
+# maximum size they are merged.
+#
+# The tree always has a root branch page. The order of the tree increases when
+# the root branch is split. It decreases when the root branch is merged. The
+# split of the root branch is a different operation from the split of a non-root
+# branch, because the root branch does not have siblings.
+#
+# ### Page Structure
+#
+# The b-tree has two types of pages. Leaf pages and branch pages.
+#
+# #### Leaf Pages
+#
+# Leaf pages contain records.
+#
+# In the abstract, a leaf page is an array data structure with zero based
+# integer index. The elements of the structure contain records. Given an
+# integer, the leaf page will return the record stored at element in the array.
+# This lookup is performed in constant time.
+# 
+# The records in the record array are ordered according to the collation of the
+# b-tree. Because of this, and because a lookup takes constant time, we can search
+# for a record in a leaf page using binary search in logorithmic time.
+#
+# The first record of every leaf page must be unique in relation to the first
+# record of every other leaf page. The b-tree will accept records that are
+# dupcliates according to the collation. When we split a page, we cannot cannot
+# choose a partition that has the same value as the first record, since that
+# would violate the unique first record constraint.
+#
+# If a page reaches the maximum leaf page size, filled with records that have
+# the same value according to the collation, the leaf page is cannot split,
+# since no suitable partition exists. The page will be allowed to grow beyond
+# the maximum page size.
+#
+# #### Branch Pages
+#
+# Branch pages contain links to other pages. To find the a record in the b-tree,
+# we first use branch pages to find the leaf page that contains our record.
+#
+# All pages are identified by a unique page address. The page address is an
+# integer assigned to the page when the page is created. Branch pages link to
+# other pages by storing the address of the referenced page in an array of page
+# addresses. This array of page addresses is essentially an *array of children*.
+#
+# A branch page orders its children according to the b-tree collation using a
+# record obtained from a leaf page as a *key*. A branch page always has one more
+# children than the number of keys. Keys are unique. A key used in a branch page
+# will not equal another key used in any branch page according to the collation.
+#
+# There are two special types of branch pages, the root page, and penultimate
+# pages.
+#
+# ##### Root Page
+#
+# The root page is the first page we consult to find the desired leaf page. Our
+# b-tree always contains a root page. The b-tree is never so empty that the root
+# page disappears. The root page always has the same address.
+#
+# TK move. Until the root branch page is split, it is both the root branch page
+# and a penultimate branch page.
+#
+# ##### Penultimate Pages
+#
+# A penultimate branch page is a branch page whose children are leaf pages. If a
+# branch page is not penultimate, then its children are branch pages.
+#
+# In a penultimate branch page, the array of children is ordered by the b-tree
+# collation using a first record in the referenced leaf page for ordering. That
+# is, the first record of the leaf page is used as the key associated with a
+# page address in a penultimate branch page.
+#
+# The non-leaf nodes of a b-tree have the property that the number of node
+# children is one greater than the number of keys. We obtain this property by
+# treating the first child as the left child of the entire page, and excluding
+# its key from the search. We search the subsequent keys to find the first key
+# that is grater than or equal to the record sought. Essentially, when we
+# encouter a key that is greater than our sought record, we know that the record
+# is contained in the leaf page child associated with the key before it.
+# Although it sounds linear, we are able to perform this search using binary
+# search in logorithmic time.
+#
+# By ignoring the key of the first leaf page, the penultimate branch page has a
+# number of children that is one greater than the number of keys.
+#
+# Notice that, when we are inserting a record into a leaf page other than the
+# left leaf page, we add it to a leaf page whose key is equal to or greater than
+# the penultimate branch key, so that the first record does not change, and
+# therefore that penultimate branch key does not change. The exception is the
+# left leaf page, which accepts all the records less than the first key, and
+# therefore may accept a record less than its current least record.
+#
+# An insertion can only insert a into the left most leaf page of a penumltimate
+# branch page a record less than the least record of the leaf page.
+#
+# ##### Interior Branch Pages
+#
+# A branch page whose children are other branch pages is called an interior
+# branch page.
+#
+# Like the penultimate branch page, we treat the first child of an interior
+# branch page as the left child of the entire page. Like the penultimate branch
+# page the subsequent children have an associated key that is the first record
+# of a leaf page.
+#
+# The key is obtained by decending the sub-tree referenced by the child. We
+# first visit the branch page referneced by the child. We then visit left
+# children recursively, visiting the left child of the child, and the left child
+# of any subsquently visited children, until we reach a leaf page.  The first
+# record of that leaf page is the key to associate with the child address in the
+# address array of the interior branch page.
+#
+# It is the nature of the b-tree that keys move up to the higher levels of the
+# tree as pages split, while preserving the collation order of the keys. When a
+# branch page splits, a key from the middle of the page is chosen as a
+# partition. The partition is used as the key for the right half of the split
+# page in the parent page.
+#
+# Our implementation does not store the keys, as you may have noticed, but
+# decends down to the leaf page to fetch the record to use as a key. 
+#
+# We start from a penultimate page as a root page. When a leaf page fills, we
+# split it, creating a new right leaf page. The penultimate page uses the first
+# record of the new right page as the key to associate with that page.
+#
+# When the root penultimate page is full we split it, so that the root page is
+# an interior page with two children, which are two penultimate pages. The tree
+# now contains a root interior branch page, with a left penultimate branch page
+# and a right penultimate branch page.
+#
+# The root interior branch page has one key. Prior to split, that key was
+# associated with the address of a child leaf page. After split, the key is
+# associated with the right penultimate branch page. The leaf page is now the
+# left child of the right penultimate branch page.
+#
+# When we visit the root interior page, to obtain the key to associate with the
+# right penultimate page, we visit the right penultimate page, then we visit its
+# left child, the leaf page whose first record is the key.
+#
+# #### Keys and First Records
+#
+# We said that it is only possible for an insertion to insert a into the left
+# most child leaf page of a penumltimate branch page a record less than the least
+# record. We can say about a tree rooted by an interor branch page, that an
+# insertion is only able to insert into the left most leaf page in the *entire
+# tree* a record less than the least record.
+#
+# Using our example tree with one root interior page, with two penultimate
+# branch page children, we cannot insert a record into the right penultimate
+# branch page that will displace the first record of its left most child branch,
+# because that first record is the key for the right penultimate branch page.
+# When we insert a record that is less than the key, the search for a leaf page
+# to store the record goes to the left of the key. It cannot descend into the
+# right penultimate branch page, so it is impossible for it be inserted into
+# left child of the right penultimate branch page, so the first record left
+# child of the penultimate branch page will never be displaced by an insertion.
+#
+# Only if we insert a record that is less than least key of the left penultimate
+# page do we face the possibility of displacing the first record of a leaf page,
+# and that leaf page is the left most leaf page in the entire tree.
+#
+# This maintains a property of the b-tree that for every leaf page except the
+# left most leaf page, there exists a unique branch page key derived from the
+# first record of the page.
+#
+# As above, you can find the first record used to derive a key by visting the
+# child and going left. You can find the leaf page to the left of the leaf page
+# used to derive a page branch key, by visiting the child to the left of the key
+# and going right.
+#
+# NOTE Literate programming has finally materialized with Docco and
+# CoffeeScript.
+#
+# When the root page splits, it becomes an interior branch page. Until it splits
+# it is both the root page and a penultimate page.
 
 # Requried node.js libraries.
 fs = require "fs"
@@ -18,6 +248,27 @@ die = (splat...) ->
   console.log.apply null, splat if splat.length
   process.exit 1
 say = (splat...) -> console.log.apply null, splat
+
+# ### Collation
+#
+# A b-tree has a client defined collation. The collation is determined by the
+# combination of an extractor and a comparator. The extractor is used to
+# extract or calculate from the stored record the fields values pertient to the
+# collation. The comparator is used to order records by comparing the extracted
+# fields.
+#
+# The extractor allows us to cache the fields pertinent to the collation. It may
+# be the case that records have large fields that are not pertinent to the
+# collation. If we are only using the record as a point of reference while
+# searchng the tree, we allow the record to fall out of the cache, and hold onto
+# only the pertient fields. 
+#
+# This strategy wouldn't work if extraction and comparison were the same
+# function. By making them separate functions, we can cache the intermediate
+# extraction step.
+#
+# Additionally, the comparitor is pretty easily generalized, while the exractor
+# is invariably specialized.
 
 # Default comparator is good only for strings, use a - b for numbers.
 comparator = (a, b) ->
@@ -288,6 +539,20 @@ class Level
       true
     false
 
+# ### B-Tree Structure
+#
+# We call page of the b-tree, ah, maybe we stop using the word tier, start using
+# the word page, because we're not going to have to reduce the ambiguity with
+# some sort of subdivided binary file structure.
+#
+# NOTE Come back and look at this. It is succinct.
+#
+# There are two types of pages. Branch pages and leaf pages.
+#
+# Leaf pages store the records. They maintain the collation
+#
+# Leaf pages are all uniformly the same.
+#
 # ### Leaf Tier Files
 #
 # A leaf tier maintains an array of file positions called an address array. A
@@ -455,9 +720,39 @@ class LeafIO
     fs.close(@fd, _) if @fd
     @position = @fd = null
 
-# ### Branch Tier Files
+# ### Tier File Storage
 #
-# A branch tier file contains an array of object addresses 
+# Tiers are identified by a number tier address. The tier address is a number
+# that is incremented as new tier are created. A branch tier file has a file
+# name that includes the tier address. The file name is derived from the tier
+# address. When we load a tier, we first derive the file name from the tier
+# address, then we load the file.
+#
+# The leaf tier file contains insert objects, delete objects and address array
+# objects, stored as JSON, one object per line, as described above.
+#
+# The branch tier file contains a single object that includes the array of
+# tier addresses. The tier addresses reference leaf tier files. The tier
+# addresses are sorted according to the value of the objects in leaf tiers they
+# reference. The addresses are sorted by the tree collation using the record
+# from the referenced leaf tier that has the least value according to the tree
+# collation.
+#
+# Put another way, each branch element in a branch tier represents a leaf tier.
+# The leaf tiers are sorted by the tree collation. The object value used to sort
+# the branch tier is first element in the sorted leaf tier.
+#
+# TODO Okay, what? I'm forgetting that I need the addresses to inner tiers as
+# well as to leaf tiers, both, when the tier is not penultimate. Descending is
+# not going to work, that is going to load the entire tree into memory quickly.
+#
+# Hmm... Maybe not. Tree four deep means loading only a particular path. It
+# ensures that we read lock our way down the tree to get our record. Although, I
+# believe I thought long and hard about this, and jumping down to the leaves
+# wasn't a problem.
+#
+# We only need to store the sorted array of the leaf tier addresses in our
+# branch tier, since we can obtain the object used to collate the address
 
 #
 class IO
@@ -527,55 +822,8 @@ class IO
     previous.next = next
     entry
 
-  # TODO Move down, bring read and write up.
-  lock: (exclusive, address, leaf, callback) ->
-    if not tier = @cache[address]
-      @cache[address] = tier =
-        @link({ leaf, address, cache: {}, addresses: [], locks: [[]] })
-    locks = tier.locks
-    if tier.loaded
-      lock = callback
-    else
-      lock = (error, tier) =>
-        if error
-          callback error
-        else if tier.loaded
-          callback null, tier
-        else if leaf
-          @readLeaves tier, callback
-        else
-          @readBranches tier, callback
-    if exclusive
-      throw new Error "already locked" unless locks.length % 2
-      locks.push [ lock ]
-      locks.push []
-      if locks[0].length is 0
-        locks.shift()
-        lock(null, tier)
-    else
-      locks[locks.length - 1].push lock
-      if locks.length is 1
-        lock(null, tier)
-
-  resume: (tier, continuations) ->
-    process.nextTick =>
-      for callback in continuations
-        callback(null, tier)
-
-  # Remove the lock callback from the callback list..
-  release: (tier) ->
-    locks = tier.locks
-    running = locks[0]
-    running.shift()
-    say { locks }
-    if running.length is 0 and locks.length isnt 1
-      locks.shift()
-      @resume tier, locks[0] if locks[0].length
-      
-  upgrade: (tier, _) ->
-    @release tier
-    @lock true, tier.address, false, _
-
+  # Generate a file name for a tier file with an optional suffix for temporary
+  # rewrite files. Tier file names are generated from the tier address.
   filename: (address, suffix) ->
     suffix or= ""
     padding = "00000000".substring(0, 8 - String(address).length)
@@ -595,59 +843,6 @@ class IO
       cache: {}
       right: right
       io: new LeafIO @filename address
-
-  readLeaves: (tier, _) ->
-    filename = @filename tier.address
-    stat = fs.stat filename, _
-    fd = fs.open filename, "r+", _
-
-    # Obviously, while all this is going on, I could end up writing to the
-    # leaf, because it is not actually locked. First lock, then load. The
-    # entry object needs to be linked, then loaded.
-    line      = ""
-    offset    = -1
-    end       = stat.size
-    eol       = stat.size
-    splices   = []
-    addresses = []
-    cache     = {}
-    buffer    = new Buffer(1024)
-    while end
-      end     = eol
-      start   = end - buffer.length
-      start   = 0 if start < 0
-      read    = fs.read fd, buffer, 0, buffer.length, start, _
-      end    -= read
-      offset  = read
-      if buffer[--read] isnt 0x0A
-        throw new Error "corrupt leaves"
-      eos     = read + 1
-      stop    = if start is 0 then 0 else -1
-      while read != 0
-        read = read - 1
-        if buffer[read] is 0x0A or read is stop
-          record = JSON.parse buffer.toString("utf8", read, eos)
-          eos   = read + 1
-          index = record.shift()
-          if index is 0
-            [ addresses, end ] = [ record, 0 ]
-            break
-          else
-            splices.push [ index, start + read ]
-            if index > 0
-              cache[start + read] = record.shift()
-      eol = start + eos
-    splices.reverse()
-    for splice in splices
-      [ index, address ] = splice
-      if index > 0
-        addresses.splice(index - 1, 0, address)
-      else
-        addresses.splice(-(index + 1), 1)
-    fs.close fd, _
-    loaded = true
-    io = new LeafIO @filename tier.address
-    tier = extend tier, { addresses, cache, loaded, io }
 
   # Going forward, every will story keys, so that when we encounter a record, we
   # don't have to run the extractor, plus we get some caching.
@@ -730,6 +925,59 @@ class IO
     io.close(_)
     extend tier, { addresses, cache }
 
+  readLeaves: (tier, _) ->
+    filename = @filename tier.address
+    stat = fs.stat filename, _
+    fd = fs.open filename, "r+", _
+
+    # Obviously, while all this is going on, I could end up writing to the
+    # leaf, because it is not actually locked. First lock, then load. The
+    # entry object needs to be linked, then loaded.
+    line      = ""
+    offset    = -1
+    end       = stat.size
+    eol       = stat.size
+    splices   = []
+    addresses = []
+    cache     = {}
+    buffer    = new Buffer(1024)
+    while end
+      end     = eol
+      start   = end - buffer.length
+      start   = 0 if start < 0
+      read    = fs.read fd, buffer, 0, buffer.length, start, _
+      end    -= read
+      offset  = read
+      if buffer[--read] isnt 0x0A
+        throw new Error "corrupt leaves"
+      eos     = read + 1
+      stop    = if start is 0 then 0 else -1
+      while read != 0
+        read = read - 1
+        if buffer[read] is 0x0A or read is stop
+          record = JSON.parse buffer.toString("utf8", read, eos)
+          eos   = read + 1
+          index = record.shift()
+          if index is 0
+            [ addresses, end ] = [ record, 0 ]
+            break
+          else
+            splices.push [ index, start + read ]
+            if index > 0
+              cache[start + read] = record.shift()
+      eol = start + eos
+    splices.reverse()
+    for splice in splices
+      [ index, address ] = splice
+      if index > 0
+        addresses.splice(index - 1, 0, address)
+      else
+        addresses.splice(-(index + 1), 1)
+    fs.close fd, _
+    loaded = true
+    io = new LeafIO @filename tier.address
+    tier = extend tier, { addresses, cache, loaded, io }
+
   # Move a new branch tier file into place. Unlink the existing branch tier
   # file, then rename the new branch tier file to the permanent name of the
   # branch tier file.
@@ -744,6 +992,55 @@ class IO
     catch e
       throw e unless e.code is "ENOENT"
     fs.rename replacement, permanent, _
+
+  # TODO Move down, bring read and write up.
+  lock: (exclusive, address, leaf, callback) ->
+    if not tier = @cache[address]
+      @cache[address] = tier =
+        @link({ leaf, address, cache: {}, addresses: [], locks: [[]] })
+    locks = tier.locks
+    if tier.loaded
+      lock = callback
+    else
+      lock = (error, tier) =>
+        if error
+          callback error
+        else if tier.loaded
+          callback null, tier
+        else if leaf
+          @readLeaves tier, callback
+        else
+          @readBranches tier, callback
+    if exclusive
+      throw new Error "already locked" unless locks.length % 2
+      locks.push [ lock ]
+      locks.push []
+      if locks[0].length is 0
+        locks.shift()
+        lock(null, tier)
+    else
+      locks[locks.length - 1].push lock
+      if locks.length is 1
+        lock(null, tier)
+
+  resume: (tier, continuations) ->
+    process.nextTick =>
+      for callback in continuations
+        callback(null, tier)
+
+  # Remove the lock callback from the callback list..
+  release: (tier) ->
+    locks = tier.locks
+    running = locks[0]
+    running.shift()
+    say { locks }
+    if running.length is 0 and locks.length isnt 1
+      locks.shift()
+      @resume tier, locks[0] if locks[0].length
+      
+  upgrade: (tier, _) ->
+    @release tier
+    @lock true, tier.address, false, _
 
 class exports.Strata
   # Construct the Strata from the options.
