@@ -15,7 +15,7 @@
 #
 # But this isn't important at the moment.
 #
-# ### Terminology
+# ## Terminology
 #
 # We refer to the nodes in our b-tree as *pages*. The term node conjures an
 # image of a discrete component in a linked data structure that contains one,
@@ -37,7 +37,7 @@
 # Terms specific to our implementation will be introduced as they are
 # encountered in the document. 
 #
-# ### What is a b-tree?
+# ## What is a b-tree?
 #
 # This documentation assumes that you understand the theory behind the b-tree,
 # and know the variations of implementation. If you are interested in learning
@@ -46,7 +46,7 @@
 # [B-trees](http://en.wikipedia.org/wiki/B-tree) and
 # [B+trees](http://en.wikipedia.org/wiki/B%2B_tree). 
 #
-# ### What flavor of b-tree is this?
+# ## What flavor of b-tree is this?
 #
 # Strata is a b-tree with leaf pages that contain records ordered by the
 # collation order of the tree, indexed for retrieval in constant time, so that
@@ -65,11 +65,11 @@
 # split of the root branch is a different operation from the split of a non-root
 # branch, because the root branch does not have siblings.
 #
-# ### Page Structure
+# ## Implementation
 #
 # The b-tree has two types of pages. Leaf pages and branch pages.
 #
-# #### Leaf Pages
+# ### Leaf Pages
 #
 # Leaf pages contain records.
 #
@@ -93,7 +93,7 @@
 # since no suitable partition exists. The page will be allowed to grow beyond
 # the maximum page size.
 #
-# #### Branch Pages
+# ### Branch Pages
 #
 # Branch pages contain links to other pages. To find the a record in the b-tree,
 # we first use branch pages to find the leaf page that contains our record.
@@ -111,7 +111,7 @@
 # There are two special types of branch pages, the root page, and penultimate
 # pages.
 #
-# ##### Root Page
+# #### Root Branch Page
 #
 # The root page is the first page we consult to find the desired leaf page. Our
 # b-tree always contains a root page. The b-tree is never so empty that the root
@@ -120,7 +120,7 @@
 # TK move. Until the root branch page is split, it is both the root branch page
 # and a penultimate branch page.
 #
-# ##### Penultimate Pages
+# #### Penultimate Branch Pages
 #
 # A penultimate branch page is a branch page whose children are leaf pages. If a
 # branch page is not penultimate, then its children are branch pages.
@@ -153,7 +153,7 @@
 # An insertion can only insert a into the left most leaf page of a penumltimate
 # branch page a record less than the least record of the leaf page.
 #
-# ##### Interior Branch Pages
+# #### Interior Branch Pages
 #
 # A branch page whose children are other branch pages is called an interior
 # branch page.
@@ -197,7 +197,7 @@
 # right penultimate page, we visit the right penultimate page, then we visit its
 # left child, the leaf page whose first record is the key.
 #
-# #### Keys and First Records
+# ### Keys and First Records
 #
 # We said that it is only possible for an insertion to insert a into the left
 # most child leaf page of a penumltimate branch page a record less than the least
@@ -276,6 +276,382 @@ comparator = (a, b) ->
 
 # Default extractor returns the value as hole, i.e. tree of integers.
 extractor = (a) -> a
+
+# ## Page Storage
+#
+# A *leaf page file* contains insert objects, delete objects and address array
+# objects, stored as JSON, one object per line, as described above. The JSON
+# objects stored on behalf of the client are called *records* and they are
+# contained within the insert objects.
+#
+# A *branch page file* contains a single JSON object stored on a single line
+# that contains the array of child page addresses.
+#
+# The `IO` class manages the wholesale reading and writing of page files. The
+# `RecordIO` class manages the insertion and deletion of individual records in a
+# leaf page file.
+
+#
+class IO
+  # Each page is stored in its own file. The files are all kept in a single
+  # directory. The directory is specified by the client when the database object
+  # is constructed.
+  #
+  # The `IO` class needs the `extractor` to extract keys from records. It does
+  # not store the `extractor`, of course.
+
+  # Set directory and extractor. Initialze the page cache and MRU list.
+  constructor: (@directory, @extractor) ->
+    @cache          = {}
+    @head           = { address: -1 }
+    @head.next      = @head
+    @head.previous  = @head
+    @nextAddress    = 0
+
+  # Pages are identified by an integer page address. The page address is a number
+  # that is incremented as new pages are created. A page file has a file name that
+  # includes the page address.  When we load a page, we first derive the file name
+  # from the page address, then we load the file.
+  #
+  # The `filename` method accepts a suffix, so that we can create replacement
+  # files. Instead of overwriting an existing page file, we create a replacement
+  # with the suffix `.new`. We then delete the existing file and rename the
+  # replacement file using the `relink` method. This two step write is part of
+  # our crash recovery strategy.
+  #
+  # We always write out entire branch page files. Leaf pages files are updated
+  # by appending, but on occasion we rewrite them to vaccum deleted records.
+
+  # Create a file name for a given address with an optional suffix.
+  filename: (address, suffix) ->
+    suffix or= ""
+    padding = "00000000".substring(0, 8 - String(address).length)
+    "#{@directory}/segment#{padding}#{address}#{suffix}"
+
+  # Move a replacement page file into place. Unlink the existing page file, then
+  # rename the new page file to the permanent name of the page file.
+  relink: (page, _) ->
+    replacement = @filename(page.address, ".new")
+    stat = fs.stat replacement, _
+    if not stat.isFile()
+      throw new Error "not a file"
+    permanent = @filename(page.address)
+    try
+      fs.unlink permanent, _
+    catch e
+      throw e unless e.code is "ENOENT"
+    fs.rename replacement, permanent, _
+
+  # We create a new branch pages in memory. They do not exist on disk until they
+  # are first written.
+  #
+  # A new branch page is given the next unused page number.
+  #
+  # In memory, a branch page is an array of child page addresses. It keeps track
+  # of its key and whether or not it is a penultimate branch page. The cache is
+  # used to cache the keys associated with the child page addresses. The cache
+  # maps the address of a child page to a key extracted from the first record of
+  # the leaf page referenced by the child page address.
+  #
+  # Our in memory is also cached and added as a node an MRU list. We must make
+  # sure that each page has only one in memory representation, because the in
+  # memory page is used for locking.
+
+  #
+  allocateBranches: (penultimate) ->
+    address = @nextAddress++
+    link = @link({ penultimate, address, addresses: [], cache: {} })
+    @cache[address] = link
+
+  # We write the branch page to a file as a single JSON object on a single line.
+  # We tuck the page properties into an object, and then serialize that object.
+  # We do not store the branch page keys. They are looked up as needed as
+  # described in the b-tree overview above.
+  #
+  # We always write a page branch first to a replacement file, then move it
+  # until place using `relink`.
+
+  #
+  rewriteBranches: (page, _) ->
+    link unlink page
+    filename = @filename page.address, ".new"
+    record = [ page.penultimate, page.next?.address, page.addresses ]
+    json = JSON.stringify(record) + "\n"
+    fs.writeFile filename, json, "utf8", _
+
+  # To read a branch page we read the entire page and evaluate it as JSON. We
+  # did not store the branch page keys. They are looked up as needed as
+  # described in the b-tree overview above.
+
+  #
+  readBranches: (page, _) ->
+    link unlink page
+    filename = @filename page.address
+    json = fs.readFile filename, "utf8", _
+    [ penultimate, next, addresses ] = JSON.parse json
+    extend page, { penultimate, next, addresses }
+
+  # After creating a database object, the client will either open the existing
+  # database, or create a new database.
+  
+  # Create the database detroying any exisiting database.
+
+  # &mdash;
+  create: (_) ->
+    # Create the directory if it doesn't exist.
+    try
+      stat = fs.stat @directory, _
+      if not stat.isDirectory()
+        throw new Error "database #{@directory} is not a directory."
+    catch e
+      throw e if e.code isnt "ENOENT"
+      fs.mkdir @directory, 0755, _
+    # Create a root branch with a single empty leaf.
+    root = @allocateBranches true
+    leaf = @allocateLeaves([], -1)
+    root.addresses.push leaf.address
+    # Write the root branch.
+    @writeBranches root, "", _
+    @rewriteLeaves leaf, _
+    @relink leaf, _
+
+  # Open an existing database.
+  
+  # &mdash;
+  open: (_) ->
+    try
+      stat = fs.stat @directory, _
+      if not stat.isDirectory()
+        throw new Error "database #{@directory} is not a directory."
+    catch e
+      if e.code isnt "ENOENT"
+        throw new Error "database #{@directory} does not exist."
+      else
+        throw e
+    for file in fs.readdir @directory, _
+      if match = /^segment(\d+)$/.exec file
+        address = parseInt match[1], 10
+        @nextAddress = address + 1 if address > @nextAddress
+
+  # TODO Very soon.
+  close: (_) ->
+#
+#
+# A branch page file contains a single object that includes the array of page
+# addresses that reference the branch page's children.
+#
+# The branch page file also stores a penultimate flag, and the address of the
+# next sibling of the branch
+# page.
+# The keys associated with the child addresses are not stored in the
+# branch page.
+#
+# Put another way, each branch element in a branch page represents a leaf page.
+# The leaf pages are sorted by the tree collation. The object value used to sort
+# the branch page is first element in the sorted leaf page.
+#
+# TODO Okay, what? I'm forgetting that I need the addresses to inner tiers as
+# well as to leaf tiers, both, when the tier is not penultimate. Descending is
+# not going to work, that is going to load the entire tree into memory quickly.
+#
+# Hmm... Maybe not. Tree four deep means loading only a particular path. It
+# ensures that we read lock our way down the tree to get our record. Although, I
+# believe I thought long and hard about this, and jumping down to the leaves
+# wasn't a problem.
+#
+# We only need to store the sorted array of the leaf tier addresses in our
+# branch tier, since we can obtain the object used to collate the address
+
+  # Link tier to the head of the MRU list.
+  link: (entry) ->
+    next = @head.next
+    entry.next = next
+    next.previous = entry
+    @head.next = entry
+    entry.previous = @head
+    entry
+
+  # Unlnk a tier from the MRU list.
+  unlink: (entry) ->
+    { next, previous } = entry
+    next.previous = previous
+    previous.next = next
+    entry
+
+  allocateLeaves: (addresses, right) ->
+    address = @nextAddress++
+    @cache[address] = @link
+      leaf: true
+      address: address
+      addresses: addresses
+      cache: {}
+      right: right
+      io: new LeafIO @filename address
+
+  # Going forward, every will story keys, so that when we encounter a record, we
+  # don't have to run the extractor, plus we get some caching.
+  #
+  # Or maybe just three arrays, key, object and address? I'm talking about using
+  # each key as an object cache, by adding an object member to the key. But,
+  # they cache container is a hash table, which is a compactish representation,
+  # so why not make it yet anohter hash table? The logic gets a lot easier.
+  object: (tier, index, _) ->
+    address = tier.addresses[index]
+    if not object = tier.cache[address]
+      object = tier.cache[address] = tier.io.readObject address, _
+    object
+
+  key: (tierOrAddress, index, _) ->
+    if typeof tierOrAddress is "number"
+      leaf  = @lock false, tierOrAddress, true, _
+      key = @extractor @object leaf, index, _
+      @release leaf
+      key
+    else if tierOrAddress.leaf
+      @extractor @object tierOrAddress, index, _
+    else
+      address = tierOrAddress.addresses[index]
+      if not key = tierOrAddress.cache[address]
+        # Here's something to consdier. The only time we lock the leaf is during
+        # descent, to read in the key.
+        #
+        # If this leaf tier is locked exclusively, we are not the ones holding the
+        # lock, because that would mean that we are locking the inner tier, we
+        # would already have traversed the inner tier, the key would be in the
+        # cache.
+        #
+        # If this leaf tier has an exclusive lock pending, it is not a lock that
+        # we are waiting for, so we can append a shared lock and wait for multiple
+        # exclusive and shared locks to clear.
+        key = tierOrAddress.cache[address] = @key address, 0, _
+      key
+
+  # TODO Consider: can't I always just rewrite and link?
+  rewriteBranches: (tier, _) ->
+    @writeBranches(tier, ".new", _)
+
+  # TODO Ensure that you close the current tier I/O. Also, you must also be very
+  # much locked before you use this, but I'm sure you know that.
+  
+  # Compact a leaf tier file by writing it to a temporary file that will become
+  # the permanent file. All of records referenced by the current address array a
+  # appended to a new leaf tier file using insert objects. An address array
+  # object is appended to the end of new leaf tier file. The new file will load
+  # quickly, because the address array object will be found immediately.
+  rewriteLeaves: (tier, _) ->
+    io = new LeafIO @filename(tier.address, ".new")
+    addresses = []
+    cache = {}
+    for i in [0...tier.addresses.length]
+      object = @object tier, i, _
+      address = io.writeInsert(object, i, _)
+      addresses.push address
+      cache[address] = object
+    io.writeAddresses(tier.right, addresses, _)
+    io.close(_)
+    extend tier, { addresses, cache }
+
+  readLeaves: (tier, _) ->
+    filename = @filename tier.address
+    stat = fs.stat filename, _
+    fd = fs.open filename, "r+", _
+
+    # Obviously, while all this is going on, I could end up writing to the
+    # leaf, because it is not actually locked. First lock, then load. The
+    # entry object needs to be linked, then loaded.
+    line      = ""
+    offset    = -1
+    end       = stat.size
+    eol       = stat.size
+    splices   = []
+    addresses = []
+    cache     = {}
+    buffer    = new Buffer(1024)
+    while end
+      end     = eol
+      start   = end - buffer.length
+      start   = 0 if start < 0
+      read    = fs.read fd, buffer, 0, buffer.length, start, _
+      end    -= read
+      offset  = read
+      if buffer[--read] isnt 0x0A
+        throw new Error "corrupt leaves"
+      eos     = read + 1
+      stop    = if start is 0 then 0 else -1
+      while read != 0
+        read = read - 1
+        if buffer[read] is 0x0A or read is stop
+          record = JSON.parse buffer.toString("utf8", read, eos)
+          eos   = read + 1
+          index = record.shift()
+          if index is 0
+            [ addresses, end ] = [ record, 0 ]
+            break
+          else
+            splices.push [ index, start + read ]
+            if index > 0
+              cache[start + read] = record.shift()
+      eol = start + eos
+    splices.reverse()
+    for splice in splices
+      [ index, address ] = splice
+      if index > 0
+        addresses.splice(index - 1, 0, address)
+      else
+        addresses.splice(-(index + 1), 1)
+    fs.close fd, _
+    loaded = true
+    io = new LeafIO @filename tier.address
+    tier = extend tier, { addresses, cache, loaded, io }
+
+  # TODO Move down, bring read and write up.
+  lock: (exclusive, address, leaf, callback) ->
+    if not tier = @cache[address]
+      @cache[address] = tier =
+        @link({ leaf, address, cache: {}, addresses: [], locks: [[]] })
+    locks = tier.locks
+    if tier.loaded
+      lock = callback
+    else
+      lock = (error, tier) =>
+        if error
+          callback error
+        else if tier.loaded
+          callback null, tier
+        else if leaf
+          @readLeaves tier, callback
+        else
+          @readBranches tier, callback
+    if exclusive
+      throw new Error "already locked" unless locks.length % 2
+      locks.push [ lock ]
+      locks.push []
+      if locks[0].length is 0
+        locks.shift()
+        lock(null, tier)
+    else
+      locks[locks.length - 1].push lock
+      if locks.length is 1
+        lock(null, tier)
+
+  resume: (tier, continuations) ->
+    process.nextTick =>
+      for callback in continuations
+        callback(null, tier)
+
+  # Remove the lock callback from the callback list..
+  release: (tier) ->
+    locks = tier.locks
+    running = locks[0]
+    running.shift()
+    say { locks }
+    if running.length is 0 and locks.length isnt 1
+      locks.shift()
+      @resume tier, locks[0] if locks[0].length
+      
+  upgrade: (tier, _) ->
+    @release tier
+    @lock true, tier.address, false, _
 
 # Glossary:
 # 
@@ -719,329 +1095,6 @@ class LeafIO
   close: (_) ->
     fs.close(@fd, _) if @fd
     @position = @fd = null
-
-# ### Tier File Storage
-#
-# Tiers are identified by a number tier address. The tier address is a number
-# that is incremented as new tier are created. A branch tier file has a file
-# name that includes the tier address. The file name is derived from the tier
-# address. When we load a tier, we first derive the file name from the tier
-# address, then we load the file.
-#
-# The leaf tier file contains insert objects, delete objects and address array
-# objects, stored as JSON, one object per line, as described above.
-#
-# The branch tier file contains a single object that includes the array of
-# tier addresses. The tier addresses reference leaf tier files. The tier
-# addresses are sorted according to the value of the objects in leaf tiers they
-# reference. The addresses are sorted by the tree collation using the record
-# from the referenced leaf tier that has the least value according to the tree
-# collation.
-#
-# Put another way, each branch element in a branch tier represents a leaf tier.
-# The leaf tiers are sorted by the tree collation. The object value used to sort
-# the branch tier is first element in the sorted leaf tier.
-#
-# TODO Okay, what? I'm forgetting that I need the addresses to inner tiers as
-# well as to leaf tiers, both, when the tier is not penultimate. Descending is
-# not going to work, that is going to load the entire tree into memory quickly.
-#
-# Hmm... Maybe not. Tree four deep means loading only a particular path. It
-# ensures that we read lock our way down the tree to get our record. Although, I
-# believe I thought long and hard about this, and jumping down to the leaves
-# wasn't a problem.
-#
-# We only need to store the sorted array of the leaf tier addresses in our
-# branch tier, since we can obtain the object used to collate the address
-
-#
-class IO
-  # Set directory and extractor. Initialze cache and MRU list.
-  constructor: (@directory, @extractor) ->
-    @cache          = {}
-    @head           = { address: -1 }
-    @head.next      = @head
-    @head.previous  = @head
-    @nextAddress    = 0
-
-  # Create the database detroying any exisiting database.
-
-  # &mdash;
-  create: (_) ->
-    # Create the directory if it doesn't exist.
-    try
-      stat = fs.stat @directory, _
-      if not stat.isDirectory()
-        throw new Error "database #{@directory} is not a directory."
-    catch e
-      throw e if e.code isnt "ENOENT"
-      fs.mkdir @directory, 0755, _
-    # Create a root branch with a single empty leaf.
-    root = @allocateBranches true
-    leaf = @allocateLeaves([], -1)
-    root.addresses.push leaf.address
-    # Write the root branch.
-    @writeBranches root, "", _
-    @rewriteLeaves leaf, _
-    @relink leaf, _
-
-  # Open an existing database.
-  
-  # &mdash;
-  open: (_) ->
-    try
-      stat = fs.stat @directory, _
-      if not stat.isDirectory()
-        throw new Error "database #{@directory} is not a directory."
-    catch e
-      if e.code isnt "ENOENT"
-        throw new Error "database #{@directory} does not exist."
-      else
-        throw e
-    for file in fs.readdir @directory, _
-      if match = /^segment(\d+)$/.exec file
-        address = parseInt match[1], 10
-        @nextAddress = address + 1 if address > @nextAddress
-
-  # TODO Very soon.
-  close: (_) ->
-
-  # Link tier to the head of the MRU list.
-  link: (entry) ->
-    next = @head.next
-    entry.next = next
-    next.previous = entry
-    @head.next = entry
-    entry.previous = @head
-    entry
-
-  # Unlnk a tier from the MRU list.
-  unlink: (entry) ->
-    { next, previous } = entry
-    next.previous = previous
-    previous.next = next
-    entry
-
-  # Generate a file name for a tier file with an optional suffix for temporary
-  # rewrite files. Tier file names are generated from the tier address.
-  filename: (address, suffix) ->
-    suffix or= ""
-    padding = "00000000".substring(0, 8 - String(address).length)
-    "#{@directory}/segment#{padding}#{address}#{suffix}"
-
-  allocateBranches: (penultimate) ->
-    address = @nextAddress++
-    tier = @link({ penultimate, address, addresses: [], cache: {} })
-    @cache[address] = tier
-
-  allocateLeaves: (addresses, right) ->
-    address = @nextAddress++
-    @cache[address] = @link
-      leaf: true
-      address: address
-      addresses: addresses
-      cache: {}
-      right: right
-      io: new LeafIO @filename address
-
-  # Going forward, every will story keys, so that when we encounter a record, we
-  # don't have to run the extractor, plus we get some caching.
-  #
-  # Or maybe just three arrays, key, object and address? I'm talking about using
-  # each key as an object cache, by adding an object member to the key. But,
-  # they cache container is a hash table, which is a compactish representation,
-  # so why not make it yet anohter hash table? The logic gets a lot easier.
-  object: (tier, index, _) ->
-    address = tier.addresses[index]
-    if not object = tier.cache[address]
-      object = tier.cache[address] = tier.io.readObject address, _
-    object
-
-  key: (tierOrAddress, index, _) ->
-    if typeof tierOrAddress is "number"
-      leaf  = @lock false, tierOrAddress, true, _
-      key = @extractor @object leaf, index, _
-      @release leaf
-      key
-    else if tierOrAddress.leaf
-      @extractor @object tierOrAddress, index, _
-    else
-      address = tierOrAddress.addresses[index]
-      if not key = tierOrAddress.cache[address]
-        # Here's something to consdier. The only time we lock the leaf is during
-        # descent, to read in the key.
-        #
-        # If this leaf tier is locked exclusively, we are not the ones holding the
-        # lock, because that would mean that we are locking the inner tier, we
-        # would already have traversed the inner tier, the key would be in the
-        # cache.
-        #
-        # If this leaf tier has an exclusive lock pending, it is not a lock that
-        # we are waiting for, so we can append a shared lock and wait for multiple
-        # exclusive and shared locks to clear.
-        key = tierOrAddress.cache[address] = @key address, 0, _
-      key
-
-  # Write the branches to a file as a JSON string. We tuck the tier properties
-  # into an object before we serialize it, so that it is easy deserialize.
-  writeBranches: (tier, suffix, _) ->
-    filename = @filename tier.address, suffix
-    record = [ tier.penultimate, tier.next?.address, tier.addresses ]
-    json = JSON.stringify(record) + "\n"
-    fs.writeFile filename, json, "utf8", _
-
-  # Read branches from a brach tier file and assign the tier properties to the
-  # given tier object.
-  #
-  # TODO: Move link to head always, to maintain MRU.
-  readBranches: (tier, _) ->
-    filename = @filename tier.address
-    json = fs.readFile filename, "utf8", _
-    [ penultimate, next, addresses ] = JSON.parse json
-    extend tier, { penultimate, next, addresses }
-
-  # TODO Consider: can't I always just rewrite and link?
-  rewriteBranches: (tier, _) ->
-    @writeBranches(tier, ".new", _)
-
-  # TODO Ensure that you close the current tier I/O. Also, you must also be very
-  # much locked before you use this, but I'm sure you know that.
-  
-  # Compact a leaf tier file by writing it to a temporary file that will become
-  # the permanent file. All of records referenced by the current address array a
-  # appended to a new leaf tier file using insert objects. An address array
-  # object is appended to the end of new leaf tier file. The new file will load
-  # quickly, because the address array object will be found immediately.
-  rewriteLeaves: (tier, _) ->
-    io = new LeafIO @filename(tier.address, ".new")
-    addresses = []
-    cache = {}
-    for i in [0...tier.addresses.length]
-      object = @object tier, i, _
-      address = io.writeInsert(object, i, _)
-      addresses.push address
-      cache[address] = object
-    io.writeAddresses(tier.right, addresses, _)
-    io.close(_)
-    extend tier, { addresses, cache }
-
-  readLeaves: (tier, _) ->
-    filename = @filename tier.address
-    stat = fs.stat filename, _
-    fd = fs.open filename, "r+", _
-
-    # Obviously, while all this is going on, I could end up writing to the
-    # leaf, because it is not actually locked. First lock, then load. The
-    # entry object needs to be linked, then loaded.
-    line      = ""
-    offset    = -1
-    end       = stat.size
-    eol       = stat.size
-    splices   = []
-    addresses = []
-    cache     = {}
-    buffer    = new Buffer(1024)
-    while end
-      end     = eol
-      start   = end - buffer.length
-      start   = 0 if start < 0
-      read    = fs.read fd, buffer, 0, buffer.length, start, _
-      end    -= read
-      offset  = read
-      if buffer[--read] isnt 0x0A
-        throw new Error "corrupt leaves"
-      eos     = read + 1
-      stop    = if start is 0 then 0 else -1
-      while read != 0
-        read = read - 1
-        if buffer[read] is 0x0A or read is stop
-          record = JSON.parse buffer.toString("utf8", read, eos)
-          eos   = read + 1
-          index = record.shift()
-          if index is 0
-            [ addresses, end ] = [ record, 0 ]
-            break
-          else
-            splices.push [ index, start + read ]
-            if index > 0
-              cache[start + read] = record.shift()
-      eol = start + eos
-    splices.reverse()
-    for splice in splices
-      [ index, address ] = splice
-      if index > 0
-        addresses.splice(index - 1, 0, address)
-      else
-        addresses.splice(-(index + 1), 1)
-    fs.close fd, _
-    loaded = true
-    io = new LeafIO @filename tier.address
-    tier = extend tier, { addresses, cache, loaded, io }
-
-  # Move a new branch tier file into place. Unlink the existing branch tier
-  # file, then rename the new branch tier file to the permanent name of the
-  # branch tier file.
-  relink: (tier, _) ->
-    replacement = @filename(tier.address, ".new")
-    stat = fs.stat replacement, _
-    if not stat.isFile()
-      throw new Error "not a file"
-    permanent = @filename(tier.address)
-    try
-      fs.unlink permanent, _
-    catch e
-      throw e unless e.code is "ENOENT"
-    fs.rename replacement, permanent, _
-
-  # TODO Move down, bring read and write up.
-  lock: (exclusive, address, leaf, callback) ->
-    if not tier = @cache[address]
-      @cache[address] = tier =
-        @link({ leaf, address, cache: {}, addresses: [], locks: [[]] })
-    locks = tier.locks
-    if tier.loaded
-      lock = callback
-    else
-      lock = (error, tier) =>
-        if error
-          callback error
-        else if tier.loaded
-          callback null, tier
-        else if leaf
-          @readLeaves tier, callback
-        else
-          @readBranches tier, callback
-    if exclusive
-      throw new Error "already locked" unless locks.length % 2
-      locks.push [ lock ]
-      locks.push []
-      if locks[0].length is 0
-        locks.shift()
-        lock(null, tier)
-    else
-      locks[locks.length - 1].push lock
-      if locks.length is 1
-        lock(null, tier)
-
-  resume: (tier, continuations) ->
-    process.nextTick =>
-      for callback in continuations
-        callback(null, tier)
-
-  # Remove the lock callback from the callback list..
-  release: (tier) ->
-    locks = tier.locks
-    running = locks[0]
-    running.shift()
-    say { locks }
-    if running.length is 0 and locks.length isnt 1
-      locks.shift()
-      @resume tier, locks[0] if locks[0].length
-      
-  upgrade: (tier, _) ->
-    @release tier
-    @lock true, tier.address, false, _
-
 class exports.Strata
   # Construct the Strata from the options.
   constructor: (options) ->
