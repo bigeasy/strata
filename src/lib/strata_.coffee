@@ -307,6 +307,7 @@ class IO
     @head.next      = @head
     @head.previous  = @head
     @nextAddress    = 0
+    @length         = 1024
 
   # Pages are identified by an integer page address. The page address is a number
   # that is incremented as new pages are created. A page file has a file name that
@@ -373,7 +374,6 @@ class IO
 
   #
   rewriteBranches: (page, _) ->
-    link unlink page
     filename = @filename page.address, ".new"
     record = [ page.penultimate, page.next?.address, page.addresses ]
     json = JSON.stringify(record) + "\n"
@@ -385,82 +385,24 @@ class IO
 
   #
   readBranches: (page, _) ->
-    link unlink page
     filename = @filename page.address
     json = fs.readFile filename, "utf8", _
     [ penultimate, next, addresses ] = JSON.parse json
     extend page, { penultimate, next, addresses }
 
-  # After creating a database object, the client will either open the existing
-  # database, or create a new database.
-  
-  # Create the database detroying any exisiting database.
-
-  # &mdash;
-  create: (_) ->
-    # Create the directory if it doesn't exist.
-    try
-      stat = fs.stat @directory, _
-      if not stat.isDirectory()
-        throw new Error "database #{@directory} is not a directory."
-    catch e
-      throw e if e.code isnt "ENOENT"
-      fs.mkdir @directory, 0755, _
-    # Create a root branch with a single empty leaf.
-    root = @allocateBranches true
-    leaf = @allocateLeaves([], -1)
-    root.addresses.push leaf.address
-    # Write the root branch.
-    @writeBranches root, "", _
-    @rewriteLeaves leaf, _
-    @relink leaf, _
-
-  # Open an existing database.
-  
-  # &mdash;
-  open: (_) ->
-    try
-      stat = fs.stat @directory, _
-      if not stat.isDirectory()
-        throw new Error "database #{@directory} is not a directory."
-    catch e
-      if e.code isnt "ENOENT"
-        throw new Error "database #{@directory} does not exist."
-      else
-        throw e
-    for file in fs.readdir @directory, _
-      if match = /^segment(\d+)$/.exec file
-        address = parseInt match[1], 10
-        @nextAddress = address + 1 if address > @nextAddress
-
-  # TODO Very soon.
-  close: (_) ->
-#
-#
-# A branch page file contains a single object that includes the array of page
-# addresses that reference the branch page's children.
-#
-# The branch page file also stores a penultimate flag, and the address of the
-# next sibling of the branch
-# page.
-# The keys associated with the child addresses are not stored in the
-# branch page.
-#
-# Put another way, each branch element in a branch page represents a leaf page.
-# The leaf pages are sorted by the tree collation. The object value used to sort
-# the branch page is first element in the sorted leaf page.
-#
-# TODO Okay, what? I'm forgetting that I need the addresses to inner tiers as
-# well as to leaf tiers, both, when the tier is not penultimate. Descending is
-# not going to work, that is going to load the entire tree into memory quickly.
-#
-# Hmm... Maybe not. Tree four deep means loading only a particular path. It
-# ensures that we read lock our way down the tree to get our record. Although, I
-# believe I thought long and hard about this, and jumping down to the leaves
-# wasn't a problem.
-#
-# We only need to store the sorted array of the leaf tier addresses in our
-# branch tier, since we can obtain the object used to collate the address
+  # ### Page Caching
+  #
+  # We keep a map of page addresses to cached page objects.
+  #
+  # We also maintain a most-recently used linked list using the page objets as
+  # list nodes. When we want to cull the cache, we can remove the pages at the
+  # end of the list, since they are the least recently used.
+  #
+  # TODO Some way of judging popularity. A decent index?
+  #
+  # It is important that the page objects are unique, that we do not represent a
+  # page file with more than one page object, because the page objects house the
+  # locking mechanisms.
 
   # Link tier to the head of the MRU list.
   link: (entry) ->
@@ -478,15 +420,533 @@ class IO
     previous.next = next
     entry
 
-  allocateLeaves: (addresses, right) ->
+  # ### Leaf Tier Files
+  #
+  # A leaf tier maintains an array of file positions called a positions array. A
+  # file position in the positions array references a record in the leaf tier
+  # file by its file position. The positions in the positions array are sorted
+  # according to the b-tree collation of the referenced records.
+  #
+  # A new leaf page is given the next unused page number.
+  #
+  # The in memory representation of the leaf page includes a flag to indicate
+  # that the page is leaf page, the address of the leaf page, the page address
+  # of the next leaf page, and a cache that maps record file positions to
+  # records that have been loaded from the file.
+
+  #
+  allocateLeaves: (positions, right) ->
     address = @nextAddress++
     @cache[address] = @link
       leaf: true
       address: address
-      addresses: addresses
+      positions: positions
       cache: {}
       right: right
-      io: new LeafIO @filename address
+
+  # #### Appends for Durability
+  #
+  # A leaf tier file contains JSON objects, one object on each line. The objects
+  # represent record insertions and deletions, so that the leaf tier file is
+  # essentially a log. Each time we write to the log, we open and close the
+  # file, so that the operating system will flush our writes to disk. This gives
+  # us durability.
+  
+  # Append an object to the leaf tier file as a single line of JSON.
+  #
+  # We call the append method to both update an existing leaf page file, as
+  # well as to create a replacment leaf page file that will be relinked to
+  # replace the existing leaf page file. The caller determines which file should
+  # be written, so it opens and closes the file descriptor.
+  #
+  # The file descriptor must be open for for append. 
+
+  #
+  _writeJSON: (fd, page, object, _) ->
+    # TODO Move this point somewhere. Since we need to fsync anyway, it we just
+    # to open the file and and close the file when we append a JSON object to
+    # it. Because no file handles are kept open, the b-tree object can simply be
+    # reaped by the garbage collection.
+    page.position or= fs.fstat(fd, _).size
+
+    # Calcuate a buffer length. Take note of the current page position.
+    json            = JSON.stringify object
+    position        = page.positon
+    length          = Buffer.byteLength(json, "utf8")
+    buffer          = new Buffer(length + 1)
+    offset          = 0
+
+    # Write JSON and newline.
+    buffer.write json
+    buffer[length] = 0x0A
+
+    # Write may be interrupted by a signal, so we keep track of how many bytes
+    # are actually written and write the difference if we come up short.
+    while offset != buffer.length
+      count = buffer.length - offset
+      written = fs.write fd, buffer, offset, count, page.position, _
+      page.position += written
+      offset += written
+
+    # Return the file position of the appended JSON object.
+    position
+
+  # #### Leaf Tier File Records
+  #
+  # There are three types of objects in a leaf tier file, *insert objects*,
+  # *delete objects*, and *address array objects*.
+  #
+  # An insert object contains a *record* and the index in the address array
+  # where the record's address would be inserted to preserve the sort order of
+  # the address array.
+  #
+  # Beginning with an empty position array and reading from the start of the
+  # file, the leaf tier is reconstituted by replaying the inserts and deletes
+  # described by the insert and delete objects.
+  #
+  # The JSON objects stored in the leaf array are JSON arrays. The first element
+  # is used as a flag to indicate the type of object.
+  #
+  # If the first element is an integer greater than zero, it indicates an insert
+  # object.  The integer is the one based index into the zero based position
+  # array, indicating the index where the position of the current insert object
+  # should be inserted. The second element of the leaf tier object array is the
+  # record object.
+  #
+  # When we read the insert object, we will place the record in the record cache
+  # for the page, mapping the position to the record.
+
+  # Write an insert object.
+  writeInsert: (fd, page, object, index, _) ->
+    @_writeJSON fd, page, [ index + 1, object ], _
+
+  # If the first element is less than zero, it indicates a delete object. The
+  # absolute value of the integer is the one based index into the zero based
+  # position array, indicating the index of address array element that should be
+  # deleted.
+  #
+  # There are no other elements in the delete object.
+
+  # Write a delete object.
+  writeDelete: (fd, page, index, _) ->
+    @_writeJSON fd, page, [ -(index + 1) ], _
+  
+  # On occasion, we can store a position array object. An position array object
+  # contains the position array itself.  We store a copy of a constructed
+  # position array object in the leaf page file so that we can read a large leaf
+  # page file quickly.
+  #
+  # When we read a leaf page file, if we read from the back of the file toward
+  # the front, we can read backward until we find an position array object. Then
+  # we can read forward to the end of the file, applying the inserts and deletes
+  # that occured after we wrote the position array object. 
+  # 
+  # When a leaf page file is large, stashing the constructed position array at
+  # the end means that the leaf page can be loaded quickly, because we will only
+  # have to read backwards a few entries to find a mostly completed position
+  # array. We can then read forward from the array to amend the position array
+  # with the inserts and deletes that occured after it was written.
+  #
+  # Not all of the records will be loaded when we go backwards, but we have
+  # their file position from the address array, so we can jump to them and load
+  # them as we need them. That is, if we need them, because owing to binary
+  # search, we might only need a few records out of a great many records to find
+  # the record we're looking for.
+
+  # Write an address array object.
+  writePositions: (fd, page, _) ->
+    @_writeJSON fd, page, [ 0, page.right, page.positions ], _
+
+  # Here is the backward search for a position in array in practice. We don't
+  # really ever start from the beginning. The backwards than forwards read is
+  # just as resillient.
+  
+  #
+  readLeaves: (page, _) ->
+    # We don't cache file descriptors after the leaf page file read. We will
+    # close the file descriptors before the function returns.
+    filename  = @filename page.address
+    fd        = fs.open filename, "r+", _
+    stat      = fs.stat filename, _
+
+    # When we read backwards, we create a list of of the insert and delete
+    # objects in the splices array. When we have found a positions array, we
+    # stop going backwards.
+    splices   = []
+    # Note that if we don't find a position array that has been written to the
+    # leaf page file, then we'll start with an empty position array.
+    positions = []
+    #
+    line      = ""
+    offset    = -1
+    end       = stat.size
+    eol       = stat.size
+    cache     = {}
+    buffer    = new Buffer(1024)
+    while end
+      end     = eol
+      start   = end - buffer.length
+      start   = 0 if start < 0
+      read    = fs.read fd, buffer, 0, buffer.length, start, _
+      end    -= read
+      offset  = read
+      if buffer[--read] isnt 0x0A
+        throw new Error "corrupt leaves"
+      eos     = read + 1
+      stop    = if start is 0 then 0 else -1
+      while read != 0
+        read = read - 1
+        if buffer[read] is 0x0A or read is stop
+          record = JSON.parse buffer.toString("utf8", read, eos)
+          eos   = read + 1
+          index = record.shift()
+          if index is 0
+            [ positions, end ] = [ record, 0 ]
+            break
+          else
+            splices.push [ index, start + read ]
+            if index > 0
+              cache[start + read] = record.shift()
+      eol = start + eos
+    # Now we replay the inserts and deletes described by the insert and delete
+    # objects that we've gathered up in our splices array.
+    splices.reverse()
+    for splice in splices
+      [ index, address ] = splice
+      if index > 0
+        positions.splice(index - 1, 0, address)
+      else
+        positions.splice(-(index + 1), 1)
+    # Close the file descriptor.
+    fs.close fd, _
+    # Return the loaded page.
+    extend page, { addresses, cache, loaded: true }
+
+  # Each line is terminated by a newline. In case your concerned that this
+  # simple search will mistake a byte inside a multi-byte character for a
+  # newline, have a look at
+  # [UTF-8](http://en.wikipedia.org/wiki/UTF-8#Description). All bytes
+  # participating in a multi-byte character have their leading bit set, all
+  # single-byte characters have their leading bit unset.
+
+  # Search for the newline that separates JSON records.
+  _readJSON: (buffer, read) ->
+    for offset in [0...read]
+      if buffer[offset] is 0x0A
+        return JSON.parse buffer.toString("utf8", 0, offset + 1)
+
+  # Our backwards read can load a position array that has been written to the
+  # the leaf page file, without having to load all of the records referenced by
+  # the position array. We will have to load the records as they are requested.
+  #
+  # To load a record, we open the file and jump to the position indicated by the
+  # position array. We then read the insert object that introdced the record to
+  # the leaf page file.
+  #
+  # We open a file descriptor and then close it after the record has been read.
+  # The desire to cache the file descriptor is strong, but it would complicate
+  # the shutdown of the b-tree. As it stands, we can always simply let the
+  # b-tree succumb to the garbage collector, because we hold no other system
+  # resources that need to be explictly released.
+  #
+  # Note how we allow we keep track of the minimum buffer size that will
+  # accommodate the largest possible buffer.
+  #
+  # TODO Have a mininum buffer that we constantly reuse, uh no. That will be
+  # shared by descents.
+
+  #
+  readRecord: (page, address, _) ->
+    filename = @filename page.address
+    page.position or= fs.stat(filename, _).size
+    fd = fs.open filename, "r", _
+    loop
+      buffer = new Buffer(@length)
+      read = fs.read fd, buffer, 0, buffer.length, address, _
+      if json = @_readJSON(buffer, read)
+        break
+      if @length > page.position - address
+        throw new Error "cannot find end of record."
+      @length += @length >>> 1
+    fs.close fd, _
+    json.pop()
+  
+
+  # Over time, a leaf page file can grow fat with deleted records. Each deleted
+  # record means both an insert object that is no longer useful, and the delete
+  # record that marks it as useless.  We vacuum a leaf page file by writing it
+  # to a replacement leaf page file, then using `relink` to replace the current
+  # leaf page file with the replacement.
+  #
+  # All of records referenced by the current position array are appended into
+  # the replacement leaf page file using insert objects. A position array object
+  # is appended to the end of the replacement leaf page file. The rewritten leaf
+  # page file will load quickly, because the position array object will be found
+  # immediately.
+
+  # Note that we close the file descriptor before this function returns.
+  rewriteLeaves: (page, _) ->
+    filename = @filename page.address, ".new"
+    fd = fs.open filename, "a", 0644, _
+    positions = []
+    cache = {}
+    for position, index in page.positions
+      object = page.cache[position] or @readRecord page, position, _
+      position = @writeInsert fd, page, object, index, _
+      positions.push position
+      cache[position] = object
+    extend page, { positions, cache }
+    @writePositions fd, page, _
+    fs.close fd, _
+
+  # ### B-Tree Initialization
+  #
+  # After creating a `Strata` object, the client will either open the existing
+  # database, or create a new database.
+  #
+  # #### Creation
+  #
+  # Creating a new database will not create the database directory. The database
+  # directory must already exist, it must be empty. We don't want to surprise
+  # the application developer by blithely obliterating an existing database.
+  #
+  # An empty database has a single root penultimate branch page with only a left
+  # child and no keys. The left child is a single leaf page that is empty.
+
+  #
+  create: (_) ->
+    # Create the directory if it doesn't exist.
+    stat = fs.stat @directory, _
+    if not stat.isDirectory()
+      throw new Error "database #{@directory} is not a directory."
+    if fs.readdir(@directory, _).length
+      throw new Error "database #{@directory} is not empty."
+    # Create a root branch with a single empty leaf.
+    root = @allocateBranches true
+    leaf = @allocateLeaves([], -1)
+    root.addresses.push leaf.address
+    # Write the root branch.
+    @rewriteBranches root, _
+    @rewriteLeaves leaf, _
+    @relink leaf, _
+    @relink root, _
+
+  # #### Opening
+  #
+  # Opening an existing database is a matter checking for any evidence of a hard
+  # shutdown. You never know. There may be a banged up leaf page file, one who's
+  # last append did not complete. We won't know that until we open it.
+  #
+  # Ah, no. Let's revisit. Here's a simple strategy. Open touches a file.
+  # Closing deletes teh file. If we open and the file exists, then we probably
+  # have to inspect every file that was modified after the modification,
+  # adjusting for dst? No because we'll be using seconds since the epoch. Only
+  # if the system time is changed do we have a problem.
+  #
+  # Thus, we have a reference point. Any file after needs to be inspected. We
+  # load it, and our `readLeaves` function will check for bad JSON, finding it
+  # very quickly.
+  #
+  # Now, we might have been in the middle of a split. The presenence of `*.new`
+  # files would indicate that. We can probably delete the split. Hmm..
+  #
+  # We can add more to the suffix. `*.new.0`, or `*.commit`, which is the last
+  # relink. If we have a case where there is a file named `*.commit` that does
+  # not have a corresponding permanent file, then we have a case where the
+  # permenant file has been deleted and not linked, but all the others have
+  # been, since this operaiton will go last, so we complete it to go forward.
+  #
+  # Otherwise, we delete the `*.commit`. We delete all the replacments that are
+  # not commits.
+  #
+  # We can always do a thorough rebuild of some kind.
+  
+  # &mdash;
+  open: (_) ->
+    try
+      stat = fs.stat @directory, _
+      if not stat.isDirectory()
+        throw new Error "database #{@directory} is not a directory."
+    catch e
+      if e.code isnt "ENOENT"
+        throw new Error "database #{@directory} does not exist."
+      else
+        throw e
+    for file in fs.readdir @directory, _
+      if match = /^segment(\d+)$/.exec file
+        address = parseInt match[1], 10
+        @nextAddress = address + 1 if address > @nextAddress
+
+  close: (_) ->
+
+  # TODO Ensure that you close the current tier I/O. Also, you must also be very
+  # much locked before you use this, but I'm sure you know that.
+
+  # ### Concurrency
+  #
+  # The b-tree must only be read and written by a single Node.js process. It is
+  # not suitable for use with multiple node processes, or the cluster API.
+  #
+  # Although there is only a single thread in a Node.js process, the b-tree is
+  # still a concurrent data structure. Instead of thinking about concurrency in
+  # terms of threads we talk about concurrent *descents* of the b-tree.
+  #
+  # When we search the tree or alter the tree, we must descend the tree.
+  #
+  # Decents of the b-tree can become concurrent when descent encounters a page
+  # that is not in memory. While it is waiting on evented I/O to load the page
+  # files, the main thread of the process can make progress on another request
+  # to search or alter the b-tree, it can make process on another descent.
+  #
+  # This concurrency keeps the CPU and I/O loaded.
+  #
+  # ### Locking
+  #
+  # Locking prevents race conditions where an evented I/O request returns to to
+  # find that the sub-tree it was descending has been altered in way that causes
+  # an error. Pages may have split or merged by the main thread, records may
+  # have been inserted or deleted. While evented I/O is performed, the sub-tree
+  # needs to be locked to prevent it from being altered.
+  #
+  # The b-tree is locked page by page. We are able to lock only the pages of
+  # interest to a particular descent of the tree.
+  #
+  # Futhermore, the b-tree destinguishes between shared read locks and exclusive
+  # write locks. Multiple descents can read a traverse that is read locked, but
+  # only the descent that holds an exclusive write lock can traverse it or write
+  # to it.
+  #
+  # Of course, Node.js doesn't have the concept of mutexes to protect critical
+  # sections of code the way that threaded programming platforms do. There are
+  # no standard read and write lock APIs for use to use.
+  #
+  # Nor do we use file system locking.
+  #
+  # Instead, we simulate locks using callbacks. A call to `lock` is an evented
+  # function call that provides a callback. If the `lock` method can grant the
+  # lock request to the caller, the lock method will invoke the callback.
+  #
+  # If the `lock` method cannot grant the lock request, the `lock` method will
+  # queue the callback into a queue of callbacks assocated with the page. When
+  # other descents release the locks that prevent the lock request, the lock
+  # request callback is dequeued, and the callback invoked.
+  #
+  # The locking mechanism is a writer preferred shared read, exclusive write
+  # lock. If a descent holds an exclusive write lock, then all lock requests by
+  # other descents are blocked. If one or more descents hold a shared read lock,
+  # then any request for an exclusive write lock is blocked. Any request for a
+  # shared read lock is granted, unless an exclusive write lock is queued. 
+  #
+  # The locks are not re-entrant.
+  #
+  # #### Lock
+
+  #
+  lock: (exclusive, address, leaf, callback) ->
+    # We must make sure that we have one and only one page object to represent
+    # the page. We the page object will maintain the lock queue for the page. It
+    # won't due to have different descents consulting different lock queues.
+    # There can be only one.
+    #
+    # The queue is implemented using an array of arrays. Shared locks are
+    # grouped inside one of the arrays in the queue element. Exclusive locks are
+    # queued alone as a single element in the array in the queue element.
+    if not page = @cache[address]
+      @cache[address] = page =
+        @link
+          leaf: leaf
+          address: address
+          cache: {}
+          addresses: []
+          locks: [[]]
+
+    # If the page needs to be laoded, we must load the page only after a lock
+    # has been obtained. Loading is a read, so we can load regardless of whether
+    # the lock is exclusive read/write or shared read.
+    if page.loaded
+      lock = callback
+    else
+      lock = (error, page) =>
+        if error
+          callback error
+        else if page.loaded
+          callback null, page
+        else if leaf
+          @readLeaves page, callback
+        else
+          @readBranches page, callback
+
+    # The callback is always added to the queue, even if it is not blocked and
+    # will execute immediately. The array in the queue element acts as a lock
+    # count.
+    #
+    # If the callback we add to the queue is added to the the first queue
+    # element is executed immediately. Otherwise, it will be executed when the
+    # preceeding queue elements have compeleted.
+    #
+    # When an exclusive lock is queued, an empty array is appended to the queue.
+    # Subsequent read lock callbacks are appened to the array in the last
+    # element. This gives exclusive lock callbacks priority.
+    locks = page.locks
+    if exclusive
+      throw new Error "already locked" unless locks.length % 2
+      locks.push [ lock ]
+      locks.push []
+      if locks[0].length is 0
+        locks.shift()
+        lock(null, tier)
+    else
+      locks[locks.length - 1].push lock
+      if locks.length is 1
+        lock(null, tier)
+
+  # #### Unlock
+
+  # When we release a lock, we simply shift a callback off of the array in the
+  # first element of the queue to decrement the lock count. We are only
+  # interested in the count, so it doesn't matter if the callback shifted by the
+  # descent is the one that it queued.
+
+  #
+  release: (tier) ->
+    locks = tier.locks
+    running = locks[0]
+    running.shift()
+    say { locks }
+    if running.length is 0 and locks.length isnt 1
+      locks.shift()
+      @resume tier, locks[0] if locks[0].length
+
+  # We call resume with the list of callbacks shifted off of a pages lock queue.
+  # The callbacks are scheduled to run in the next tick.
+  resume: (page, continuations) ->
+    process.nextTick =>
+      for callback in continuations
+        callback(null, page)
+      
+  upgrade: (tier, _) ->
+    @release tier
+    @lock true, tier.address, false, _
+
+# Descent of a tree.
+
+#              
+class Mutation
+  # The constructor always felt like a dangerous place to be doing anything
+  # meaningful in C++ or Java.
+  constructor: (@strata, @object, @key, @operation) ->
+    @io         = @strata._io
+    @options    = @strata._options
+
+    @parent     = { operations: [], locks: [] }
+    @child      = { operations: [], locks: [] }
+    @exclusive  = []
+    @shared     = []
+    @pivots     = []
+
+    { @extractor, @comparator } = @options
+
+    @key        = @extractor @object if @object? and not key?
 
   # Going forward, every will story keys, so that when we encounter a record, we
   # don't have to run the extractor, plus we get some caching.
@@ -495,13 +955,16 @@ class IO
   # each key as an object cache, by adding an object member to the key. But,
   # they cache container is a hash table, which is a compactish representation,
   # so why not make it yet anohter hash table? The logic gets a lot easier.
-  object: (tier, index, _) ->
-    address = tier.addresses[index]
-    if not object = tier.cache[address]
-      object = tier.cache[address] = tier.io.readObject address, _
-    object
+  #
+  # TODO None of this is right.
+  record: (page, index, _) ->
+    position = page.positions[index]
+    if not record = page.cache[position]
+      record = page.cache[position] = @readRecord page, position, _
+    record
 
-  key: (tierOrAddress, index, _) ->
+  # TODO Descend. Ah, well, find is in `Mutation`, so this moves to `Mutation`.
+  _key: (tierOrAddress, index, _) ->
     if typeof tierOrAddress is "number"
       leaf  = @lock false, tierOrAddress, true, _
       key = @extractor @object leaf, index, _
@@ -525,160 +988,6 @@ class IO
         # exclusive and shared locks to clear.
         key = tierOrAddress.cache[address] = @key address, 0, _
       key
-
-  # TODO Consider: can't I always just rewrite and link?
-  rewriteBranches: (tier, _) ->
-    @writeBranches(tier, ".new", _)
-
-  # TODO Ensure that you close the current tier I/O. Also, you must also be very
-  # much locked before you use this, but I'm sure you know that.
-  
-  # Compact a leaf tier file by writing it to a temporary file that will become
-  # the permanent file. All of records referenced by the current address array a
-  # appended to a new leaf tier file using insert objects. An address array
-  # object is appended to the end of new leaf tier file. The new file will load
-  # quickly, because the address array object will be found immediately.
-  rewriteLeaves: (tier, _) ->
-    io = new LeafIO @filename(tier.address, ".new")
-    addresses = []
-    cache = {}
-    for i in [0...tier.addresses.length]
-      object = @object tier, i, _
-      address = io.writeInsert(object, i, _)
-      addresses.push address
-      cache[address] = object
-    io.writeAddresses(tier.right, addresses, _)
-    io.close(_)
-    extend tier, { addresses, cache }
-
-  readLeaves: (tier, _) ->
-    filename = @filename tier.address
-    stat = fs.stat filename, _
-    fd = fs.open filename, "r+", _
-
-    # Obviously, while all this is going on, I could end up writing to the
-    # leaf, because it is not actually locked. First lock, then load. The
-    # entry object needs to be linked, then loaded.
-    line      = ""
-    offset    = -1
-    end       = stat.size
-    eol       = stat.size
-    splices   = []
-    addresses = []
-    cache     = {}
-    buffer    = new Buffer(1024)
-    while end
-      end     = eol
-      start   = end - buffer.length
-      start   = 0 if start < 0
-      read    = fs.read fd, buffer, 0, buffer.length, start, _
-      end    -= read
-      offset  = read
-      if buffer[--read] isnt 0x0A
-        throw new Error "corrupt leaves"
-      eos     = read + 1
-      stop    = if start is 0 then 0 else -1
-      while read != 0
-        read = read - 1
-        if buffer[read] is 0x0A or read is stop
-          record = JSON.parse buffer.toString("utf8", read, eos)
-          eos   = read + 1
-          index = record.shift()
-          if index is 0
-            [ addresses, end ] = [ record, 0 ]
-            break
-          else
-            splices.push [ index, start + read ]
-            if index > 0
-              cache[start + read] = record.shift()
-      eol = start + eos
-    splices.reverse()
-    for splice in splices
-      [ index, address ] = splice
-      if index > 0
-        addresses.splice(index - 1, 0, address)
-      else
-        addresses.splice(-(index + 1), 1)
-    fs.close fd, _
-    loaded = true
-    io = new LeafIO @filename tier.address
-    tier = extend tier, { addresses, cache, loaded, io }
-
-  # TODO Move down, bring read and write up.
-  lock: (exclusive, address, leaf, callback) ->
-    if not tier = @cache[address]
-      @cache[address] = tier =
-        @link({ leaf, address, cache: {}, addresses: [], locks: [[]] })
-    locks = tier.locks
-    if tier.loaded
-      lock = callback
-    else
-      lock = (error, tier) =>
-        if error
-          callback error
-        else if tier.loaded
-          callback null, tier
-        else if leaf
-          @readLeaves tier, callback
-        else
-          @readBranches tier, callback
-    if exclusive
-      throw new Error "already locked" unless locks.length % 2
-      locks.push [ lock ]
-      locks.push []
-      if locks[0].length is 0
-        locks.shift()
-        lock(null, tier)
-    else
-      locks[locks.length - 1].push lock
-      if locks.length is 1
-        lock(null, tier)
-
-  resume: (tier, continuations) ->
-    process.nextTick =>
-      for callback in continuations
-        callback(null, tier)
-
-  # Remove the lock callback from the callback list..
-  release: (tier) ->
-    locks = tier.locks
-    running = locks[0]
-    running.shift()
-    say { locks }
-    if running.length is 0 and locks.length isnt 1
-      locks.shift()
-      @resume tier, locks[0] if locks[0].length
-      
-  upgrade: (tier, _) ->
-    @release tier
-    @lock true, tier.address, false, _
-
-# Glossary:
-# 
-#  * Descent - What we call an attempt to move from a parent node to a child
-#              node in  the tree, which may be paused because it encounters a
-#              lock on a tier.
-#  * Record - A JSON object stored in the b-tree.
-#  * Object - JavaScript objects are referred to as objects in this
-#             documentation and are not to be confused with actual records.
-
-#              
-class Mutation
-  # The constructor always felt like a dangerous place to be doing anything
-  # meaningful in C++ or Java.
-  constructor: (@strata, @object, @key, @operation) ->
-    @io         = @strata._io
-    @options    = @strata._options
-
-    @parent     = { operations: [], locks: [] }
-    @child      = { operations: [], locks: [] }
-    @exclusive  = []
-    @shared     = []
-    @pivots     = []
-
-    { @extractor, @comparator } = @options
-
-    @key        = @extractor @object if @object? and not key?
   
   # Descend the tree, optionally starting an exclusive descent. Once the descent
   # is exclusive, all subsequent descents are exclusive.
@@ -914,187 +1223,6 @@ class Level
       locks.shift()
       true
     false
-
-# ### B-Tree Structure
-#
-# We call page of the b-tree, ah, maybe we stop using the word tier, start using
-# the word page, because we're not going to have to reduce the ambiguity with
-# some sort of subdivided binary file structure.
-#
-# NOTE Come back and look at this. It is succinct.
-#
-# There are two types of pages. Branch pages and leaf pages.
-#
-# Leaf pages store the records. They maintain the collation
-#
-# Leaf pages are all uniformly the same.
-#
-# ### Leaf Tier Files
-#
-# A leaf tier maintains an array of file positions called an address array. A
-# file position in the address array references a record in the leaf tier file
-# by its file position. The addresses in the address array are sorted by the
-# the sort order of the referenced records according to the sort order of the
-# b-tree.
-#
-# A leaf tier file contains JSON objects, one object on each line.
-#
-# There are three types of objects in a leaf tier file, insert objects, delete
-# objects, and address array objects.
-#
-# An insert object contains a *record* and the index in the address array where
-# the record's address would be inserted to preserve the sort order of the
-# address array.
-#
-# Beginning with an empty array and reading from the start of the file, the leaf
-# tier address array is reconstituted by reading the object at the current
-# position in the file, then inserting the position of the current object into
-# the address array at the index in the insert object.
-#
-# We record a deletion by appending a delete object. A delete object contains
-# an index in the address array that should be deleted. When reading the leaf
-# tier from the start of the file, we insert an address into the address array
-# when we encounter an insert object, and we delete an address when we encounter
-# a delete object.
-#
-# On occasion, we can store an address array object, An address array object
-# contains the address array itself.  We store a copy of a constructed address
-# array object in the leaf tier file so that we can read a large leaf tier file
-# quickly.
-#
-# When we read a leaf tier file, if we read from the back of the file toward the
-# front, we can read backward until we find an address array object. Then we can
-# read forward to the end of the file, applying the inserts and deletes that
-# occured after we wrote the address array object. 
-# 
-# When a leaf tier file is large, stashing the constructed address array at the
-# end means that the leaf tier can be loaded quickly, because we will only have
-# to read backwards a few entries to find a mostly completed address array. We
-# can then read forward from the array to amend the address array with the
-# inserts and deletes that occured after it was written.
-#
-# Not all of the records will be loaded when we go backwards, but we have their
-# file position from the address array, so we can jump to them and load them as
-# we need them. That is, if we need them, because owing to binary search, we
-# might only need a few records out of a great many records to find the record
-# we're looking for.
-#
-# Over time, a leaf tier file can grow fat with deleted records &mdash; an
-# insert object and a subsequent delete object. We vacuum a leaf tier file by
-# writing it to a new leaf tier file.
-
-# `LeafIO` &mdash; Keeps track of a file descriptor opened for append, and the
-# append file position. The `LeafIO` class does *not* contain all methods
-# relating to leaf tier file I/O. You can find more leaf tier file methods in
-# the `IO` class below.
-#
-# TODO Rename `RecordIO`.
-class LeafIO
-  # Construct a leaf file tier writer for the given file name.
-  constructor: (@filename) ->
-    @length = 1024
-
-  # #### Leaf Tier File Object Format
-  #
-  # Each leaf tier object is a JSON array. The first element of the array is an
-  # integer.
-  #
-  # If the integer is greater than zero, it indicates an insert object.  The
-  # integer is the one based index into the zero based address array, indicating
-  # the index where the position of the current insert object should be
-  # inserted. The second element of the leaf tier object array is the record
-  # object.
-
-  # Write an insert object.
-  writeInsert: (object, index, _) ->
-    @_writeJSON [ index + 1, object ], _
-
-  # If the integer is less than zero, it indicates a delete object. The absolute
-  # value of the integer is the one based index into the zero based addrss
-  # array, indicating the index of address array element that should be deleted.
-  # There are no other elements in the leaf tier object array.
-
-  # Write a delete object.
-  writeDelete: (index, _) ->
-    @_writeJSON [ -(index + 1) ], _
-  
-  # If the integer is zero, it indicates an address array object. The integer
-  # value of zero is used only as an indicator. The second element is the
-  # address of the leaf tier to the right of current leaf tier. The third
-  # element of the leaf tier object array is the address array.
-
-  # Write an address array object.
-  writeAddresses: (right, addresses, _) ->
-    @_writeJSON [ 0, right, addresses ], _
-
-  # Append an object to the leaf tier file as a single line of JSON.
-  _writeJSON: (object, _) ->
-    @fd           or= fs.open @filename, "a+", 0644, _
-    @position     or= fs.stat(@filename, _).size
-
-    json            = JSON.stringify object
-    position        = @position
-    length          = Buffer.byteLength(json, "utf8")
-    buffer          = new Buffer(length + 1)
-    offset          = 0
-
-    # Write JSON and newline.
-    buffer.write json
-    buffer[length] = 0x0A
-
-    # Write may be interrupted by a signal, so we keep track of how many bytes
-    # are actually written and write the difference if we come up short.
-    while offset != buffer.length
-      count = buffer.length - offset
-      written = fs.write @fd, buffer, offset, count, @position, _
-      @position += written
-      offset += written
-
-    # What's the point if it doesn't make it to disk?
-    fs.fsync @fd, _
-
-    # Return the file position of the inserted record.
-    position
-
-  # Each line is terminated by a newline. In case your concerned that this
-  # simple search will mistake a byte inside a multi-byte character for a
-  # newline, have a look at
-  # [UTF-8](http://en.wikipedia.org/wiki/UTF-8#Description). All bytes
-  # participating in a multi-byte character have their leading bit set, all
-  # single-byte characters have their leading bit unset.
-
-  # Search for the newline that separates JSON records.
-  _readJSON: (buffer, read) ->
-    for offset in [0...read]
-      if buffer[offset] is 0x0A
-        return JSON.parse buffer.toString("utf8", 0, offset + 1)
-
-  # Jump to a position in the file and read a specific object. Because objects
-  # are cached in memory by a leaf tier, we're not going to get a request to
-  # read an object that has been written to the current write stream. When we
-  # read in a leaf tier, we'll cache any objects we encounter prior to read the
-  # ordering array.
-  #
-  # Note how we allow we keep track of the minimum buffer size that will
-  # accommodate the largest possible buffer.
-  readObject: (address, _) ->
-    @fd or= fs.open @filename, "a+", _
-    @position or= fs.stat(@filename, _).size
-    loop
-      buffer = new Buffer(@length)
-      read = fs.read @in, buffer, 0, buffer.length, address, _
-      if json = @_readJSON(buffer, read)
-        break
-      if @length > @position - address
-        throw new Error "cannot find end of record."
-      @length += @length >>> 1
-    json.pop()
-
-  # Close the file descriptor if it is open and reset the file descriptor and
-  # append position.
-  close: (_) ->
-    fs.close(@fd, _) if @fd
-    @position = @fd = null
 class exports.Strata
   # Construct the Strata from the options.
   constructor: (options) ->
