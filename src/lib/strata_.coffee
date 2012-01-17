@@ -385,7 +385,13 @@ class IO
   #
   allocateBranches: (penultimate) ->
     address = @nextAddress++
-    link = @link({ penultimate, address, addresses: [], cache: {} })
+    link = @link
+      penultimate: penultimate
+      address: address
+      addresses: []
+      cache: {}
+      locks: [[]]
+      loaded: true
     @cache[address] = link
 
   # We write the branch page to a file as a single JSON object on a single line.
@@ -462,11 +468,13 @@ class IO
   allocateLeaves: (positions, right) ->
     address = @nextAddress++
     @cache[address] = @link
+      loaded: true
       leaf: true
       address: address
       positions: positions
       cache: {}
       right: right
+      locks: [[]]
 
   # #### Appends for Durability
   #
@@ -865,6 +873,7 @@ class IO
   #
   # #### Lock
 
+  # TODO Signature: Address should go first.
   #
   lock: (exclusive, address, leaf, callback) ->
     # We must make sure that we have one and only one page object to represent
@@ -881,8 +890,8 @@ class IO
           leaf: leaf
           address: address
           cache: {}
-          addresses: []
           locks: [[]]
+      page[if leaf then "positions" else "addresses"] = []
 
     # If the page needs to be laoded, we must load the page only after a lock
     # has been obtained. Loading is a read, so we can load regardless of whether
@@ -918,11 +927,11 @@ class IO
       locks.push []
       if locks[0].length is 0
         locks.shift()
-        lock(null, tier)
+        lock(null, page)
     else
       locks[locks.length - 1].push lock
       if locks.length is 1
-        lock(null, tier)
+        lock(null, page)
 
   # #### Unlock
 
@@ -934,10 +943,9 @@ class IO
   #
   release: (tier) ->
     locks = tier.locks
-    running = locks[0]
-    running.shift()
-    say { locks }
-    if running.length is 0 and locks.length isnt 1
+    locked = locks[0]
+    locked.shift()
+    if locked.length is 0 and locks.length isnt 1
       locks.shift()
       @resume tier, locks[0] if locks[0].length
 
@@ -952,10 +960,10 @@ class IO
     @release tier
     @lock true, tier.address, false, _
 
-# Descent of a tree.
+# The moving parts of the b-tree are in the `Descent` class. It represents...
 
 #              
-class Mutation
+class Descent
   # The constructor always felt like a dangerous place to be doing anything
   # meaningful in C++ or Java.
   constructor: (@strata, @object, @key, @operation) ->
@@ -987,8 +995,9 @@ class Mutation
       record = page.cache[position] = @readRecord page, position, _
     record
 
-  # TODO Descend. Ah, well, find is in `Mutation`, so this moves to `Mutation`.
+  # TODO Descend. Ah, well, find is in `Descent`, so this moves to `Descent`.
   _key: (tierOrAddress, index, _) ->
+    die "HERE"
     if typeof tierOrAddress is "number"
       leaf  = @lock false, tierOrAddress, true, _
       key = @extractor @object leaf, index, _
@@ -1017,7 +1026,7 @@ class Mutation
   # is exclusive, all subsequent descents are exclusive.
 
   # `mutation.descend(exclusive)` 
-  descend: (exclusive) ->
+  _descend: (exclusive) ->
     # Add a new level to the plan.
     @plan.unshift { operations: [], addresses: [] }
 
@@ -1089,10 +1098,8 @@ class Mutation
   # TODO: We are always allowed to get a shared lock on any leaf page and read a
   # value, as long as we let go of it immediately. This allows us to read from
   # leaf pages to get branch values.
-  # TODO: Rename this descend.
 
-  # `mutation.mutate(callback)`
-  mutate: (_) ->
+  descend: (_) ->
     parent = null
 
     @shared.push child = @io.lock false, 0, false, _
@@ -1106,29 +1113,33 @@ class Mutation
     # TODO: Flag for shared or exclusive. If exclusive, leave parent locked, if
     # shared, then unlock parent.
 
-    mutation = @[@operation.method].call this, parent, child, _
+    descent = @[@operation.method].call this, parent, child, _
 
-    @io.release tier for tier in @shared
-    @io.release tier for tier in @exclusive
+    @io.release page for page in @shared
+    @io.release page for page in @exclusive
 
-    mutation.mutate _ if mutation
+    descent.descend _ if descent
 
   insertSorted: (parent, child, _) ->
     branch = @find child, @key, _
-    @exclusive.push leaves = @io.lock true, child.addresses[branch], true, _
+    @exclusive.push leaf = @io.lock true, child.addresses[branch], true, _
 
-    addresses = leaves.addresses
+    positions = leaf.positions
 
     # Insert the object value sorted.
-    for i in [0...addresses.length]
-      key = @io.key(leaves, i, _)
+    for i in [0...positions.length]
+      key = @_key leaf, i, _
       if @comparator(@key, key) <= 0
         break
 
-    address = leaves.io.writeInsert @object, i, _
-    addresses.splice i, 0, address
+    filename = @io.filename leaf.address
+    fd = fs.open filename, "a", 0644, _
+    position = @io.writeInsert fd, leaf, @object, i, _
+    fs.close fd, _
 
-    if addresses.length > @options.leafSize and not @homogenous(leaves, _)
+    positions.splice i, 0, position
+
+    if positions.length > @options.leafSize and not @homogenous(leaf, _)
       keys = []
       process.nextTick _
       # Opportunity to deadlock.
@@ -1138,15 +1149,14 @@ class Mutation
       operation =
         method: "splitLeaf"
         keys: keys
-      new Mutation(@strata, null, key, operation)
+      new Descent(@strata, null, key, operation)
   
   # If the leaf tier is now at the maximum size, we test to see if the leaf tier
   # is filled with an identical key value, and if not, we split the leaf tier.
-  homogenous: (tier, _) ->
-    { io, comparator } = @
-    first = io.key(tier, 0, _)
-    last = io.key(tier, tier.addresses.length - 1, _)
-    comparator(first, last) is 0
+  homogenous: (leaf, _) ->
+    first = @_key leaf, 0, _
+    last = @_key leaf, page.positions.length - 1, _
+    @comparator(first, last) is 0
 
   get: (parent, child, _) ->
     branch = @find child, @key, _
@@ -1266,13 +1276,13 @@ class exports.Strata
 
   get: (key, callback) ->
     operation = method: "get"
-    mutation = new Mutation(@, null, key, operation)
-    mutation.mutate callback
+    mutation = new Descent(@, null, key, operation)
+    mutation.descend callback
 
   insert: (object, callback) ->
     operation = method: "insertSorted"
-    mutation = new Mutation(@, object, null, operation)
-    mutation.mutate callback
+    descent = new Descent(@, object, null, operation)
+    descent.descend callback
 
   # Both `insert` and `remove` use this generalized mutation method that
   # implements locking the proper tiers during the descent of the tree to find
