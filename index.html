@@ -2,20 +2,42 @@
 
 <h2>Purpose</h2>
 
-<p>Implements a file backed <a href="http://en.wikipedia.org/wiki/B-tree">b-tree</a>.</p>
+<p>Strata stores JSON objects on disk, according to a sort order of your
+choosing, indexed for fast retrieval. Faster than a flat file. Lighter than a
+database. More capacity than an in memory tree.</p>
 
-<p>TK Points to cover as far as advocacy goes.</p>
+<p>Strata is a <a href="http://en.wikipedia.org/wiki/B-tree">b-tree</a> implementation for
+<a href="http://nodejs.org/">Node.js</a> that <strong>evented</strong>, <strong>concurrent</strong>, <strong>perstant</strong>
+and <strong>durable</strong>.</p>
 
-<ul>
-<li>Concurrency.</li>
-<li>Flexiblity of ordering.</li>
-<li>Atomicity.</li>
-<li>A database primitive, for use as if it were a programming primitive like an
-array or an associative array.</li>
-<li>Standard Node.js API.</li>
-</ul>
+<p>Strata is <strong>evented</strong> because it uses asynchronous I/O to read and write
+b-tree pages, allowing your CPU to continue to do work while Strata waits on
+I/O.</p>
 
-<p>But this isn't important at the moment.</p>
+<p>Strata is <strong>concurrent</strong>. Strata will satisfy any queries from its in memory
+cache that it can, even while waiting on evented I/O to load. It queues the
+I/O, but keeps the main thread of execution busy while the I/O completes.
+Strata keeps your CPU and I/O busy when requests are heavy.</p>
+
+<p>Strata is <strong>persistant</strong>. It stores your tree in page files. The page files
+are plain old JSON. You can open them up in a <code>vim</code> or EMACS, back them up
+using <code>textutils</code>, check them into <code>git</code>, and munge them with JavaScript. It's
+your data, you ought to be able to read it.</p>
+
+<p>Strata is <strong>durable</strong>. It only appends records to to file, so a hard shutdown
+will only ever lose the few last records added. When pages jornaled when they
+are vaccumed and rewritten.</p>
+
+<p>Strata is a b-tree. A b-tree is a database primiative. Using Strata, you can
+start to experiment with database designs of your own. You can use Strata to
+build an MVCC database table, like PostgreSQL. You can create Strata b-trees
+to create relationship indexes. You can use Strata to store what ever form of
+JSON suits your needs like NoSQL databases.</p>
+
+<p>It runs anywhere that Node.js runs, in pure JavaScript.</p>
+
+<p>Maybe you need a database server, or maybe Strata is all you need to get your
+next application growing.</p>
 
 <h2>Terminology</h2>
 
