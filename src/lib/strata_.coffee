@@ -1,19 +1,43 @@
 # A Streamline.js friendly evented I/O b-tree for node.js.
 #
 # ## Purpose
+#
+# Strata stores JSON objects on disk, according to a sort order of your
+# choosing, indexed for fast retrieval. Faster than a flat file. Lighter than a
+# database. More capacity than an in memory tree.
 # 
-# Implements a file backed [b-tree](http://en.wikipedia.org/wiki/B-tree).
+# Strata is a [b-tree](http://en.wikipedia.org/wiki/B-tree) implementation for
+# [Node.js](http://nodejs.org/) that **evented**, **concurrent**, **perstant**
+# and **durable**.
 #
-# TK Points to cover as far as advocacy goes.
+# Strata is **evented** because it uses asynchronous I/O to read and write
+# b-tree pages, allowing your CPU to continue to do work while Strata waits on
+# I/O.
 #
-#  * Concurrency.
-#  * Flexiblity of ordering.
-#  * Atomicity.
-#  * A database primitive, for use as if it were a programming primitive like an
-#  array or an associative array.
-#  * Standard Node.js API.
+# Strata is **concurrent**. Strata will satisfy any queries from its in memory
+# cache that it can, even while waiting on evented I/O to load. It queues the
+# I/O, but keeps the main thread of execution busy while the I/O completes.
+# Strata keeps your CPU and I/O busy when requests are heavy.
 #
-# But this isn't important at the moment.
+# Strata is **persistant**. It stores your tree in page files. The page files
+# are plain old JSON. You can open them up in a `vim` or EMACS, back them up
+# using `textutils`, check them into `git`, and munge them with JavaScript. It's
+# your data, you ought to be able to read it.
+#
+# Strata is **durable**. It only appends records to to file, so a hard shutdown
+# will only ever lose the few last records added. When pages jornaled when they
+# are vaccumed and rewritten.
+#
+# Strata is a b-tree. A b-tree is a database primiative. Using Strata, you can
+# start to experiment with database designs of your own. You can use Strata to
+# build an MVCC database table, like PostgreSQL. You can create Strata b-trees
+# to create relationship indexes. You can use Strata to store what ever form of
+# JSON suits your needs like NoSQL databases.
+#
+# It runs anywhere that Node.js runs, in pure JavaScript.
+#
+# Maybe you need a database server, or maybe Strata is all you need to get your
+# next application growing.
 #
 # ## Terminology
 #
