@@ -1,5 +1,7 @@
 # A Streamline.js friendly evented I/O b-tree for node.js.
 #
+# TK Our I/O page storage an in memory page structures are inherently sparse.
+#
 # ## Purpose
 #
 # Strata stores JSON objects on disk, according to a sort order of your
@@ -792,6 +794,9 @@ class IO
   # not commits.
   #
   # We can always do a thorough rebuild of some kind.
+  #
+  # Probably need "r" to not create the crash file, in case we're reading from a
+  # read only file system, or something..
   
   # &mdash;
   open: (_) ->
@@ -874,6 +879,16 @@ class IO
   # #### Lock
 
   # TODO Signature: Address should go first.
+  #
+  # TODO If the page is not loaded, and we simply move forward when we encounter
+  # the page, that is, we have two descents, one encounters this unloaded page,
+  # but it is a read, so we go ahead, it makes an evented I/O call and waits,
+  # we make progress on a new descent, the desent encounters the unloaded page,
+  # and it loads the page, and waits.
+  #
+  # Maybe we can queue the people waiting on the load? The simplest thing would
+  # be to put the callbacks in an array of onloads.
+
   #
   lock: (exclusive, address, leaf, callback) ->
     # We must make sure that we have one and only one page object to represent
@@ -960,7 +975,496 @@ class IO
     @release tier
     @lock true, tier.address, false, _
 
-# The moving parts of the b-tree are in the `Descent` class. It represents...
+# ## Descent
+#
+# When we want to retreive records from the b-tree, or alter the b-tree in any
+# way, first we descend the tree. When we navigate to leaf pages of a search
+# b-tree to obtain records, we *search* the b-tree. When we change the b-tree in
+# any way, adding or deleting records, splitting or merging pages, we *mutate*
+# the b-tree.
+#
+# A *decent* is analogous to a thread. A decent is a b-tree operation. A decent
+# can make progress while other descents make progress. 
+#
+# A decent an make progress while other decents make progress, even though
+# Node.js only has a single thread of execution. When we descend the tree, we
+# may have to wait for evented I/O to read or write a page. While we wait, we
+# can make progress on another descent.
+#
+# With this parallel descent, we need to ensure that we do not alter pages that
+# the waiting descent needs to complete its descent, nor read pages that the
+# waiting descent has begun to alter.
+#
+# These are race conditions. We use the shared read/exclusive write locks to
+# guard against these race conditions.
+#
+# #### Locking on Descent
+#
+# Multiple search descents can be performed concurrently by multiple descents.
+# Alteration descents require exclusive access, but only to the pages they
+# alter. A search descent can still make progres in the presence of an
+# alteration decent, so long as the search does not visit the pages being
+# altered.
+#
+# An alteration uses the shared read/exclusive write lock mechanism to lock only
+# the pages needed to perform the alteration. This allows other searches and
+# alterations to make progress in other areas of the b-tree.
+#
+# To allow progress in parallel, we lock only the pages we need to descend the
+# tree, only as long as we need to traverse the page. Metaphically, we descend
+# the tree locking hand-over-hand.
+#
+# When we descend the tree we first obtain a read lock on the root branch page.
+# We then aquire and read release read locks as we descend the tree. We aquire a
+# read lock to find the child page to descend. We aquire a read lock on the
+# child we will visit next. We then release the read lock on the parent of the
+# child.
+#
+# We hold the lock on the parent page while we aquire the lock on the child page
+# because we don't want another descent to alter the parent page, invaliding the
+# direction of our descent.
+#
+# You must only acquire a lock on a child page if you hold a lock on its parent
+# page. We maintain this ordering to prevent deadlock. We cannot have a descent
+# that has an exclusive lock on a parent attempt to obtain a lock on child, when
+# another descent has an exclusive lock on the child and is attempting to obtain
+# a lock on the parent. By only obtaining locks top down, we avoid this deadlock
+# condition.
+#
+# ### Locking Siblings
+#
+# Both branch pages and leaf pages are singly linked to their right sibling. If
+# you hold a lock on a page, you are allowed to obtain a lock on its right
+# sibling. This left right ordering allows us to traverse a level of the b-tree,
+# which is necessary for cursors and merges.
+#
+# To prevent a deadlock when a left right traversal coincides with the top down
+# traversal, we insist that when a parent obtains a lock on more than one child,
+# it locks the children in left to right order.
+#
+# We never need to traverse siblings at more than one level of the tree during a
+# descent, so we do not have to worry about the deadlock conditions that would
+# occur if were we to do so.
+#
+# TK Oddly, some of the rules here may not be necessary. I've often been unable
+# to express my designs, because the rules that I'm following may be too many.
+# It may be the case that you could remove one of the rules, and still deadlock
+# will never occur. I'm not trying to define the mininum requirements to prevent
+# deadlock. Any set of requirements that prevent deadlock will do. If one of
+# them prevented a necessary b-tree operation, I'd think hard about how to do
+# without. That thinking might discover that it was unnecessary.
+#
+# TK I'm not saying that any of this is to be sure, or to stay on the safe side.
+# An unnecessary rule is unnecessary. I'd remove it from the documentation,
+# maybe make a note of the discovery in the project journal.
+#
+# ### Upgrading from Shared to Exclusive
+#
+# When we release our lock on the parent, we allow another descent to alter the
+# parent. Another descent may choose to obtain an exclusive write lock on the
+# parent, and alter the parent. The parent may be merged with another page. It
+# may split or merge its child pages, other than the child page we've read
+# locked. It does not matter to our descent because we've already descended into
+# a sub-tree.
+#
+# We need to use our in documentation. We cannot use terms like primary,
+# secondary. The descent of the first primary visitor holding the key of the
+# lock that has reserved adversary acessess on page before the current page in
+# clock-wise order of the tertiary doublely-linked list.
+#
+# There is no b-tree operation will invalidate the entire sub-tree, only pointer
+# operations that will change the route you take to reach it. When we have
+# passed though the route, another descent can alter the route, without
+# invaliding the outcome of our descent.
+#
+# We've entered a sub-tree. That sub-tree is isolated from alterations to the
+# tree made by other descents of the tree. By desecnding with read locks, we
+# wait for any write locks, meaning we wait for any alterations to complete.
+#
+# When we search, we use the hand-over-hand descent of the tree we reach the
+# leaf pages, read our record and return it to the client.
+#
+# For alterations, we use the hand-over-hand desecent of the tree to reach the
+# start of the sub-tree what we will 
+#
+# ### B-Tree Balancing Strategies
+#
+# In traditional b-tree literature, one of the properties of efficency of the
+# b-tree is that you can split the nodes of the b-tree by traversing back up the
+# tree splitting full nodes after an insert.
+#
+# In a concurrent implementation, however we need to lock the the parent of the
+# first page to split. This makes that efficent property inefficent.
+#
+# As in most b-tree literature, I'm going to use split as an example in
+# describing exclusive lock strategies, and then wave my hands and say that
+# merge is pretty much the same thing. That is, I'm going to lie to you. (Waves
+# hands.)
+#
+# In reality, you don't know that a page needs to be merged simply by visting
+# it. You will only know that it needs to merge by looking at the page and both
+# its left and right sibling pages.
+#
+# ##### Exclusive Write Locks on the Way Down
+#
+# Balancing on Insert or Delete
+#
+# If we wanted to take advantage of the fact that we can determine the pages
+# that need to be split while we descend the tree, to split the pages on the way
+# back up the tree, we will need to lock those pages as we see them.
+#
+# To prevent deadlock, we've established an ordering of lock acquisition. A
+# descent can obtain a lock the child or right sibling of a page on which it
+# holds a lock. We are always moving top down, or left right.
+#
+# We may make a list of pages we need to split on the way down, but we won't be
+# able to back to obtain exclusive locks on them. We can only obtain a lock on a
+# page if we hold a lock to its left sibling or parent. We release the parent
+# lock as part of traversal to keep the b-tree lively. The only way to implement
+# insert and split in a single pass is to hold the locks on the way down.
+#
+# We'd hold them in a queue. When we completed our insert, we'd have to upgrade
+# our read locks to exclusive locks, moving forward through the queue performing
+# the upgrades. Then we'd move backwards through the queue performing splits.
+#
+# When you upgrade from read to write, you're not garaunteed to be first descent
+# to get the upgrade. Another descent might get the upgrade, alter the pages of
+# interest, and render your plan for balancing the tree invalid.
+#
+# To prevent this, we could upgrade from shared to exclusive the first time we
+# encouter a full page. After we've obtained our exclusive lock, we know that
+# we've blocked any other descents from descending into the sub-tree, so our
+# plan for balance will remain valid as we descend the tree, creating a queue of
+# exclusively locked pages to split.
+#
+# However, If any decendant page of the exclusively locked page is not full, the
+# exclusively locked page will not be split, so we have to empty our queue of
+# exclusively locked pages, releasing the exclusive locks abtained along the
+# way. We have wasted our time waiting on those exclusive locks, while making
+# every other desecent that follows in our path page wait for us to waste our
+# time.
+#
+# If it were the case that the full page with the potential to split were the
+# root branch page, then our entire b-tree would be locked exclusively for each
+# insert, until the b-tree grew to the point there the root page split. We can
+# hardly call that an efficency.
+#
+# With our queue of read locks, we'd have to re-test the conditions after we
+# obtained exclusive locks. We could them proceed to split, if none of the pages
+# involved had changed.
+#
+# At this point however, we've created quite an aparatus to take advantage of a
+# supposedly convienent side-effect of desending the tree for insert. We've
+# added a lot of complexity to the act of insertion.
+#
+# The best part is, it is only for insertion and split that this effeciency
+# applies. You can't determine if a page needes to be merged without also
+# looking at its siblings. You can't merge a page with its left sibling without
+# first visiting that sibling through a descent of the tree.
+#
+# It might be possible to do delete and merge in a single pass with a different
+# b-tree structure, one with cached pages sizes, or page sizes kept in the
+# parent, but not with the b-tree structure we've chosen here.
+#
+# Instead, we balance our tree as a separate step from changing its size. We
+# first insert or delete a record. We then split or merge the pages if we
+# determine that it is necessary.
+#
+# #### Balancing in a Single Pass
+#
+# We will know that split is necessary when we have filled a leaf page beyond
+# its capacity. If the parent of the leaf page is at capacity, splitting the
+# leaf page will put the parent of the leaf page beyond its capacity, and it
+# too will need to be split.
+#
+# After insert, when we know that a split is necessary, we descend the tree
+# again, this time with an intent to split the leaf page. Because we are a
+# concurrent data structure, we might have two inserts complete at the same
+# time, initiating two splits. The split operation will check that the split is
+# still necessary.
+#
+# Now we are faced with the same temptation to employ for the efficencies we've
+# weighed. Should we attempt to perform all the necessary splits in a single
+# pass?
+#
+# We know there will be at least one split, so if we lock exclusively on the way
+# down, we know that at least one of those locks is necessary.
+#
+# We still face the condition where the leaf is full beyond capacity, the root
+# is at capacity, but the branch page between them is below capacity. We will
+# detect that the root has the potenital to split, lock it exclusively, but then
+# find that the lock was unnecessary because it will not actually split.
+#
+# This unnecsssary lock won't occur at every insert however, only at every leaf
+# split.
+#
+# In order to determine if splitting in a single pass after insert is worth are
+# while, lets look at how we would split in multiple passes.
+#
+# #### Balancing in Multiple Passes
+#
+# When we insert a record into a leaf page and that leaf page fills beyond
+# capacity, we descend the tree again, this time with a plan to obtain an
+# exclusive lock on the parent branch page of the leaf page that needs to split.
+# Once we obtain that exclusive lock, we obtain an exclusive lock on the leaf
+# branch page. If the leaf page is not beyond capacity, then we assume that
+# another descent has deleted a record or split the page, so we're done. If the
+# leaf page is still beyond capacity, we create a new right sibling, move a
+# number records into the new night sibling and then add a new child to the
+# parent branch page.
+#
+# Now, we may have the case were the parent branch page is one beyond its
+# capacity. We release all our locks, and descend the tree again, this time with
+# a plan to obtain an exclusive lock on the parent branch page of branch page
+# that needs to split.
+#
+# It is a simple recurisve operation. The cost is that we must desend the tree
+# for each page that fills beyond capacity. However, the cost of a subsequent
+# descent to split a parent branch is only incurred when the parent branch
+# fills, which is a occurance order of magnitude less frequent than a leaf page
+# filling. At times we might have to descent the tree three times, to split the
+# parent of a pentultite branch page, but that is an occurance that is an order
+# of magnitude less frequent that a penultimate branch splitting.
+#
+# And then, the cost of the descent of the b-tree is not debilitating, 
+#
+# The simplicity means that we have a single method for splitting pages that
+# applies to both branch and leaf pages. We'll also have a single method for
+# merging both branch pages and leaf pages.
+#
+# ### Splitting
+#
+# ### Merging
+#
+# Deleting a record can trigger a merge. Merge detection is a callenge. When we
+# insert a record to a leaf page, the size of the leaf page determines if the a
+# split is necessary. When we delete a record, in order to determine if a merge
+# is necessary, we need to example both the left and right siblint pages, to see
+# if we can combine the current page with one or another sibling.
+#
+# Checking the right sibling page is possible, because we can navigate from left
+# to right. We cannot check the left sibling page without a second descent.
+#
+# ### At the Time of Writing
+#
+# At the time of writing, your humble author cannot make an informed decision
+# about the balancing of the tree. I'm leaning toward the notion of a balancing
+# machine. But, I am imagining use cases.
+#
+# A b-tree that grows. This is going to be common. It grows slowly. Pages
+# splitting. A b-tree that grows by appending. That is common. Inserting a log
+# of records. Each insert descends the tree. The tree should not be too deep.
+#
+# Can we break up Strata into more primatives, so that there are other
+# operations? Let's say I want to merge a bunch of records. Can I start with the
+# smallest one, then work through the tree, inserting them? This might be a way
+# to queue a bunch of inserts. Or to do a larger operation like a merge.
+#
+# Can I pause balancing?
+#
+# I'm seeing a couple of interfaces.
+#
+# First, you must remember that this is a primitive. It is not supposed to be a
+# database. You ought to be able to pause balancing, or have some say about
+# balancing. If you're performing an agggressive operation, then you might want
+# to take control.
+#
+# Imagine that you've implemented MVCC. You're always appending, until it is
+# time to vacuum. When you vacuum, you're deleting all over the place. You may
+# as well do a table scan. You might choose to iterate through the leaf pages.
+# You may have kept track of where records have been stored since the last
+# vacuum, so if you have a terabyte large table, you're only vacuum the pages
+# that need it.
+#
+# You might strip records from ever leaf page. You could attempt to iterate,
+# descending to delete a record you found needing deletion, waiting on balance,
+# then continuing. That sounds slow.
+#
+# Why not strip all the records you want to strip, then balance.
+#
+# We can have an exclusive forward cursor. That cursor can delete records. It
+# will mark them as needing balance. Nice thing is that as you move through,
+# you're going to get some sizes.
+#
+# Also, nice property, if we do cache sizes, well, we can. Updating the cache
+# would be atomic, of course.
+#
+# I imagine that items would disappear, a great many, and then we'll have
+# entirely empty pages, lot's of clean up to do. From there, were do we go?
+# Lot's of clean up mind you.
+#
+# We cache the previous sibling in memory. We need only update the in memory
+# cache. Now we know sizes, of everything. We've cached it. Same MRU cache, so
+# we can use the same expiration strategy, maybe create two levels. Clean up the
+# cache of records and keys, clean the array, but leave points and counts.
+#
+# Again, only delete is problem. Split is rather easy. We know when a page needs
+# to be split. We don't now when we need to merge.
+#
+# The problme is that we might vacuum, deleting a whole bunch of records, then
+# we come up with a plan to merge the records.
+#
+# Okay, we have a balance queue. It would work rather simply in the case of
+# inserts. Here's how it works.
+#
+# You have a queue. When the time comes for the queue to make a calculation,
+# everything it needs will be in memory. Nothing that it does will cause an
+# evented operation. No descent can make progress during the calculation.
+#
+# Normal operation are the atomic inserts and deletes. If we did not have a
+# balance queue, we would balance immediately, as in a single threaded
+# implementation. With a balance queue, the operation would be to add a single
+# unbalanced page into the queue, then have the queue balance that one page.
+#
+# For an insert, we know that the page needs to be split, so we add the page to
+# the unbalanced pages list at the end of the queue. That queue element would
+# consist of a map of page numbers to differences, the number of records added
+# or deleted from the page. If the number is negative, we know that the page has
+# shrunk and might need merge. If the number is positive, we know that the page
+# has grown. We then look at the size of the page in the cache and we split if
+# it greater than capacity.
+#
+# To do something like a large insert, descend the tree to the first item.
+# Insert it. Attempt to insert the second, if it would go at the end, then load
+# the next sibling and see if it would to the end there. If it is less than the
+# first time in the next one, then it belongs in this page. Less than the end of
+# the next page, it belongs there. Beyond the end of the next page, give up and
+# descend the tree again. Make it so that the user can implement this. Give up
+# automatically, if you go to the end on the second, only if you're on a roll to
+# you continue to the next page.
+#
+# We can delete all pages.
+#
+# Merge we merge the right into the left, always. When we compare against
+# siblings, if the left sibling is to be merged, we use the middle. If the
+# middle is to merge with the right, we use the right.
+#
+# We descent the tree. We see the key. When we do, we lock exclusively. We then
+# go left, then right, locking all the way down. We then follow the child path,
+# then go left all the way down. Now we append everything in the right to the
+# leaf. We rewrite the penultimate page without after removing the first page.
+# We need to write something to the deleted page to say that it was deleted.
+# Hmm... How about we just leave it empty. That is an indication that something
+# is wrong. When we see an entirely empty leaf, we know that it is part of an
+# incomplete merge.
+#
+# When our rewrite is done, we delete the key in the top most locked page. Leaf
+# merge is complete.
+#
+# Now we merge the parents. We find a penultimate page by the key of the left
+# most leaf. Similar go left, then get the up to three pages. See if they will
+# fit. Keep them around in cache. You may visit them again soon.
+#
+# If they fit, then you merge them. Lock exclusively the form page where you
+# found the key. Move left into the right. Rewriting. Remove the key from the
+# parent. You will have it locked. Delete the key.
+#
+# Then, get the left most leaf key. Okay there is only one thread balancing, so
+# we will have a consistant depth. This is merge.
+#
+# Delete the key to trigger the lookup.
+#
+# We fix deleted first keys at balance. Descend locking the key when we see it.
+# Mark it deleted forever. Then delete the key. It will get looked up again.
+#
+# We split recursively. Split and put into the parent. If the parent is ready to
+# split, descend the tree locking the parent of the parent exclusively. We'll
+# track where that is. No one else is changing the height of the tree. Only one
+# thread is changing the height of the tree.
+#
+# We will create a plan to merge and split. We execute our plan. If we reach a
+# place where our plan is invalid, we requeue, but only if it is invalid. If it
+# is not invalid, only different, we continue with our merge, or our split.
+#
+# This give us a potential for live lock. We're constantly creating plans to
+# merge, that are invalidated, so we create plans and those are invalidated.
+#
+# Our descent of the tree to balance will be evented anyway. We can probably
+# make our calculation evented. We were fretting that we'd exasterbate the live
+# lock problem. Live lock is a problem if it is a problem. There is no real
+# gauntlet to run. The user can determine if balance will live lock. If there
+# are a great many operations, then balance, wait a while, then balance, wait a
+# while. It is up the the end user.
+#
+# The end user can use the b-tree a map, tucking in values, getting them out.
+# Or else, as an index, to scan, perform table scans. We'll figure that out.
+#
+# Now I have an API problem. The client will have to know about pages to work
+# with them. We can iterate through them, in a table scan. We can implement a
+# merge. We probably need an intelligent cursor, or a reporting cursor.
+
+
+class Balance
+  last: -> @queue[@queue.length - 1]
+  # Increment or decrement the difference of the page since the last balance.
+  difference: (page, difference) ->
+    if not @differences[page.address]?
+      @differences[page.address] = difference
+      page.balancers++
+    else
+      last.differences[page.address] += differnece
+  balance: ->
+    ordered = {}
+    merge = {}
+    for address, difference of @differences
+      page = @io.cache[address]
+      if difference < 0
+        if page.left is -1
+          ordered[page.address] = { page }
+        else
+          if not left = ordered[page.left]
+            left = ordered[page.left] = { page: @io.cache[page.left] }
+          if not left.right
+            left.right = ordered[page.address] or { page }
+          delete ordered[page.address]
+        if page.right isnt -1
+          self = ordered[page.address] or left.right
+          if not right = ordered[page.right] or self.right
+            right = { page: @io.cache[page.right] }
+          if not self.right
+            self.right = right
+          delete ordered[page.right]
+          
+# Are we able to jump in, lock exclusive, or do we really need to go hand over
+# hand. Here are some properties. There is only one thread of execution that is
+# going to mutate branch pages, the same that does merges.
+#
+# We make a plan, moving from left to right, to merge. or else to split. Merges
+# require
+#
+# We have a deleted page, and that page gets the deleted pages added to it. It
+# is rewritten just as any other leaf page is rewritten. We rewrite. If you want
+# to have that go very, very fast, then create small branch pages, and huge leaf
+# pages.
+#
+# Leaning toward making a requirement that keys are unique. Duplicate keys can
+# be a combination of system time and an offset, descent count. Maybe, maybe
+# not.
+#
+# Degenerate case for all this is that we have someone inserting and deleting
+# faster than we can balance, creating live lock. There are constant balance
+# operations, not completing, and a back log of unbalanced pages. This may be an
+# imagined problem.
+#
+# We track sizes using json length. A calcualated length, based on the JSON
+# respesentation. When we reach a particular size, we purge the cache. We also
+# have items that have no length, pages that we've cached for sizes for the sake
+# of merge. We don't purge those pages if they are being used to calculate
+# balance. We keep a reference count. We also only purge at balance time, so
+# that we don't purge cached size data when it is needed.
+# 
+# When we delete an item, if it is the first record, we leave the item in place,
+# to act as a key. We need to fix this during balance. When we delete the first
+# item, we mark the item. How? Well, somehow, there is a flag that says that
+# this item has been deleted, but still exists. In fact, it is the second item
+# to the delete object, a boolean, true for retained false for destroyed. We put
+# in a second one to delete it for good.
+#
+# During balance, 
+#
+# Our binary search will skip it during search.
+#
+# When we balance, if 
 
 #              
 class Descent
@@ -978,7 +1482,7 @@ class Descent
 
     { @extractor, @comparator } = @options
 
-    @key        = @extractor @object if @object? and not key?
+    @sought     = @extractor @object if @object? and not key?
 
   # Going forward, every will story keys, so that when we encounter a record, we
   # don't have to run the extractor, plus we get some caching.
@@ -996,8 +1500,7 @@ class Descent
     record
 
   # TODO Descend. Ah, well, find is in `Descent`, so this moves to `Descent`.
-  _key: (tierOrAddress, index, _) ->
-    die "HERE"
+  key: (tierOrAddress, index, _) ->
     if typeof tierOrAddress is "number"
       leaf  = @lock false, tierOrAddress, true, _
       key = @extractor @object leaf, index, _
