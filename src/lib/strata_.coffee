@@ -798,16 +798,16 @@ class IO
   # shared by descents.
 
   #
-  readRecord: (page, address, _) ->
+  readRecord: (page, position, _) ->
     filename = @filename page.address
     page.position or= fs.stat(filename, _).size
     fd = fs.open filename, "r", _
     loop
       buffer = new Buffer(@length)
-      read = fs.read fd, buffer, 0, buffer.length, address, _
+      read = fs.read fd, buffer, 0, buffer.length, position, _
       if json = @_readJSON(buffer, read)
         break
-      if @length > page.position - address
+      if @length > page.position - position
         throw new Error "cannot find end of record."
       @length += @length >>> 1
     fs.close fd, _
@@ -862,10 +862,12 @@ class IO
     size += JSON.stringify(record).length
     size += JSON.stringify(key).length
 
-    page.cache[position] = { record, key, size }
+    entry = page.cache[position] = { record, key, size }
 
     page.size += size
     @size += size
+
+    entry
 
   # When we purge the record, we add the position length. We will only ever
   # delete a record that has been cached, so we do not have to create a function
@@ -1096,13 +1098,13 @@ class IO
   # descent is the one that it queued.
 
   #
-  release: (tier) ->
-    locks = tier.locks
+  release: (page) ->
+    locks = page.locks
     locked = locks[0]
     locked.shift()
     if locked.length is 0 and locks.length isnt 1
       locks.shift()
-      @resume tier, locks[0] if locks[0].length
+      @resume page, locks[0] if locks[0].length
 
   # We call resume with the list of callbacks shifted off of a pages lock queue.
   # The callbacks are scheduled to run in the next tick.
@@ -1610,7 +1612,7 @@ class Balance
 class Descent
   # The constructor always felt like a dangerous place to be doing anything
   # meaningful in C++ or Java.
-  constructor: (@strata, @object, @key, @operation) ->
+  constructor: (@strata, @object, @sought, @operation) ->
     @io         = @strata._io
     @options    = @strata._options
 
@@ -1619,10 +1621,11 @@ class Descent
     @exclusive  = []
     @shared     = []
     @pivots     = []
+    @stack      = []
 
     { @extractor, @comparator } = @options
 
-    @sought     = @extractor @object if @object? and not key?
+    @sought     = @extractor @object if @object? and not @sought?
 
   # Going forward, every will story keys, so that when we encounter a record, we
   # don't have to run the extractor, plus we get some caching.
@@ -1639,31 +1642,26 @@ class Descent
       record = page.cache[position] = @readRecord page, position, _
     record
 
+  stash: (page, index, _) ->
+    if not stash = page.cache[position]
+      record = @io.readRecord page, position, _
+      stash = @io.cacheRecord page, position, record
+    stash
+
   # TODO Descend. Ah, well, find is in `Descent`, so this moves to `Descent`.
-  key: (tierOrAddress, index, _) ->
-    if typeof tierOrAddress is "number"
-      leaf  = @lock false, tierOrAddress, true, _
-      key = @extractor @object leaf, index, _
-      @release leaf
-      key
-    else if tierOrAddress.leaf
-      @extractor @object tierOrAddress, index, _
-    else
-      address = tierOrAddress.addresses[index]
-      if not key = tierOrAddress.cache[address]
-        # Here's something to consdier. The only time we lock the leaf is during
-        # descent, to read in the key.
-        #
-        # If this leaf tier is locked exclusively, we are not the ones holding the
-        # lock, because that would mean that we are locking the inner tier, we
-        # would already have traversed the inner tier, the key would be in the
-        # cache.
-        #
-        # If this leaf tier has an exclusive lock pending, it is not a lock that
-        # we are waiting for, so we can append a shared lock and wait for multiple
-        # exclusive and shared locks to clear.
-        key = tierOrAddress.cache[address] = @key address, 0, _
-      key
+  key: (page, address, _) ->
+    stack = []
+    loop
+      page = @io.lock false, address, page.penultimate, _
+      stack.push page
+      if page.leaf
+        key = @stash(page, position, _).key
+        break
+      else
+        address = page.addresses[0]
+    for page in stack
+      @io.unlock page
+    key
   
   # Descend the tree, optionally starting an exclusive descent. Once the descent
   # is exclusive, all subsequent descents are exclusive.
@@ -1925,9 +1923,9 @@ class exports.Strata
     mutation = new Descent(@, null, key, operation)
     mutation.descend callback
 
-  insert: (object, callback) ->
+  insert: (record, callback) ->
     operation = method: "insertSorted"
-    descent = new Descent(@, object, null, operation)
+    descent = new Descent(@, record, null, operation)
     descent.descend callback
 
   # Both `insert` and `remove` use this generalized mutation method that
