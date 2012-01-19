@@ -389,7 +389,7 @@ class IO
   # memory page is used for locking.
 
   #
-  allocateBranch: (address, override) ->
+  createBranch: (address, override) ->
     page = @cache[address] = @link @mru.core,
       count: 0
       penultimate: true
@@ -571,9 +571,9 @@ class IO
   # records that have been loaded from the file.
 
   #
-  allocateLeaf: (address, override) ->
+  createLeaf: (address, override) ->
     page = @cache[address] = @link @mru.core,
-      loaded: true
+      loaded: false
       leaf: true
       address: address
       positions: []
@@ -704,7 +704,7 @@ class IO
   # just as resillient.
   
   #
-  readLeaves: (page, _) ->
+  readLeaf: (page, _) ->
     # We don't cache file descriptors after the leaf page file read. We will
     # close the file descriptors before the function returns.
     filename  = @filename page.address
@@ -739,30 +739,36 @@ class IO
       while read != 0
         read = read - 1
         if buffer[read] is 0x0A or read is stop
-          record = JSON.parse buffer.toString("utf8", read, eos)
+          object = JSON.parse buffer.toString("utf8", read, eos)
           eos   = read + 1
-          index = record.shift()
+          index = object.shift()
           if index is 0
-            [ positions, end ] = [ record, 0 ]
+            page.right = object.shift()
+            page.positions = object.shift()
+            end = 0
             break
           else
-            splices.push [ index, start + read ]
+            position = start + read
+            splices.push [ index, position ]
             if index > 0
-              cache[start + read] = record.shift()
+              @cachePosition(page, position)
+              @cacheRecord(page, position, object.shift())
       eol = start + eos
     # Now we replay the inserts and deletes described by the insert and delete
     # objects that we've gathered up in our splices array.
     splices.reverse()
     for splice in splices
-      [ index, address ] = splice
+      [ index, position ] = splice
       if index > 0
-        positions.splice(index - 1, 0, address)
+        positions.splice(index - 1, 0, position)
       else
         positions.splice(-(index + 1), 1)
     # Close the file descriptor.
     fs.close fd, _
+    
     # Return the loaded page.
-    extend page, { addresses, cache, loaded: true }
+    count = positions.length
+    extend page, { positions, count, loaded: true }
 
   # Each line is terminated by a newline. In case your concerned that this
   # simple search will mistake a byte inside a multi-byte character for a
@@ -904,8 +910,8 @@ class IO
     if fs.readdir(@directory, _).length
       throw new Error "database #{@directory} is not empty."
     # Create a root branch with a single empty leaf.
-    root = @allocateBranch @nextAddress++, penultimate: true, loaded: true
-    leaf = @allocateLeaf @nextAddress++, loaded: true
+    root = @createBranch @nextAddress++, penultimate: true, loaded: true
+    leaf = @createLeaf @nextAddress++, loaded: true
     root.addresses.push leaf.address
     # Write the root branch.
     @rewriteBranches root, _
@@ -926,7 +932,7 @@ class IO
   # if the system time is changed do we have a problem.
   #
   # Thus, we have a reference point. Any file after needs to be inspected. We
-  # load it, and our `readLeaves` function will check for bad JSON, finding it
+  # load it, and our `readLeaf` function will check for bad JSON, finding it
   # very quickly.
   #
   # Now, we might have been in the middle of a split. The presenence of `*.new`
@@ -1048,7 +1054,7 @@ class IO
     # grouped inside one of the arrays in the queue element. Exclusive locks are
     # queued alone as a single element in the array in the queue element.
     if not page = @cache[address]
-      page = @["allocate#{if leaf then "Leaf" else "Branch"}"](address)
+      page = @["create#{if leaf then "Leaf" else "Branch"}"](address)
 
     # If the page needs to be laoded, we must load the page only after a lock
     # has been obtained. Loading is a read, so we can load regardless of whether
@@ -1062,7 +1068,7 @@ class IO
         else if page.loaded
           callback null, page
         else if leaf
-          @readLeaves page, callback
+          @readLeaf page, callback
         else
           @readBranches page, callback
 
@@ -1116,6 +1122,29 @@ class IO
   upgrade: (tier, _) ->
     @unlock tier
     @lock tier.address, true, false, _
+
+  stash: (page, index, _) ->
+    position = page.positions[index]
+    if not stash = page.cache[position]
+      record = @readRecord page, position, _
+      stash = @cacheRecord page, position, record
+    stash
+
+  # TODO Descend. Ah, well, find is in `Descent`, so this moves to `Descent`.
+  key: (page, index, _) ->
+    stack = []
+    loop
+      if page.leaf
+        key = @stash(page, index, _).key
+        break
+      else
+        address = page.addresses[index]
+        page = @lock address, false, page.penultimate, _
+        index = 0
+        stack.push page
+    for page in stack
+      @unlock page
+    key
 
 # ## Descent
 #
@@ -1567,6 +1596,35 @@ class Balance
             self.right = right
           delete ordered[page.right]
           
+class Reader
+  constructor: (@_io, @_page, @_index, @_key, @_found, @_exclusive) ->
+    @_exclusive or= false
+
+  found: (_) -> @_found
+
+  unlock: -> @_io.unlock @_page
+
+  get: (_) ->
+    if @_index < @_page.count
+      @_io.stash(@_page, @_index, _).record
+
+  next: (_) ->
+    if @_page.right is -1
+      false
+    else
+      next = @_io.lock @_page.right, @_exclusive, true, _
+      @_io.unlock @_page
+      @_page = next
+      true
+
+class Writer extends Reader
+  insertion: (record) ->
+    insertion =
+      record: record
+      key: @_io.extractor record
+
+  insert: (insertion, _) ->
+
 # Are we able to jump in, lock exclusive, or do we really need to go hand over
 # hand. Here are some properties. There is only one thread of execution that is
 # going to mutate branch pages, the same that does merges.
@@ -1612,7 +1670,7 @@ class Balance
 class Descent
   # The constructor always felt like a dangerous place to be doing anything
   # meaningful in C++ or Java.
-  constructor: (@strata, @object, @sought, @operation) ->
+  constructor: (@strata, @object, @key, @operation) ->
     @io         = @strata._io
     @options    = @strata._options
 
@@ -1625,7 +1683,7 @@ class Descent
 
     { @extractor, @comparator } = @options
 
-    @sought     = @extractor @object if @object? and not @sought?
+    @key        = @extractor @object if @object? and not @key?
 
   # Going forward, every will story keys, so that when we encounter a record, we
   # don't have to run the extractor, plus we get some caching.
@@ -1641,27 +1699,6 @@ class Descent
     if not record = page.cache[position]
       record = page.cache[position] = @readRecord page, position, _
     record
-
-  stash: (page, index, _) ->
-    if not stash = page.cache[position]
-      record = @io.readRecord page, position, _
-      stash = @io.cacheRecord page, position, record
-    stash
-
-  # TODO Descend. Ah, well, find is in `Descent`, so this moves to `Descent`.
-  key: (page, address, _) ->
-    stack = []
-    loop
-      page = @io.lock address, false, page.penultimate, _
-      stack.push page
-      if page.leaf
-        key = @stash(page, position, _).key
-        break
-      else
-        address = page.addresses[0]
-    for page in stack
-      @io.unlock page
-    key
   
   # Descend the tree, optionally starting an exclusive descent. Once the descent
   # is exclusive, all subsequent descents are exclusive.
@@ -1700,37 +1737,37 @@ class Descent
   # that follows it. I'll clean this up with unit testing.
 
   # `mutation.find(tier, key, callback)`
-  find: (tier, key, _) ->
-    size = tier.addresses.length
-    if tier.leaf
-      [ low, high, leaf ] = [ 0, size - 1, true ]
-    else if size is 1
-      return 0
-    else
-      [ low, high ] = [ 1, size - 1 ]
+  find: (page, key, low, _) ->
+    high = page.count - 1
+    compare = -1
+    mid  = 0
+
+    # Classic binary search.
     { comparator, io } = @
-    loop
+    while compare isnt 0 and low <= high
       mid = (low + high) >>> 1
-      compare = comparator key, io.key(tier, mid, _)
-      if compare is 0
-        break
+      compare = comparator key, io.key(page, mid, _)
       if compare > 0
         low = mid + 1
       else
         high = mid - 1
-    if compare is 0
-      if leaf
-        while mid != 0 && comparator(key, io.key(tier, mid - 1, _)) == 0
-          mid--
-      mid
-    else if branches
-      mid - 1
-    else
-      mid
+
+    # Index is negative if not found.
+    if compare is 0 then mid else ~mid
+
+  # Aching to get rid of duplicates. We need to support them here, when
+  # searching for a leaf page partition at split, and when determining whether
+  # to split a leaf page.
+  #
+  # This will rewind to the place before the key.
+
+  #
+  first: (page, index, key, _) ->
+    while index != 0 && comparator(key, io.key(page, index - 1, _)) == 0
+      index--
 
   hasKey: (tier, _) ->
     for key in @operation.keys or []
-      die { key }
       branch = @find(tier, key, _)
       if tier.cache[branch] is key
         return true
@@ -1760,6 +1797,26 @@ class Descent
     @io.unlock page for page in @exclusive
 
     descent.descend _ if descent
+
+  cursor: (exclusive, _) ->
+    @shared.push page = @io.lock 0, false, false, _
+
+    while not page.penultimate
+      die "ITERATING"
+
+    index = @find page, @key, 1, _
+    index = ~index if index < 0
+
+    page = @io.lock page.addresses[index], exclusive, true, _
+    index = @find page, @key, 0, _
+    index = ~index if not (found = index >= 0)
+
+    cursor = if exclusive then Writer else Reader
+    cursor = new cursor(@io, page, index, @key, found)
+
+    @io.unlock page for page in @shared
+
+    cursor
 
   insertSorted: (parent, child, _) ->
     branch = @find child, @key, _
@@ -1922,6 +1979,11 @@ class exports.Strata
     operation = method: "get"
     mutation = new Descent(@, null, key, operation)
     mutation.descend callback
+
+  cursor: (key, splat..., callback) ->
+    exclusive = splat.shift() if splat.length
+    descent = new Descent(@, null, key, null)
+    descent.cursor(exclusive, callback)
 
   insert: (record, callback) ->
     operation = method: "insertSorted"

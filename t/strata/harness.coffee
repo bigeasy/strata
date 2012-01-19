@@ -13,6 +13,6 @@ module.exports = require("ace.is.aces.in.my.book") (_) ->
   catch e
     throw e if e.code isnt 'EEXIST'
   for file in fs.readdir directory, _
-    continue if /^\.\.?$/.test file
+    continue if /^\./.test file
     fs.unlink "#{directory}/#{file}", _
   { Strata, directory }
