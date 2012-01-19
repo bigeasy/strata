@@ -1,9 +1,10 @@
 #!/usr/bin/env coffee-streamline
 return if not require("streamline/module")(module)
 fs = require "fs"
-require("./harness") 5, ({ Strata, directory }, _) ->
+require("./harness") 6, ({ Strata, directory }, _) ->
   strata = new Strata directory: directory, leafSize: 3, branchSize: 3
   strata.create(_)
+  @equal strata._io.size, 3, "json size"
   strata.close(_)
   @ok 1, "created"
   lines = fs.readFile("#{directory}/segment00000000", "utf8", _).split(/\n/)

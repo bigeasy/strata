@@ -5,7 +5,7 @@ require("./harness") 4, ({ Strata, directory }, _) ->
   strata = new Strata directory: directory, leafSize: 3, branchSize: 3
   strata.create _
   strata.insert "a", _
-  @equal strata._io.size, 5, "json size"
+  @equal strata._io.size, 3, "json size"
   strata.close _
   lines = fs.readFile("#{directory}/segment00000001", "utf8", _).split(/\n/)
   lines.pop()

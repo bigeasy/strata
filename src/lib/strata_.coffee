@@ -329,11 +329,13 @@ class IO
   # Set directory and extractor. Initialze the page cache and MRU list.
   constructor: (@directory, @extractor) ->
     @cache          = {}
-    @head           = { address: -1 }
-    @head.next      = @head
-    @head.previous  = @head
+    @mru            = {}
+    @mru.core       = @createMRU()
+    @mru.balance    = @createMRU()
     @nextAddress    = 0
     @length         = 1024
+    @size           = 0
+    @count          = 0
 
   # Pages are identified by an integer page address. The page address is a number
   # that is incremented as new pages are created. A page file has a file name that
@@ -369,6 +371,8 @@ class IO
       throw e unless e.code is "ENOENT"
     fs.rename replacement, permanent, _
 
+  # ### Branch Page Files
+  #
   # We create a new branch pages in memory. They do not exist on disk until they
   # are first written.
   #
@@ -385,16 +389,17 @@ class IO
   # memory page is used for locking.
 
   #
-  allocateBranches: (penultimate) ->
-    address = @nextAddress++
-    link = @link
-      penultimate: penultimate
+  allocateBranch: (address, override) ->
+    page = @cache[address] = @link @mru.core,
+      count: 0
+      penultimate: true
       address: address
       addresses: []
       cache: {}
       locks: [[]]
-      loaded: true
-    @cache[address] = link
+      loaded: false
+      size: 0
+    extend page, override or {}
 
   # We write the branch page to a file as a single JSON object on a single line.
   # We tuck the page properties into an object, and then serialize that object.
@@ -408,8 +413,17 @@ class IO
   rewriteBranches: (page, _) ->
     filename = @filename page.address, ".new"
     record = [ page.penultimate, page.next?.address, page.addresses ]
-    json = JSON.stringify(record) + "\n"
-    fs.writeFile filename, json, "utf8", _
+    json = JSON.stringify(record)
+    buffer = new Buffer(json.length + 1)
+    buffer.write json
+    buffer[json.length] = 0x0A
+    fs.writeFile filename, buffer, "utf8", _
+
+    # Update in memory serialized JSON size of page and b-tree.
+    @size -= page.size or 0
+    page.cache = {}
+    page.size = JSON.stringify(page.addresses).length
+    @size += page.size
 
   # To read a branch page we read the entire page and evaluate it as JSON. We
   # did not store the branch page keys. They are looked up as needed as
@@ -419,30 +433,120 @@ class IO
   readBranches: (page, _) ->
     filename = @filename page.address
     json = fs.readFile filename, "utf8", _
-    [ penultimate, next, addresses ] = JSON.parse json
-    extend page, { penultimate, next, addresses }
+    record = JSON.parse json
+    [ penultimate, next, addresses ] = record
+    count = addresses.length
+
+    # Set in memory serialized JSON size of page and add to b-tree.
+    page.size = JSON.stringify(addresses).length
+    @size += page.size
+
+    # Extend the existing page with the properties read from file.
+    extend page, { penultimate, next, addresses, count }
+
+  # Add a key to the branch page cache and recalculate JSON size.
+  cacheKey: (page, address, key) ->
+    size = JSON.stringify key
+
+    page.cache[address] or= {}
+    page.cache[address].key = key
+    page.cache[address].size = size
+
+    page.size += size
+    @size += size
+
+  # Purge a key from the branch page cache and recalculate JSON size.
+  purgeKey: (page, address) ->
+    if size = page.cache[address]?.size
+      page.size -= size
+      @size -= size
+      delete page.cache[address]
 
   # ### Page Caching
   #
   # We keep a map of page addresses to cached page objects.
   #
+  # #### Most-Recently Used List
+  #
   # We also maintain a most-recently used linked list using the page objets as
   # list nodes. When we want to cull the cache, we can remove the pages at the
   # end of the list, since they are the least recently used.
   #
-  # TODO Some way of judging popularity. A decent index?
+  # #### Cache Purge Trigger
+  #
+  # There are a few ways we could schedule a cache purge; elapsed time, after a
+  # certain number of requests, when a reference count reaches zero, or when
+  # when a limit is reached.
+  #
+  # For the records and page references in a cache entry, the bulk of the data
+  # in the cache, we take the limits approach. We use a maxmimum size for cached
+  # records and page references for the entire b-tree that will trigger a cache
+  # purge to bring it below the size. The purge will remove entries from the end
+  # of the most-recently used list until the limit is met.
+  #
+  # There will be cache entires loaded for house keeping only. When balancing
+  # the tree, the item count of a page is needed to determine page size. These
+  # cache entries can be purged of cached records and page references, but the
+  # entry itself cannot be deleted until it is no longer needed to calculate a
+  # merge. We use reference counting to determine if an entry is participating
+  # in balance calcuations.
+  #
+  # #### JSON Size
+  #
+  # Limits would be difficult to guage if we were an in memory data structure,
+  # but we can get an accuate relative measure of the size of a page using the
+  # length of the JSON strings used to store records and references. 
+  #
+  # The JSON size of a branch page is the string length of the JSON serialized
+  # page address array. The JSON size of leaf page is the string length of the
+  # file position array when serialized with JSOn, plus the string length of
+  # each record loaded in memory when JSON serialized with JSON.
+  #
+  # This is not an exact measure of the system memory committed to the in memory
+  # representation of the b-tree. It ignores the house keeping associated with
+  # each page.
+  #
+  # An exact mesure is not necessary. We only need to be sure to trigger a cache
+  # purge at some point before we reach the limits imposed by sytem memory or
+  # the V8 JavaScript engine.
+  #
+  # #### Cache Entries
+  #
+  # Cache entries are the page objects themselves.
   #
   # It is important that the page objects are unique, that we do not represent a
   # page file with more than one page object, because the page objects house the
   # locking mechanisms.
+  #
+  # The cache entires are linked to form a doubly-linked list. A doubly-linked
+  # list of entries has a head node that has a null address, so that end of the
+  # list is unambiguous.
+  #
+  # There are two linked list heads. A core list of cache entries, and a
+  # balancing list for pages that were loaded for the sake of item counts while
+  # calculating a merge. The when it comes time to purge, the balance list is
+  # purged first.
+  #
+  # If a page cached for balance calculations, is needed for other purposes, it
+  # is unlinked from the balance list, and linked to the head of the core list.
+  #
+  # We always move a page to the front of the core list when we reference it
+  # during b-tree descent.
+
+  # Create an MRU list head node and return it. We call this to create the core
+  # and balance list in the constructor above.
+  createMRU: ->
+    head            = { address: -1 }
+    head.next       = head
+    head.previous   = head
 
   # Link tier to the head of the MRU list.
-  link: (entry) ->
-    next = @head.next
+  link: (head, entry) ->
+    next = head.next
     entry.next = next
     next.previous = entry
-    @head.next = entry
-    entry.previous = @head
+    head.next = entry
+    entry.previous = head
     entry
 
   # Unlnk a tier from the MRU list.
@@ -467,16 +571,18 @@ class IO
   # records that have been loaded from the file.
 
   #
-  allocateLeaves: (positions, right) ->
-    address = @nextAddress++
-    @cache[address] = @link
+  allocateLeaf: (address, override) ->
+    page = @cache[address] = @link @mru.core,
       loaded: true
       leaf: true
       address: address
-      positions: positions
+      positions: []
       cache: {}
-      right: right
+      count: 0
+      size: 0
+      right: -1
       locks: [[]]
+    extend page, override or {}
 
   # #### Appends for Durability
   #
@@ -497,10 +603,6 @@ class IO
 
   #
   _writeJSON: (fd, page, object, _) ->
-    # TODO Move this point somewhere. Since we need to fsync anyway, it we just
-    # to open the file and and close the file when we append a JSON object to
-    # it. Because no file handles are kept open, the b-tree object can simply be
-    # reaped by the garbage collection.
     page.position or= fs.fstat(fd, _).size
 
     # Calcuate a buffer length. Take note of the current page position.
@@ -550,9 +652,13 @@ class IO
   # When we read the insert object, we will place the record in the record cache
   # for the page, mapping the position to the record.
 
-  # Write an insert object.
-  writeInsert: (fd, page, object, index, _) ->
-    @_writeJSON fd, page, [ index + 1, object ], _
+  # Write an insert object. Calculate the serialized JSON string length of the
+  # inserted record and add it to the in memory JSON size of the page and the in
+  # memory b-tree as a whole. We always use the JSON serialization we already
+  # perform for storage, instead of serializing for both storage and size
+  # calculation.
+  writeInsert: (fd, page, record, index, _) ->
+    @_writeJSON fd, page, [ index + 1, record ], _
 
   # If the first element is less than zero, it indicates a delete object. The
   # absolute value of the integer is the one based index into the zero based
@@ -561,7 +667,9 @@ class IO
   #
   # There are no other elements in the delete object.
 
-  # Write a delete object.
+  # Write a delete object. Calculate the serialized JSON string length of the
+  # inserted record and add it to the in memory JSON size of the page and the in
+  # memory b-tree as a whole.
   writeDelete: (fd, page, index, _) ->
     @_writeJSON fd, page, [ -(index + 1) ], _
   
@@ -733,6 +841,44 @@ class IO
     @writePositions fd, page, _
     fs.close fd, _
 
+  # #### Leaf Page JSON Size
+
+  # We do not include the position size in the cached size because it is simple
+  # to calculate and the client cannot alter it.
+  cachePosition: (page, position) ->
+    size = if page.length is 1 then "[#{position}}" else ",#{position}"
+
+    page.size += size
+    @size += size
+
+  # We have to cache the calcuated size of the record because we return the
+  # records to the client. We're not strict about ownership. The client may
+  # decide to alter the object we returned. We need to cache the JSON size and
+  # the key value when we load the object.
+  cacheRecord: (page, position, record) ->
+    key = @extractor record
+
+    size = 0
+    size += JSON.stringify(record).length
+    size += JSON.stringify(key).length
+
+    page.cache[position] = { record, key, size }
+
+    page.size += size
+    @size += size
+
+  # When we purge the record, we add the position length. We will only ever
+  # delete a record that has been cached, so we do not have to create a function
+  # to purge a position.
+  purgeRecord: (page, position) ->
+    if size = page.cache[position]?.size
+      size += if page.length is 1 then "[#{position}}" else ",#{position}"
+
+      page.size -= size
+      @size -= size
+
+      delete page.cache[position]
+
   # ### B-Tree Initialization
   #
   # After creating a `Strata` object, the client will either open the existing
@@ -756,8 +902,8 @@ class IO
     if fs.readdir(@directory, _).length
       throw new Error "database #{@directory} is not empty."
     # Create a root branch with a single empty leaf.
-    root = @allocateBranches true
-    leaf = @allocateLeaves([], -1)
+    root = @allocateBranch @nextAddress++, penultimate: true, loaded: true
+    leaf = @allocateLeaf @nextAddress++, loaded: true
     root.addresses.push leaf.address
     # Write the root branch.
     @rewriteBranches root, _
@@ -900,13 +1046,7 @@ class IO
     # grouped inside one of the arrays in the queue element. Exclusive locks are
     # queued alone as a single element in the array in the queue element.
     if not page = @cache[address]
-      @cache[address] = page =
-        @link
-          leaf: leaf
-          address: address
-          cache: {}
-          locks: [[]]
-      page[if leaf then "positions" else "addresses"] = []
+      page = @["allocate#{if leaf then "Leaf" else "Branch"}"](address)
 
     # If the page needs to be laoded, we must load the page only after a lock
     # has been obtained. Loading is a read, so we can load regardless of whether
@@ -1635,6 +1775,9 @@ class Descent
       if @comparator(@key, key) <= 0
         break
 
+    # Since we need to fsync anyway, we open the file and and close the file
+    # when we append a JSON object to it.  Because no file handles are kept
+    # open, the b-tree object can simply be reaped by the garbage collection.
     filename = @io.filename leaf.address
     fd = fs.open filename, "a", 0644, _
     position = @io.writeInsert fd, leaf, @object, i, _
