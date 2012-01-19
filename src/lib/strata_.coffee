@@ -1038,7 +1038,7 @@ class IO
   # be to put the callbacks in an array of onloads.
 
   #
-  lock: (exclusive, address, leaf, callback) ->
+  lock: (address, exclusive, leaf, callback) ->
     # We must make sure that we have one and only one page object to represent
     # the page. We the page object will maintain the lock queue for the page. It
     # won't due to have different descents consulting different lock queues.
@@ -1098,7 +1098,7 @@ class IO
   # descent is the one that it queued.
 
   #
-  release: (page) ->
+  unlock: (page) ->
     locks = page.locks
     locked = locks[0]
     locked.shift()
@@ -1114,8 +1114,8 @@ class IO
         callback(null, page)
       
   upgrade: (tier, _) ->
-    @release tier
-    @lock true, tier.address, false, _
+    @unlock tier
+    @lock tier.address, true, false, _
 
 # ## Descent
 #
@@ -1652,7 +1652,7 @@ class Descent
   key: (page, address, _) ->
     stack = []
     loop
-      page = @io.lock false, address, page.penultimate, _
+      page = @io.lock address, false, page.penultimate, _
       stack.push page
       if page.leaf
         key = @stash(page, position, _).key
@@ -1743,7 +1743,7 @@ class Descent
   descend: (_) ->
     parent = null
 
-    @shared.push child = @io.lock false, 0, false, _
+    @shared.push child = @io.lock 0, false, false, _
     if @operation.keys and (child.addresses.length is 1 or @hasKey(child, _))
       @exclusive.push @io.upgrade @shared.pop(), _
 
@@ -1756,14 +1756,14 @@ class Descent
 
     descent = @[@operation.method].call this, parent, child, _
 
-    @io.release page for page in @shared
-    @io.release page for page in @exclusive
+    @io.unlock page for page in @shared
+    @io.unlock page for page in @exclusive
 
     descent.descend _ if descent
 
   insertSorted: (parent, child, _) ->
     branch = @find child, @key, _
-    @exclusive.push leaf = @io.lock true, child.addresses[branch], true, _
+    @exclusive.push leaf = @io.lock child.addresses[branch], true, true, _
 
     positions = leaf.positions
 
@@ -1804,13 +1804,13 @@ class Descent
 
   get: (parent, child, _) ->
     branch = @find child, @key, _
-    @shared.push leaves = @io.lock false, child.addresses[branch], true, _
+    @shared.push leaves = @io.lock child.addresses[branch], false, true, _
     address = @find leaves, @key, _
     leaves.cache[leaves.addresses[address]]
 
   splitLeaf: (parent, child, _) ->
     branch = @find child, @key, _
-    @exclusive.push leaves = @io.lock true, child.addresses[branch], true, _
+    @exclusive.push leaves = @io.lock child.addresses[branch], true, true, _
 
     # See that nothing has changed since we last descended.
     { comparator: c, io, options: { leafSize: length } } = @
