@@ -327,7 +327,7 @@ class IO
   # not store the `extractor`, of course.
 
   # Set directory and extractor. Initialze the page cache and MRU list.
-  constructor: (@directory, @extractor) ->
+  constructor: (@directory, @options) ->
     @cache          = {}
     @mru            = {}
     @mru.core       = @createMRU()
@@ -336,6 +336,8 @@ class IO
     @length         = 1024
     @size           = 0
     @count          = 0
+    { @extractor
+    , @comparator } = @options
 
   # Pages are identified by an integer page address. The page address is a number
   # that is incremented as new pages are created. A page file has a file name that
@@ -657,7 +659,7 @@ class IO
   # memory b-tree as a whole. We always use the JSON serialization we already
   # perform for storage, instead of serializing for both storage and size
   # calculation.
-  writeInsert: (fd, page, record, index, _) ->
+  writeInsert: (fd, page, index, record, _) ->
     @_writeJSON fd, page, [ index + 1, record ], _
 
   # If the first element is less than zero, it indicates a delete object. The
@@ -840,7 +842,7 @@ class IO
     cache = {}
     for position, index in page.positions
       object = page.cache[position] or @readRecord page, position, _
-      position = @writeInsert fd, page, object, index, _
+      position = @writeInsert fd, page, index, object, _
       positions.push position
       cache[position] = object
     extend page, { positions, cache }
@@ -907,7 +909,7 @@ class IO
     stat = fs.stat @directory, _
     if not stat.isDirectory()
       throw new Error "database #{@directory} is not a directory."
-    if fs.readdir(@directory, _).length
+    if fs.readdir(@directory, _).filter((f) -> not /^\./.test(f)).length
       throw new Error "database #{@directory} is not empty."
     # Create a root branch with a single empty leaf.
     root = @createBranch @nextAddress++, penultimate: true, loaded: true
@@ -1599,14 +1601,15 @@ class Balance
 class Reader
   constructor: (@_io, @_page, @_index, @_key, @_found, @_exclusive) ->
     @_exclusive or= false
+    @_offset = 0
 
   found: (_) -> @_found
 
   unlock: -> @_io.unlock @_page
 
   get: (_) ->
-    if @_index < @_page.count
-      @_io.stash(@_page, @_index, _).record
+    if @_index + @_offset < @_page.count
+      @_io.stash(@_page, @_index + @_offset, _).record
 
   next: (_) ->
     if @_page.right is -1
@@ -1618,12 +1621,33 @@ class Reader
       true
 
 class Writer extends Reader
-  insertion: (record) ->
-    insertion =
-      record: record
-      key: @_io.extractor record
+  constructor: (io, page, index, key, found) ->
+    super io, page, index, key, found, true
 
-  insert: (insertion, _) ->
+  insert: (cassette, _) ->
+    # We need to know if this is, without doubt, the leaf page for the record
+    # according to the descent of the b-tree. Otherwise, if we perform a find
+    # and determine that the record would go at the very end, it might actually
+    # belong to a left sibling, so we have to check.
+    ambiguous = not (@_key? and @_io.comparator(@_key, cassette.key) is 0)
+
+    if not ambiguous and not @_offset
+      index = @_index
+    else
+      die { ambiguous, cassette }
+
+    # Since we need to fsync anyway, we open the file and and close the file
+    # when we append a JSON object to it.  Because no file handles are kept
+    # open, the b-tree object can simply be reaped by the garbage collection.
+    filename = @_io.filename @_page.address
+    fd = fs.open filename, "a", 0644, _
+    position = @_io.writeInsert fd, @_page, index, cassette.record, _
+    fs.close fd, _
+
+    @_page.positions.splice index, 0, position
+
+class Cassette
+  constructor: (@record, @key) ->
 
 # Are we able to jump in, lock exclusive, or do we really need to go hand over
 # hand. Here are some properties. There is only one thread of execution that is
@@ -1672,7 +1696,7 @@ class Descent
   # meaningful in C++ or Java.
   constructor: (@strata, @object, @key, @operation) ->
     @io         = @strata._io
-    @options    = @strata._options
+    @options    = @strata._io.options
 
     @parent     = { operations: [], locks: [] }
     @child      = { operations: [], locks: [] }
@@ -1966,8 +1990,7 @@ class exports.Strata
       branchSize: 12
       comparator: comparator
       extractor: extractor
-    @_options       = extend defaults, options
-    @_io            = new IO options.directory, @_options.extractor
+    @_io = new IO options.directory, extend defaults, options
 
   create: (_) -> @_io.create(_)
 
@@ -1981,7 +2004,11 @@ class exports.Strata
     mutation.descend callback
 
   cursor: (key, splat..., callback) ->
-    exclusive = splat.shift() if splat.length
+    if key instanceof Cassette
+      exclusive = true
+      key = key.key
+    else
+      exclusive = splat.shift() if splat.length
     descent = new Descent(@, null, key, null)
     descent.cursor(exclusive, callback)
 
@@ -1989,6 +2016,19 @@ class exports.Strata
     operation = method: "insertSorted"
     descent = new Descent(@, record, null, operation)
     descent.descend callback
+
+  # Create a cassette to insert into b-tree.
+  cassette: (object) -> new Cassette(object, @_io.extractor(object))
+
+  # Create an array of cassettes, sorted by the record key, from the array of
+  # records.
+  cassettes: (objects...) ->
+    sorted = (@record(object) for object in objects)
+
+    { comparator } = @_io
+    sorted.sort (a, b) -> comparator(a.key, b.key)
+
+    sorted
 
   # Both `insert` and `remove` use this generalized mutation method that
   # implements locking the proper tiers during the descent of the tree to find

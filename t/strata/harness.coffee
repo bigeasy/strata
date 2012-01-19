@@ -1,6 +1,7 @@
 #!/usr/bin/env coffee-streamline
 return if not require("streamline/module")(module)
 fs = require "fs"
+fixture = require "../fixture"
 {Strata} = require "../../lib/strata"
 module.exports = require("ace.is.aces.in.my.book") (_) ->
   directory = "#{__dirname}/../../tmp/strata"
@@ -15,4 +16,4 @@ module.exports = require("ace.is.aces.in.my.book") (_) ->
   for file in fs.readdir directory, _
     continue if /^\./.test file
     fs.unlink "#{directory}/#{file}", _
-  { Strata, directory }
+  { Strata, directory, fixture }
