@@ -1149,14 +1149,21 @@ class IO
 
 # ## Descent
 #
-# A *decent* is a b-tree operation.  We use the term
-# descent to describe both top down and left right traversal of our b-tree.
+# A *decent* is a b-tree operation. It describes a traversal of the b-tree that
+# results in the creation of a cursor and cursor actions, or else balance
+# operation such as a merge or split. We use the term descent to describe both
+# top down and left right traversal of our b-tree.
 #
-# When we want to retreive records from the b-tree, or alter the b-tree in any
-# way, first we descend the tree. When we navigate to leaf pages of a search
-# b-tree to obtain records, we *search* the b-tree. When we change the b-tree in
-# any way, adding or deleting records, splitting or merging pages, we *alter*
-# the b-tree.
+# When we navigate to leaf pages of a search b-tree to obtain records, we
+# *search* the b-tree. When we change the size of the b-tree by adding or
+# deleting records we *edit* the b-tree. When we change the structure of the
+# b-tree by splitting or merging pages, we *balance* the b-tree.
+#
+# We use these terms in this document to save the chore of writing, and the
+# confustion of reading; insert or delete, or split or merge. We also want to
+# draw a distinction between changing the count of records stored in the b-tree,
+# editing, and changing the height of the b-tree, the count of pages, or the
+# choice of keys, balancing.
 #
 # A descent is analogous to a thread, because one can make progress while
 # another descent is waiting on I/O.
@@ -1375,122 +1382,252 @@ class IO
 # We will call the code that co-ordinates the series of splits and merges to
 # balance the tree, the *balancer*.
 #
+# The balancer maintains an offset count for each modified leaf page in the
+# b-tree. When an insert is performed, the offset count for the leaf page is
+# incremented.  When a delete is performed, the offset count for the leaf page
+# is decremented. This keeps track of the total change in size.
+#
+# We use the offset counts to determine which pages changed.
+#
+# ##### Balance Cutoff
+#
+# When it comes time to balance, we create a new balancer and put it in place to
+# collect a new round of offset counts, while we are off balancing the pages
+# gathered in the last round balance counts.
+#
+# We create a balance plan for the current set of pages. We balance the tree,
+# splitting and merging pages according to our balance plan. Only one balancer
+# balances the tree at a time. The balancer perform one split or merge descent
+# at a time. Balance descents are never concurrent with other balance descents.
+#
+# While balancing takes place, records can be inserted and deleted concurrently.
+# Those changes will be reflected when the next balancer balances the tree.
+#
+# ##### Creating a Balance Plan
+#
+# When it comes time to balance, we consult the pages for which we've maintained
+# the offset counts. If the page is greater than the maximum page size, we split
+# the page. That much is obvious. Otherwise, if the offset count is negative,
+# we've deleted records. There may be an opportunity to merge, so we check the
+# left and right siblings of the page to determine if a merge is possible.
+#
+# Determining a plan for a merge requires inspecting three pages, the page that
+# decreased in size, plus its left and right sibling pages. We merge a page with
+# the sibling that will create the smallest page that is less than or equal to
+# the maximum page size.
+#
+# ##### Purging the Cache
+#
+# When inspecting page for merge, we are only interested in the count of records
+# in the page. It may have been a long time since the last merge, so we might
+# have accumulated a lot of pages that need to be consulted. To create a
+# complete plan, we'll need to gather up the sizes of all the leaf pages, and
+# the only way to get the size of a page is to load it into memory. But, we
+# won't need to keep the page in memory, because we only need the size.
+#
+# When we calculate a merge, we load the left and right sibling. We're touching
+# a lot of pages that we don't really know that we need.
+#
+# When we lock a page, we indicate that if the page is loaded, it ought to be
+# loaded into balancer most-recently used list. This indicates that the page was
+# loaded by the balancer. We also set the balancer flag, indiciating that we
+# need to preserve the page for record count, even if the actual page data is
+# discarded by a cache purge.
+#
+# We check the cache size frequently. If we're going over, we offer up the
+# balancer pages to the cache purge first. If we determine that a page will be
+# used in a balance operation we add it to the core most-recently used list,
+# where it is subject to the same priority as any other page loaded by the
+# cache.
+#
+# ### Splitting
+#
+# Splitting is the simpiler of the two balancing operations.
+#
+# To split a leaf page, we start by obtaining the key value of the first record.
+# We can do this by acquiring a read lock on the page, without performing a
+# descent. The balancer gets to break some rules since it knows that we know
+# that the b-tree is not being otherwise balanced.
+#
+# We descend the tree until we encoutner the penultimate branch page that is the
+# parent of the branch page.  We acquire an excsluive lock the branch page. We
+# can release our shared lock and acquire an exclusive lock. We do not have
+# retest conditions after the upgrade, because only the balancer would change
+# the keys in a branch page, and we're the balancer.
+#
+# We allocate a new leaf page. We append the greater half of the record to the
+# page. We add the page as a child to the penultimate branch page to the right
+# of the page we've split. We unlock the pages.
+#
+# We can see immediately if the penultimate page needs to be split. If it does,
+# we descend the tree with the same key, stopping at the parent of the
+# penultimate page. We will have kept the address of the parent of the
+# penultimate page for this reason. We split the penultimate page, copying the
+# addresses to a new right sibling. Adding the right sibling to the parent. We
+# make sure to clear the cache of keys for the addresses we are removing. (Oh,
+# and clear the cache for the records when you leaf split. Oh, hey, copy the
+# records as well, duh.)
+#
+# Note that a page split means a change in size downward. It means that one or
+# both of our two halves may be a candidate to merge with what were the left and
+# right siblings of the page before it split. There may have been less than half
+# a page of records one or both both of the sides of the tree. After we split,
+# we check for a chance to merge. More live lock fears, but one heck of a
+# balanced tree.
+#
+# ### Need to Add
+#
+# We always balance cascading up. Unlike leaf pages, which we can allow to
+# depleate, the branch pages cannot be allowed to become empty as we merge leaf
+# pages. As we delete records, we still keep a ghost of a key. As we delete leaf
+# pages, we delete the ghost keys. Branch pages become paths to nowhere. They
+# don't hold their own keys, so they can't find them.  We'd have to have null
+# keys in our tree. Even if we kept keys around, we're sending searches down a
+# path to nowhere. There is no leaf page to visit. We get rid of these paths. We
+# always balance the upper levels immediately, we perform the cascade. Our tree
+# descent logic would have to account for these empty sub-trees. Much better to
+# balance and keep things orderly.
+# 
+# This raises a concerns about live lock, that we might be balancing 
+#
+# TK Yes file times are enough. Even if the system clock changes drastically,
+# the file times are all relative to one another. It it changes during
+# operation, that is a problem, but we're not going to endeavor to provide a
+# solution that deals with erratic clock times. Worst case, how do we not detect
+# a file in need of recovery? We ignore files older than the timestamp file. So,
+# we might have the system clock move far backward, so that the timestamp file
+# is much newer than all the files that are being updated. Oh, well. What's the
+# big deal then? How do we fix that? If it is a server install, we demand that
+# you maintain your clock. If it is a desktop install, we can comb the entire
+# database, because how big is it going to be?
+#
+# Hmm... What are you going to do? This is why people like servers.
+#
 # ### Merging
 #
-# Deleting a record can trigger a merge. Merge detection is a callenge. When we
-# insert a record to a leaf page, the size of the leaf page determines if the a
-# split is necessary. When we delete a record, in order to determine if a merge
-# is necessary, we need to example both the left and right siblint pages, to see
-# if we can combine the current page with one or another sibling.
+# TODO Great example floating around. Imagine that you've implemented MVCC.
+# You're always appending, until it is time to vacuum. When you vacuum, you're
+# deleting all over the place. You may as well do a table scan. You might choose
+# to iterate through the leaf pages.  You may have kept track of where records
+# have been stored since the last vacuum, so if you have a terabyte large table,
+# you're only vacuum the pages that need it.
 #
-# Checking the right sibling page is possible, because we can navigate from left
-# to right. We cannot check the left sibling page without a second descent.
+# Merge is from right to left. When we merge we always merge a page into its
+# left sibling. If we've determined that a page from which records have been
+# deleted is supposed to merge with its right sibling, we apply our merge
+# algorithm to the right sibling, so that is is merged with its left sibling. 
 #
-# ### At the Time of Writing
+# When we compare a page from which records have been deleted against its
+# siblings, if the left sibling is to be merged, we use the page itself, the
+# middle page in our comparison. If the middle page is to merge with the right
+# page, we use the right page.
 #
-# At the time of writing, your humble author cannot make an informed decision
-# about the balancing of the tree. I'm leaning toward the notion of a balancing
-# machine. But, I am imagining use cases.
+# To merge a leaf page, we start by obtaining the key value of the first record.
+# We can do this by acquiring a read lock on the page, without performing a
+# descent. The balancer gets to break some rules since it knows that we know
+# that the b-tree is not being otherwise balanced.
 #
-# A b-tree that grows. This is going to be common. It grows slowly. Pages
-# splitting. A b-tree that grows by appending. That is common. Inserting a log
-# of records. Each insert descends the tree. The tree should not be too deep.
+# With that key, we descend the b-tree. We know that the key value cannot
+# change, because it is the balancer that alters keys. The first record may be
+# deleted by editing, but a ghost of the first record is preserved for the key
+# value, which is the key value of the page.
 #
-# Can we break up Strata into more primatives, so that there are other
-# operations? Let's say I want to merge a bunch of records. Can I start with the
-# smallest one, then work through the tree, inserting them? This might be a way
-# to queue a bunch of inserts. Or to do a larger operation like a merge.
+# When we encouter the key value in a branch page, we acquire an excsluive lock
+# the branch page. We can release our shared lock and acquire an exclusive lock.
+# We do not have retest conditions after the upgrade, because only the balancer
+# would change the keys in a branch page, and we're the balancer.
 #
-# Can I pause balancing?
+# We then descend the child to the left of the key, instead of to the right as
+# we would ordinarly. We descend to the left child acquiring, an exclusive lock,
+# but retaining our exclusive lock on branch page where we found our key. We
+# then descend to the right most child of every child page, acqcuiring exclusive
+# locks in the hand-over-hand fashion, until we reach a leaf page. We are now at
+# the left sibling of the page we want to merge.
 #
-# I'm seeing a couple of interfaces.
+# We've locked the branch page that contains the key exclusively so that we can
+# reassign the key. It will no longer be valid when the page is merged into its
+# left sibling because the first record is now somewhere in the midst of the
+# left sibling. We lock excluslively hand-over-hand thereafter to squeeze out
+# any shared locks. Our exclusive lock on the parent containing the key prevents
+# another descent from entering the sub-tree where we are performing the merge.
 #
-# First, you must remember that this is a primitive. It is not supposed to be a
-# database. You ought to be able to pause balancing, or have some say about
-# balancing. If you're performing an agggressive operation, then you might want
-# to take control.
+# We now proceed down the path to the merge page as we would ordinarily, except
+# that we acquire exclusive locks hand-over-hand instead of shared locks. This
+# will squeeze out any other descents.
 #
-# Imagine that you've implemented MVCC. You're always appending, until it is
-# time to vacuum. When you vacuum, you're deleting all over the place. You may
-# as well do a table scan. You might choose to iterate through the leaf pages.
-# You may have kept track of where records have been stored since the last
-# vacuum, so if you have a terabyte large table, you're only vacuum the pages
-# that need it.
+# We retain the exclusive lock on the penultimate branch page. No other descent
+# will be able to visit this penultimate branch, because we've blocked entry
+# into the sub-tree and squeeed out the other descents. We still need to hold
+# onto the exclusive lock, however, otherwise the page might be discarded during
+# a cache purge, which can happen concurently.
 #
-# You might strip records from ever leaf page. You could attempt to iterate,
-# descending to delete a record you found needing deletion, waiting on balance,
-# then continuing. That sounds slow.
+# We append the records in the merge page to its left sibling. We remove the
+# address of the merged page from the penultimate page.
 #
-# Why not strip all the records you want to strip, then balance.
+# If we've deleted the first child of the penultimate branch page, then we
+# delete the cached key of the new first child. The new first child is the
+# left-most child of the penultimate page. Its key, if it not the left-most page
+# of the entire tree, has been elevated to the exclusively locked branch page
+# where we ecountered the merge page key. We don't want keys to gather where
+# they are not used. That is a memory leak.
 #
-# We can have an exclusive forward cursor. That cursor can delete records. It
-# will mark them as needing balance. Nice thing is that as you move through,
-# you're going to get some sizes.
+# We clear the merge key from the branch page where we found it. The next
+# descent that needs it will look up the new merge key. If we found the merge
+# key in a penultimate page, we need to make sure to clear the key using the
+# page address we stashed, because the page is now deleted.
 #
-# Also, nice property, if we do cache sizes, well, we can. Updating the cache
-# would be atomic, of course.
+# #### Merging Parent Branches
 #
-# I imagine that items would disappear, a great many, and then we'll have
-# entirely empty pages, lot's of clean up to do. From there, were do we go?
-# Lot's of clean up mind you.
+# Once we've merged a leaf page, we check to see if the penultimate branch page
+# that lost a child can be merged with one of its siblings. The procedure for
+# merging branch pages other than the root branch page is the same regardless of
+# the depth of the branch page.
 #
-# We cache the previous sibling in memory. We need only update the in memory
-# cache. Now we know sizes, of everything. We've cached it. Same MRU cache, so
-# we can use the same expiration strategy, maybe create two levels. Clean up the
-# cache of records and keys, clean the array, but leave points and counts.
+# We acquire the key for the left most page in the sub-tree underneath the
+# branch page. We do this by following the left most children until we reach a
+# leaf page. We use that key to descend the tree.
 #
-# Again, only delete is problem. Split is rather easy. We know when a page needs
-# to be split. We don't now when we need to merge.
+# we lock the page exclusively. We retain that lock
+# for the duration of the merge.
 #
-# The problme is that we might vacuum, deleting a whole bunch of records, then
-# we come up with a plan to merge the records.
+# When we encounter the key, we descent the child to the left of the key, then
+# we decent the right most child of every page until we reach the page at the
+# same depth as the merge page. That is the left sibling of the merge page.
 #
-# Okay, we have a balance queue. It would work rather simply in the case of
-# inserts. Here's how it works.
+# We can then obtain a size for the left sibling, the merge and the right
+# sibling of the merge. If we are able to merge, we choose a merge page to merge
+# that page into the left sibling.
 #
-# You have a queue. When the time comes for the queue to make a calculation,
-# everything it needs will be in memory. Nothing that it does will cause an
-# evented operation. No descent can make progress during the calculation.
+# We now descend the tree with the key for the merge page. We lock that page
+# exclusively. We go left then right to the level of the left sibling. We go
+# right then left to reach the merge page. (We're using page addresses to know
+# that we've reached the merge page, the key is going to only be useful to find
+# path on takes to find the left sibling.) We can then copy append addresses to
+# the left sibling. Remove the merge sibling from its parent. Delete the key
+# from where we found it, so it can be looked up again.
 #
-# Normal operation are the atomic inserts and deletes. If we did not have a
-# balance queue, we would balance immediately, as in a single threaded
-# implementation. With a balance queue, the operation would be to add a single
-# unbalanced page into the queue, then have the queue balance that one page.
+# Before we lose track of the sub-tree we're in, we descend to the poteinally
+# new left most leaf of the parent, and obtain its key to repeat the process.
 #
-# For an insert, we know that the page needs to be split, so we add the page to
-# the unbalanced pages list at the end of the queue. That queue element would
-# consist of a map of page numbers to differences, the number of records added
-# or deleted from the page. If the number is negative, we know that the page has
-# shrunk and might need merge. If the number is positive, we know that the page
-# has grown. We then look at the size of the page in the cache and we split if
-# it greater than capacity.
+# #### Filling the Root Page
 #
-# To do something like a large insert, descend the tree to the first item.
-# Insert it. Attempt to insert the second, if it would go at the end, then load
-# the next sibling and see if it would to the end there. If it is less than the
-# first time in the next one, then it belongs in this page. Less than the end of
-# the next page, it belongs there. Beyond the end of the next page, give up and
-# descend the tree again. Make it so that the user can implement this. Give up
-# automatically, if you go to the end on the second, only if you're on a roll to
-# you continue to the next page.
+# If the parent is the root page, we only do something special when the root
+# page reaches one child and no keys. At that point, the one child becomes the
+# root. We will have deleted the last key, merged everything to the left.
 #
-# We can delete all pages.
+# We descend again, locking the root. We lock the one child of the root. We copy
+# the contents of the one root child into the root and delete the child.
 #
-# Merge we merge the right into the left, always. When we compare against
-# siblings, if the left sibling is to be merged, we use the middle. If the
-# middle is to merge with the right, we use the right.
+# This will decrease the height of the b-tree by one.
 #
-# We descent the tree. We see the key. When we do, we lock exclusively. We then
-# go left, then right, locking all the way down. We then follow the child path,
-# then go left all the way down. Now we append everything in the right to the
-# leaf. We rewrite the penultimate page without after removing the first page.
-# We need to write something to the deleted page to say that it was deleted.
-# Hmm... How about we just leave it empty. That is an indication that something
-# is wrong. When we see an entirely empty leaf, we know that it is part of an
-# incomplete merge.
+# #### Deleting Pages
 #
-# When our rewrite is done, we delete the key in the top most locked page. Leaf
-# merge is complete.
+# A page deletion is simply a merge where we prefer to use the empty page as the
+# merge page. We have to make an exception when the empty page is the left most
+# page in the entire tree, which is not uncommon for time series data where the
+# oldest records are regularly purged.
+# 
+# #### Purging Deleted First Keys
 #
 # Now we merge the parents. We find a penultimate page by the key of the left
 # most leaf. Similar go left, then get the up to three pages. See if they will
@@ -1504,6 +1641,8 @@ class IO
 # we will have a consistant depth. This is merge.
 #
 # Delete the key to trigger the lookup.
+#
+# #### Deleted First Keys
 #
 # We fix deleted first keys at balance. Descend locking the key when we see it.
 # Mark it deleted forever. Then delete the key. It will get looked up again.
@@ -1521,7 +1660,7 @@ class IO
 # merge, that are invalidated, so we create plans and those are invalidated.
 #
 # Our descent of the tree to balance will be evented anyway. We can probably
-# make our calculation evented. We were fretting that we'd exasterbate the live
+# make our calculation evented. We were fretting that we'd exacerbate the live
 # lock problem. Live lock is a problem if it is a problem. There is no real
 # gauntlet to run. The user can determine if balance will live lock. If there
 # are a great many operations, then balance, wait a while, then balance, wait a
@@ -1566,6 +1705,22 @@ class Balance
             self.right = right
           delete ordered[page.right]
           
+# ## Cursors
+# 
+# When the application developer requests a cursor, they receive either a read
+# only *iterator*, or a read/write *mutator*.
+#
+# An interator provides random access to the records in a page. It can move from
+# a page to the right sibling of the page. A mutator does the same, but it is
+# also able to insert or delete records into the current page.
+#
+# ### Iterator
+#
+# The application developer uses an iterator to move across the leaf pages of
+# the b-tree in ascending collation order. The cursor is always visiting a
+# single leaf page. 
+
+#
 class Iterator
   constructor: (@_io, @_page, @_index, @_key, @_found, @_exclusive) ->
     @_exclusive or= false
@@ -1575,9 +1730,11 @@ class Iterator
 
   unlock: -> @_io.unlock @_page
 
+  end: -> @_index + @_offset is @_page.count
+
   get: (_) ->
     if @_index + @_offset < @_page.count
-      @_io.stash(@_page, @_index + @_offset, _).record
+      @_io.stash(@_page, @_index + @_offset++, _).record
 
   next: (_) ->
     if @_page.right is -1
@@ -1592,6 +1749,54 @@ class Mutator extends Iterator
   constructor: (io, page, index, key, found) ->
     super io, page, index, key, found, true
 
+  # To insert does not indicate that the record cannot be inserted into the
+  # b-tree. Only that it cannot be inserted, with certainty, into the current
+  # page.
+  #
+  # If the binary search determines that the record would be inserted at the end
+  # of the page, after the last current record, it may be the case that
+  # the record really belongs in a subsequent page.
+  #
+  # There are two ways to determine if this is the correct page in this case.
+  #
+  # If the key of the record to insert is the key we used to find this page when
+  # we descended the tree, than this is the correct page regardless of where the
+  # record would be inserted. If it were not the correct page, we would have
+  # landed elsehwere. 
+  #
+  # If we've moved from the first page, or the key is not the key we used to
+  # find the first page than we must look at the key of the first record of the
+  # next sibling page. If that key is greater than or key of the record we're
+  # inserting, than the record to insert, then the record does indeed belong in
+  # the current page. 
+  #
+  # Thus, if you're attempting to insert a series of records, and you get a
+  # false result, you can continue by either descending the tree again to obtain
+  # a new cursor, or by calling `peek` to inspect the first key of the next
+  # sibling page. After calling `peek`, if insert returns false, then this is
+  # not the correct leaf page for the record.
+  #
+  # When you call `peek`, a lock is acquired on the next page, and its first
+  # record is read. The lock is held until the mutator moves to the next leaf
+  # page using `next`, or the cursor is unlocked using `unlock`.
+  #
+  # TODO The lock must held because deleting the record definately can change
+  # during editing. The balancer can swoop in and prune the dead first records
+  # and thereby change the key. It could not delete the page nor merge the page,
+  # but it can prune dead first records.
+  #
+  # The lock is held becase the first record of the next sibling might otherwise
+  # change, it might be deleted. When the first key is deleted, the range of the
+  # the keys that valid for the current page increases. We have a race condition
+  # where we might reject an insertion into the current record because it is
+  # less than the first key of the next, but the first key of the next page has
+  # been deleted, and the current record is less than the range of the new first
+  # key, it is within the extended range.
+  #
+  # TK Move. If we are locking the pages left to right hand over hand, inserting
+  # a each record from the set into its correct page as we visit the page, then
+  # there is now way for the tree to mutate such that we would miss the place
+  # were a record ought to be inserted.
   insert: (cassette, _) ->
     # We need to know if this is, without doubt, the leaf page for the record
     # according to the descent of the b-tree. Otherwise, if we perform a find

@@ -16,7 +16,7 @@ stringify = module.exports.stringify = (directory, _) ->
 load = module.exports.load = (segments, _) ->
   JSON.parse fs.readFile segments, "utf8", _
 
-module.exports.export = (directory, segments, _) ->
+module.exports.serialize = (segments, directory, _) ->
   if typeof segments is "string"
     segments = load segments, _
   for file, lines of segments
