@@ -1111,14 +1111,10 @@ class IO
     locked.shift()
     if locked.length is 0 and locks.length isnt 1
       locks.shift()
-      @resume page, locks[0] if locks[0].length
-
-  # We call resume with the list of callbacks shifted off of a pages lock queue.
-  # The callbacks are scheduled to run in the next tick.
-  resume: (page, continuations) ->
-    process.nextTick =>
-      for callback in continuations
-        callback(null, page)
+      # Each callback is scheduled using next tick. If any callback waits on
+      # I/O, then another one will resume. Concurrency.
+      for callback in locks[0]
+        do (callback) -> process.nextTick -> callback(null, page)
       
   upgrade: (tier, _) ->
     @unlock tier
