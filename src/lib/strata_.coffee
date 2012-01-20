@@ -335,7 +335,6 @@ class IO
     @nextAddress    = 0
     @length         = 1024
     @size           = 0
-    @count          = 0
     { @extractor
     , @comparator } = @options
 
@@ -1150,262 +1149,231 @@ class IO
 
 # ## Descent
 #
+# A *decent* is a b-tree operation.  We use the term
+# descent to describe both top down and left right traversal of our b-tree.
+#
 # When we want to retreive records from the b-tree, or alter the b-tree in any
 # way, first we descend the tree. When we navigate to leaf pages of a search
 # b-tree to obtain records, we *search* the b-tree. When we change the b-tree in
-# any way, adding or deleting records, splitting or merging pages, we *mutate*
+# any way, adding or deleting records, splitting or merging pages, we *alter*
 # the b-tree.
 #
-# A *decent* is analogous to a thread. A decent is a b-tree operation. A decent
-# can make progress while other descents make progress. 
+# A descent is analogous to a thread, because one can make progress while
+# another descent is waiting on I/O.
 #
 # A decent an make progress while other decents make progress, even though
 # Node.js only has a single thread of execution. When we descend the tree, we
 # may have to wait for evented I/O to read or write a page. While we wait, we
-# can make progress on another descent.
+# can make progress on another descent in the main thread of execution.
 #
-# With this parallel descent, we need to ensure that we do not alter pages that
-# the waiting descent needs to complete its descent, nor read pages that the
-# waiting descent has begun to alter.
+# Because descents can make progress in parallel, we need to synchronize access
+# to b-tree pages, as we would with a multi-threaded b-tree implementation. When
+# we descend the b-tree we need to make sure that we do not alter pages that
+# another waiting descent needs to complete its descent when it awakes, nor read
+# pages that a waiting descent had begun to alter before it had to wait.
 #
-# These are race conditions. We use the shared read/exclusive write locks to
-# guard against these race conditions.
+# These are race conditions. We use the shared read/exclusive write locks
+# described in the `IO` class above to guard against these race conditions.
 #
 # #### Locking on Descent
 #
-# Multiple search descents can be performed concurrently by multiple descents.
-# Alteration descents require exclusive access, but only to the pages they
+# Becase a search descent does not alter the structure of the b-tree, Multiple
+# search descents can be performed concurrently, without interfering with each
+# other.
+#
+# Descents that alter the b-tree exclusive access, but only to the pages they
 # alter. A search descent can still make progres in the presence of an
 # alteration decent, so long as the search does not visit the pages being
 # altered.
 #
-# An alteration uses the shared read/exclusive write lock mechanism to lock only
-# the pages needed to perform the alteration. This allows other searches and
-# alterations to make progress in other areas of the b-tree.
+# A search descent obtains shared locks on the pages that it visits.  An
+# alteration descent obtains exclusive locks on the pages that it needs to
+# alter. The alteration descent will obtain shared locks on the pages that
+# visits in search the pages that it wants to alter.
+#
+# #### Locking Hand Over Hand
 #
 # To allow progress in parallel, we lock only the pages we need to descend the
-# tree, only as long as we need to traverse the page. Metaphically, we descend
-# the tree locking hand-over-hand.
+# tree, for only as long as we takes to determine which page to visit next.
+# Metaphically, we descend the tree locking hand-over-hand.
 #
-# When we descend the tree we first obtain a read lock on the root branch page.
-# We then aquire and read release read locks as we descend the tree. We aquire a
-# read lock to find the child page to descend. We aquire a read lock on the
-# child we will visit next. We then release the read lock on the parent of the
-# child.
+# We start from the root page. We lock the root page. We perform a binary search
+# that compares our search key against the keys in the root page. We determine
+# the correct child page to visit to continue our search. We lock the child
+# page. We then release the lock on the parent page.
+# 
+# We repeat the process of locking a page, searching it, locking a child, and
+# then releasing the lock on the child's parent.
 #
 # We hold the lock on the parent page while we aquire the lock on the child page
 # because we don't want another descent to alter the parent page, invaliding the
 # direction of our descent.
 #
-# You must only acquire a lock on a child page if you hold a lock on its parent
-# page. We maintain this ordering to prevent deadlock. We cannot have a descent
-# that has an exclusive lock on a parent attempt to obtain a lock on child, when
-# another descent has an exclusive lock on the child and is attempting to obtain
-# a lock on the parent. By only obtaining locks top down, we avoid this deadlock
-# condition.
-#
-# ### Locking Siblings
+# #### Lateral Traversal
 #
 # Both branch pages and leaf pages are singly linked to their right sibling. If
 # you hold a lock on a page, you are allowed to obtain a lock on its right
 # sibling. This left right ordering allows us to traverse a level of the b-tree,
-# which is necessary for cursors and merges.
+# which simplifies the implemtation of record cursors and page merges.
+#
+# When we move from a page to its right sibling, we hold the lock on the left
+# page until we've obtained the lock on the right sibling. The prevents another
+# descent from relinking linking our page and invalidating our traversal.
+#
+# #### Deadlock Prevention and Traversal Direction
+#
+# To prevent deadlock, we always move form a parent node to a child node, or
+# form a left sibling to a right sibling.
+# so that we do not create a condition
+# where on descent 
+#
+# Othewise we would deadlock when a descent that has an exclusive lock on a
+# parent attempted to obtain a lock on child, while another descent has either
+# sort of lock on the child attempted to obtain a lock on the parent. By only
+# obtaining locks top down, we avoid this deadlock condition because all of the
+# descents obtain locks in the same order.
+#
+# When traversing the tree laterally, we always travel from a page to the right
+# sibling of that page. Two descents traversing a level in both directions would
+# deadlock when they encountered each other, if one of the descents was locking
+# exclusively.
 #
 # To prevent a deadlock when a left right traversal coincides with the top down
 # traversal, we insist that when a parent obtains a lock on more than one child,
-# it locks the children in left to right order.
+# it locks the children in left to right order. That is, we must remember the
+# left right ordering regardless of whether we're navigating using a page's link
+# to it's right sibling, or whether we're referencing a branch page's children
+# pages.
 #
-# We never need to traverse siblings at more than one level of the tree during a
-# descent, so we do not have to worry about the deadlock conditions that would
-# occur if were we to do so.
+# #### Insertion and Deletion Verus Balance
 #
-# TK Oddly, some of the rules here may not be necessary. I've often been unable
-# to express my designs, because the rules that I'm following may be too many.
-# It may be the case that you could remove one of the rules, and still deadlock
-# will never occur. I'm not trying to define the mininum requirements to prevent
-# deadlock. Any set of requirements that prevent deadlock will do. If one of
-# them prevented a necessary b-tree operation, I'd think hard about how to do
-# without. That thinking might discover that it was unnecessary.
+# We do not attempt to balance the tree with every insertion or deletion. The
+# client may obtain a cursor to the leaf pages, iterate through them deleting
+# records along the way. Balacing 
 #
-# TK I'm not saying that any of this is to be sure, or to stay on the safe side.
-# An unnecessary rule is unnecessary. I'd remove it from the documentation,
-# maybe make a note of the discovery in the project journal.
+# #### Staccato Blanace Operations
 #
-# ### Upgrading from Shared to Exclusive
+# The b-tree balance operations cascade by nature. If you insert a value into a
+# leaf node, such that the leaf node is beyond capacity, you split the leaf
+# node, adding a new child to the parent node. If the parent node is now beyond
+# capacity, you split the parent node, adding a new child to its parent node.
+# When every node on the path to the leaf node is at capacity, a split of the
+# leaf node will split every node all they way up to the root.
 #
-# When we release our lock on the parent, we allow another descent to alter the
-# parent. Another descent may choose to obtain an exclusive write lock on the
-# parent, and alter the parent. The parent may be merged with another page. It
-# may split or merge its child pages, other than the child page we've read
-# locked. It does not matter to our descent because we've already descended into
-# a sub-tree.
+# Merges too move from leaves to root, so that a merge at one level of the
+# b-tree potentially triggers a merge of the parent with one of its siblings.
 #
-# We need to use our in documentation. We cannot use terms like primary,
-# secondary. The descent of the first primary visitor holding the key of the
-# lock that has reserved adversary acessess on page before the current page in
-# clock-wise order of the tertiary doublely-linked list.
+# However, we've established rules for lock acquisition that require that locks
+# are obtained from the top down, and never from the bottom up. This is why we
+# do not perform balance operations as a part of a single pass. We instead
+# descend the tree once to insert or delete records form the leaf pages. We then
+# descend the tree once for each split or merge of a page.
 #
-# There is no b-tree operation will invalidate the entire sub-tree, only pointer
-# operations that will change the route you take to reach it. When we have
-# passed though the route, another descent can alter the route, without
-# invaliding the outcome of our descent.
+# Much b-tree literature makes mention of a potential efficency where you split
+# full pages on the way back up from an insert. You can determine which pages
+# would split if the leaf split as you descend the b-tree, since you'll visit
+# every page that would participate in a split.
 #
-# We've entered a sub-tree. That sub-tree is isolated from alterations to the
-# tree made by other descents of the tree. By desecnding with read locks, we
-# wait for any write locks, meaning we wait for any alterations to complete.
+# That efficency applies only for split, and not for merge, because you have to
+# inspect the left and right siblings of a page to determine if it is time to
+# merge. If the left sibling page of a page, is not also child of that page's
+# parent page, then the left sibling page is in a different sub-tree. It can not
+# be reached by the path that was used to find the leaf page where the delete
+# occured.
 #
-# When we search, we use the hand-over-hand descent of the tree we reach the
-# leaf pages, read our record and return it to the client.
+# The single pass insert on the way down and split on the way up violates the
+# rules we laid out to prevent deadlock. To abide by our rules, we'd have to
+# lock exclusively on the way down, then hold the locks on the pages above the
+# leaf page that were full and could possibly split. This would reduce the
+# liveliness of our implementation.
 #
-# For alterations, we use the hand-over-hand desecent of the tree to reach the
-# start of the sub-tree what we will 
+# There are compromises, but rather than create a complicated locking apparatus,
+# with upgrades, we're going to simplify our algorithm greatly, by descending
+# the tree once for each split or merge. 
 #
-# ### B-Tree Balancing Strategies
+# When we travel to the unbalanced page, we acquire shared locks in the hand
+# over hand fashion used for search. We acquire exclusive locks only on those
+# pages that participate in the balance operation. That is two pages in the case
+# of the split. In the case of a merge that is three pages. During a balance
+# operation are locking exclusively, at most, three pages at a time.
 #
-# In traditional b-tree literature, one of the properties of efficency of the
-# b-tree is that you can split the nodes of the b-tree by traversing back up the
-# tree splitting full nodes after an insert.
+# If out balance operation casades so that it requires a balance at every level,
+# we'll descend the tree once for every level. However, the path we follow is
+# almost certain to be in memory, since we're revisting the same path.
 #
-# In a concurrent implementation, however we need to lock the the parent of the
-# first page to split. This makes that efficent property inefficent.
+# Also, a balance operation will involve an increasing number of levels with
+# decreasing frequency. A split will most often require that only the leaf page
+# is split. The penultimate pages will be involved in a balance operation at
+# least an order of mangitude less frequently. The pages above the penultimate
+# branch pages will be involved in a balance operation yet another order of
+# mangniutde less frequently.
 #
-# As in most b-tree literature, I'm going to use split as an example in
-# describing exclusive lock strategies, and then wave my hands and say that
-# merge is pretty much the same thing. That is, I'm going to lie to you. (Waves
-# hands.)
+# Conserving descents during balance operations is a false economy. It
+# complicates lock acquisition. It reduces the liveliness of the b-tree.
 #
-# In reality, you don't know that a page needs to be merged simply by visting
-# it. You will only know that it needs to merge by looking at the page and both
-# its left and right sibling pages.
+# The multiple descents will allow searches of the b-tree to make progress
+# between balance operations.
 #
-# ##### Exclusive Write Locks on the Way Down
+# ##### Descent as Unit of Work
 #
-# Balancing on Insert or Delete
+# We can see that a descent of the tree is analogous to a thread in
+# multi-threaded operation. A decent is an actor on the tree, performing a
+# single balance operation, searching 
 #
-# If we wanted to take advantage of the fact that we can determine the pages
-# that need to be split while we descend the tree, to split the pages on the way
-# back up the tree, we will need to lock those pages as we see them.
+# ##### Delayed Balance
 #
-# To prevent deadlock, we've established an ordering of lock acquisition. A
-# descent can obtain a lock the child or right sibling of a page on which it
-# holds a lock. We are always moving top down, or left right.
+# We've determined that we do not want to perform a split or merge of the leaf
+# level the moment we've detected the need for one. If we fill a leaf page, we
+# descend the tree again to split the leaf page.
 #
-# We may make a list of pages we need to split on the way down, but we won't be
-# able to back to obtain exclusive locks on them. We can only obtain a lock on a
-# page if we hold a lock to its left sibling or parent. We release the parent
-# lock as part of traversal to keep the b-tree lively. The only way to implement
-# insert and split in a single pass is to hold the locks on the way down.
+# Because the b-tree is a concurrent structure, the leaf split descent may
+# discover that another descent has removed a record, and a leaf split is no
+# longer necessary. There may be, in fact, a descent on the way to the left
+# sibling of the page, to check for the potential for a merge.
 #
-# We'd hold them in a queue. When we completed our insert, we'd have to upgrade
-# our read locks to exclusive locks, moving forward through the queue performing
-# the upgrades. Then we'd move backwards through the queue performing splits.
+# The concurrent operation means that we have to deal with situation where we've
+# undertaken a descent to balance the b-tree, but another series of descents
+# has rendered that plan invalid.
 #
-# When you upgrade from read to write, you're not garaunteed to be first descent
-# to get the upgrade. Another descent might get the upgrade, alter the pages of
-# interest, and render your plan for balancing the tree invalid.
+# As long as we're dealing with that problem, we may as well decouple insertion
+# and deletion form split and merge entirely, and see if we can't gain more
+# liveliness, and a simpiler implementation, by separating these concerns.
 #
-# To prevent this, we could upgrade from shared to exclusive the first time we
-# encouter a full page. After we've obtained our exclusive lock, we know that
-# we've blocked any other descents from descending into the sub-tree, so our
-# plan for balance will remain valid as we descend the tree, creating a queue of
-# exclusively locked pages to split.
+# We can provide an interface where the application developer can insert or
+# delete any number of records, then order a balance of the tree that takes all
+# the changes into account. This can avoid degenerate cases of sort where a leaf
+# page at the split threshold and the application in turn inserts and deletes a
+# single record from it.
 #
-# However, If any decendant page of the exclusively locked page is not full, the
-# exclusively locked page will not be split, so we have to empty our queue of
-# exclusively locked pages, releasing the exclusive locks abtained along the
-# way. We have wasted our time waiting on those exclusive locks, while making
-# every other desecent that follows in our path page wait for us to waste our
-# time.
+# We can provide the application developer with a cursor. The cursor can delete
+# a range of values, or insert a range of values, without having to descend the
+# tree for each inserted value. The developer can insert or delete records as
+# fast as the operating system can append a string to a file. We'll balance this
+# mess for her later.
 #
-# If it were the case that the full page with the potential to split were the
-# root branch page, then our entire b-tree would be locked exclusively for each
-# insert, until the b-tree grew to the point there the root page split. We can
-# hardly call that an efficency.
+# It is still cheap to check for balance for single inserts or deletes, as if we
+# were checking as part of a single pass.
 #
-# With our queue of read locks, we'd have to re-test the conditions after we
-# obtained exclusive locks. We could them proceed to split, if none of the pages
-# involved had changed.
+# ##### Balance Thread
 #
-# At this point however, we've created quite an aparatus to take advantage of a
-# supposedly convienent side-effect of desending the tree for insert. We've
-# added a lot of complexity to the act of insertion.
+# We perform balance operations one a time. We do not begin a new balance
+# operation until the previous one completes. In essence, we perform balancing
+# in a separate thread of execution.
 #
-# The best part is, it is only for insertion and split that this effeciency
-# applies. You can't determine if a page needes to be merged without also
-# looking at its siblings. You can't merge a page with its left sibling without
-# first visiting that sibling through a descent of the tree.
+# Of course, a Node.js application really only has one thread of execution. In
+# our b-tree, however, multiple descents can make progress at the time, or
+# rather, the progress made by one decent, while another descent waits on I/O.
 #
-# It might be possible to do delete and merge in a single pass with a different
-# b-tree structure, one with cached pages sizes, or page sizes kept in the
-# parent, but not with the b-tree structure we've chosen here.
+# We ensure that only one descent at a time is making progress toward the
+# balance of the tree. This simpilies or balance implementation, because the
+# structure of the tree, its depth and number of pages, will only be changed one
+# one series of descents. A balance descent can assume that the tree retain its
+# structure while the balance descent waits on I/O.
 #
-# Instead, we balance our tree as a separate step from changing its size. We
-# first insert or delete a record. We then split or merge the pages if we
-# determine that it is necessary.
+# ##### Balancer
 #
-# #### Balancing in a Single Pass
-#
-# We will know that split is necessary when we have filled a leaf page beyond
-# its capacity. If the parent of the leaf page is at capacity, splitting the
-# leaf page will put the parent of the leaf page beyond its capacity, and it
-# too will need to be split.
-#
-# After insert, when we know that a split is necessary, we descend the tree
-# again, this time with an intent to split the leaf page. Because we are a
-# concurrent data structure, we might have two inserts complete at the same
-# time, initiating two splits. The split operation will check that the split is
-# still necessary.
-#
-# Now we are faced with the same temptation to employ for the efficencies we've
-# weighed. Should we attempt to perform all the necessary splits in a single
-# pass?
-#
-# We know there will be at least one split, so if we lock exclusively on the way
-# down, we know that at least one of those locks is necessary.
-#
-# We still face the condition where the leaf is full beyond capacity, the root
-# is at capacity, but the branch page between them is below capacity. We will
-# detect that the root has the potenital to split, lock it exclusively, but then
-# find that the lock was unnecessary because it will not actually split.
-#
-# This unnecsssary lock won't occur at every insert however, only at every leaf
-# split.
-#
-# In order to determine if splitting in a single pass after insert is worth are
-# while, lets look at how we would split in multiple passes.
-#
-# #### Balancing in Multiple Passes
-#
-# When we insert a record into a leaf page and that leaf page fills beyond
-# capacity, we descend the tree again, this time with a plan to obtain an
-# exclusive lock on the parent branch page of the leaf page that needs to split.
-# Once we obtain that exclusive lock, we obtain an exclusive lock on the leaf
-# branch page. If the leaf page is not beyond capacity, then we assume that
-# another descent has deleted a record or split the page, so we're done. If the
-# leaf page is still beyond capacity, we create a new right sibling, move a
-# number records into the new night sibling and then add a new child to the
-# parent branch page.
-#
-# Now, we may have the case were the parent branch page is one beyond its
-# capacity. We release all our locks, and descend the tree again, this time with
-# a plan to obtain an exclusive lock on the parent branch page of branch page
-# that needs to split.
-#
-# It is a simple recurisve operation. The cost is that we must desend the tree
-# for each page that fills beyond capacity. However, the cost of a subsequent
-# descent to split a parent branch is only incurred when the parent branch
-# fills, which is a occurance order of magnitude less frequent than a leaf page
-# filling. At times we might have to descent the tree three times, to split the
-# parent of a pentultite branch page, but that is an occurance that is an order
-# of magnitude less frequent that a penultimate branch splitting.
-#
-# And then, the cost of the descent of the b-tree is not debilitating, 
-#
-# The simplicity means that we have a single method for splitting pages that
-# applies to both branch and leaf pages. We'll also have a single method for
-# merging both branch pages and leaf pages.
-#
-# ### Splitting
+# We will call the code that co-ordinates the series of splits and merges to
+# balance the tree, the *balancer*.
 #
 # ### Merging
 #
@@ -1566,7 +1534,7 @@ class IO
 # with them. We can iterate through them, in a table scan. We can implement a
 # merge. We probably need an intelligent cursor, or a reporting cursor.
 
-
+#
 class Balance
   last: -> @queue[@queue.length - 1]
   # Increment or decrement the difference of the page since the last balance.
@@ -1598,7 +1566,7 @@ class Balance
             self.right = right
           delete ordered[page.right]
           
-class Reader
+class Iterator
   constructor: (@_io, @_page, @_index, @_key, @_found, @_exclusive) ->
     @_exclusive or= false
     @_offset = 0
@@ -1620,7 +1588,7 @@ class Reader
       @_page = next
       true
 
-class Writer extends Reader
+class Mutator extends Iterator
   constructor: (io, page, index, key, found) ->
     super io, page, index, key, found, true
 
@@ -1835,7 +1803,7 @@ class Descent
     index = @find page, @key, 0, _
     index = ~index if not (found = index >= 0)
 
-    cursor = if exclusive then Writer else Reader
+    cursor = if exclusive then Mutator else Iterator
     cursor = new cursor(@io, page, index, @key, found)
 
     @io.unlock page for page in @shared
@@ -2012,10 +1980,13 @@ class exports.Strata
     descent = new Descent(@, null, key, null)
     descent.cursor(exclusive, callback)
 
-  insert: (record, callback) ->
-    operation = method: "insertSorted"
-    descent = new Descent(@, record, null, operation)
-    descent.descend callback
+  # Insert a single record into the tree.
+
+  #
+  insert: (record, _) ->
+    cursor = @cursor @cassette(record), _
+    cursor.insert(record)
+    cursor.unlock()
 
   # Create a cassette to insert into b-tree.
   cassette: (object) -> new Cassette(object, @_io.extractor(object))
