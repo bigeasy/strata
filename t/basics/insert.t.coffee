@@ -10,7 +10,12 @@ require("./harness") 2, ({ Strata, directory, fixture: { load, objectify } }, _)
   console.error { cassette }
   cursor = strata.cursor cassette, _
 
-  cursor.insert cassette, _
+  loop
+    index = cursor.insert cassette, _
+    if index is 0 and cursor.peek()
+      break
+    else if index < 0
+      throw new Error "duplicates"
 
   cursor.unlock()
 

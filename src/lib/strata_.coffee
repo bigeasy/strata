@@ -334,6 +334,7 @@ class IO
     @mru.balance    = @createMRU()
     @nextAddress    = 0
     @length         = 1024
+    @balancer       = new Balancer
     @size           = 0
     { @extractor
     , @comparator } = @options
@@ -392,6 +393,7 @@ class IO
   #
   createBranch: (address, override) ->
     page = @cache[address] = @link @mru.core,
+      balancers: 0
       count: 0
       penultimate: true
       address: address
@@ -574,6 +576,7 @@ class IO
   #
   createLeaf: (address, override) ->
     page = @cache[address] = @link @mru.core,
+      balancers: 0
       loaded: false
       leaf: true
       address: address
@@ -671,8 +674,10 @@ class IO
   # Write a delete object. Calculate the serialized JSON string length of the
   # inserted record and add it to the in memory JSON size of the page and the in
   # memory b-tree as a whole.
-  writeDelete: (fd, page, index, _) ->
-    @_writeJSON fd, page, [ -(index + 1) ], _
+  #
+  # TODO Document `ghost`.
+  writeDelete: (fd, page, index, ghost, _) ->
+    @_writeJSON fd, page, [ -(index + 1), ghost ], _
   
   # On occasion, we can store a position array object. An position array object
   # contains the position array itself.  We store a copy of a constructed
@@ -1142,6 +1147,24 @@ class IO
     for page in stack
       @unlock page
     key
+
+  find: (page, key, low, _) ->
+    high = page.count - 1
+    compare = -1
+    mid  = 0
+
+    # Classic binary search.
+    { comparator } = @
+    while compare isnt 0 and low <= high
+      mid = (low + high) >>> 1
+      compare = comparator key, @key(page, mid, _)
+      if compare > 0
+        low = mid + 1
+      else
+        high = mid - 1
+
+    # Index is negative if not found.
+    if compare is 0 then mid else ~mid
 
 # ## Descent
 #
@@ -1670,7 +1693,15 @@ class IO
 # merge. We probably need an intelligent cursor, or a reporting cursor.
 
 #
-class Balance
+class Balancer
+  constructor: ->
+    @counts = {}
+
+  unbalanced: (page) ->
+    if not @counts[page.address]?
+      @counts[page.address] = page.count
+      page.balancers++
+
   last: -> @queue[@queue.length - 1]
   # Increment or decrement the difference of the page since the last balance.
   difference: (page, difference) ->
@@ -1770,9 +1801,17 @@ class Iterator
   # the first page.
   #
   # We expose an `index` property that is the index of the least record that is
-  # equal to or greater than the search key in the current page. When we move to
-  # a right sibling leaf page, the index property becomes zero.
-
+  # equal to or greater than the search key in the current page.
+  # 
+  # When we move to a right sibling leaf page, the index property is set to
+  # point to the first undeleted record in the leaf page. A leaf page will
+  # retain a delete first record until the next balance, perserving it because
+  # the record key is used as key in the branch pages. The index is zero if
+  # there is no ghost record, or one if there is a ghost record. It is never
+  # more than one.
+  # 
+  # Use the page index to begin iteration over the records in the leaf page.
+  #
   # Additional public properties of the `Iterator` are the `key` used to create
   # the iterator, `found` which indicates whether or not the record actually
   # exists in the b-tree, `count` which is the number of leaf pages visited by
@@ -1780,8 +1819,9 @@ class Iterator
   # a mutator. This properties are read-only, so make sure you only read them.
 
   # 
-  constructor: (@_io, @_page, @index, @key, @found, @exclusive) ->
+  constructor: (@_io, @_page, @index, @key, @found, @first, @exclusive) ->
     @exclusive or= false
+    @length = @_page.positions.length
     @count = 1
 
   # Get a the record at the given `index` from the current leaf page.
@@ -1794,16 +1834,25 @@ class Iterator
   # Go to the next leaf page. Returns true if there is a next, false if there
   # the current leaf page is the last leaf page.
   next: (_) ->
-    if @_page.right is -1
-      false
-    else
-      next = @_io.lock @_page.right, @_exclusive, true, _
+    if @_page.right > 0
+      if @_next
+        next = @_next
+        @_next = null
+      else
+        next = @_io.lock @_page.right, @_exclusive, true, _
       @_io.unlock @_page
       @_page = next
       true
+    else
+      false
+
+  indexOf: (key, _) ->
+    @_io.find @_page, key, @_page.deleted, _
 
   # Unlock all leaf pages held by the iterator.
-  unlock: -> @_io.unlock @_page
+  unlock: ->
+    @_io.unlock @_page
+    @_io.unlock @_next if @_next
 
 # ### Mutator
 
@@ -1890,47 +1939,96 @@ class Iterator
 # less than the first key of the next, but the first key of the next page has
 # been deleted, and the current record is less than the range of the new first
 # key, it is within the extended range.
+#
+# duplicate keys: Duplicate keys again. Now it occurs to me that duplicates are
+# actually not difficult for the application developer to implement given a
+# mutator. The application developer can move forward through a series and
+# append a record that has one greater than the maximum record.  Not a problem
+# to worry about ambiguity in this case. Ah, we need to peek though, because we
+# need to get that number.
+#
+# In fact, given a key plus a maximum series value, you will always land after
+# the last one the series, or else a record that is less than the key, which
+# means that the series is zero. Deleted keys present a problem, so we need to
+# expose a leaf page key to the user, which, in case of a delete, is definately
+# the greatest in the series.
+
 
 #
 class Mutator extends Iterator
   peek: ->
+    peeking = @_peek is @_count
     @_peek = @_count
-  insert: (cassette, _) ->
+    peeking
+
+  insert: (object, _) ->
+    if object instanceof Cassette
+      { key, record } = object
+    else
+      [ record, key ]  = [ object, @_io.extractor object ]
+
     # If we are at the first page and the key is equal to the key that created
     # the mutator, than this is the correct leaf page for the record.
     unambiguous = @count is 1 and @key and @_io.comparator(@key, key) is 0
 
     if unambiguous
-      index = @index
+      [ index, found ] = [ @index, @found ]
     else
       index = @_io.find page, key, page.deleted, _
-      die { ambiguous, cassette }
+      unless found = (index >= 0)
+        index = ~index
+      unambiguous = index <= page.count
 
-    # duplicate keys: Duplicate keys again. Now it occurs to me that duplicates
-    # are actually not difficult for the application developer to implement
-    # given a mutator. The application developer can move forward through a
-    # series and append a record that has one greater than the maximum record.
-    # Not a problem to worry about ambiguity in this case. Ah, we need to peek
-    # though, because we need to get that number.
-    #
-    # In fact, given a key plus a maximum series value, you will always land
-    # after the last one the series, or else a record that is less than the key,
-    # which means that the series is zero. Deleted keys present a problem, so we
-    # need to expose a leaf page key to the user, which, in case of a delete, is
-    # definately the greatest in the series.
+    if found
+      # TODO Special case: adding a first second copy of a record that has been
+      # deleted, but still exists. We put the new record after the first record
+      # and it exists as a special kind of duplicate.
+      # TODO Think harder about this. It seems like it would work.
+      # TODO No, we're not including the `0` in the range.
+      index = ~index
 
-    # Since we need to fsync anyway, we open the file and and close the file
-    # when we append a JSON object to it.  Because no file handles are kept
-    # open, the b-tree object can simply be reaped by the garbage collection.
+    if index is 0 and not @first
+      throw new Error "lesser key"
+    else if index >= 0
+      if not unambiguous and @_peek is @_count
+        unless unambiguous = page.next is -1
+          @_next or= @_io.lock @_page.right, @_exclusive, true, _
+          unambiguous = @_io.compare(key, @_io.key(@_next, 0, _)) < 0
+
+      if unambiguous
+        # Cache the current count.
+        @_io.balancer.unbalanced(@_page)
+
+      # Since we need to fsync anyway, we open the file and and close the file
+      # when we append a JSON object to it. Because no file handles are kept
+      # open, the b-tree object can simply be reaped by the garbage collection.
+        filename = @_io.filename @_page.address
+        fd = fs.open filename, "a", 0644, _
+        position = @_io.writeInsert fd, @_page, index, record, _
+        fs.close fd, _
+
+
+        @_page.positions.splice index, 0, position
+        @_page.count++
+        @length = @_page.positions.length
+      else
+        index = 0
+    index
+
+  delete: (index, _) ->
+    if not (0 <= index < @_page.count)
+      throw new Error "index out of bounds"
+
+    @_io.balancer.unbalanced(@_page)
+
     filename = @_io.filename @_page.address
     fd = fs.open filename, "a", 0644, _
-    position = @_io.writeInsert fd, @_page, index, cassette.record, _
+    position = @_io.writeDelete fd, @_page, index, index is 0 and not @first, _
     fs.close fd, _
-
-    @_page.positions.splice index, 0, position
-
-  unlock: (_) ->
-    super()
+    
+    @_page.positions.splice index, 1 if index > 0 or @first
+    @_page.count--
+    @length = @_page.positions.length
 
 class Cassette
   constructor: (@record, @key) ->
@@ -2033,38 +2131,6 @@ class Descent
     if exclusive
       @exclusive.push(@child)
 
-  # Search for a value in a tier, returning the  index of the value or else
-  # where it should be inserted.
-  #
-  # There is some magic here, long forgotten at the time of documentation. The
-  # tree beneath each branch in an inner tier contains records whose value is
-  # equal to or greater than the pivot. Thus, the pivot of the first record on
-  # an inner tier is null, indicating that that is the branch for all values
-  # less than the value of the first branch with a real pivot.
-  #
-  # TODO: Reading through the code, this does not take this into account, and
-  # will problably send items that belong in the least value tree into the three
-  # that follows it. I'll clean this up with unit testing.
-
-  # `mutation.find(tier, key, callback)`
-  find: (page, key, low, _) ->
-    high = page.count - 1
-    compare = -1
-    mid  = 0
-
-    # Classic binary search.
-    { comparator, io } = @
-    while compare isnt 0 and low <= high
-      mid = (low + high) >>> 1
-      compare = comparator key, io.key(page, mid, _)
-      if compare > 0
-        low = mid + 1
-      else
-        high = mid - 1
-
-    # Index is negative if not found.
-    if compare is 0 then mid else ~mid
-
   # Aching to get rid of duplicates. We need to support them here, when
   # searching for a leaf page partition at split, and when determining whether
   # to split a leaf page.
@@ -2111,18 +2177,23 @@ class Descent
   cursor: (exclusive, _) ->
     @shared.push page = @io.lock 0, false, false, _
 
+    first = true
     while not page.penultimate
-      die "ITERATING"
+      index = @io.find page, @key, 1, _
+      index = ~index if index < 0
+      first and= index is 0
 
-    index = @find page, @key, 1, _
+
+    index = @io.find page, @key, 1, _
     index = ~index if index < 0
+    first and= index is 0
 
     page = @io.lock page.addresses[index], exclusive, true, _
-    index = @find page, @key, 0, _
+    index = @io.find page, @key, 0, _
     index = ~index if not (found = index >= 0)
 
     cursor = if exclusive then Mutator else Iterator
-    cursor = new cursor(@io, page, index, @key, found)
+    cursor = new cursor(@io, page, index, @key, found, first, exclusive)
 
     @io.unlock page for page in @shared
 

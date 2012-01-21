@@ -1,7 +1,7 @@
 #!/usr/bin/env coffee-streamline
 return if not require("streamline/module")(module)
 fs = require "fs"
-require("./harness") 2, ({ Strata, directory }, _) ->
+require("./harness") 5, ({ Strata, directory }, _) ->
   fs.writeFile "#{directory}/segment00000000", "#{JSON.stringify([true,-1,[1]])}\n", "utf8", _
   fs.writeFile "#{directory}/segment00000001", """
     #{JSON.stringify([0,-1,[]])}
@@ -16,7 +16,10 @@ require("./harness") 2, ({ Strata, directory }, _) ->
 
   cursor = strata.cursor "a", _
 
-  @ok cursor.found(), "found"
-  @equal cursor.get(_), "a", "get"
+  @ok not cursor.exclusive, "shared"
+  @ok cursor.first, "first"
+
+  @ok cursor.found, "found"
+  @equal cursor.get(cursor.index, _), "a", "get"
 
   cursor.unlock()
