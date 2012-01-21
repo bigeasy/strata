@@ -19,7 +19,7 @@ require("./harness") 2, ({ Strata, directory, fixture: { load, objectify } }, _)
 
   cursor.unlock()
 
-  @equal strata._io.size, 3, "json size"
+  @equal strata._io.size, 4, "json size"
 
   strata.close _
 

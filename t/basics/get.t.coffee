@@ -2,7 +2,7 @@
 return if not require("streamline/module")(module)
 fs = require "fs"
 require("./harness") 5, ({ Strata, directory }, _) ->
-  fs.writeFile "#{directory}/segment00000000", "#{JSON.stringify([true,-1,[1]])}\n", "utf8", _
+  fs.writeFile "#{directory}/segment00000000", "#{JSON.stringify([-1,[-1]])}\n", "utf8", _
   fs.writeFile "#{directory}/segment00000001", """
     #{JSON.stringify([0,-1,[]])}
     #{JSON.stringify([1,"a"])}

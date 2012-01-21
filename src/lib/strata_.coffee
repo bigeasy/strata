@@ -355,6 +355,7 @@ class IO
 
   # Create a file name for a given address with an optional suffix.
   filename: (address, suffix) ->
+    address = Math.abs(address)
     suffix or= ""
     padding = "00000000".substring(0, 8 - String(address).length)
     "#{@directory}/segment#{padding}#{address}#{suffix}"
@@ -401,6 +402,7 @@ class IO
       cache: {}
       locks: [[]]
       loaded: false
+      right: -1
       size: 0
     extend page, override or {}
 
@@ -415,7 +417,7 @@ class IO
   #
   rewriteBranches: (page, _) ->
     filename = @filename page.address, ".new"
-    record = [ page.penultimate, page.next?.address, page.addresses ]
+    record = [ page.right, page.addresses ]
     json = JSON.stringify(record)
     buffer = new Buffer(json.length + 1)
     buffer.write json
@@ -437,7 +439,7 @@ class IO
     filename = @filename page.address
     json = fs.readFile filename, "utf8", _
     record = JSON.parse json
-    [ penultimate, next, addresses ] = record
+    [ right, addresses ] = record
     count = addresses.length
 
     # Set in memory serialized JSON size of page and add to b-tree.
@@ -445,7 +447,7 @@ class IO
     @size += page.size
 
     # Extend the existing page with the properties read from file.
-    extend page, { penultimate, next, addresses, count }
+    extend page, { right, addresses, count }
 
   # Add a key to the branch page cache and recalculate JSON size.
   cacheKey: (page, address, key) ->
@@ -917,7 +919,7 @@ class IO
       throw new Error "database #{@directory} is not empty."
     # Create a root branch with a single empty leaf.
     root = @createBranch @nextAddress++, penultimate: true, loaded: true
-    leaf = @createLeaf @nextAddress++, loaded: true
+    leaf = @createLeaf -(@nextAddress++), loaded: true
     root.addresses.push leaf.address
     # Write the root branch.
     @rewriteBranches root, _
@@ -1050,7 +1052,7 @@ class IO
   # be to put the callbacks in an array of onloads.
 
   #
-  lock: (address, exclusive, leaf, callback) ->
+  lock: (address, exclusive, callback) ->
     # We must make sure that we have one and only one page object to represent
     # the page. We the page object will maintain the lock queue for the page. It
     # won't due to have different descents consulting different lock queues.
@@ -1060,7 +1062,7 @@ class IO
     # grouped inside one of the arrays in the queue element. Exclusive locks are
     # queued alone as a single element in the array in the queue element.
     if not page = @cache[address]
-      page = @["create#{if leaf then "Leaf" else "Branch"}"](address)
+      page = @["create#{if address < 0 then "Leaf" else "Branch"}"](address)
 
     # If the page needs to be laoded, we must load the page only after a lock
     # has been obtained. Loading is a read, so we can load regardless of whether
@@ -1073,7 +1075,7 @@ class IO
           callback error
         else if page.loaded
           callback null, page
-        else if leaf
+        else if address < 0
           @readLeaf page, callback
         else
           @readBranches page, callback
@@ -1921,7 +1923,7 @@ class Iterator
         next = @_next
         @_next = null
       else
-        next = @_io.lock @_page.right, @_exclusive, true, _
+        next = @_io.lock @_page.right, @_exclusive, _
       @_io.unlock @_page
       @_page = next
       true
@@ -2133,10 +2135,10 @@ class Descent
   # leaf pages to get branch values.
 
   cursor: (exclusive, _) ->
-    @locks.push page = @io.lock 0, false, false, _
+    @locks.push page = @io.lock 0, false, _
 
     first = true
-    while not page.penultimate
+    while not page.addresses[0] < 0
       index = @io.find page, @key, 1, _
       index = ~index if index < 0
       first and= index is 0
@@ -2146,7 +2148,7 @@ class Descent
     index = ~index if index < 0
     first and= index is 0
 
-    page = @io.lock page.addresses[index], exclusive, true, _
+    page = @io.lock page.addresses[index], exclusive, _
     index = @io.find page, @key, 0, _
     index = ~index if not (found = index >= 0)
 
@@ -2169,7 +2171,6 @@ class Descent
   leftMost: (page) -> page.addresses[0]
 
   descend: (exclusive, next, stop, _) ->
-    page @lock @address, exclusive, 
     @locks.push page = @io.lock 0, false, false, _
 
     while not (page.penultimate or stop(page))
