@@ -1692,7 +1692,36 @@ class IO
 # with them. We can iterate through them, in a table scan. We can implement a
 # merge. We probably need an intelligent cursor, or a reporting cursor.
 
+# There has been a desire second guess the most-recently used list. There is a
+# desire to link nodes to the back of the list or suspend purges.
 #
+# There is a desire to cache the addresses of the left sibling pages when
+# possible, so I wouldn't have to descend the tree. Except that the
+# most-recently used list works hand in hand with b-tree descent. The higher
+# levels of the tree are kept in memory, because they are more frequently visted
+# than lower levels. To much iteration along one level threatens to purge other
+# levels.
+#
+# One can imagine that when balancing b-tree that has been left unbalanced for a
+# long time, reading in many unbalanced leaf pages will cause the first ones to
+# flush, which is a pity, since we'll probably need one of them.
+#
+# Perhaps we suspect a page needs to be split but it doesn't. If the balancer
+# was the one to load the page, simply to determine that nothing needs to be
+# done, their is a desire to expedite the removal of the page from the cache.
+#
+# There are so many desires. It makes one giddy with thoughts of premature
+# optimization.
+#
+# We're going to descent the tree to find our left sibling to exercise the
+# most-recently used cache. We are not going to second guess it. We're going to
+# defer to the algorithms. The simpiler the code, the more trust you can have in
+# the code, the more likely your code will be adopted. A wide user base can
+# inform decisions on optimization. There is always a core of what your
+# application needs to do, and Strata needs to search and edit records.
+#
+# Balancing the tree is maintainence. The balancer can take its time.
+
 class Balancer
   constructor: ->
     @counts = {}
@@ -2092,6 +2121,8 @@ class Descent
   constructor: (@strata, @object, @key, @operation) ->
     @io         = @strata._io
     @options    = @strata._io.options
+    @locks      = []
+    @locked     = {}
 
     { @extractor, @comparator } = @options
 
@@ -2102,7 +2133,7 @@ class Descent
   # leaf pages to get branch values.
 
   cursor: (exclusive, _) ->
-    @shared.push page = @io.lock 0, false, false, _
+    @locks.push page = @io.lock 0, false, false, _
 
     first = true
     while not page.penultimate
@@ -2114,6 +2145,42 @@ class Descent
     index = @io.find page, @key, 1, _
     index = ~index if index < 0
     first and= index is 0
+
+    page = @io.lock page.addresses[index], exclusive, true, _
+    index = @io.find page, @key, 0, _
+    index = ~index if not (found = index >= 0)
+
+    cursor = if exclusive then Mutator else Iterator
+    cursor = new cursor(@io, page, index, @key, found, first, exclusive)
+
+    @io.unlock page for page in @locks
+
+    cursor
+
+  key: (key) ->
+    { io } = @
+    (page, _) -> io.find page, key, 1, _
+
+  iterate: (page) ->
+    @first = false
+
+  upgrade: (page) ->
+
+  leftMost: (page) -> page.addresses[0]
+
+  descend: (exclusive, next, stop, _) ->
+    page @lock @address, exclusive, 
+    @locks.push page = @io.lock 0, false, false, _
+
+    while not (page.penultimate or stop(page))
+      index = next page, _
+      index = ~index if index < 0
+      @first and= index is 0
+      page = @io.lock 0, false, false, _
+
+    index = @io.find page, @key, 1, _
+    index = ~index if index < 0
+    @first and= index is 0
 
     page = @io.lock page.addresses[index], exclusive, true, _
     index = @io.find page, @key, 0, _
