@@ -1703,6 +1703,7 @@ class Balancer
       page.balancers++
 
   last: -> @queue[@queue.length - 1]
+
   # Increment or decrement the difference of the page since the last balance.
   difference: (page, difference) ->
     if not @differences[page.address]?
@@ -1710,13 +1711,18 @@ class Balancer
       page.balancers++
     else
       last.differences[page.address] += differnece
-  balance: ->
+
+  balance: (@io) ->
+    @io.balancer = new Balancer
+
     ordered = {}
     merge = {}
-    for address, difference of @differences
+
+    for address, count of @counts
       page = @io.cache[address]
+      difference = page.count - count
       if difference < 0
-        if page.left is -1
+        if page.address is 1
           ordered[page.address] = { page }
         else
           if not left = ordered[page.left]
@@ -1731,6 +1737,53 @@ class Balancer
           if not self.right
             self.right = right
           delete ordered[page.right]
+
+  splitLeaf: (branch, key, _) ->
+    address = branch.addresses[@io.find(child, @key, 1, _)]
+    @exclusive.push leaf = @io.lock address, true, true, _
+
+    # See that nothing has changed since we last descended.
+    { comparator: c, io, options: { leafSize: length } } = @
+    return if leaves.addresses.length < @options.leafSize
+
+    # We might have let things go for so long, that we're going to have to split
+    # the page into more than two pages.
+    partitions = Math.floor leaf.count / @options.leafSize
+    while (partitions * @options.leafSize) <= leaves.addresses.length
+      # Find a partition.
+      partition = Math.floor leaves.addresses.length / (partitions + 1)
+      key = io.key leaves, partition, _
+      pivot = @io.find(child, key, _) + 1
+
+      addresses = leaf.positions.splice(partition)
+      right = io.allocateLeaves(addresses, leaves.right)
+
+      leaves.right = right.address
+
+      child.addresses.splice(pivot, 0, right.address)
+
+      # Order of rewrites is to first write the pages out. Then delete the old
+      # files. Then copy the new files. The presence of a new file without an
+      # old file means to roll forward. The presence of new files each with and
+      # old file means to roll back.
+      #
+      # TODO Split relink into unlink and rename.
+
+      # Append an operation indciator. This would be a record that describes all
+      # the participants in the rewrite, in the order in which they are supposed
+      # to be rewritten. When found, we look at the last item in the list, then
+      # load that, and ensure that the last record is a complete operation
+      # record. If it is, we know that all of the temporary pages were written.
+      @io.rewriteLeaves(leaves, _)
+      @io.rewriteLeaves(right, _)
+
+      @io.rewriteBranches(child, _)
+
+      @io.relink(right, _)
+      @io.relink(leaves, _)
+      @io.relink(child, _)
+
+      --paritions
           
 # ## Cursors
 # 
@@ -2033,48 +2086,6 @@ class Mutator extends Iterator
 class Cassette
   constructor: (@record, @key) ->
 
-# Are we able to jump in, lock exclusive, or do we really need to go hand over
-# hand. Here are some properties. There is only one thread of execution that is
-# going to mutate branch pages, the same that does merges.
-#
-# We make a plan, moving from left to right, to merge. or else to split. Merges
-# require
-#
-# We have a deleted page, and that page gets the deleted pages added to it. It
-# is rewritten just as any other leaf page is rewritten. We rewrite. If you want
-# to have that go very, very fast, then create small branch pages, and huge leaf
-# pages.
-#
-# Leaning toward making a requirement that keys are unique. Duplicate keys can
-# be a combination of system time and an offset, descent count. Maybe, maybe
-# not.
-#
-# Degenerate case for all this is that we have someone inserting and deleting
-# faster than we can balance, creating live lock. There are constant balance
-# operations, not completing, and a back log of unbalanced pages. This may be an
-# imagined problem.
-#
-# We track sizes using json length. A calcualated length, based on the JSON
-# respesentation. When we reach a particular size, we purge the cache. We also
-# have items that have no length, pages that we've cached for sizes for the sake
-# of merge. We don't purge those pages if they are being used to calculate
-# balance. We keep a reference count. We also only purge at balance time, so
-# that we don't purge cached size data when it is needed.
-# 
-# When we delete an item, if it is the first record, we leave the item in place,
-# to act as a key. We need to fix this during balance. When we delete the first
-# item, we mark the item. How? Well, somehow, there is a flag that says that
-# this item has been deleted, but still exists. In fact, it is the second item
-# to the delete object, a boolean, true for retained false for destroyed. We put
-# in a second one to delete it for good.
-#
-# During balance, 
-#
-# Our binary search will skip it during search.
-#
-# When we balance, if 
-
-#              
 class Descent
   # The constructor always felt like a dangerous place to be doing anything
   # meaningful in C++ or Java.
@@ -2082,97 +2093,13 @@ class Descent
     @io         = @strata._io
     @options    = @strata._io.options
 
-    @parent     = { operations: [], locks: [] }
-    @child      = { operations: [], locks: [] }
-    @exclusive  = []
-    @shared     = []
-    @pivots     = []
-    @stack      = []
-
     { @extractor, @comparator } = @options
 
     @key        = @extractor @object if @object? and not @key?
 
-  # Going forward, every will story keys, so that when we encounter a record, we
-  # don't have to run the extractor, plus we get some caching.
-  #
-  # Or maybe just three arrays, key, object and address? I'm talking about using
-  # each key as an object cache, by adding an object member to the key. But,
-  # they cache container is a hash table, which is a compactish representation,
-  # so why not make it yet anohter hash table? The logic gets a lot easier.
-  #
-  # TODO None of this is right.
-  record: (page, index, _) ->
-    position = page.positions[index]
-    if not record = page.cache[position]
-      record = page.cache[position] = @readRecord page, position, _
-    record
-  
-  # Descend the tree, optionally starting an exclusive descent. Once the descent
-  # is exclusive, all subsequent descents are exclusive.
-
-  # `mutation.descend(exclusive)` 
-  _descend: (exclusive) ->
-    # Add a new level to the plan.
-    @plan.unshift { operations: [], addresses: [] }
-
-    # Two or more exclusive levels mean that the parent is exclusive.
-    if @exclusive.length < 1
-      @strata._release @parent
-
-    # Any items in the exclusive level array means we are now locking exclusive.
-    exclusive or= @exclusive.length > 0
-
-    # Make child a parent.
-    @parent = @child
-    @child = { operations: [], locks: [], exclusive }
-
-    # Add the new child to the list of exclusive levels.
-    if exclusive
-      @exclusive.push(@child)
-
-  # Aching to get rid of duplicates. We need to support them here, when
-  # searching for a leaf page partition at split, and when determining whether
-  # to split a leaf page.
-  #
-  # This will rewind to the place before the key.
-
-  #
-  first: (page, index, key, _) ->
-    while index != 0 && comparator(key, io.key(page, index - 1, _)) == 0
-      index--
-
-  hasKey: (tier, _) ->
-    for key in @operation.keys or []
-      branch = @find(tier, key, _)
-      if tier.cache[branch] is key
-        return true
-    false
-
   # TODO: We are always allowed to get a shared lock on any leaf page and read a
   # value, as long as we let go of it immediately. This allows us to read from
   # leaf pages to get branch values.
-
-  descend: (_) ->
-    parent = null
-
-    @shared.push child = @io.lock 0, false, false, _
-    if @operation.keys and (child.addresses.length is 1 or @hasKey(child, _))
-      @exclusive.push @io.upgrade @shared.pop(), _
-
-    # TODO: Flag for go left.
-    while not child.penultimate or child.address is @soughtAddress
-      process.exit 1
-
-    # TODO: Flag for shared or exclusive. If exclusive, leave parent locked, if
-    # shared, then unlock parent.
-
-    descent = @[@operation.method].call this, parent, child, _
-
-    @io.unlock page for page in @shared
-    @io.unlock page for page in @exclusive
-
-    descent.descend _ if descent
 
   cursor: (exclusive, _) ->
     @shared.push page = @io.lock 0, false, false, _
@@ -2199,146 +2126,18 @@ class Descent
 
     cursor
 
-  insertSorted: (parent, child, _) ->
-    branch = @find child, @key, _
-    @exclusive.push leaf = @io.lock child.addresses[branch], true, true, _
-
-    positions = leaf.positions
-
-    # Insert the object value sorted.
-    for i in [0...positions.length]
-      key = @_key leaf, i, _
-      if @comparator(@key, key) <= 0
-        break
-
-    # Since we need to fsync anyway, we open the file and and close the file
-    # when we append a JSON object to it.  Because no file handles are kept
-    # open, the b-tree object can simply be reaped by the garbage collection.
-    filename = @io.filename leaf.address
-    fd = fs.open filename, "a", 0644, _
-    position = @io.writeInsert fd, leaf, @object, i, _
-    fs.close fd, _
-
-    positions.splice i, 0, position
-
-    if positions.length > @options.leafSize and not @homogenous(leaf, _)
-      keys = []
-      process.nextTick _
-      # Opportunity to deadlock.
-      keys.push key = @io.key leaves, 0, _
-      if leaves.right
-        keys.push @io.key leaves.right, 0, _
-      operation =
-        method: "splitLeaf"
-        keys: keys
-      new Descent(@strata, null, key, operation)
-  
-  # If the leaf tier is now at the maximum size, we test to see if the leaf tier
-  # is filled with an identical key value, and if not, we split the leaf tier.
-  homogenous: (leaf, _) ->
-    first = @_key leaf, 0, _
-    last = @_key leaf, page.positions.length - 1, _
-    @comparator(first, last) is 0
-
   get: (parent, child, _) ->
     branch = @find child, @key, _
     @shared.push leaves = @io.lock child.addresses[branch], false, true, _
     address = @find leaves, @key, _
     leaves.cache[leaves.addresses[address]]
 
-  splitLeaf: (parent, child, _) ->
-    branch = @find child, @key, _
-    @exclusive.push leaves = @io.lock child.addresses[branch], true, true, _
-
-    # See that nothing has changed since we last descended.
-    { comparator: c, io, options: { leafSize: length } } = @
-    return if c(io.key(leaves, 0, _), @key) isnt 0
-    return if @homogenous(leaves, _)
-    return if leaves.addresses.length < @options.leafSize
-
-    # We might have let things go for so long, that we're going to have to split
-    # the page into more than two pages.
-    partitions = Math.floor leaves.addresses.length / @options.leafSize
-    while (partitions * @options.leafSize) <= leaves.addresses.length
-      # Find a partition.
-      mid = Math.floor leaves.addresses.length / (partitions + 1)
-      key = io.key leaves, mid, _
-      [ before, after ] = [ mid - 1, mid + 1 ]
-      while not partition
-        if before > 0 and c(io.key(leaves, before, _), key) isnt 0
-          partition = before + 1
-        else if after <= length and c(io.key(leaves, after, _)) isnt 0
-          partition = after
-        else
-          --before
-          ++after
-
-      key = io.key leaves, partition, _
-      pivot = @find(child, key, _) + 1
-
-      addresses = leaves.addresses.splice(partition)
-      right = io.allocateLeaves(addresses, leaves.right)
-
-      leaves.right = right.address
-
-      child.addresses.splice(pivot, 0, right.address)
-
-      # Append an operation indciator. This would be a record that describes all
-      # the participants in the rewrite, in the order in which they are supposed
-      # to be rewritten. When found, we look at the last item in the list, then
-      # load that, and ensure that the last record is a complete operation
-      # record. If it is, we know that all of the temporary pages were written.
-      @io.rewriteLeaves(leaves, _)
-      @io.rewriteLeaves(right, _)
-
-      @io.rewriteBranches(child, _)
-
-      @io.relink(right, _)
-      @io.relink(leaves, _)
-      @io.relink(child, _)
-
-      --paritions
 
   mergeLeaf: (parent, child, _) ->
     [ key, rightKey ] = @operation.keys
     compare = @comparator(full, leftKey = @io.key(child, 0, _))
     if compare is 0
       return if leftKey isnt key
-
-class Level
-  # Construct a new level. The `exclusive` pararameter determines how this level
-  # locks tiers when asked to lock tiers.
-  constructor: (@exclusive) ->
-    @operations = []
-    @locks = []
-
-  # Convert lock to read lock and tell anyone waiting that they can go ahead.
-  #
-  # We give the next tick a copy of just the continuations to fire, excluding
-  # our own continuation which we're about to add. (TODO rename continuations?) 
-  #
-  # If you're wondering, no, you're not going to fire the continuations twice.
-  # They are only ever fired by the decent that holds the exclusive lock. This
-  # level will be removed from the level list, so we won't grab at it when the
-  # operations are over.
-  downgrade: (strata) ->
-    if @exclusive
-      while @locks.length
-        lock = @locks.shift()
-        locks = strata.locks[lock.address]
-        throw "not locked by me" if locks[0][0] isnt lock
-        locks.shift()
-        @_resume strata, locks[0].slice(0)
-        locks[0].push lock
-      @exclusive = false
-  
-  # Unused.
-  advance: (strata) ->
-    locks = strata.locks[@tier.id]
-    if locks[0].length is 0 and locks.length isnt 1
-      locks.shift()
-      true
-    false
 class exports.Strata
   # Construct the Strata from the options.
   constructor: (options) ->
@@ -2389,422 +2188,3 @@ class exports.Strata
     sorted.sort (a, b) -> comparator(a.key, b.key)
 
     sorted
-
-  # Both `insert` and `remove` use this generalized mutation method that
-  # implements locking the proper tiers during the descent of the tree to find
-  # the leaf to mutate.
-  #
-  # This generalized mutation will insert or remove a single item.
-  _generalized: (mutation, _) ->
-    mutation.descend false
-
-    tier = mutation.parent.tier = @_lock mutation.parent, 0, false, _
-
-    # Perform the root decision with only a read lock obtained.
-    mutation.decisions.initial.call @, mutation, _
-
-    # Determine if we need to lock a tier. We have different criteria for inner
-    # tiers with inner tier children then for penultimate inner tiers with leaf
-    # tier children.
-    loop
-      { decisions, parent } = mutation
-      break if parent.tier.penultimate
-      @_testInnerTier mutation, decisions.subsequent, "swap", _
-      branch = @_find(mutation.parent.tier, mutation.sought)
-      mutation.descend false
-      branch.child.tier = @_load branch.address, false, _
-
-    # Make decisions based on the penultimate level.
-    @_testInnerTier mutation, decisions.penultimate, "", _
-
-    # All the necessary locks have been obtained and we are able to mutate the
-    # tree with impunity.
-
-    # Run through levels, bottom to top, performing the operations at for level.
-    mutation.levels.reverse()
-    mutation.levelQueue = mutation.levels.slice(0)
-    operation = mutation.leafOperation
-    operation.shift().apply @, operation.concat mutation, @_leafDirty
-      
-  # Perform decisions related to the inner tier.
-  _testInnerTier: (mutation, decision, exclude, _) ->
-    mutation.decisions.swap.call @, mutation
-    # If no split/merge, then clear all actions except for swap.
-    if not decision.call @, mutation, _
-      for step in mutation.plan
-        step.operations = step.operations.filter (operation) ->
-          operation isnt exclude
-
-  # The leaf operation may or may not alter the leaf. If it doesn't, all of the
-  # operations to split or merge the inner tiers are moot, because we didn't
-  # make the changes to the leaf that we expected.
-  _leafDirty: (mutation) ->
-    if mutation.dirtied
-      @_operateOnLevel mutation
-    else
-      @_unlock mutation
-
-  _operateOnLevel: (mutation) ->
-    if mutation.levelQueue.length is 0
-      @_unlock mutation
-    else
-      @_operateOnOperation mutation
-
-  _operateOnOperation: (mutation) ->
-    if mutation.levelQueue[0].operations.length is 0
-      mutation.levelQueue.shift()
-      @_operateOnLevel mutation
-    else
-      operation = mutation.levelQueue[0].operations.pop()
-      operation.shift().apply @, operation.concat mutation, @_operateOnOperation
-
-  # Inovke the blocker method, used for testing locks, if it exists, otherwise
-  # release all locks.
-  _unlock: (mutation) ->
-    if mutation.blocker
-      mutation.blocker => @_releaseLocks(mutation)
-    else
-      @_releaseLocks(mutation)
-      
-  # When we release the locks, we send the first waiting operations we encounter
-  # forward on the next tick. We don't have to keep track of this, because the
-  # first waiting operations will always be in top most level. 
-  _releaseLocks: (mutation) ->
-    # For each level locked by the mutation.
-    for level in mutation.levels
-      level.release(@)
-
-    # We can tell the user that the operation succeeded on the next tick.
-    process.nextTick -> mutation.callback.call null, mutation.dirtied
-
-  _resume: (continuations) ->
-
-  _record: (tier, index, _) ->
-    if tier.leaf
-      process.exit 1
-    else
-      process.exit 1
-
-  # If the root is full, we add a root split operation to the operation stack.
-  _shouldDrainRoot: (mutation, _) ->
-    if @innerSize is mutation.parent.tier.objects.length
-      mutation.plan[0].push
-        operation: "_splitRoot",
-        addresses: [ mutation.parent.tier.address ]
-
-  # To split the root, we copy the contents of the root into two children,
-  # splitting the contents between the children, then make the two children the
-  # only two nodes of the root tier. The address of the root tier does not
-  # change, only the contents.
-  #
-  # While a split at lower levels will create two half empty tiers and add a
-  # single branch to the parent, this operation will empty the root into two
-  # separate tiers, creating an almost empty root each time it is split.
-  _drainRoot: (mutation) ->
-    # Create new left and right inner tiers.
-    left = @_newInnerTier mutation, root.penultimate
-    right = @_newInnerTier mutation, root.penultimate
-
-    # Find the partition index and move the branches up to the partition
-    # into the left inner tier. Move the branches at and after the partiion
-    # into the right inner tier.
-    partition = root.lenth / 2
-    fullSize = root.length
-    for i in [0...partition]
-      left.push root[i]
-    for i in [partition...root.length]
-      right.push root[i]
-
-    # Empty the root.
-    root.length = 0
-
-    # The left-most pivot or the right inner tier is null.
-    pivot = right[0].record
-    right[0].record = null
-
-    # Add the branches to the new left and right inner tiers to the now
-    # empty root tier.
-    root.push { pivot: null, address: left.address }
-    root.push { pivot, address: right.address }
-
-    # Set the child type of the root tier to inner.
-    root.penultimate = false
-
-    # Stage the dirty tiers for write.
-    @io.dirty root, left, right
-
-  # Determine if the root inner tier should be filled with contents of a two
-  # extra remaining inner tier children. When an root inner tier has only one
-  # inner tier child, the contents of that inner tier child becomes the root of
-  # the b-tree.
-  _shouldFillRoot: (mutation) ->
-    if not root.penultimate and root.length is 2
-      first = mutation.io.load root[0].childAddress
-      second = mutation.io.load root[1].childAddress
-      if first.length + second.length is @innerSize
-        mutations.parentLevel.operations.add @_fillRoot
-        return true
-    false
-
-  # Determines whether to merge two inner tiers into one tier or else to delete
-  # an inner tier that has only one child tier but is either the only child tier
-  # or its siblings are already full.
-  #
-  # **Only Children**
-  #
-  # It is possible that an inner tier may have only one child leaf or inner
-  # tier. This occurs in the case where the siblings of of inner tier are at
-  # capacity. A merge occurs when two children are combined. The nodes from the
-  # child to the right are combined with the nodes from the child to the left.
-  # The parent branch that referenced the right child is deleted.
-  # 
-  # If it is the case that a tier is next to full siblings, as leaves are
-  # deleted from that tier, it will not be a candidate to merge with a sibling
-  # until it reaches a size of one. At that point, it could merge with a sibling
-  # if a deletion were to cause its size to reach zero.
-  #
-  # However, the single child of that tier has no siblings with which it can
-  # merge. A tier with a single child cannot reach a size of zero by merging.
-  #
-  # If were where to drain the subtree of an inner tier with a single child of
-  # every leaf, we would merge its leaf tiers and merge its inner tiers until we
-  # had subtree that consisted solely of inner tiers with one child and a leaf
-  # with one item. At that point, when we delete the last item, we need to
-  # delete the chain of tiers with only children.
-  #
-  # We deleting any child that is size of one that cannot merge with a sibling.
-  # Deletion means freeing the child and removing the branch that references it.
-  #
-  # The only leaf child will not have a sibling with which it can merge,
-  # however. We won't be able to copy leaf items from a right leaf to a left
-  # leaf. This means we won't be able to update the linked list of leaves,
-  # unless we go to the left of the only child. But, going to the left of the
-  # only child requires knowing that we must go to the left.
-  #
-  # We are not going to know which left to take the first time down, though. The
-  # actual pivot is not based on the number of children. It might be above the
-  # point where the list of only children begins. As always, it is a pivot whose
-  # value matches the first item in the leaf, in this case the only item in the
-  # leaf.
-  # 
-  # Here's how it works.
-  #
-  # On the way down, we look for a branch that has an inner tier that is size of
-  # one. If so, we set a flag in the mutator to note that we are now deleting.
-  #
-  # If we encounter an inner tier has more than one child on the way down we are
-  # not longer in the deleting state.
-  #
-  # When we reach the leaf, if it has a size of one and we are in the deleting
-  # state, then we look in the mutator for a left leaf variable and an is left
-  # most flag. More on those later as neither are set.
-  #
-  # We tell the mutator that we have a last item and that the action has failed,
-  # by setting the fail action. Failure means we try again.
-  #
-  # On the retry, as we descend the tree, we have the last item variable set in
-  # the mutator.
-  #
-  # Note that we are descending the tree again. Because we are a concurrent data
-  # structure, the structure of the tree may change. I'll get to that. For now,
-  # let's assume that it has not changed.
-  #
-  # If it has not changed, then we are going to encounter a pivot that has our
-  # last item. When we encounter this pivot, we are going to go left. Going left
-  # means that we descend to the child of the branch before the branch of the
-  # pivot. We then follow each rightmost branch of each inner tier until we reach
-  # the right most leaf. That leaf is the leaf before the leaf that is about to
-  # be removed. We store this in the mutator.
-  #
-  # Of course, the leaf to be removed may be the left most leaf in the entire
-  # data structure. In that case, we set a variable named left most in the
-  # mutator.
-  #
-  # When we go left, we lock every inner tier and the leaf tier exclusive, to
-  # prevent it from being changed by another query in another thread. We always
-  # lock from left to right.
-  #
-  # Now we continue our descent. Eventually, we reach out chain of inner tiers
-  # with only one child. That chain may only be one level deep, but there will be
-  # such a chain.
-  #
-  # Now we can add a remove leaf operation to the list of operations in the
-  # parent level. This operation will link the next leaf of the left leaf to the
-  # next leaf of the remove leaf, reserving our linked list of leaves. It will
-  # take place after the normal remove operation, so that if the remove operation
-  # fails (because the item to remove does not actually exist) then the leave
-  # removal does not occur.
-  #
-  # I revisited this logic after a year and it took me a while to convince myself
-  # that it was not a misunderstanding on my earlier self's part, that these
-  # linked lists of otherwise empty tiers are a natural occurrence.
-  #
-  # The could be addressed by linking the inner tiers and thinking harder, but
-  # that would increase the size of the project.
-  _shouldMergeInner: (mutation) ->
-    # Find the child tier.
-    branch = @_find parent, mutation.fields
-    child = @_pool.load parent[branch].childAddress
-
-    # If we are on our way down to remove the last item of a leaf tier that is
-    # an only child, then we need to find the leaf to the left of the only child
-    # leaf tier. This means that we need to detect the branch that uses the the
-    # value of the last item in the only child leaf as a pivot. When we detect
-    # it we then navigate each right most branch of the tier referenced by the
-    # branch before it to find the leaf to the left of the only child leaf. We
-    # then make note of it so we can link it around the only child that is go be
-    # removed.
-    lockLeft = mutation.onlyChild and pivot? and not mutation.leftLeaf?
-    if lockLeft
-      lockLeft = @comparison(mutation.fields, @io.fields pivot) is 0
-    if lockLeft
-      # FIXME You need to hold these exclusive locks, so add an operation that
-      # is uncancelable, but does nothing.
-      index = parent.getIndexOfChildAddress(child.getAddress()) - 1
-      inner = parent
-      while not inner.childLeaf
-        inner = pool.load(mutation.getStash(), inner.getChildAddress(index))
-        levelOfParent.lockAndAdd(inner)
-        index = inner.getSize() - 1
-      leaf = pool.load(mutation.getStash(), inner.getChildAddress(index))
-      levelOfParent.lockAndAdd(leaf)
-      mutation.setLeftLeaf(leaf)
-
-    # When we detect an inner tier with an only child, we note that we have
-    # begun to descend a list of tiers with only one child.  Tiers with only one
-    # child are deleted rather than merged. If we encounter a tier with children
-    # with siblings, we are no longer deleting.
-    if child.length is 1
-      mutation.deleting = true
-      levelOfParent.operations.push @_removeInner(parent, child)
-      return true
-
-    # Determine if we can merge with either sibling.
-    listToMerge = []
-
-    index = parent.getIndexOfChildAddress(child.getAddress())
-    if index != 0
-      left = pool.load(mutation.getStash(), parent.getChildAddress(index - 1))
-      levelOfChild.lockAndAdd(left)
-      levelOfChild.lockAndAdd(child)
-      if left.getSize() + child.getSize() <= structure.getInnerSize()
-        listToMerge.add(left)
-        listToMerge.add(child)
-
-    if index is 0
-      levelOfChild.lockAndAdd(child)
-
-    if listToMerge.isEmpty() && index != parent.getSize() - 1
-      right = pool.load(mutation.getStash(), parent.getChildAddress(index + 1))
-      levelOfChild.lockAndAdd(right)
-      if (child.getSize() + right.getSize() - 1) == structure.getInnerSize()
-        listToMerge.add(child)
-        listToMerge.add(right)
-
-    # Add the merge operation.
-    if listToMerge.size() != 0
-      # If the parent or ancestors have only children and we are creating
-      # a chain of delete operations, we have to cancel those delete
-      # operations. We cannot delete an inner tier as the result of a
-      # merge, we have to allow this subtree of nearly empty tiers to
-      # exist. We rewind all the operations above us, but we leave the
-      # top two tiers locked exclusively.
-
-      # FIXME I'm not sure that rewind is going to remove all the
-      # operations. The number here indicates that two levels are
-      # supposed to be left locked exclusive, but I don't see in rewind,
-      # how the operations are removed.
-      if mutation.deleting
-        mutation.rewind 2
-        mutation.deleting = false
-
-      levelOfParent.operations.push new MergeInner(parent, listToMerge.get(0), listToMerge.get(1))
-
-      return true
-
-    # When we encounter an inner tier without an only child, then we are no
-    # longer deleting. Returning false will cause the Query to rewind the
-    # exclusive locks and cancel the delete operations, so the delete
-    # action is reset.
-    mutation.deleting = false
-
-    return false
- 
-  _shouldSplitInner: (mutation) ->
-    console.log "_shouldSplitInner"
-    structure = mutation.getStructure()
-    branch = parent.find(mutation.getComparable())
-    child = structure.getStorage().load(mutation.getStash(), parent.getChildAddress(branch))
-    levelOfChild.lockAndAdd(child)
-    if child.getSize() == structure.getInnerSize()
-      levelOfParent.operations.add(new SplitInner(parent, child))
-      return true
-    return false
-
-  _never: -> false
-
-  # Determine if the leaf that will hold the inserted value is full and ready
-  # to split, if it is full and part of linked list of b+tree leaves of
-  # duplicate index values, or it it can be inserted without splitting.
-  #
-  # TODO Now there is a chance that this might already be in a split state. What
-  # do we do? Do we create a new plan as we decend to test the current plan?
-  _howToInsertLeaf: (mutation, _) ->
-    # Find the branch that navigates to the leaf child.
-    branch = @_find mutation.parent.tier, mutation.fields, _
-    address = mutation.parent.tier.addresses[branch]
-    
-    # Lock the leaf exclusively.
-    mutation.child.exclusive = true
-    leaf = @_lock mutation.child, address, true, _
-    mutation.child.tier = leaf
-
-    # If the leaf size is equal to the maximum leaf size, then we either
-    # have a leaf that must split or a leaf that is full of objects that
-    # have the same index value. Otherwise, we have a leaf that has a free
-    # slot.
-    if leaf.addresses.length is @leafSize
-      # If the index value of the first value is equal to the index value
-      # of the last value, then we have a linked list of duplicate index
-      # values. Otherwise, we have a full page that can split.
-      first = @extractor leaf.record(0)
-      if @compartor(first, @extractor leaf.record(leaf.size() - 1)) is 0
-        # If the inserted value is less than the current value, create
-        # a new page to the left of the leaf, if it is greater create a
-        # new page to the right of the leaf. If it is equal, append the
-        # leaf to the linked list of duplicate index values.
-        compare = @comparator mutation.fields, first
-        # TODO We will never split left! The inserted value is never less than
-        # the first value in the leaf! Assert this and get rid of the left
-        # split.
-        if compare < 0
-          mutation.leafOperation = [ @_splitLinkedListLeft, parent ]
-        else if compare > 0
-          mutation.leafOperation = [ @_splitLinkedListRight, parent ]
-        else
-          mutation.leafOperation = [ @_insertLinkedList, leaf ]
-          split = false
-      else
-        # Insert the value and then split the leaf.
-        parentLevel.operations.push [ @_splitLeaf, parent ]
-        mutation.leafOperation = [ @_insertSorted, parent ]
-    else
-      # No split and the value is inserted into leaf.
-      mutation.leafOperation = [ @_insertSorted, leaf ]
-      split = false
-
-    # Let the caller know if we've added a split operation.
-    split
-
-# Mark the operations that split or merge the tree. These are the operations we
-# cancel if split or merge is not necessary, because a decendent tier will not
-# split or merge.
-# 
-# That is, splits and merges ripple up from the leaves, so if
-# the root, say is empty and ready to merge, we will lock it to merge it, but if
-# it has an inner tier child that is not ready to merge, we remove the root
-# merge operation. If there are no other operations in the tier we can unlock it.
-#
-# Swap operations are not cancelable.
-for operation in "_drainRoot".split /\n/
-  module.exports.Strata.prototype[operation].isSplitOrMerge = true
