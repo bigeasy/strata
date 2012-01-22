@@ -1169,22 +1169,20 @@ class IO
     key
 
   find: (page, key, low, _) ->
-    high = page.count - 1
-    compare = -1
-    mid  = 0
-
-    # Classic binary search.
     { comparator } = @
-    while compare isnt 0 and low <= high
+    high = page.count - 1
+    # Classic binary search.
+    while low <= high
       mid = (low + high) >>> 1
       compare = comparator key, @key(page, mid, _)
       if compare > 0
         low = mid + 1
-      else
+      else if compare < 0
         high = mid - 1
-
+      else
+        return mid
     # Index is negative if not found.
-    if compare is 0 then mid else ~mid
+    ~low
 
 # ## Descent
 #
@@ -2054,7 +2052,8 @@ class Iterator
 # means that the series is zero. Deleted keys present a problem, so we need to
 # expose a leaf page key to the user, which, in case of a delete, is definately
 # the greatest in the series.
-
+#
+# TODO Zero is a valid index for the left most leaf page.
 
 #
 class Mutator extends Iterator
@@ -2162,7 +2161,7 @@ class Descent
 
 
     index = @io.find page, @key, 1, _
-    index = ~index if index < 0
+    index = (~index) - 1 if index < 0
     first and= index is 0
 
     page = @io.lock page.addresses[index], exclusive, _
