@@ -613,7 +613,7 @@ class IO
 
     # Calcuate a buffer length. Take note of the current page position.
     json            = JSON.stringify object
-    position        = page.positon
+    position        = page.position
     length          = Buffer.byteLength(json, "utf8")
     buffer          = new Buffer(length + 1)
     offset          = 0
@@ -731,8 +731,21 @@ class IO
     offset    = -1
     end       = stat.size
     eol       = stat.size
-    cache     = {}
     buffer    = new Buffer(1024)
+    # TODO You can edit your files, and you can certainly read them, but know
+    # that they are fragile. We treat extra whitespace as corruption, an
+    # indication that something is wrong. We're not forgiving, because that
+    # would complicate the code, also introduce ambigutities. If this were a
+    # binary file format, there would be no forgiveness. If we were truly a
+    # human format, then certianly there would be forgiveness, but we're not,
+    # not really a text format for editing, only one for sanity checking. Thus a
+    # line alway ends with `"]\n"`, so we know that something is wrong. If the
+    # last line does not end this way, it is treated as a bad write and the
+    # record is discarded. Now, we could do that, but the chances that a
+    # developer will dip into the files and make an edit are rather high. Hmm...
+    # But we store file positions, so making an edit will corrupt the files.
+    #
+    # TODO Thinking about using SHA1 as a checksum and resuming it for each line.
     while end
       end     = eol
       start   = end - buffer.length
@@ -756,7 +769,7 @@ class IO
             end = 0
             break
           else
-            position = start + read
+            position = start + read + 1
             splices.push [ index, position ]
             if index > 0
               @cachePosition(page, position)
@@ -1910,7 +1923,7 @@ class Iterator
 
   # Get a the record at the given `index` from the current leaf page.
   get: (index, _) ->
-    if not index < @_page.count
+    if not (@index <= index < @length)
       throw new Error "index out of bounds"
 
     @_io.stash(@_page, index, _).record
@@ -2083,14 +2096,13 @@ class Mutator extends Iterator
         # Cache the current count.
         @_io.balancer.unbalanced(@_page)
 
-      # Since we need to fsync anyway, we open the file and and close the file
-      # when we append a JSON object to it. Because no file handles are kept
-      # open, the b-tree object can simply be reaped by the garbage collection.
+        # Since we need to fsync anyway, we open the file and and close the file
+        # when we append a JSON object to it. Because no file handles are kept
+        # open, the b-tree object can left to garbage collection.
         filename = @_io.filename @_page.address
         fd = fs.open filename, "a", 0644, _
         position = @_io.writeInsert fd, @_page, index, record, _
         fs.close fd, _
-
 
         @_page.positions.splice index, 0, position
         @_page.count++
