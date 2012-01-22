@@ -1,8 +1,8 @@
 #!/usr/bin/env coffee-streamline
 return if not require("streamline/module")(module)
 fs = require "fs"
-require("./harness") 2, ({ Strata, directory, fixture: { serialize, load, objectify } }, _) ->
-  serialize "#{__dirname}/fixtures/between.json", directory, _
+require("./harness") 3, ({ Strata, directory, fixture: { serialize, load, objectify } }, _) ->
+  serialize "#{__dirname}/fixtures/between.after.json", directory, _
 
   strata = new Strata directory: directory, leafSize: 3, branchSize: 3
   strata.open(_)
