@@ -1742,7 +1742,9 @@ class IO
 
 class Balancer
   constructor: ->
+    @referenced = {}
     @counts = {}
+    @operations = []
 
   unbalanced: (page) ->
     if not @counts[page.address]?
@@ -1759,16 +1761,31 @@ class Balancer
     else
       last.differences[page.address] += differnece
 
-  balance: (@io) ->
+  # TODO If it is not exposed to the user, I don't unbar it.
+  reference: (page) ->
+    if not @referenced[page.address]
+      page.balancers++
+      @referenced[page.address] = true
+
+  # TODO You will have to launch this in a worker thread, otherwise there is no
+  # good way for you to handle the error, or rather, you're going to have to
+  # have some form of error callback, which is a pattern I'd like to avoid.
+  balance: (@io, _) ->
     @io.balancer = new Balancer
 
     ordered = {}
     merge = {}
+    seen = {}
 
     for address, count of @counts
-      page = @io.cache[address]
+      address = parseInt address, 10
+      page = @io.lock address, false, _
       difference = page.count - count
-      if difference < 0
+      if difference > 0 and page.count > @io.options.leafSize
+        @reference(page)
+        @operations.push type: "splitLeaf", address: address
+      else if difference < 0
+        referenced = true
         if page.address is 1
           ordered[page.address] = { page }
         else
@@ -1784,8 +1801,15 @@ class Balancer
           if not self.right
             self.right = right
           delete ordered[page.right]
+      @io.unlock page
+    
+    for operation in @operations
+      @[operation.type](operation, _)
 
-  splitLeaf: (branch, key, _) ->
+  splitLeaf: ({ address }, _) ->
+    say "SPLITTING #{address}"
+
+  _splitLeaf: (branch, key, _) ->
     address = branch.addresses[@io.find(child, @key, 1, _)]
     @exclusive.push leaf = @io.lock address, true, true, _
 
@@ -2222,6 +2246,7 @@ class Descent
     compare = @comparator(full, leftKey = @io.key(child, 0, _))
     if compare is 0
       return if leftKey isnt key
+
 class exports.Strata
   # Construct the Strata from the options.
   constructor: (options) ->
@@ -2272,3 +2297,5 @@ class exports.Strata
     sorted.sort (a, b) -> comparator(a.key, b.key)
 
     sorted
+
+  balance: (_) -> @_io.balancer.balance(@_io, _)
