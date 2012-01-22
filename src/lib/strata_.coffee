@@ -921,6 +921,11 @@ class IO
   #
   # An empty database has a single root penultimate branch page with only a left
   # child and no keys. The left child is a single leaf page that is empty.
+  #
+  # Note that the address of the root branch page is `0` and the address of the
+  # left most leaf page is `-1`. This will not change. Even as the b-tree is
+  # balanced with splits and mergers of leaf pages, the root branch page is
+  # always `0` and left most leaf page is always `-1`.
 
   #
   create: (_) ->
