@@ -1329,6 +1329,343 @@ class IO
 # left right ordering regardless of whether we're navigating using a page's link
 # to it's right sibling, or whether we're referencing a branch page's children
 # pages.
+
+class Descent
+  # The constructor always felt like a dangerous place to be doing anything
+  # meaningful in C++ or Java.
+  constructor: (@io) ->
+    @locks      = []
+    @locked     = {}
+    @first      = true
+    @page       = { addresses: [ 0 ], leaf: false }
+    @index      = 0
+    @exact      = false
+    @exclusive  = false
+
+  key: (key) ->
+    { io } = @
+    (page, _) -> io.find page, key, 1, _
+
+  iterate: (page) ->
+    @first = false
+
+  leftMost: (page, _) -> 0
+
+  penultimate: (page) -> page.addresses[0] < 0
+
+  leaf: (page) -> page.leaf
+
+  exclude: -> @exclusive = true
+
+  descend: (next, stop, _) ->
+    while not stop(@page, @index, @exact)
+      parent = @page
+      @page = @io.lock parent.addresses[@index], @exclusive, _
+      @io.unlock parent if parent.address?
+      @index = next @page, _
+      if @index < 0
+        @index = (~@index) - 1
+        @exact = false
+      else
+        @exact = true
+      @first and= @index is 0
+          
+# ## Cursors
+# 
+# When the application developer requests a cursor, they receive either a read
+# only *iterator*, or a read/write *mutator*.
+#
+# An interator provides random access to the records in a page. It can move from
+# a page to the right sibling of the page. A mutator does the same, but it is
+# also able to insert or delete records into the current page.
+#
+# ### Iterator
+#
+# The application developer uses an iterator to move across the leaf pages of
+# the b-tree in ascending collation order, one leaf page a time. The leaf pages
+# themselves are visited one at a time, not the records. The iterator can
+# randomly access any record a the currently visited leaf page.
+#
+# The application developer obtains an iterator by calling `Strata.cursor` and
+# providing a key. The key is used to find the page that would contain the key.
+# Alternatively, the application developer can obtain an iterator that begins at
+# the left most leaf page by by calling `Strata.first`. 
+#
+# By locking the pages left to right hand over hand, then there is now way for
+# the tree to mutate such that would defeat our iteration. Leaf pages that we've
+# visited may by edited by another descent after we've visited them, however.
+
+#
+class Iterator
+  # #### Ambiguous Range Start
+  #
+  # As the result of a descent, we will know the index of the record that
+  # corresponds to the key used to find the leaf page. This is either the index
+  # of the key's record, or if there no record that could derive the key in the
+  # b-tree, the location where the key's record would be inserted.
+  #
+  # There are good reasons to search for key that does not exist in the tree. We
+  # may be interested in searching for time series data that occured between
+  # noon and midnight. It doesn't matter to us if there were no events that
+  # occured exactly at the millisecond that defines noon.
+  #
+  # We are interested in starting our iteration from where that record would be.
+  # That is the insert location of the millisecond that defines noon. We need a
+  # way to find an ***insert location*** for a record, in order to implement a
+  # ranged search.
+  #
+  # When we ask for the insert location of a key, if the key is greater than the
+  # largest record in the leaf page, then the index is the end of the leaf page.
+  # If this is the case, the real insert location might be in the right sibling
+  # leaf page, or in a page beyond the right sibling leaf page. We won't know
+  # for certain if the non-existing record would be in the current leaf page
+  # without testing to see if it is less than the first record of the right
+  # sibling page.
+  #
+  # However, we do know that the first leaf page is the correct leaf page for
+  # the search key, because we used a b-tree descent to find the page. That is
+  # unambiguous. When we search for the search key in the leaf page, even if it
+  # does not exist, and is greater than the last record, we still know for
+  # certain that the key does not belong to any of the right siblings.
+  #
+  # The challenge here is an interface challenge. How do we convey the range to
+  # the application developer? We cannot expose the binary search, because the
+  # results of a binary search for a missing key are unambiguous only for the
+  # first leaf page, and only if the key is same search key that brought us to
+  # the first page.
+  #
+  # We expose an `index` property that is the index of the least record that is
+  # equal to or greater than the search key in the current page.
+  # 
+  # When we move to a right sibling leaf page, the index property is set to
+  # point to the first undeleted record in the leaf page. A leaf page will
+  # retain a delete first record until the next balance, perserving it because
+  # the record key is used as key in the branch pages. The index is zero if
+  # there is no ghost record, or one if there is a ghost record. It is never
+  # more than one.
+  # 
+  # Use the page index to begin iteration over the records in the leaf page.
+  #
+  # Additional public properties of the `Iterator` are the `key` used to create
+  # the iterator, `found` which indicates whether or not the record actually
+  # exists in the b-tree, `count` which is the number of leaf pages visited by
+  # this iterator, and `exclusive` indicating whehter we are an iterator or
+  # a mutator. This properties are read-only, so make sure you only read them.
+
+  # 
+  constructor: (@key, @index, @found, { io, page, first, exclusive }) ->
+    @_page = page
+    @_io = io
+    @length = @_page.positions.length
+    @count = 1
+    @exclusive = exclusive
+    @first = first
+
+  # Get a the record at the given `index` from the current leaf page.
+  get: (index, _) ->
+    if not (@index <= index < @length)
+      throw new Error "index out of bounds"
+
+    @_io.stash(@_page, index, _).record
+
+  # Go to the next leaf page. Returns true if there is a next, false if there
+  # the current leaf page is the last leaf page.
+  next: (_) ->
+    if @_page.right > 0
+      if @_next
+        next = @_next
+        @_next = null
+      else
+        next = @_io.lock @_page.right, @_exclusive, _
+      @_io.unlock @_page
+      @_page = next
+      true
+    else
+      false
+
+  indexOf: (key, _) ->
+    @_io.find @_page, key, @_page.deleted, _
+
+  # Unlock all leaf pages held by the iterator.
+  unlock: ->
+    @_io.unlock @_page
+    @_io.unlock @_next if @_next
+
+# ### Mutator
+
+# A mutator is an iterator that can also edit leaf pages. It can delete records
+# from the currently visit leaf page. It can insert records into the current
+# leaf page, if the record belongs in the current leaf page. Like an `Iterator`
+# it  moves bacross the leaf pages of an the b-tree in ascending collation
+# order. It has random access to the records in the page using an index into the
+# array of records.
+#
+# #### Ambiguous Insert Locations
+# 
+# Like the ambiguous range starts above, insert locations for new records can be
+# ambiguous if the binary search indicates that a record should be inserted at
+# the end of the leaf page, after the current last record in the leaf page. If
+# the insert location is after the last record, it could be the case that the
+# record really belongs to a right sibling leaf page page.
+#
+# As in the case of ambiguous range starts, an insert location is unambiguous if
+# the key is the search key used to locate the first page of the mutator. The
+# key is determined to belong inside the leaf page by virtue of a desent of the
+# b-tree. That is unambiguous.
+#
+# Using the example of time series data again, the application developer may
+# have an hour of events she wishes to insert into a day of events, within a
+# b-tree of years of events. Because the events took place within an hour, they
+# would all be inserted into leaf pages that are close to each other, perhaps
+# right next to each other, or maybe they all fall within a single leaf page.
+# 
+# Rather than inserting an event at a time, desecnding the tree for each event,
+# the application developer can create a mutator uses the earliest event as a
+# key. This will give her the correct page for that first event. She can then
+# insert the remainder of the events in their ascending order, while moving
+# forward with the mutator in ascending order. If an event does not belong in
+# the current leaf page, she can move the mutator forward to the next leaf page
+# and see if it belongs there.
+#
+# The problem is that, after inserting that first record, if we determine that
+# the  insert location for a subsequent record is after the last record on the
+# current page, then it could be the case that it really belongs in in some
+# right sibling page. If the first key of the next sibling page is less than or
+# equal to the insert key, then we are on the wrong page. Unless we inspect the
+# next page, the insert location is ambiguous.
+#
+# To obtain an unambiguous insert location without descending the b-tree to
+# create a new mutator, we add a `Mutator.peek` method.
+#
+# This gives the mutator permission to peek at the right sibling leaf page of
+# the current leaf page, to determine if a record whose insert location is after
+# the last record of the current page.
+#
+# If you do not grant the mutator permission to peek, then you cannot use the
+# mutator to insert records into subsequent pages. You have to grant permission
+# to peek for each page.
+# 
+# Why would you want to deny permission to peek when you're inserting a set of
+# records? Maybe you're not certain that the records are close togther.
+#
+# Let's say our application developer wants to insert a set of events, but only
+# a few of those events occured at or about the same time. They are for the most
+# part in completely different months of the year.
+#
+# She might take the opportunity to see if the next event belongs on the current
+# leaf page, but if it is actually a month away, the insert location will
+# definately be after the last record in the page. She might not want to load
+# the next page to resolve the ambiguity, when it is not likely to be resovled
+# that the currnet leaf page is the correct leaf page.  Instead, she creates a
+# new mutator to resolve the ambiguity, even though there is a slight chance
+# she'll come back to the same page.
+#
+# If she is only inserting a single record, there's no ambiguity, because she'll
+# use the key of the record to create the mutator. There is no need to enable
+# peek for a single insert, but there is no real cost either.
+#
+# TODO The lock must held because deleting the record definately can change
+# during editing. The balancer can swoop in and prune the dead first records and
+# thereby change the key. It could not delete the page nor merge the page, but
+# it can prune dead first records.
+#
+# The lock is held becase the first record of the next sibling might otherwise
+# change, it might be deleted. When the first key is deleted, the range of the
+# the keys that valid for the current page increases. We have a race condition
+# where we might reject an insertion into the current record because it is
+# less than the first key of the next, but the first key of the next page has
+# been deleted, and the current record is less than the range of the new first
+# key, it is within the extended range.
+#
+# duplicate keys: Duplicate keys again. Now it occurs to me that duplicates are
+# actually not difficult for the application developer to implement given a
+# mutator. The application developer can move forward through a series and
+# append a record that has one greater than the maximum record.  Not a problem
+# to worry about ambiguity in this case. Ah, we need to peek though, because we
+# need to get that number.
+#
+# In fact, given a key plus a maximum series value, you will always land after
+# the last one the series, or else a record that is less than the key, which
+# means that the series is zero. Deleted keys present a problem, so we need to
+# expose a leaf page key to the user, which, in case of a delete, is definately
+# the greatest in the series.
+#
+# TODO Zero is a valid index for the left most leaf page.
+
+#
+class Mutator extends Iterator
+  peek: ->
+    peeking = @_peek is @_count
+    @_peek = @_count
+    peeking
+
+  insert: (object, _) ->
+    if object instanceof Cassette
+      { key, record } = object
+    else
+      [ record, key ]  = [ object, @_io.extractor object ]
+
+    # If we are at the first page and the key is equal to the key that created
+    # the mutator, than this is the correct leaf page for the record.
+    unambiguous = @count is 1 and @key and @_io.comparator(@key, key) is 0
+
+    if unambiguous
+      [ index, found ] = [ @index, @found ]
+    else
+      index = @_io.find page, key, page.deleted, _
+      unless found = (index >= 0)
+        index = ~index
+      unambiguous = index <= page.count
+
+    if found
+      # TODO Special case: adding a first second copy of a record that has been
+      # deleted, but still exists. We put the new record after the first record
+      # and it exists as a special kind of duplicate.
+      # TODO Think harder about this. It seems like it would work.
+      # TODO No, we're not including the `0` in the range.
+      index = ~index
+
+    if index is 0 and not @first
+      throw new Error "lesser key"
+    else if index >= 0
+      if not unambiguous and @_peek is @_count
+        unless unambiguous = page.next is -1
+          @_next or= @_io.lock @_page.right, @_exclusive, true, _
+          unambiguous = @_io.compare(key, @_io.key(@_next, 0, _)) < 0
+
+      if unambiguous
+        # Cache the current count.
+        @_io.balancer.unbalanced(@_page)
+
+        # Since we need to fsync anyway, we open the file and and close the file
+        # when we append a JSON object to it. Because no file handles are kept
+        # open, the b-tree object can left to garbage collection.
+        filename = @_io.filename @_page.address
+        fd = fs.open filename, "a", 0644, _
+        position = @_io.writeInsert fd, @_page, index, record, _
+        fs.close fd, _
+
+        @_page.positions.splice index, 0, position
+        @_page.count++
+        @length = @_page.positions.length
+      else
+        index = 0
+    index
+
+  delete: (index, _) ->
+    if not (0 <= index < @_page.count)
+      throw new Error "index out of bounds"
+
+    @_io.balancer.unbalanced(@_page)
+
+    filename = @_io.filename @_page.address
+    fd = fs.open filename, "a", 0644, _
+    position = @_io.writeDelete fd, @_page, index, index is 0 and not @first, _
+    fs.close fd, _
+    
+    @_page.positions.splice index, 1 if index > 0 or @first
+    @_page.count--
+    @length = @_page.positions.length
 #
 # #### Insertion and Deletion Verus Balance
 #
@@ -2043,346 +2380,9 @@ class Balancer
       @io.relink(child, _)
 
       --paritions
-          
-# ## Cursors
-# 
-# When the application developer requests a cursor, they receive either a read
-# only *iterator*, or a read/write *mutator*.
-#
-# An interator provides random access to the records in a page. It can move from
-# a page to the right sibling of the page. A mutator does the same, but it is
-# also able to insert or delete records into the current page.
-#
-# ### Iterator
-#
-# The application developer uses an iterator to move across the leaf pages of
-# the b-tree in ascending collation order, one leaf page a time. The leaf pages
-# themselves are visited one at a time, not the records. The iterator can
-# randomly access any record a the currently visited leaf page.
-#
-# The application developer obtains an iterator by calling `Strata.cursor` and
-# providing a key. The key is used to find the page that would contain the key.
-# Alternatively, the application developer can obtain an iterator that begins at
-# the left most leaf page by by calling `Strata.first`. 
-#
-# By locking the pages left to right hand over hand, then there is now way for
-# the tree to mutate such that would defeat our iteration. Leaf pages that we've
-# visited may by edited by another descent after we've visited them, however.
-
-#
-class Iterator
-  # #### Ambiguous Range Start
-  #
-  # As the result of a descent, we will know the index of the record that
-  # corresponds to the key used to find the leaf page. This is either the index
-  # of the key's record, or if there no record that could derive the key in the
-  # b-tree, the location where the key's record would be inserted.
-  #
-  # There are good reasons to search for key that does not exist in the tree. We
-  # may be interested in searching for time series data that occured between
-  # noon and midnight. It doesn't matter to us if there were no events that
-  # occured exactly at the millisecond that defines noon.
-  #
-  # We are interested in starting our iteration from where that record would be.
-  # That is the insert location of the millisecond that defines noon. We need a
-  # way to find an ***insert location*** for a record, in order to implement a
-  # ranged search.
-  #
-  # When we ask for the insert location of a key, if the key is greater than the
-  # largest record in the leaf page, then the index is the end of the leaf page.
-  # If this is the case, the real insert location might be in the right sibling
-  # leaf page, or in a page beyond the right sibling leaf page. We won't know
-  # for certain if the non-existing record would be in the current leaf page
-  # without testing to see if it is less than the first record of the right
-  # sibling page.
-  #
-  # However, we do know that the first leaf page is the correct leaf page for
-  # the search key, because we used a b-tree descent to find the page. That is
-  # unambiguous. When we search for the search key in the leaf page, even if it
-  # does not exist, and is greater than the last record, we still know for
-  # certain that the key does not belong to any of the right siblings.
-  #
-  # The challenge here is an interface challenge. How do we convey the range to
-  # the application developer? We cannot expose the binary search, because the
-  # results of a binary search for a missing key are unambiguous only for the
-  # first leaf page, and only if the key is same search key that brought us to
-  # the first page.
-  #
-  # We expose an `index` property that is the index of the least record that is
-  # equal to or greater than the search key in the current page.
-  # 
-  # When we move to a right sibling leaf page, the index property is set to
-  # point to the first undeleted record in the leaf page. A leaf page will
-  # retain a delete first record until the next balance, perserving it because
-  # the record key is used as key in the branch pages. The index is zero if
-  # there is no ghost record, or one if there is a ghost record. It is never
-  # more than one.
-  # 
-  # Use the page index to begin iteration over the records in the leaf page.
-  #
-  # Additional public properties of the `Iterator` are the `key` used to create
-  # the iterator, `found` which indicates whether or not the record actually
-  # exists in the b-tree, `count` which is the number of leaf pages visited by
-  # this iterator, and `exclusive` indicating whehter we are an iterator or
-  # a mutator. This properties are read-only, so make sure you only read them.
-
-  # 
-  constructor: (@key, @index, @found, { io, page, first, exclusive }) ->
-    @_page = page
-    @_io = io
-    @length = @_page.positions.length
-    @count = 1
-    @exclusive = exclusive
-    @first = first
-
-  # Get a the record at the given `index` from the current leaf page.
-  get: (index, _) ->
-    if not (@index <= index < @length)
-      throw new Error "index out of bounds"
-
-    @_io.stash(@_page, index, _).record
-
-  # Go to the next leaf page. Returns true if there is a next, false if there
-  # the current leaf page is the last leaf page.
-  next: (_) ->
-    if @_page.right > 0
-      if @_next
-        next = @_next
-        @_next = null
-      else
-        next = @_io.lock @_page.right, @_exclusive, _
-      @_io.unlock @_page
-      @_page = next
-      true
-    else
-      false
-
-  indexOf: (key, _) ->
-    @_io.find @_page, key, @_page.deleted, _
-
-  # Unlock all leaf pages held by the iterator.
-  unlock: ->
-    @_io.unlock @_page
-    @_io.unlock @_next if @_next
-
-# ### Mutator
-
-# A mutator is an iterator that can also edit leaf pages. It can delete records
-# from the currently visit leaf page. It can insert records into the current
-# leaf page, if the record belongs in the current leaf page. Like an `Iterator`
-# it  moves bacross the leaf pages of an the b-tree in ascending collation
-# order. It has random access to the records in the page using an index into the
-# array of records.
-#
-# #### Ambiguous Insert Locations
-# 
-# Like the ambiguous range starts above, insert locations for new records can be
-# ambiguous if the binary search indicates that a record should be inserted at
-# the end of the leaf page, after the current last record in the leaf page. If
-# the insert location is after the last record, it could be the case that the
-# record really belongs to a right sibling leaf page page.
-#
-# As in the case of ambiguous range starts, an insert location is unambiguous if
-# the key is the search key used to locate the first page of the mutator. The
-# key is determined to belong inside the leaf page by virtue of a desent of the
-# b-tree. That is unambiguous.
-#
-# Using the example of time series data again, the application developer may
-# have an hour of events she wishes to insert into a day of events, within a
-# b-tree of years of events. Because the events took place within an hour, they
-# would all be inserted into leaf pages that are close to each other, perhaps
-# right next to each other, or maybe they all fall within a single leaf page.
-# 
-# Rather than inserting an event at a time, desecnding the tree for each event,
-# the application developer can create a mutator uses the earliest event as a
-# key. This will give her the correct page for that first event. She can then
-# insert the remainder of the events in their ascending order, while moving
-# forward with the mutator in ascending order. If an event does not belong in
-# the current leaf page, she can move the mutator forward to the next leaf page
-# and see if it belongs there.
-#
-# The problem is that, after inserting that first record, if we determine that
-# the  insert location for a subsequent record is after the last record on the
-# current page, then it could be the case that it really belongs in in some
-# right sibling page. If the first key of the next sibling page is less than or
-# equal to the insert key, then we are on the wrong page. Unless we inspect the
-# next page, the insert location is ambiguous.
-#
-# To obtain an unambiguous insert location without descending the b-tree to
-# create a new mutator, we add a `Mutator.peek` method.
-#
-# This gives the mutator permission to peek at the right sibling leaf page of
-# the current leaf page, to determine if a record whose insert location is after
-# the last record of the current page.
-#
-# If you do not grant the mutator permission to peek, then you cannot use the
-# mutator to insert records into subsequent pages. You have to grant permission
-# to peek for each page.
-# 
-# Why would you want to deny permission to peek when you're inserting a set of
-# records? Maybe you're not certain that the records are close togther.
-#
-# Let's say our application developer wants to insert a set of events, but only
-# a few of those events occured at or about the same time. They are for the most
-# part in completely different months of the year.
-#
-# She might take the opportunity to see if the next event belongs on the current
-# leaf page, but if it is actually a month away, the insert location will
-# definately be after the last record in the page. She might not want to load
-# the next page to resolve the ambiguity, when it is not likely to be resovled
-# that the currnet leaf page is the correct leaf page.  Instead, she creates a
-# new mutator to resolve the ambiguity, even though there is a slight chance
-# she'll come back to the same page.
-#
-# If she is only inserting a single record, there's no ambiguity, because she'll
-# use the key of the record to create the mutator. There is no need to enable
-# peek for a single insert, but there is no real cost either.
-#
-# TODO The lock must held because deleting the record definately can change
-# during editing. The balancer can swoop in and prune the dead first records and
-# thereby change the key. It could not delete the page nor merge the page, but
-# it can prune dead first records.
-#
-# The lock is held becase the first record of the next sibling might otherwise
-# change, it might be deleted. When the first key is deleted, the range of the
-# the keys that valid for the current page increases. We have a race condition
-# where we might reject an insertion into the current record because it is
-# less than the first key of the next, but the first key of the next page has
-# been deleted, and the current record is less than the range of the new first
-# key, it is within the extended range.
-#
-# duplicate keys: Duplicate keys again. Now it occurs to me that duplicates are
-# actually not difficult for the application developer to implement given a
-# mutator. The application developer can move forward through a series and
-# append a record that has one greater than the maximum record.  Not a problem
-# to worry about ambiguity in this case. Ah, we need to peek though, because we
-# need to get that number.
-#
-# In fact, given a key plus a maximum series value, you will always land after
-# the last one the series, or else a record that is less than the key, which
-# means that the series is zero. Deleted keys present a problem, so we need to
-# expose a leaf page key to the user, which, in case of a delete, is definately
-# the greatest in the series.
-#
-# TODO Zero is a valid index for the left most leaf page.
-
-#
-class Mutator extends Iterator
-  peek: ->
-    peeking = @_peek is @_count
-    @_peek = @_count
-    peeking
-
-  insert: (object, _) ->
-    if object instanceof Cassette
-      { key, record } = object
-    else
-      [ record, key ]  = [ object, @_io.extractor object ]
-
-    # If we are at the first page and the key is equal to the key that created
-    # the mutator, than this is the correct leaf page for the record.
-    unambiguous = @count is 1 and @key and @_io.comparator(@key, key) is 0
-
-    if unambiguous
-      [ index, found ] = [ @index, @found ]
-    else
-      index = @_io.find page, key, page.deleted, _
-      unless found = (index >= 0)
-        index = ~index
-      unambiguous = index <= page.count
-
-    if found
-      # TODO Special case: adding a first second copy of a record that has been
-      # deleted, but still exists. We put the new record after the first record
-      # and it exists as a special kind of duplicate.
-      # TODO Think harder about this. It seems like it would work.
-      # TODO No, we're not including the `0` in the range.
-      index = ~index
-
-    if index is 0 and not @first
-      throw new Error "lesser key"
-    else if index >= 0
-      if not unambiguous and @_peek is @_count
-        unless unambiguous = page.next is -1
-          @_next or= @_io.lock @_page.right, @_exclusive, true, _
-          unambiguous = @_io.compare(key, @_io.key(@_next, 0, _)) < 0
-
-      if unambiguous
-        # Cache the current count.
-        @_io.balancer.unbalanced(@_page)
-
-        # Since we need to fsync anyway, we open the file and and close the file
-        # when we append a JSON object to it. Because no file handles are kept
-        # open, the b-tree object can left to garbage collection.
-        filename = @_io.filename @_page.address
-        fd = fs.open filename, "a", 0644, _
-        position = @_io.writeInsert fd, @_page, index, record, _
-        fs.close fd, _
-
-        @_page.positions.splice index, 0, position
-        @_page.count++
-        @length = @_page.positions.length
-      else
-        index = 0
-    index
-
-  delete: (index, _) ->
-    if not (0 <= index < @_page.count)
-      throw new Error "index out of bounds"
-
-    @_io.balancer.unbalanced(@_page)
-
-    filename = @_io.filename @_page.address
-    fd = fs.open filename, "a", 0644, _
-    position = @_io.writeDelete fd, @_page, index, index is 0 and not @first, _
-    fs.close fd, _
-    
-    @_page.positions.splice index, 1 if index > 0 or @first
-    @_page.count--
-    @length = @_page.positions.length
 
 class Cassette
   constructor: (@record, @key) ->
-
-class Descent
-  # The constructor always felt like a dangerous place to be doing anything
-  # meaningful in C++ or Java.
-  constructor: (@io) ->
-    @locks      = []
-    @locked     = {}
-    @first      = true
-    @page       = { addresses: [ 0 ], leaf: false }
-    @index      = 0
-    @exact      = false
-    @exclusive  = false
-
-  key: (key) ->
-    { io } = @
-    (page, _) -> io.find page, key, 1, _
-
-  iterate: (page) ->
-    @first = false
-
-  leftMost: (page, _) -> 0
-
-  penultimate: (page) -> page.addresses[0] < 0
-
-  leaf: (page) -> page.leaf
-
-  exclude: -> @exclusive = true
-
-  descend: (next, stop, _) ->
-    while not stop(@page, @index, @exact)
-      parent = @page
-      @page = @io.lock parent.addresses[@index], @exclusive, _
-      @io.unlock parent if parent.address?
-      @index = next @page, _
-      if @index < 0
-        @index = (~@index) - 1
-        @exact = false
-      else
-        @exact = true
-      @first and= @index is 0
 
 class exports.Strata
   # Construct the Strata from the options.
