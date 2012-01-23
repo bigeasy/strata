@@ -1,34 +1,32 @@
-# A Streamline.js friendly evented I/O b-tree for node.js.
-#
-# TK Our I/O page storage an in memory page structures are inherently sparse.
+# A Streamline.js friendly evented I/O b-tree for Node.js.
 #
 # ## Purpose
 #
 # Strata stores JSON objects on disk, according to a sort order of your
-# choosing, indexed for fast retrieval. Faster than a flat file. Lighter than a
-# database. More capacity than an in memory tree.
+# choosing, indexed for fast retrieval.
+#
+# Strata is Faster than a flat file, lighter than a database, with more capacity
+# than an in memory tree.
 # 
 # Strata is a [b-tree](http://en.wikipedia.org/wiki/B-tree) implementation for
-# [Node.js](http://nodejs.org/) that **evented**, **concurrent**, **perstant**
+# [Node.js](http://nodejs.org/) that **evented**, **concurrent**, **persistant**
 # and **durable**.
 #
-# Strata is **evented** because it uses asynchronous I/O to read and write
-# b-tree pages, allowing your CPU to continue to do work while Strata waits on
-# I/O.
+# Strata is **evented**. It uses asynchronous I/O to read and write b-tree
+# pages, allowing your CPU to continue to do work while Strata waits on I/O.
 #
 # Strata is **concurrent**. Strata will satisfy any queries from its in memory
-# cache that it can, even while waiting on evented I/O to load. It queues the
-# I/O, but keeps the main thread of execution busy while the I/O completes.
-# Strata keeps your CPU and I/O busy when requests are heavy.
+# cache when it can, so requests can be satisifed, even when there are evented
+# I/O requests outstanding.
 #
 # Strata is **persistant**. It stores your tree in page files. The page files
-# are plain old JSON. You can open them up in a `vim` or EMACS, back them up
-# using `textutils`, check them into `git`, and munge them with JavaScript. It's
-# your data, you ought to be able to read it.
+# are plain old JSON, text files that are easy to manage. You can open them up
+# in a `vim` or EMACS, back them up using `tar`, check them into `git`, and
+# munge them with JavaScript.
 #
 # Strata is **durable**. It only appends records to to file, so a hard shutdown
-# will only ever lose the few last records added. When pages jornaled when they
-# are vaccumed and rewritten.
+# will only ever lose the few last records added. Pages are journaled when they
+# are vacuumed or rewritten. 
 #
 # Strata is a b-tree. A b-tree is a database primiative. Using Strata, you can
 # start to experiment with database designs of your own. You can use Strata to
@@ -36,10 +34,10 @@
 # to create relationship indexes. You can use Strata to store what ever form of
 # JSON suits your needs like NoSQL databases.
 #
-# It runs anywhere that Node.js runs, in pure JavaScript.
+# Strata is two database primatives in one, because with a time series index,
+# you can use Strata as a write ahead-log.
 #
-# Maybe you need a database server, or maybe Strata is all you need to get your
-# next application growing.
+# Strata runs anywhere that Node.js runs, in pure JavaScript.
 #
 # ## Terminology
 #
@@ -50,10 +48,15 @@
 # out of memory when they have not been recently referenced. These are behaviors
 # that conjure an image of a page of values.
 #
-# Otherwise, we use common teriminology for *order*, *depth*, *parent*, *child*,
-# *split* and *merge*. There is no hard and fast definition for all the terms. A
-# leaf is a fuzzy concept in b-tree literature, for example. We call a page that
-# contains records a *leaf page*. We call a non-leaf page a *branch page*.
+# Otherwise, we use common teriminology for *height*, *depth*, *parent*,
+# *child*, *split* and *merge*.
+#
+# There is no hard and fast definition for all the terms. A leaf is a fuzzy
+# concept in b-tree literature, for example. We call a page that contains
+# records a *leaf page*. We call a non-leaf page a *branch page*. The term
+# *order* means different things to different people.  We define the order of a
+# branch page to be the maximum number of child pages, while the order of a leaf
+# page to be the maximum number of records.
 #
 # The term *b-tree* itself may not be correct. There are different names for
 # b-tree that reflect the variations of implementation, but those distinctions
@@ -67,37 +70,66 @@
 #
 # This documentation assumes that you understand the theory behind the b-tree,
 # and know the variations of implementation. If you are interested in learning
-# about b-trees, this document could be a learning aid for you, but you should
-# start with the Wikipedia articles on
+# about b-trees you should start with the Wikipedia articles on
 # [B-trees](http://en.wikipedia.org/wiki/B-tree) and
-# [B+trees](http://en.wikipedia.org/wiki/B%2B_tree). 
+# [B+trees](http://en.wikipedia.org/wiki/B%2B_tree). I was introduced to b-trees
+# while reading [Algorithms in C](http://www.amazon.com/dp/0201314525), quite
+# some time ago.
 #
 # ## What flavor of b-tree is this?
 #
 # Strata is a b-tree with leaf pages that contain records ordered by the
-# collation order of the tree, indexed for retrieval in constant time, so that
-# they can be found using binary search. Branch pages contain links to other
-# pages, and do not store records themselves. Leaf pages are linked in ascending
-# order to ease the implementation of cursors.
+# collation order of the tree. Records are stored for retrieval in constant
+# time, addressed by an integer index, so that they can be found using binary
+# search.
 #
-# There is a maximum size for a page, that limits the number of links, in the
-# case of branch pages, or records in the case of leaf pages. When the maximum
-# size is reached which point a node is split. When two sibling pages next to
-# each other contain keys or records that combined are the less than than
-# maximum size they are merged.
+# Branch pages contain links to other pages, and do not store records
+# themselves.
 #
-# The tree always has a root branch page. The order of the tree increases when
-# the root branch is split. It decreases when the root branch is merged. The
-# split of the root branch is a different operation from the split of a non-root
-# branch, because the root branch does not have siblings.
+# Leaf pages are linked in ascending order for traversal by cursors. Brance
+# pages are singly linked in ascending order to simplify implementation of
+# branch pages merges.
 #
-# ## Implementation
+# The page order is the maximum number of children for a branch page, or the
+# maximum number of records for a leaf page. When a page exceeds its capacity it
+# is split into two pages. When two sibling pages next to each other can be
+# combined to create a page less than than maximum size they are merged.
+#
+# The b-tree always has a root branch page. The order of the tree increases when
+# the root branch page is split. It decreases when the root branch page is
+# merged. The split of the root branch is a different operation from the split
+# of a non-root branch, because the root branch does not have siblings.
+#
+# ## Storage
+#
+# A database is a directory on the file system. Each page in the b-tree is
+# stored in a file in the file system.
+#
+# Our page implementations use JavaScript arrays of references to objects on
+# disk. The arrays sort the referneces according to the collation order of the
+# pages or records they reference. When we read records and keys off of disk, we
+# store them in an object that acts as a cache for the page.
+#
+# On disk and in memory, this arrangement is inheriently sparse. Pages are
+# stored in their own file, so they are no larger than they need to be on disk.
+#
+# JavaScript array implemenations are [clever about memory
+# usage](http://stackoverflow.com/questions/614126/why-is-array-push-sometimes-faster-than-arrayn-value/614255#614255)
+# and the per-page record cache is a hash table.
+#
+# ## Pages
+#
+# Every page has a page address. The page address is an integer. We reference
+# pages by this address. We write a page on disk into a file whose filename is
+# a prefix with the integer address appended. When we defererence a page we
+# either read it from a cache, or else we format the filename for the page and
+# read it from disk into the cache. Then we read it from cache.
 #
 # The b-tree has two types of pages. Leaf pages and branch pages.
 #
 # ### Leaf Pages
 #
-# Leaf pages contain records.
+# A leaf page contain records.
 #
 # In the abstract, a leaf page is an array data structure with zero based
 # integer index. The elements of the structure contain records. Given an
@@ -108,43 +140,30 @@
 # b-tree. Because of this, and because a lookup takes constant time, we can search
 # for a record in a leaf page using binary search in logorithmic time.
 #
-# The first record of every leaf page must be unique in relation to the first
-# record of every other leaf page. The b-tree will accept records that are
-# dupcliates according to the collation. When we split a page, we cannot cannot
-# choose a partition that has the same value as the first record, since that
-# would violate the unique first record constraint.
+# Leaf pages cannot contain duplicate records. Therefore, the b-tree cannot
+# contain duplicate records. You can simulate duplicate records by adding a
+# series value to your key. The cursor implementation is designed faciliate
+# psuedo-duplicates in this fashion.
 #
-# If a page reaches the maximum leaf page size, filled with records that have
-# the same value according to the collation, the leaf page is cannot split,
-# since no suitable partition exists. The page will be allowed to grow beyond
-# the maximum page size.
+# The first record of every leaf page is the key value of the leaf page. When we
+# delete records from the leaf page, if we delete the first reord, we keep a
+# ghost of the record around, so we will know the key value of the leaf page.
+#
+# If a leaf page exceeds the leaf order, the leaf page is split.
 #
 # ### Branch Pages
 #
-# Branch pages contain links to other pages. To find the a record in the b-tree,
-# we first use branch pages to find the leaf page that contains our record.
+# To find the a record in the b-tree, we first use a tree of branch pages to
+# find the leaf page that contains our record.
 #
-# All pages are identified by a unique page address. The page address is an
-# integer assigned to the page when the page is created. Branch pages link to
-# other pages by storing the address of the referenced page in an array of page
-# addresses. This array of page addresses is essentially an *array of children*.
+# A branch page contains the addresses of child pages. This array of page
+# addresses is essentially an *array of children*.
 #
-# A branch page orders its children according to the b-tree collation using a
-# record obtained from a leaf page as a *key*. A branch page always has one more
-# children than the number of keys. Keys are unique. A key used in a branch page
-# will not equal another key used in any branch page according to the collation.
+# The child addresses are ordered according to the b-tree collation of the keys
+# of the directly or indirectly referenced leaf pages.
 #
-# There are two special types of branch pages, the root page, and penultimate
-# pages.
-#
-# #### Root Branch Page
-#
-# The root page is the first page we consult to find the desired leaf page. Our
-# b-tree always contains a root page. The b-tree is never so empty that the root
-# page disappears. The root page always has the same address.
-#
-# TK move. Until the root branch page is split, it is both the root branch page
-# and a penultimate branch page.
+# There are three types of branch pages, penultimate branch pages, interior
+# branch pages, and the root branch page.
 #
 # #### Penultimate Branch Pages
 #
@@ -162,9 +181,8 @@
 # its key from the search. We search the subsequent keys to find the first key
 # that is grater than or equal to the record sought. Essentially, when we
 # encouter a key that is greater than our sought record, we know that the record
-# is contained in the leaf page child associated with the key before it.
-# Although it sounds linear, we are able to perform this search using binary
-# search in logorithmic time.
+# is contained in the leaf page child associated with the key before it. We are
+# able to perform this search using binary search in logorithmic time.
 #
 # By ignoring the key of the first leaf page, the penultimate branch page has a
 # number of children that is one greater than the number of keys.
@@ -222,6 +240,15 @@
 # When we visit the root interior page, to obtain the key to associate with the
 # right penultimate page, we visit the right penultimate page, then we visit its
 # left child, the leaf page whose first record is the key.
+#
+# #### Root Branch Page
+#
+# The root page is the first page we consult to find the desired leaf page. Our
+# b-tree always contains a root page. The b-tree is never so empty that the root
+# page disappears. The root page always has the same address.
+#
+# TK move. Until the root branch page is split, it is both the root branch page
+# and a penultimate branch page.
 #
 # ### Keys and First Records
 #
@@ -1187,38 +1214,51 @@ class IO
 
 # ## Descent
 #
-# A *decent* is a b-tree operation. It describes a traversal of the b-tree that
-# results in the creation of a cursor and cursor actions, or else balance
-# operation such as a merge or split. We use the term descent to describe both
-# top down and left right traversal of our b-tree.
+# We use the term *descent* to describe b-tree operations, because all b-tree
+# operations require a descent of the b-tree, a traversal of the b-tree starting
+# from the root. Whenever we are search the tree, insert or delete records, or
+# balance the tree with a page splits and merges, we first begin with a descent
+# of the b-tree, from the root, to find the page we want to act upon.
 #
-# When we navigate to leaf pages of a search b-tree to obtain records, we
+# #### Descent as Unit of Work
+#
+# We use the term descent to describe the both traversal of the b-tree and the
+# subsequent actions performed when when the desired page is found.
+# 
+# The descent is the unit of work in our concurrency model.  A descent is
+# analogous to a thread, because when a descent waits on I/O, other descents can
+# make progress.
+#
+# Descents can make progress concurrently, even though Node.js only has a single
+# thread of execution. Descents do not actually make progress in parallel, but
+# their progress can be interleaved. When we descend the tree, we may have to
+# wait for evented I/O to read or write a page. While we wait, we can make
+# progress on another descent in the main thread of execution.
+#
+# Because descents can make interleaved progress, we need to synchronize access
+# to b-tree pages, just as we would with a multi-threaded b-tree implementation.
+# When we descend the b-tree we need to make sure that we do not alter pages
+# that another waiting descent needs to complete its descent when it awakes, nor
+# read pages that a waiting descent had begun to alter before it had to wait.
+#
+# These are race conditions. We use the shared read/exclusive write locks
+# described in the `IO` class above to guard against these race conditions.
+#
+# #### Classes of Descent
+#
+# When we descend to leaf pages of a search b-tree to obtain records, we
 # *search* the b-tree. When we change the size of the b-tree by adding or
 # deleting records we *edit* the b-tree. When we change the structure of the
 # b-tree by splitting or merging pages, we *balance* the b-tree.
 #
+# We talk about search descents, edit descents, and balance descents we we
+# describe the interaction of b-tree operations.
+#
 # We use these terms in this document to save the chore of writing, and the
 # confustion of reading; insert or delete, or split or merge. We also want to
 # draw a distinction between changing the count of records stored in the b-tree,
-# editing, and changing the height of the b-tree, the count of pages, or the
-# choice of keys, balancing.
-#
-# A descent is analogous to a thread, because one can make progress while
-# another descent is waiting on I/O.
-#
-# A decent an make progress while other decents make progress, even though
-# Node.js only has a single thread of execution. When we descend the tree, we
-# may have to wait for evented I/O to read or write a page. While we wait, we
-# can make progress on another descent in the main thread of execution.
-#
-# Because descents can make progress in parallel, we need to synchronize access
-# to b-tree pages, as we would with a multi-threaded b-tree implementation. When
-# we descend the b-tree we need to make sure that we do not alter pages that
-# another waiting descent needs to complete its descent when it awakes, nor read
-# pages that a waiting descent had begun to alter before it had to wait.
-#
-# These are race conditions. We use the shared read/exclusive write locks
-# described in the `IO` class above to guard against these race conditions.
+# *editing*, and changing the height of the b-tree, the count of pages, or the
+# choice of keys, *balancing*.
 #
 # #### Locking on Descent
 #
