@@ -7,13 +7,12 @@ require("./harness") 2, ({ Strata, directory, fixture: { load, objectify, serial
   strata = new Strata directory: directory, leafSize: 3, branchSize: 3
   strata.open _
 
-  cassette = strata.cassette("b")
-  cursor = strata.cursor cassette, _
-  index = cursor.insert cassette, _
+  cursor = strata.mutator "b", _
+  index = cursor.insert "b", _
   cursor.unlock()
 
   records = []
-  cursor = strata.cursor "a", _
+  cursor = strata.iterator "a", _
   for i in [cursor.index...cursor.length]
     records.push cursor.get i, _
   cursor.unlock()

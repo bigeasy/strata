@@ -7,7 +7,7 @@ require("./harness") 5, ({ Strata, directory, fixture: { serialize } }, _) ->
   strata = new Strata directory: directory, leafSize: 3, branchSize: 3
   strata.open(_)
 
-  cursor = strata.cursor("a", _)
+  cursor = strata.iterator("a", _)
   @ok cursor.found, "found"
   @equal cursor.index, 0, "found"
   @equal cursor.length, 1, "length"

@@ -8,8 +8,8 @@ require("./harness") 3, ({ Strata, directory, fixture: { serialize, load, object
   strata.open(_)
 
   cassette = strata.cassette("b")
-  cursor = strata.cursor(cassette, _)
-  cursor.insert(cassette, _)
+  cursor = strata.mutator(cassette.key, _)
+  cursor.insert(cassette.record, _)
   cursor.unlock()
 
   expected = load "#{__dirname}/fixtures/between.after.json", _
@@ -25,7 +25,7 @@ require("./harness") 3, ({ Strata, directory, fixture: { serialize, load, object
   strata.open(_)
 
   records = []
-  cursor = strata.cursor("a", _)
+  cursor = strata.iterator("a", _)
   for i in [cursor.index...cursor.length]
     records.push cursor.get(i, _)
   cursor.unlock()

@@ -14,7 +14,7 @@ require("./harness") 5, ({ Strata, directory }, _) ->
 
   @equal strata._io.size, 0, "json size"
 
-  cursor = strata.cursor "a", _
+  cursor = strata.iterator "a", _
 
   @ok not cursor.exclusive, "shared"
   @ok cursor.first, "first"

@@ -8,10 +8,10 @@ require("./harness") 2, ({ Strata, directory, fixture: { load, objectify } }, _)
 
   cassette = strata.cassette("a")
   console.error { cassette }
-  cursor = strata.cursor cassette, _
+  cursor = strata.mutator "a", _
 
   loop
-    index = cursor.insert cassette, _
+    index = cursor.insert "a", _
     if index is 0 and cursor.peek()
       break
     else if index < 0

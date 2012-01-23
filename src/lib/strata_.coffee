@@ -584,6 +584,7 @@ class IO
       address: address
       positions: []
       cache: {}
+      deleted: 0
       count: 0
       size: 0
       right: -1
@@ -1747,64 +1748,211 @@ class Balancer
     @operations = []
 
   unbalanced: (page) ->
-    if not @counts[page.address]?
-      @counts[page.address] = page.count
-      page.balancers++
+    @counts[page.address] = page.count unless @counts[page.address]?
 
-  last: -> @queue[@queue.length - 1]
-
-  # Increment or decrement the difference of the page since the last balance.
-  difference: (page, difference) ->
-    if not @differences[page.address]?
-      @differences[page.address] = difference
-      page.balancers++
-    else
-      last.differences[page.address] += differnece
-
-  # TODO If it is not exposed to the user, I don't unbar it.
+  # TODO If it is not exposed to the user, I don't underbar it.
   reference: (page) ->
     if not @referenced[page.address]
+      @referenced[page.address] = page
       page.balancers++
-      @referenced[page.address] = true
 
   # TODO You will have to launch this in a worker thread, otherwise there is no
   # good way for you to handle the error, or rather, you're going to have to
   # have some form of error callback, which is a pattern I'd like to avoid.
+
+  # TODO Once loaded, and marked as part of the balancer, we can do our
+  # calculations in one fell soop. This triggers the consternation over what all
+  # these extranious pages do to the cache.
+
+  # Ah, also, when we do load these, when we want to get them from the cache, we
+  # don't really need them to be loaded. We should reach in a probe the cache
+  # ourselves. My former Java self would have to spend three days thinking about
+  # encapsulation, probably create a new sub-project. Agony.
+
+  # No. Race condition. We want to gather all the pages in memory, so we can
+  # evaluate them, without someone else changing them. We add a page because it
+  # has grown, but then, when we imagine that we've gathered all the pages
+  # necessary, it turns out that in the mean time, that page has shrunk so that
+  # it is now too small. We could create an outer loop that keeps on referencing
+  # cache entries until all are available, but then you have an outer strange
+  # condition where you might load the entire b-tree, because you're taking so
+  # long, and every page is being touched. Allow balance to be imperfect.
   balance: (@io, _) ->
+    # We only ever run one balance at a time. If there is a balance in progress,
+    # we do not proceed. We do note that a subsequent balance has been
+    # requested, so that we can continue to balance.
+    return if @balancing
+
+    # We do not proceed if there is nothing to consider.
+    addresses = Object.keys @counts
+    return if addresses.length is 0
+
+    max = @io.options.leafSize
+ 
+    # We put a new balancer in place of the current balancer. Any edits will be
+    # considered by the next balancer.
     @io.balancer = new Balancer
+    @io.balancer.balancing = true
 
-    ordered = {}
-    merge = {}
-    seen = {}
-
-    for address, count of @counts
-      address = parseInt address, 10
-      page = @io.lock address, false, _
-      difference = page.count - count
-      if difference > 0 and page.count > @io.options.leafSize
-        @reference(page)
-        @operations.push type: "splitLeaf", address: address
-      else if difference < 0
-        referenced = true
-        if page.address is 1
-          ordered[page.address] = { page }
-        else
-          if not left = ordered[page.left]
-            left = ordered[page.left] = { page: @io.cache[page.left] }
-          if not left.right
-            left.right = ordered[page.address] or { page }
-          delete ordered[page.address]
-        if page.right isnt -1
-          self = ordered[page.address] or left.right
-          if not right = ordered[page.right] or self.right
-            right = { page: @io.cache[page.right] }
-          if not self.right
-            self.right = right
-          delete ordered[page.right]
-      @io.unlock page
+    # Prior to calculating a balance plan, we gather the sizes of each leaf page
+    # into memory. We can then make a balance plan based on page sizes that will
+    # not change while we are considering them in our plan. However, page size may
+    # change between gathering and planning, and page size may change between
+    # planning and executing the plan. Staggering gathering, planning and
+    # executing the balance gives us the ability to detect the changes in page
+    # size. When we detect that we can't make an informed decsision on a page,
+    # we pass it onto the next balancer for consideration at the next balance.
     
+    # For each page that has changed we add it to a doubly linked list.
+    ordered = {}
+    for address in addresses
+      # Convert the address back to an integer.
+      address = parseInt address, 10
+      count = @counts[address]
+
+      # We create linked lists that contain the leaf pages we're considering in
+      # our blanace plan. This is apart from the most-recently used list that
+      # the pages themselves form.
+      # 
+      # The linked list nodes contain a reference to the page, plus a reference
+      # to the node containing the previous sibling, and a reference to the node
+      # containing the next sibling. If a sibling is not participating in our
+      # balance plan, then its link is null. This gives us one or more linked
+      # lists that reference a series of leaf pages ordered according to their
+      # order in the b-tree.
+      # 
+      # We are always allowed to get a lock on a single page, so long as we're
+      # holding no other locks.
+      if not node = ordered[address]
+        page = @io.lock address, false, _
+        @reference(page)
+        node = { page, key: @io.key(page, 0, _)  }
+        @io.unlock page
+        ordered[page.address] = node
+
+      # If the page has shrunk in size, we gather the size of the left sibling
+      # page and the right sibling page. The right sibling page 
+      if node.page.count - count < 0
+        if page.address isnt -1
+          if not node.left
+            descent = new Descent(@_io)
+            next = descent.key(node.key)
+            descent.descend(descend.key(node.key), descent.found(key))
+            # TODO You know that this would drive you mad and cost you three
+            # days if you were a Java programmer. Ecapsulation! Encapsulation!
+            descent.index--
+            descent.descend(descend.right(), descent.leaf())
+            # Check to make sure we don't already have a node for the page.
+            left = { page: descent.page, key: @io.key(descent.page, 0, _) }
+            @reference(left.page)
+            @io.unlock left.page
+
+            ordered[left.page.address] = left
+
+            left.right = node
+            node.left = left
+        if not node.right and page.right isnt -1
+          if not right = ordered[page.right]
+            ordred[page.right] = right = {}
+            right.page = @io.lock address, false, _
+            @reference(right.page)
+            node = { page: right.page, key: @io.key(right.page, 0, _)  }
+            @io.unlock right.page
+          node.right = right
+          right.left = node
+      # Save us the trouble of possibly going left for a future count, if we
+      # have an opportunity to make that link from the right free of a descent.
+      else if not node.right and right =ordered[page.right]
+        node.right = right
+        right.left = node
+
+    # The remainder of the calcuations will not be interrupted by evented I/O.
+    # Gather the current counts of each page into the node itself, so we adjust
+    # the count based on the merges we schedule.
+    for address, node of ordered
+      node.count = node.page.count
+
+    # Break the link to next right node and return it.
+    unlink = (node) ->
+      if node
+        if right = node.right
+          node.right = null
+          right.left = null
+      right
+
+    # Link a node 
+    link = (node, right) ->
+      if right
+        right.left = node
+        node.right = right
+
+    # Break the lists on the nodes that we plucked because we expected that they
+    # would split. Check to see that they didn't go from growing to shrinking
+    # while we were waiting evented I/O.
+    for address, count in Object.keys @counts
+      node = ordered[address]
+      difference = node.count - count
+      # If we've grown past capacity, split the leaf. Remove this page from its
+      # list, because we know it cannot merge with its neighbors.
+      if difference > 0 and node.page.count > max
+        # Schedule the split.
+        @operations.push method: "splitLeaf", address: node.page.address
+        # Unlink this split node, so that we don't consider it when merging.
+        unlink node.left
+        unlink node
+      # Lost a race condition. When we fetched pages, this page didn't need to
+      # be tested for merge, so we didn't grab its siblings, but it does now.
+      # We ask the next balancer to consider it as we found it.
+      else if difference < 0 and not (node.left and node.right)
+        @io.balancer.counts[node.page.address] = count
+
+    # Now remove any node from our ordered collection that is not the left most,
+    # so that we have a collection of heads of linked pages.
+    for address in Object.keys ordered
+      delete ordered[address] if ordered[address].left
+
+    # We schedule merges, removing the nodes we merge and the nodes we can't
+    # merge until the list of nodes to consider is empty.
+    loop
+      # We're done where there are no more nodes to consider.
+      addresses = Object.keys ordered
+      break if addresses.length is 0
+
+      # Break the links between pages that cannot merge.
+      for address in addresses
+        node = ordered[address]
+        while node.right
+          if node.count + node.right.count > max
+            node = unlink node
+            ordered[node.address] = node
+          else
+            node = node.right
+
+      # Merge the node to the right of each head node into the head node.
+      for address in addresses
+        node = ordered[address]
+        # Schedule the merge.
+        # After we schedule the merge, we increase the size of the head node and
+        # link the head node to the right sibling of the right node.
+        if node.right
+          right = unlink node
+          @operations.push
+            method: "mergeLeaves"
+            left: node.page.address
+            right: right.page.address
+          node.count += right.count
+          link node, unlink right
+        # Remove any lists containing only one node.
+        else
+          delete ordered[address]
+
+    # Perform the operations to balance the b-tree.
     for operation in @operations
-      @[operation.type](operation, _)
+      @[operation.method](operation, _)
+
+    # Decrement the reference counts.
+    for address, page of @referenced
+      page.balancers--
 
   splitLeaf: ({ address }, _) ->
     say "SPLITTING #{address}"
@@ -1880,10 +2028,6 @@ class Balancer
 # By locking the pages left to right hand over hand, then there is now way for
 # the tree to mutate such that would defeat our iteration. Leaf pages that we've
 # visited may by edited by another descent after we've visited them, however.
-#
-# `strata.iterator(key, _)`
-#
-# `strata.mutator(_)`
 
 #
 class Iterator
@@ -1943,10 +2087,13 @@ class Iterator
   # a mutator. This properties are read-only, so make sure you only read them.
 
   # 
-  constructor: (@_io, @_page, @index, @key, @found, @first, @exclusive) ->
-    @exclusive or= false
+  constructor: (@key, @index, @found, { io, page, first, exclusive }) ->
+    @_page = page
+    @_io = io
     @length = @_page.positions.length
     @count = 1
+    @exclusive = exclusive
+    @first = first
 
   # Get a the record at the given `index` from the current leaf page.
   get: (index, _) ->
@@ -2160,44 +2307,14 @@ class Cassette
 class Descent
   # The constructor always felt like a dangerous place to be doing anything
   # meaningful in C++ or Java.
-  constructor: (@strata, @object, @key, @operation) ->
-    @io         = @strata._io
-    @options    = @strata._io.options
+  constructor: (@io) ->
     @locks      = []
     @locked     = {}
-
-    { @extractor, @comparator } = @options
-
-    @key        = @extractor @object if @object? and not @key?
-
-  # TODO: We are always allowed to get a shared lock on any leaf page and read a
-  # value, as long as we let go of it immediately. This allows us to read from
-  # leaf pages to get branch values.
-
-  cursor: (exclusive, _) ->
-    @locks.push page = @io.lock 0, false, _
-
-    first = true
-    while not page.addresses[0] < 0
-      index = @io.find page, @key, 1, _
-      index = ~index if index < 0
-      first and= index is 0
-
-
-    index = @io.find page, @key, 1, _
-    index = (~index) - 1 if index < 0
-    first and= index is 0
-
-    page = @io.lock page.addresses[index], exclusive, _
-    index = @io.find page, @key, 0, _
-    index = ~index if not (found = index >= 0)
-
-    cursor = if exclusive then Mutator else Iterator
-    cursor = new cursor(@io, page, index, @key, found, first, exclusive)
-
-    @io.unlock page for page in @locks
-
-    cursor
+    @first      = true
+    @page       = { addresses: [ 0 ], leaf: false }
+    @index      = 0
+    @exact      = false
+    @exclusive  = false
 
   key: (key) ->
     { io } = @
@@ -2206,46 +2323,26 @@ class Descent
   iterate: (page) ->
     @first = false
 
-  upgrade: (page) ->
+  leftMost: (page, _) -> 0
 
-  leftMost: (page) -> page.addresses[0]
+  penultimate: (page) -> page.addresses[0] < 0
 
-  descend: (exclusive, next, stop, _) ->
-    @locks.push page = @io.lock 0, false, false, _
+  leaf: (page) -> page.leaf
 
-    while not (page.penultimate or stop(page))
-      index = next page, _
-      index = ~index if index < 0
-      @first and= index is 0
-      page = @io.lock 0, false, false, _
+  exclude: -> @exclusive = true
 
-    index = @io.find page, @key, 1, _
-    index = ~index if index < 0
-    @first and= index is 0
-
-    page = @io.lock page.addresses[index], exclusive, true, _
-    index = @io.find page, @key, 0, _
-    index = ~index if not (found = index >= 0)
-
-    cursor = if exclusive then Mutator else Iterator
-    cursor = new cursor(@io, page, index, @key, found, first, exclusive)
-
-    @io.unlock page for page in @shared
-
-    cursor
-
-  get: (parent, child, _) ->
-    branch = @find child, @key, _
-    @shared.push leaves = @io.lock child.addresses[branch], false, true, _
-    address = @find leaves, @key, _
-    leaves.cache[leaves.addresses[address]]
-
-
-  mergeLeaf: (parent, child, _) ->
-    [ key, rightKey ] = @operation.keys
-    compare = @comparator(full, leftKey = @io.key(child, 0, _))
-    if compare is 0
-      return if leftKey isnt key
+  descend: (next, stop, _) ->
+    while not stop(@page, @index, @exact)
+      parent = @page
+      @page = @io.lock parent.addresses[@index], @exclusive, _
+      @io.unlock parent if parent.address?
+      @index = next @page, _
+      if @index < 0
+        @index = (~@index) - 1
+        @exact = false
+      else
+        @exact = true
+      @first and= @index is 0
 
 class exports.Strata
   # Construct the Strata from the options.
@@ -2268,14 +2365,26 @@ class exports.Strata
     mutation = new Descent(@, null, key, operation)
     mutation.descend callback
 
-  cursor: (key, splat..., callback) ->
-    if key instanceof Cassette
-      exclusive = true
-      key = key.key
-    else
-      exclusive = splat.shift() if splat.length
-    descent = new Descent(@, null, key, null)
-    descent.cursor(exclusive, callback)
+  # TODO NULL keys? No! Keys have to unique. We already determined that. What
+  # good is ONE and only ONE null key? Madness. How do you store nulls? Shiver.
+  # Okay, so you create a pseudo null value, you'd have to choose one. You might
+  # use, for a key, a map that says `{ key: null, ordinal: 1 }`. Cookbook it.
+  _cursor: (key, exclusive, constructor, _) ->
+    descent = new Descent(@_io)
+    next = if key? then descent.key(key) else descent.leftMost
+    descent.descend(next, descent.penultimate, _)
+    descent.exclude() if exclusive
+    descent.descend(next, descent.leaf, _)
+    index = descent.page.deleted
+    index = @_io.find(descent.page, key, index, _) if key?
+    index = ~index if not (found = index >= 0)
+    new constructor(key, index, found, descent)
+
+  iterator: (splat..., callback) ->
+    @_cursor splat.shift(), false, Iterator, callback
+
+  mutator: (splat..., callback) ->
+    @_cursor splat.shift(), true, Mutator, callback
 
   # Insert a single record into the tree.
 
