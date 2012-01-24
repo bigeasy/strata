@@ -5,12 +5,12 @@
 # Strata stores JSON objects on disk, according to a sort order of your
 # choosing, indexed for fast retrieval.
 #
-# Strata is Faster than a flat file, lighter than a database, with more capacity
+# Strata is faster than a flat file, lighter than a database, with more capacity
 # than an in memory tree.
 # 
 # Strata is a [b-tree](http://en.wikipedia.org/wiki/B-tree) implementation for
-# [Node.js](http://nodejs.org/) that **evented**, **concurrent**, **persistant**
-# and **durable**.
+# [Node.js](http://nodejs.org/) that is **evented**, **concurrent**,
+# **persistant** and **durable**.
 #
 # Strata is **evented**. It uses asynchronous I/O to read and write b-tree
 # pages, allowing your CPU to continue to do work while Strata waits on I/O.
@@ -38,6 +38,8 @@
 # you can use Strata as a write ahead-log.
 #
 # Strata runs anywhere that Node.js runs, in pure JavaScript.
+#
+# TK Transition.
 #
 # ## Terminology
 #
@@ -86,206 +88,20 @@
 # Branch pages contain links to other pages, and do not store records
 # themselves.
 #
-# Leaf pages are linked in ascending order for traversal by cursors. Brance
+# Leaf pages are linked in ascending order for traversal by cursors. Branch
 # pages are singly linked in ascending order to simplify implementation of
-# branch pages merges.
+# branch page merges.
 #
-# The page order is the maximum number of children for a branch page, or the
-# maximum number of records for a leaf page. When a page exceeds its capacity it
-# is split into two pages. When two sibling pages next to each other can be
-# combined to create a page less than than maximum size they are merged.
+# The order of a branch page is the maximum number of children for a branch
+# page. The order of a leaf page is maximum number of records for a leaf page.
+# When a page exceeds its order it is split into two or more pages. When two
+# sibling pages next to each other can be combined to create a page less than
+# than the order they are merged.
 #
 # The b-tree always has a root branch page. The order of the tree increases when
 # the root branch page is split. It decreases when the root branch page is
 # merged. The split of the root branch is a different operation from the split
 # of a non-root branch, because the root branch does not have siblings.
-#
-# ## Storage
-#
-# A database is a directory on the file system. Each page in the b-tree is
-# stored in a file in the file system.
-#
-# Our page implementations use JavaScript arrays of references to objects on
-# disk. The arrays sort the referneces according to the collation order of the
-# pages or records they reference. When we read records and keys off of disk, we
-# store them in an object that acts as a cache for the page.
-#
-# On disk and in memory, this arrangement is inheriently sparse. Pages are
-# stored in their own file, so they are no larger than they need to be on disk.
-#
-# JavaScript array implemenations are [clever about memory
-# usage](http://stackoverflow.com/questions/614126/why-is-array-push-sometimes-faster-than-arrayn-value/614255#614255)
-# and the per-page record cache is a hash table.
-#
-# ## Pages
-#
-# Every page has a page address. The page address is an integer. We reference
-# pages by this address. We write a page on disk into a file whose filename is
-# a prefix with the integer address appended. When we defererence a page we
-# either read it from a cache, or else we format the filename for the page and
-# read it from disk into the cache. Then we read it from cache.
-#
-# The b-tree has two types of pages. Leaf pages and branch pages.
-#
-# ### Leaf Pages
-#
-# A leaf page contain records.
-#
-# In the abstract, a leaf page is an array data structure with zero based
-# integer index. The elements of the structure contain records. Given an
-# integer, the leaf page will return the record stored at element in the array.
-# This lookup is performed in constant time.
-# 
-# The records in the record array are ordered according to the collation of the
-# b-tree. Because of this, and because a lookup takes constant time, we can search
-# for a record in a leaf page using binary search in logorithmic time.
-#
-# Leaf pages cannot contain duplicate records. Therefore, the b-tree cannot
-# contain duplicate records. You can simulate duplicate records by adding a
-# series value to your key. The cursor implementation is designed faciliate
-# psuedo-duplicates in this fashion.
-#
-# The first record of every leaf page is the key value of the leaf page. When we
-# delete records from the leaf page, if we delete the first reord, we keep a
-# ghost of the record around, so we will know the key value of the leaf page.
-#
-# If a leaf page exceeds the leaf order, the leaf page is split.
-#
-# ### Branch Pages
-#
-# To find the a record in the b-tree, we first use a tree of branch pages to
-# find the leaf page that contains our record.
-#
-# A branch page contains the addresses of child pages. This array of page
-# addresses is essentially an *array of children*.
-#
-# The child addresses are ordered according to the b-tree collation of the keys
-# of the directly or indirectly referenced leaf pages.
-#
-# There are three types of branch pages, penultimate branch pages, interior
-# branch pages, and the root branch page.
-#
-# #### Penultimate Branch Pages
-#
-# A penultimate branch page is a branch page whose children are leaf pages. If a
-# branch page is not penultimate, then its children are branch pages.
-#
-# In a penultimate branch page, the array of children is ordered by the b-tree
-# collation using a first record in the referenced leaf page for ordering. That
-# is, the first record of the leaf page is used as the key associated with a
-# page address in a penultimate branch page.
-#
-# The non-leaf nodes of a b-tree have the property that the number of node
-# children is one greater than the number of keys. We obtain this property by
-# treating the first child as the left child of the entire page, and excluding
-# its key from the search. We search the subsequent keys to find the first key
-# that is grater than or equal to the record sought. Essentially, when we
-# encouter a key that is greater than our sought record, we know that the record
-# is contained in the leaf page child associated with the key before it. We are
-# able to perform this search using binary search in logorithmic time.
-#
-# By ignoring the key of the first leaf page, the penultimate branch page has a
-# number of children that is one greater than the number of keys.
-#
-# Notice that, when we are inserting a record into a leaf page other than the
-# left leaf page, we add it to a leaf page whose key is equal to or greater than
-# the penultimate branch key, so that the first record does not change, and
-# therefore that penultimate branch key does not change. The exception is the
-# left leaf page, which accepts all the records less than the first key, and
-# therefore may accept a record less than its current least record.
-#
-# An insertion can only insert a into the left most leaf page of a penumltimate
-# branch page a record less than the least record of the leaf page.
-#
-# #### Interior Branch Pages
-#
-# A branch page whose children are other branch pages is called an interior
-# branch page.
-#
-# Like the penultimate branch page, we treat the first child of an interior
-# branch page as the left child of the entire page. Like the penultimate branch
-# page the subsequent children have an associated key that is the first record
-# of a leaf page.
-#
-# The key is obtained by decending the sub-tree referenced by the child. We
-# first visit the branch page referneced by the child. We then visit left
-# children recursively, visiting the left child of the child, and the left child
-# of any subsquently visited children, until we reach a leaf page.  The first
-# record of that leaf page is the key to associate with the child address in the
-# address array of the interior branch page.
-#
-# It is the nature of the b-tree that keys move up to the higher levels of the
-# tree as pages split, while preserving the collation order of the keys. When a
-# branch page splits, a key from the middle of the page is chosen as a
-# partition. The partition is used as the key for the right half of the split
-# page in the parent page.
-#
-# Our implementation does not store the keys, as you may have noticed, but
-# decends down to the leaf page to fetch the record to use as a key. 
-#
-# We start from a penultimate page as a root page. When a leaf page fills, we
-# split it, creating a new right leaf page. The penultimate page uses the first
-# record of the new right page as the key to associate with that page.
-#
-# When the root penultimate page is full we split it, so that the root page is
-# an interior page with two children, which are two penultimate pages. The tree
-# now contains a root interior branch page, with a left penultimate branch page
-# and a right penultimate branch page.
-#
-# The root interior branch page has one key. Prior to split, that key was
-# associated with the address of a child leaf page. After split, the key is
-# associated with the right penultimate branch page. The leaf page is now the
-# left child of the right penultimate branch page.
-#
-# When we visit the root interior page, to obtain the key to associate with the
-# right penultimate page, we visit the right penultimate page, then we visit its
-# left child, the leaf page whose first record is the key.
-#
-# #### Root Branch Page
-#
-# The root page is the first page we consult to find the desired leaf page. Our
-# b-tree always contains a root page. The b-tree is never so empty that the root
-# page disappears. The root page always has the same address.
-#
-# TK move. Until the root branch page is split, it is both the root branch page
-# and a penultimate branch page.
-#
-# ### Keys and First Records
-#
-# We said that it is only possible for an insertion to insert a into the left
-# most child leaf page of a penumltimate branch page a record less than the least
-# record. We can say about a tree rooted by an interor branch page, that an
-# insertion is only able to insert into the left most leaf page in the *entire
-# tree* a record less than the least record.
-#
-# Using our example tree with one root interior page, with two penultimate
-# branch page children, we cannot insert a record into the right penultimate
-# branch page that will displace the first record of its left most child branch,
-# because that first record is the key for the right penultimate branch page.
-# When we insert a record that is less than the key, the search for a leaf page
-# to store the record goes to the left of the key. It cannot descend into the
-# right penultimate branch page, so it is impossible for it be inserted into
-# left child of the right penultimate branch page, so the first record left
-# child of the penultimate branch page will never be displaced by an insertion.
-#
-# Only if we insert a record that is less than least key of the left penultimate
-# page do we face the possibility of displacing the first record of a leaf page,
-# and that leaf page is the left most leaf page in the entire tree.
-#
-# This maintains a property of the b-tree that for every leaf page except the
-# left most leaf page, there exists a unique branch page key derived from the
-# first record of the page.
-#
-# As above, you can find the first record used to derive a key by visting the
-# child and going left. You can find the leaf page to the left of the leaf page
-# used to derive a page branch key, by visiting the child to the left of the key
-# and going right.
-#
-# NOTE Literate programming has finally materialized with Docco and
-# CoffeeScript.
-#
-# When the root page splits, it becomes an interior branch page. Until it splits
-# it is both the root page and a penultimate page.
 
 # Requried node.js libraries.
 fs = require "fs"
@@ -302,58 +118,88 @@ die = (splat...) ->
   process.exit 1
 say = (splat...) -> console.log.apply null, splat
 
-# ### Collation
+# ## Collation
 #
-# A b-tree has a client defined collation. The collation is determined by the
-# combination of an extractor and a comparator. The extractor is used to
-# extract or calculate from the stored record the fields values pertient to the
-# collation. The comparator is used to order records by comparing the extracted
-# fields.
+# A b-tree has a collation defined by the application developer.
 #
-# The extractor allows us to cache the fields pertinent to the collation. It may
-# be the case that records have large fields that are not pertinent to the
-# collation. If we are only using the record as a point of reference while
-# searchng the tree, we allow the record to fall out of the cache, and hold onto
-# only the pertient fields. 
+# The collation is determined by the combination of an extractor and a
+# comparator. The extractor is used to extract a key from the stored record. The
+# comparator is used to order records by comparing the key.
 #
-# This strategy wouldn't work if extraction and comparison were the same
-# function. By making them separate functions, we can cache the intermediate
-# extraction step.
+# Separating extraction from comparison allows us to cache the key.
 #
-# Additionally, the comparitor is pretty easily generalized, while the exractor
-# is invariably specialized.
+# Keys are relevant even when the record itself is not of interest to the
+# application developer. Keys are used to order the tree, so when we will
+# constantly be reading records off the disk solely to get their key value.  If
+# we don't need the actual record, it will eventually be collected by a cache
+# purge, while the key will be retained. If the key is subset of a large record,
+# purging the records and retaining the keys will reduce the in memory size of
+# the b-tree.
+#
+# Also, the comparator is pretty easily generalized, while the exractor
+# is invariably specialized. You might have a single string comparator that you
+# use with many different extractors.
+#
+# ### Default Collation
+#
+# You will almost certainly define your down extractors and comparators, but the
+# b-tree has a default that works for b-tree that stores only JavaScript primitives.
 
 # Default comparator is good only for strings, use a - b for numbers.
 comparator = (a, b) ->
   if a < b then -1 else if a > b then 1 else 0
 
-# Default extractor returns the value as hole, i.e. tree of integers.
+# Default extractor returns the value as whole, i.e. a b-tree of strings.
 extractor = (a) -> a
 
+# ## Pages
+#
+# Our b-tree has two types of pages. Leaf pages and branch pages.
+#
+# A *leaf page* contains records. A *branch page* contains references to other
+# pages.
+#
+# Both leaf pages and branch pages are ordered according to the collation.
+#
+# To find a record, we descend a tree of branch pages to find the leaf page that
+# contains the record. That is a b-tree.
+#
 # ## Page Storage
 #
-# A *leaf page file* contains insert objects, delete objects and address array
-# objects, stored as JSON, one object per line, as described above. The JSON
-# objects stored on behalf of the client are called *records* and they are
-# contained within the insert objects.
+# <strke style="text-decoration: line-through">In memory, a pages are composed of integer arrays of page addresses or record
+# positions, with maps of addresses to JSON objects.  JavaScript array
+# implemenations are [clever about memory
+# usage](http://stackoverflow.com/questions/614126/why-is-array-push-sometimes-faster-than-arrayn-value/614255#614255).
+# Our JavaScript engine ought to be clever about growing the array address as
+# pages grow.</strike>
 #
-# A *branch page file* contains a single JSON object stored on a single line
-# that contains the array of child page addresses.
 #
-# The `IO` class manages the wholesale reading and writing of page files. The
-# `RecordIO` class manages the insertion and deletion of individual records in a
-# leaf page file.
+# The `IO` class manages the reading and writing of leaf and branch pages to and
+# from disk, page locking and page caching. It also implements the binary search
+# we use to search the pages.
 
 #
 class IO
-  # Each page is stored in its own file. The files are all kept in a single
-  # directory. The directory is specified by the client when the database object
-  # is constructed.
+  # Each page is stored in its own ***page file***. The page files are all kept
+  # in a single directory. The directory is specified by the application
+  # developer when the `Strata` object is constructed.
   #
-  # The `IO` class needs the `extractor` to extract keys from records. It does
-  # not store the `extractor`, of course.
+  # Page files contain one or more JSON strings, one string per line.
+  #
+  # A ***leaf page file*** contains insert objects, delete objects and address
+  # array objects, stored as JSON, one object per line, as described above. The
+  # JSON objects stored on behalf of the client are called *records* and they
+  # are contained within the insert objects.
+  #
+  # A ***branch page file*** contains a single JSON object stored on a single
+  # line that contains the array of child page addresses.
+  #
+  # When we read records and record keys off the disk, we store them in an
+  # object that acts as a cache for the page. We use a binary search to probe
+  # for keys and records, so we can avoid loading records we don't need.
 
-  # Set directory and extractor. Initialze the page cache and MRU list.
+  # Set directory and extractor. Initialze the page cache and most-recently used
+  # list.
   constructor: (@directory, @options) ->
     @cache          = {}
     @mru            = {}
@@ -373,9 +219,9 @@ class IO
   #
   # The `filename` method accepts a suffix, so that we can create replacement
   # files. Instead of overwriting an existing page file, we create a replacement
-  # with the suffix `.new`. We then delete the existing file and rename the
-  # replacement file using the `relink` method. This two step write is part of
-  # our crash recovery strategy.
+  # with the suffix `.new`. We then delete the existing file with the `delete`
+  # method and move the replacement into place with the `replace` method. This
+  # two step write is part of our crash recovery strategy.
   #
   # We always write out entire branch page files. Leaf pages files are updated
   # by appending, but on occasion we rewrite them to vaccum deleted records.
@@ -401,98 +247,45 @@ class IO
       throw e unless e.code is "ENOENT"
     fs.rename replacement, permanent, _
 
-  # ### Branch Page Files
-  #
-  # We create a new branch pages in memory. They do not exist on disk until they
-  # are first written.
-  #
-  # A new branch page is given the next unused page number.
-  #
-  # In memory, a branch page is an array of child page addresses. It keeps track
-  # of its key and whether or not it is a penultimate branch page. The cache is
-  # used to cache the keys associated with the child page addresses. The cache
-  # maps the address of a child page to a key extracted from the first record of
-  # the leaf page referenced by the child page address.
-  #
-  # Our in memory is also cached and added as a node an MRU list. We must make
-  # sure that each page has only one in memory representation, because the in
-  # memory page is used for locking.
+  # #### Leaf Page JSON Size
 
-  #
-  createBranch: (address, override) ->
-    page = @cache[address] = @link @mru.core,
-      balancers: 0
-      count: 0
-      penultimate: true
-      address: address
-      addresses: []
-      cache: {}
-      locks: [[]]
-      loaded: false
-      right: -1
-      size: 0
-    extend page, override or {}
-
-  # We write the branch page to a file as a single JSON object on a single line.
-  # We tuck the page properties into an object, and then serialize that object.
-  # We do not store the branch page keys. They are looked up as needed as
-  # described in the b-tree overview above.
-  #
-  # We always write a page branch first to a replacement file, then move it
-  # until place using `relink`.
-
-  #
-  rewriteBranches: (page, _) ->
-    filename = @filename page.address, ".new"
-    record = [ page.right, page.addresses ]
-    json = JSON.stringify(record)
-    buffer = new Buffer(json.length + 1)
-    buffer.write json
-    buffer[json.length] = 0x0A
-    fs.writeFile filename, buffer, "utf8", _
-
-    # Update in memory serialized JSON size of page and b-tree.
-    @size -= page.size or 0
-    page.cache = {}
-    page.size = JSON.stringify(page.addresses).length
-    @size += page.size
-
-  # To read a branch page we read the entire page and evaluate it as JSON. We
-  # did not store the branch page keys. They are looked up as needed as
-  # described in the b-tree overview above.
-
-  #
-  readBranches: (page, _) ->
-    filename = @filename page.address
-    json = fs.readFile filename, "utf8", _
-    record = JSON.parse json
-    [ right, addresses ] = record
-    count = addresses.length
-
-    # Set in memory serialized JSON size of page and add to b-tree.
-    page.size = JSON.stringify(addresses).length
-    @size += page.size
-
-    # Extend the existing page with the properties read from file.
-    extend page, { right, addresses, count }
-
-  # Add a key to the branch page cache and recalculate JSON size.
-  cacheKey: (page, address, key) ->
-    size = JSON.stringify key
-
-    page.cache[address] or= {}
-    page.cache[address].key = key
-    page.cache[address].size = size
+  # We do not include the position size in the cached size because it is simple
+  # to calculate and the client cannot alter it.
+  cachePosition: (page, position) ->
+    size = if page.length is 1 then "[#{position}}" else ",#{position}"
 
     page.size += size
     @size += size
 
-  # Purge a key from the branch page cache and recalculate JSON size.
-  purgeKey: (page, address) ->
-    if size = page.cache[address]?.size
+  # We have to cache the calcuated size of the record because we return the
+  # records to the client. We're not strict about ownership. The client may
+  # decide to alter the object we returned. We need to cache the JSON size and
+  # the key value when we load the object.
+  cacheRecord: (page, position, record) ->
+    key = @extractor record
+
+    size = 0
+    size += JSON.stringify(record).length
+    size += JSON.stringify(key).length
+
+    entry = page.cache[position] = { record, key, size }
+
+    page.size += size
+    @size += size
+
+    entry
+
+  # When we purge the record, we add the position length. We will only ever
+  # delete a record that has been cached, so we do not have to create a function
+  # to purge a position.
+  purgeRecord: (page, position) ->
+    if size = page.cache[position]?.size
+      size += if page.length is 1 then "[#{position}}" else ",#{position}"
+
       page.size -= size
       @size -= size
-      delete page.cache[address]
+
+      delete page.cache[position]
 
   # ### Page Caching
   #
@@ -565,14 +358,14 @@ class IO
   # We always move a page to the front of the core list when we reference it
   # during b-tree descent.
 
-  # Create an MRU list head node and return it. We call this to create the core
-  # and balance list in the constructor above.
+  # Create an most-recently used list head node and return it. We call this to
+  # create the core and balance list in the constructor above.
   createMRU: ->
     head            = { address: -1 }
     head.next       = head
     head.previous   = head
 
-  # Link tier to the head of the MRU list.
+  # Link tier to the head of the most-recently used list.
   link: (head, entry) ->
     next = head.next
     entry.next = next
@@ -581,28 +374,62 @@ class IO
     entry.previous = head
     entry
 
-  # Unlnk a tier from the MRU list.
+  # Unlnk a tier from the most-recently used list.
   unlink: (entry) ->
     { next, previous } = entry
     next.previous = previous
     previous.next = next
     entry
 
-  # ### Leaf Tier Files
+  # ### Leaf Pages
   #
-  # A leaf tier maintains an array of file positions called a positions array. A
-  # file position in the positions array references a record in the leaf tier
-  # file by its file position. The positions in the positions array are sorted
-  # according to the b-tree collation of the referenced records.
+  # Five key things to know about leaf pages.
   #
-  # A new leaf page is given the next unused page number.
+  # * A leaf page is an array of records.
+  # * The key of the first record is the key for the page.
+  # * If the first record is deleted, we keep a it as a ghost record, for the
+  # sake of the key, until the leaf page can be vacuumed.
+  # * The leaf page file is a text file of JSON strings that is an append log of
+  # record insertions and deletions.
+  # * A leaf page cannot contain two records that share the same key, therefore
+  # the b-tree cannot contain duplicates.
   #
+  # In the abstract, a leaf page is an array of records.  Given an integer, the
+  # leaf page will return the record stored at the offset of the array. This
+  # lookup is performed in constant time when the record is in memory.
+  #
+  # Our leaf page implemenation maintains an array of file positions called a
+  # positions array. A file position in the positions array references a record
+  # in the leaf page file by its file position. The positions in the positions
+  # array are sorted according to the b-tree collation of the referenced
+  # records.
+  #
+  # In the leaf page file, a record is stored as JSON string. The objects are
+  # loaded from the file as needed, or else when the opportunity presents
+  # itself. The leaf page keeps a [map](#map) that maps file positions to
+  # deserialized JSON objects.
+  #
+  # Because the records are sorted, and because a lookup takes constant time, we
+  # can search for a record in a leaf page using binary search in logorithmic
+  # time.
+  #
+  # Leaf pages cannot contain duplicate records. Therefore, the b-tree cannot
+  # contain duplicate records. You can simulate duplicate records by adding a
+  # series value to your key. The cursor implementation is designed faciliate
+  # psuedo-duplicates in this fashion.
+  #
+  # The first record of every leaf page is the key value of the leaf page.
+  #
+  # When we delete records from the leaf page, if we delete the first reord, we
+  # keep a ghost of the record around, so we will know the key value of the leaf
+  # page.
+  #
+  # If a leaf page exceeds the leaf order, the leaf page is split.
+
   # The in memory representation of the leaf page includes a flag to indicate
   # that the page is leaf page, the address of the leaf page, the page address
   # of the next leaf page, and a cache that maps record file positions to
   # records that have been loaded from the file.
-
-  #
   createLeaf: (address, override) ->
     page = @cache[address] = @link @mru.core,
       balancers: 0
@@ -618,22 +445,23 @@ class IO
       locks: [[]]
     extend page, override or {}
 
-  # #### Appends for Durability
+  # ### Appends for Durability
   #
-  # A leaf tier file contains JSON objects, one object on each line. The objects
-  # represent record insertions and deletions, so that the leaf tier file is
+  # A leaf page file contains JSON objects, one object on each line. The objects
+  # represent record insertions and deletions, so that the leaf page file is
   # essentially a log. Each time we write to the log, we open and close the
   # file, so that the operating system will flush our writes to disk. This gives
   # us durability.
-  
-  # Append an object to the leaf tier file as a single line of JSON.
+  # 
+  # Append an object to the leaf page file as a single line of JSON.
   #
-  # We call the append method to both update an existing leaf page file, as
-  # well as to create a replacment leaf page file that will be relinked to
-  # replace the existing leaf page file. The caller determines which file should
-  # be written, so it opens and closes the file descriptor.
+  # We call the append method to both append new records to an existing leaf
+  # page file, as well as to create whole new replacment leaf page file that
+  # will be relinked to replace the existing leaf page file. The caller
+  # determines which file should be written, so it opens and closes the file
+  # descriptor.
   #
-  # The file descriptor must be open for for append. 
+  # The file descriptor must be open for for append.
 
   #
   _writeJSON: (fd, page, object, _) ->
@@ -661,12 +489,12 @@ class IO
     # Return the file position of the appended JSON object.
     position
 
-  # #### Leaf Tier File Records
+  # ### Leaf Page File Records
   #
-  # There are three types of objects in a leaf tier file, *insert objects*,
-  # *delete objects*, and *address array objects*.
+  # There are three types of objects in a leaf tier file, ***insert objects***,
+  # ***delete objects***, and ***address array objects***.
   #
-  # An insert object contains a *record* and the index in the address array
+  # An insert object contains a ***record*** and the index in the address array
   # where the record's address would be inserted to preserve the sort order of
   # the address array.
   #
@@ -896,45 +724,246 @@ class IO
     @writePositions fd, page, _
     fs.close fd, _
 
-  # #### Leaf Page JSON Size
+  # ### Branch Pages
+  #
+  # Five key things to know about branch pages.
+  #
+  # * A branch page contains an array of addresses of child pages.
+  # * The left most address is the left child of the entire branch page.
+  # * The branch page keys are looked up as needed  by descending the tree to
+  # the left most leaf page of a child and using the leaf page page key.
+  # * The root branch page is always at address `0`.
+  #
+  # To find the a record in the b-tree, we first use a tree of branch pages to
+  # find the leaf page that contains our record.
+  #
+  # A branch page contains the addresses of child pages. This array of page
+  # addresses is essentially an *array of children*.
+  #
+  # The child addresses are ordered according to the b-tree collation of the
+  # keys of the directly or indirectly referenced leaf pages.
+  #
+  # There are three types of branch pages, penultimate branch pages, interior
+  # branch pages, and the root branch page.
+  #
+  # #### Penultimate Branch Pages
+  #
+  # A penultimate branch page is a branch page whose children are leaf pages. If
+  # a branch page is not penultimate, then its children are branch pages.
+  #
+  # In a penultimate branch page, the array of children is ordered by the b-tree
+  # collation using a first record in the referenced leaf page for ordering.
+  # That is, the first record of the leaf page is used as the key associated
+  # with a page address in a penultimate branch page.
+  #
+  # The non-leaf nodes of a b-tree have the property that the number of node
+  # children is one greater than the number of keys. We obtain this property by
+  # treating the first child as the left child of the entire page, and excluding
+  # its key from the search. We search the subsequent keys to find the first key
+  # that is grater than or equal to the record sought. Essentially, when we
+  # encouter a key that is greater than our sought record, we know that the
+  # record is contained in the leaf page child associated with the key before
+  # it. We are able to perform this search using binary search in logorithmic
+  # time.
+  #
+  # By ignoring the key of the first leaf page, the penultimate branch page has
+  # a number of children that is one greater than the number of keys.
+  #
+  # Notice that, when we are inserting a record into a leaf page other than the
+  # left leaf page, we add it to a leaf page whose key is equal to or greater
+  # than the penultimate branch key, so that the first record does not change,
+  # and therefore that penultimate branch key does not change. The exception is
+  # the left leaf page, which accepts all the records less than the first key,
+  # and therefore may accept a record less than its current least record.
+  #
+  # An insertion can only insert a into the left most leaf page of a
+  # penumltimate branch page a record less than the least record of the leaf
+  # page.
+  #
+  # #### Interior Branch Pages
+  #
+  # A branch page whose children are other branch pages is called an interior
+  # branch page.
+  #
+  # Like the penultimate branch page, we treat the first child of an interior
+  # branch page as the left child of the entire page. Like the penultimate
+  # branch page the subsequent children have an associated key that is the first
+  # record of a leaf page.
+  #
+  # The key is obtained by decending the sub-tree referenced by the child. We
+  # first visit the branch page referneced by the child. We then visit left
+  # children recursively, visiting the left child of the child, and the left
+  # child of any subsquently visited children, until we reach a leaf page.  The
+  # first record of that leaf page is the key to associate with the child
+  # address in the address array of the interior branch page.
+  #
+  # It is the nature of the b-tree that keys move up to the higher levels of the
+  # tree as pages split, while preserving the collation order of the keys. When
+  # a branch page splits, a key from the middle of the page is chosen as a
+  # partition. The partition is used as the key for the right half of the split
+  # page in the parent page.
+  #
+  # Our implementation does not store the keys, as you may have noticed, but
+  # decends down to the leaf page to fetch the record to use as a key. 
+  #
+  # We start from a penultimate page as a root page. When a leaf page fills, we
+  # split it, creating a new right leaf page. The penultimate page uses the
+  # first record of the new right page as the key to associate with that page.
+  #
+  # When the root penultimate page is full we split it, so that the root page is
+  # an interior page with two children, which are two penultimate pages. The
+  # tree now contains a root interior branch page, with a left penultimate
+  # branch page and a right penultimate branch page.
+  #
+  # The root interior branch page has one key. Prior to split, that key was
+  # associated with the address of a child leaf page. After split, the key is
+  # associated with the right penultimate branch page. The leaf page is now the
+  # left child of the right penultimate branch page.
+  #
+  # When we visit the root interior page, to obtain the key to associate with
+  # the right penultimate page, we visit the right penultimate page, then we
+  # visit its left child, the leaf page whose first record is the key.
+  #
+  # #### Root Branch Page
+  #
+  # The root page is the first page we consult to find the desired leaf page.
+  # Our b-tree always contains a root page. The b-tree is never so empty that
+  # the root page disappears. The root page always has the same address.
+  #
+  # TK move. Until the root branch page is split, it is both the root branch
+  # page and a penultimate branch page.
+  #
+  # ### Keys and First Records
+  #
+  # We said that it is only possible for an insertion to insert a into the left
+  # most child leaf page of a penumltimate branch page a record less than the
+  # least record. We can say about a tree rooted by an interor branch page, that
+  # an insertion is only able to insert into the left most leaf page in the
+  # *entire tree* a record less than the least record.
+  #
+  # Using our example tree with one root interior page, with two penultimate
+  # branch page children, we cannot insert a record into the right penultimate
+  # branch page that will displace the first record of its left most child
+  # branch, because that first record is the key for the right penultimate
+  # branch page.  When we insert a record that is less than the key, the search
+  # for a leaf page to store the record goes to the left of the key. It cannot
+  # descend into the right penultimate branch page, so it is impossible for it
+  # be inserted into left child of the right penultimate branch page, so the
+  # first record left child of the penultimate branch page will never be
+  # displaced by an insertion.
+  #
+  # Only if we insert a record that is less than least key of the left
+  # penultimate page do we face the possibility of displacing the first record
+  # of a leaf page, and that leaf page is the left most leaf page in the entire
+  # tree.
+  #
+  # This maintains a property of the b-tree that for every leaf page except the
+  # left most leaf page, there exists a unique branch page key derived from the
+  # first record of the page.
+  #
+  # As above, you can find the first record used to derive a key by visting the
+  # child and going left. You can find the leaf page to the left of the leaf
+  # page used to derive a page branch key, by visiting the child to the left of
+  # the key and going right.
+  #
+  # NOTE Literate programming has finally materialized with Docco and
+  # CoffeeScript.
+  #
+  # When the root page splits, it becomes an interior branch page. Until it
+  # splits it is both the root page and a penultimate page.
 
-  # We do not include the position size in the cached size because it is simple
-  # to calculate and the client cannot alter it.
-  cachePosition: (page, position) ->
-    size = if page.length is 1 then "[#{position}}" else ",#{position}"
+  # ### Branch Page Files
+  #
+  # We create a new branch pages in memory. They do not exist on disk until they
+  # are first written.
+  #
+  # A new branch page is given the next unused page number.
+  #
+  # In memory, a branch page is an array of child page addresses. It keeps track
+  # of its key and whether or not it is a penultimate branch page. The cache is
+  # used to cache the keys associated with the child page addresses. The cache
+  # maps the address of a child page to a key extracted from the first record of
+  # the leaf page referenced by the child page address.
+  #
+  # Our in memory is also cached and added as a node an MRU list. We must make
+  # sure that each page has only one in memory representation, because the in
+  # memory page is used for locking.
+
+  #
+  createBranch: (address, override) ->
+    page = @cache[address] = @link @mru.core,
+      balancers: 0
+      count: 0
+      penultimate: true
+      address: address
+      addresses: []
+      cache: {}
+      locks: [[]]
+      loaded: false
+      right: -1
+      size: 0
+    extend page, override or {}
+
+  # We write the branch page to a file as a single JSON object on a single line.
+  # We tuck the page properties into an object, and then serialize that object.
+  # We do not store the branch page keys. They are looked up as needed as
+  # described in the b-tree overview above.
+  #
+  # We always write a page branch first to a replacement file, then move it
+  # until place using `relink`.
+
+  #
+  rewriteBranches: (page, _) ->
+    filename = @filename page.address, ".new"
+    record = [ page.right, page.addresses ]
+    json = JSON.stringify(record)
+    buffer = new Buffer(json.length + 1)
+    buffer.write json
+    buffer[json.length] = 0x0A
+    fs.writeFile filename, buffer, "utf8", _
+
+    # Update in memory serialized JSON size of page and b-tree.
+    @size -= page.size or 0
+    page.cache = {}
+    page.size = JSON.stringify(page.addresses).length
+    @size += page.size
+
+  # To read a branch page we read the entire page and evaluate it as JSON. We
+  # did not store the branch page keys. They are looked up as needed as
+  # described in the b-tree overview above.
+
+  #
+  readBranches: (page, _) ->
+    filename = @filename page.address
+    json = fs.readFile filename, "utf8", _
+    record = JSON.parse json
+    [ right, addresses ] = record
+    count = addresses.length
+
+    # Set in memory serialized JSON size of page and add to b-tree.
+    page.size = JSON.stringify(addresses).length
+    @size += page.size
+
+    # Extend the existing page with the properties read from file.
+    extend page, { right, addresses, count }
+
+  # Add a key to the branch page cache and recalculate JSON size.
+  cacheKey: (page, address, key) ->
+    size = JSON.stringify key
+
+    page.cache[address] or= {}
+    page.cache[address].key = key
+    page.cache[address].size = size
 
     page.size += size
     @size += size
 
-  # We have to cache the calcuated size of the record because we return the
-  # records to the client. We're not strict about ownership. The client may
-  # decide to alter the object we returned. We need to cache the JSON size and
-  # the key value when we load the object.
-  cacheRecord: (page, position, record) ->
-    key = @extractor record
-
-    size = 0
-    size += JSON.stringify(record).length
-    size += JSON.stringify(key).length
-
-    entry = page.cache[position] = { record, key, size }
-
-    page.size += size
-    @size += size
-
-    entry
-
-  # When we purge the record, we add the position length. We will only ever
-  # delete a record that has been cached, so we do not have to create a function
-  # to purge a position.
-  purgeRecord: (page, position) ->
-    if size = page.cache[position]?.size
-      size += if page.length is 1 then "[#{position}}" else ",#{position}"
-
+  # Purge a key from the branch page cache and recalculate JSON size.
+  purgeKey: (page, address) ->
+    if size = page.cache[address]?.size
       page.size -= size
       @size -= size
-
-      delete page.cache[position]
+      delete page.cache[address]
 
   # ### B-Tree Initialization
   #
@@ -2448,3 +2477,8 @@ class exports.Strata
     sorted
 
   balance: (_) -> @_io.balancer.balance(@_io, _)
+
+# ## Glossary
+# 
+# * <a name="map">**map**</a> &mdash; A JavaScript Object that is used as a key
+# value store. We use the term *map*, because the term *object* is ambiguous.
