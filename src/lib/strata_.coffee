@@ -247,46 +247,6 @@ class IO
       throw e unless e.code is "ENOENT"
     fs.rename replacement, permanent, _
 
-  # #### Leaf Page JSON Size
-
-  # We do not include the position size in the cached size because it is simple
-  # to calculate and the client cannot alter it.
-  cachePosition: (page, position) ->
-    size = if page.length is 1 then "[#{position}}" else ",#{position}"
-
-    page.size += size
-    @size += size
-
-  # We have to cache the calcuated size of the record because we return the
-  # records to the client. We're not strict about ownership. The client may
-  # decide to alter the object we returned. We need to cache the JSON size and
-  # the key value when we load the object.
-  cacheRecord: (page, position, record) ->
-    key = @extractor record
-
-    size = 0
-    size += JSON.stringify(record).length
-    size += JSON.stringify(key).length
-
-    entry = page.cache[position] = { record, key, size }
-
-    page.size += size
-    @size += size
-
-    entry
-
-  # When we purge the record, we add the position length. We will only ever
-  # delete a record that has been cached, so we do not have to create a function
-  # to purge a position.
-  purgeRecord: (page, position) ->
-    if size = page.cache[position]?.size
-      size += if page.length is 1 then "[#{position}}" else ",#{position}"
-
-      page.size -= size
-      @size -= size
-
-      delete page.cache[position]
-
   # ### Page Caching
   #
   # We keep a map of page addresses to cached page objects.
@@ -444,6 +404,46 @@ class IO
       right: -1
       locks: [[]]
     extend page, override or {}
+
+  # #### Leaf Page JSON Size
+
+  # We do not include the position size in the cached size because it is simple
+  # to calculate and the client cannot alter it.
+  cachePosition: (page, position) ->
+    size = if page.length is 1 then "[#{position}}" else ",#{position}"
+
+    page.size += size
+    @size += size
+
+  # We have to cache the calcuated size of the record because we return the
+  # records to the client. We're not strict about ownership. The client may
+  # decide to alter the object we returned. We need to cache the JSON size and
+  # the key value when we load the object.
+  cacheRecord: (page, position, record) ->
+    key = @extractor record
+
+    size = 0
+    size += JSON.stringify(record).length
+    size += JSON.stringify(key).length
+
+    entry = page.cache[position] = { record, key, size }
+
+    page.size += size
+    @size += size
+
+    entry
+
+  # When we purge the record, we add the position length. We will only ever
+  # delete a record that has been cached, so we do not have to create a function
+  # to purge a position.
+  purgeRecord: (page, position) ->
+    if size = page.cache[position]?.size
+      size += if page.length is 1 then "[#{position}}" else ",#{position}"
+
+      page.size -= size
+      @size -= size
+
+      delete page.cache[position]
 
   # ### Appends for Durability
   #
