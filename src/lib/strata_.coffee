@@ -111,8 +111,8 @@ extend = (to, from) ->
   to[key] = value for key, value of from
   to
 
-# Useful for command debugging. If you don't see them called in the code, it
-# means the code is absolutely bug free.
+# Useful for debugging. If you don't see them called in the code, it means the
+# code is absolutely bug free.
 die = (splat...) ->
   console.log.apply null, splat if splat.length
   process.exit 1
