@@ -1,6 +1,3 @@
-[submodule "strata"]
-	path = code
-	url = git://github.com/bigeasy/strata.git
 [submodule "edify"]
 	path = edify
 	url = git://github.com/bigeasy/edify.git
