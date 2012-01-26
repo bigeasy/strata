@@ -1,5 +1,5 @@
 [submodule "strata"]
-	path = strata
+	path = code
 	url = git://github.com/bigeasy/strata.git
 [submodule "edify"]
 	path = edify
