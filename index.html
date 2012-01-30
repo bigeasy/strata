@@ -210,36 +210,7 @@ rename the new page file to the permanent name of the page file.</p>            
       <span class="nx">fs</span><span class="p">.</span><span class="nx">unlink</span> <span class="nx">permanent</span><span class="p">,</span> <span class="nx">_</span>
     <span class="k">catch</span> <span class="nx">e</span>
       <span class="k">throw</span> <span class="nx">e</span> <span class="nx">unless</span> <span class="nx">e</span><span class="p">.</span><span class="nx">code</span> <span class="o">is</span> <span class="s2">&quot;ENOENT&quot;</span>
-    <span class="nx">fs</span><span class="p">.</span><span class="nx">rename</span> <span class="nx">replacement</span><span class="p">,</span> <span class="nx">permanent</span><span class="p">,</span> <span class="nx">_</span></pre></div>             </td>           </tr>                               <tr id="section-15">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-15">&#182;</a>               </div>               <h4>Leaf Page JSON Size</h4>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-16">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-16">&#182;</a>               </div>               <p>We do not include the position size in the cached size because it is simple
-to calculate and the client cannot alter it.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">cachePosition: </span><span class="nf">(page, position) -&gt;</span>
-    <span class="nv">size = </span><span class="k">if</span> <span class="nx">page</span><span class="p">.</span><span class="nx">length</span> <span class="o">is</span> <span class="mi">1</span> <span class="k">then</span> <span class="s2">&quot;[#{position}}&quot;</span> <span class="k">else</span> <span class="s2">&quot;,#{position}&quot;</span>
-
-    <span class="nx">page</span><span class="p">.</span><span class="nx">size</span> <span class="o">+=</span> <span class="nx">size</span>
-    <span class="nx">@size</span> <span class="o">+=</span> <span class="nx">size</span></pre></div>             </td>           </tr>                               <tr id="section-17">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-17">&#182;</a>               </div>               <p>We have to cache the calcuated size of the record because we return the
-records to the client. We're not strict about ownership. The client may
-decide to alter the object we returned. We need to cache the JSON size and
-the key value when we load the object.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">cacheRecord: </span><span class="nf">(page, position, record) -&gt;</span>
-    <span class="nv">key = </span><span class="nx">@extractor</span> <span class="nx">record</span>
-
-    <span class="nv">size = </span><span class="mi">0</span>
-    <span class="nx">size</span> <span class="o">+=</span> <span class="nx">JSON</span><span class="p">.</span><span class="nx">stringify</span><span class="p">(</span><span class="nx">record</span><span class="p">).</span><span class="nx">length</span>
-    <span class="nx">size</span> <span class="o">+=</span> <span class="nx">JSON</span><span class="p">.</span><span class="nx">stringify</span><span class="p">(</span><span class="nx">key</span><span class="p">).</span><span class="nx">length</span>
-
-    <span class="nv">entry = </span><span class="nx">page</span><span class="p">.</span><span class="nx">cache</span><span class="p">[</span><span class="nx">position</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span> <span class="nx">record</span><span class="p">,</span> <span class="nx">key</span><span class="p">,</span> <span class="nx">size</span> <span class="p">}</span>
-
-    <span class="nx">page</span><span class="p">.</span><span class="nx">size</span> <span class="o">+=</span> <span class="nx">size</span>
-    <span class="nx">@size</span> <span class="o">+=</span> <span class="nx">size</span>
-
-    <span class="nx">entry</span></pre></div>             </td>           </tr>                               <tr id="section-18">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-18">&#182;</a>               </div>               <p>When we purge the record, we add the position length. We will only ever
-delete a record that has been cached, so we do not have to create a function
-to purge a position.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">purgeRecord: </span><span class="nf">(page, position) -&gt;</span>
-    <span class="k">if</span> <span class="nv">size = </span><span class="nx">page</span><span class="p">.</span><span class="nx">cache</span><span class="p">[</span><span class="nx">position</span><span class="p">]</span><span class="o">?</span><span class="p">.</span><span class="nx">size</span>
-      <span class="nx">size</span> <span class="o">+=</span> <span class="k">if</span> <span class="nx">page</span><span class="p">.</span><span class="nx">length</span> <span class="o">is</span> <span class="mi">1</span> <span class="k">then</span> <span class="s2">&quot;[#{position}}&quot;</span> <span class="k">else</span> <span class="s2">&quot;,#{position}&quot;</span>
-
-      <span class="nx">page</span><span class="p">.</span><span class="nx">size</span> <span class="o">-=</span> <span class="nx">size</span>
-      <span class="nx">@size</span> <span class="o">-=</span> <span class="nx">size</span>
-
-      <span class="k">delete</span> <span class="nx">page</span><span class="p">.</span><span class="nx">cache</span><span class="p">[</span><span class="nx">position</span><span class="p">]</span></pre></div>             </td>           </tr>                               <tr id="section-19">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-19">&#182;</a>               </div>               <h3>Page Caching</h3>
+    <span class="nx">fs</span><span class="p">.</span><span class="nx">rename</span> <span class="nx">replacement</span><span class="p">,</span> <span class="nx">permanent</span><span class="p">,</span> <span class="nx">_</span></pre></div>             </td>           </tr>                               <tr id="section-15">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-15">&#182;</a>               </div>               <h3>Page Caching</h3>
 
 <p>We keep a map of page addresses to cached page objects.</p>
 
@@ -308,21 +279,21 @@ purged first.</p>
 is unlinked from the balance list, and linked to the head of the core list.</p>
 
 <p>We always move a page to the front of the core list when we reference it
-during b-tree descent.</p>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-20">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-20">&#182;</a>               </div>               <p>Create an most-recently used list head node and return it. We call this to
+during b-tree descent.</p>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-16">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-16">&#182;</a>               </div>               <p>Create an most-recently used list head node and return it. We call this to
 create the core and balance list in the constructor above.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">createMRU: </span><span class="o">-&gt;</span>
     <span class="nv">head            = </span><span class="p">{</span> <span class="nv">address: </span><span class="o">-</span><span class="mi">1</span> <span class="p">}</span>
     <span class="nv">head.next       = </span><span class="nx">head</span>
-    <span class="nv">head.previous   = </span><span class="nx">head</span></pre></div>             </td>           </tr>                               <tr id="section-21">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-21">&#182;</a>               </div>               <p>Link tier to the head of the most-recently used list.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">link: </span><span class="nf">(head, entry) -&gt;</span>
+    <span class="nv">head.previous   = </span><span class="nx">head</span></pre></div>             </td>           </tr>                               <tr id="section-17">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-17">&#182;</a>               </div>               <p>Link tier to the head of the most-recently used list.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">link: </span><span class="nf">(head, entry) -&gt;</span>
     <span class="nv">next = </span><span class="nx">head</span><span class="p">.</span><span class="nx">next</span>
     <span class="nv">entry.next = </span><span class="nx">next</span>
     <span class="nv">next.previous = </span><span class="nx">entry</span>
     <span class="nv">head.next = </span><span class="nx">entry</span>
     <span class="nv">entry.previous = </span><span class="nx">head</span>
-    <span class="nx">entry</span></pre></div>             </td>           </tr>                               <tr id="section-22">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-22">&#182;</a>               </div>               <p>Unlnk a tier from the most-recently used list.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">unlink: </span><span class="nf">(entry) -&gt;</span>
+    <span class="nx">entry</span></pre></div>             </td>           </tr>                               <tr id="section-18">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-18">&#182;</a>               </div>               <p>Unlnk a tier from the most-recently used list.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">unlink: </span><span class="nf">(entry) -&gt;</span>
     <span class="p">{</span> <span class="nx">next</span><span class="p">,</span> <span class="nx">previous</span> <span class="p">}</span> <span class="o">=</span> <span class="nx">entry</span>
     <span class="nv">next.previous = </span><span class="nx">previous</span>
     <span class="nv">previous.next = </span><span class="nx">next</span>
-    <span class="nx">entry</span></pre></div>             </td>           </tr>                               <tr id="section-23">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-23">&#182;</a>               </div>               <h3>Leaf Pages</h3>
+    <span class="nx">entry</span></pre></div>             </td>           </tr>                               <tr id="section-19">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-19">&#182;</a>               </div>               <h3>Leaf Pages</h3>
 
 <p>Five key things to know about leaf pages.</p>
 
@@ -367,7 +338,7 @@ psuedo-duplicates in this fashion.</p>
 keep a ghost of the record around, so we will know the key value of the leaf
 page.</p>
 
-<p>If a leaf page exceeds the leaf order, the leaf page is split.</p>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-24">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-24">&#182;</a>               </div>               <p>The in memory representation of the leaf page includes a flag to indicate
+<p>If a leaf page exceeds the leaf order, the leaf page is split.</p>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-20">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-20">&#182;</a>               </div>               <p>The in memory representation of the leaf page includes a flag to indicate
 that the page is leaf page, the address of the leaf page, the page address
 of the next leaf page, and a cache that maps record file positions to
 records that have been loaded from the file.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">createLeaf: </span><span class="nf">(address, override) -&gt;</span>
@@ -383,7 +354,36 @@ records that have been loaded from the file.</p>             </td>             <
       <span class="nv">size: </span><span class="mi">0</span>
       <span class="nv">right: </span><span class="o">-</span><span class="mi">1</span>
       <span class="nv">locks: </span><span class="p">[[]]</span>
-    <span class="nx">extend</span> <span class="nx">page</span><span class="p">,</span> <span class="nx">override</span> <span class="o">or</span> <span class="p">{}</span></pre></div>             </td>           </tr>                               <tr id="section-25">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-25">&#182;</a>               </div>               <h3>Appends for Durability</h3>
+    <span class="nx">extend</span> <span class="nx">page</span><span class="p">,</span> <span class="nx">override</span> <span class="o">or</span> <span class="p">{}</span></pre></div>             </td>           </tr>                               <tr id="section-21">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-21">&#182;</a>               </div>               <h4>Leaf Page JSON Size</h4>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-22">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-22">&#182;</a>               </div>               <p>We do not include the position size in the cached size because it is simple
+to calculate and the client cannot alter it.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">cachePosition: </span><span class="nf">(page, position) -&gt;</span>
+    <span class="nv">size = </span><span class="k">if</span> <span class="nx">page</span><span class="p">.</span><span class="nx">length</span> <span class="o">is</span> <span class="mi">1</span> <span class="k">then</span> <span class="s2">&quot;[#{position}}&quot;</span> <span class="k">else</span> <span class="s2">&quot;,#{position}&quot;</span>
+
+    <span class="nx">page</span><span class="p">.</span><span class="nx">size</span> <span class="o">+=</span> <span class="nx">size</span>
+    <span class="nx">@size</span> <span class="o">+=</span> <span class="nx">size</span></pre></div>             </td>           </tr>                               <tr id="section-23">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-23">&#182;</a>               </div>               <p>We have to cache the calcuated size of the record because we return the
+records to the client. We're not strict about ownership. The client may
+decide to alter the object we returned. We need to cache the JSON size and
+the key value when we load the object.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">cacheRecord: </span><span class="nf">(page, position, record) -&gt;</span>
+    <span class="nv">key = </span><span class="nx">@extractor</span> <span class="nx">record</span>
+
+    <span class="nv">size = </span><span class="mi">0</span>
+    <span class="nx">size</span> <span class="o">+=</span> <span class="nx">JSON</span><span class="p">.</span><span class="nx">stringify</span><span class="p">(</span><span class="nx">record</span><span class="p">).</span><span class="nx">length</span>
+    <span class="nx">size</span> <span class="o">+=</span> <span class="nx">JSON</span><span class="p">.</span><span class="nx">stringify</span><span class="p">(</span><span class="nx">key</span><span class="p">).</span><span class="nx">length</span>
+
+    <span class="nv">entry = </span><span class="nx">page</span><span class="p">.</span><span class="nx">cache</span><span class="p">[</span><span class="nx">position</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span> <span class="nx">record</span><span class="p">,</span> <span class="nx">key</span><span class="p">,</span> <span class="nx">size</span> <span class="p">}</span>
+
+    <span class="nx">page</span><span class="p">.</span><span class="nx">size</span> <span class="o">+=</span> <span class="nx">size</span>
+    <span class="nx">@size</span> <span class="o">+=</span> <span class="nx">size</span>
+
+    <span class="nx">entry</span></pre></div>             </td>           </tr>                               <tr id="section-24">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-24">&#182;</a>               </div>               <p>When we purge the record, we add the position length. We will only ever
+delete a record that has been cached, so we do not have to create a function
+to purge a position.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">purgeRecord: </span><span class="nf">(page, position) -&gt;</span>
+    <span class="k">if</span> <span class="nv">size = </span><span class="nx">page</span><span class="p">.</span><span class="nx">cache</span><span class="p">[</span><span class="nx">position</span><span class="p">]</span><span class="o">?</span><span class="p">.</span><span class="nx">size</span>
+      <span class="nx">size</span> <span class="o">+=</span> <span class="k">if</span> <span class="nx">page</span><span class="p">.</span><span class="nx">length</span> <span class="o">is</span> <span class="mi">1</span> <span class="k">then</span> <span class="s2">&quot;[#{position}}&quot;</span> <span class="k">else</span> <span class="s2">&quot;,#{position}&quot;</span>
+
+      <span class="nx">page</span><span class="p">.</span><span class="nx">size</span> <span class="o">-=</span> <span class="nx">size</span>
+      <span class="nx">@size</span> <span class="o">-=</span> <span class="nx">size</span>
+
+      <span class="k">delete</span> <span class="nx">page</span><span class="p">.</span><span class="nx">cache</span><span class="p">[</span><span class="nx">position</span><span class="p">]</span></pre></div>             </td>           </tr>                               <tr id="section-25">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-25">&#182;</a>               </div>               <h3>Appends for Durability</h3>
 
 <p>A leaf page file contains JSON objects, one object on each line. The objects
 represent record insertions and deletions, so that the leaf page file is
