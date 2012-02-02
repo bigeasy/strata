@@ -10,7 +10,7 @@ than an in memory tree.</p>
 
 <p>Strata is a <a href="http://en.wikipedia.org/wiki/B-tree">b-tree</a> implementation for
 <a href="http://nodejs.org/">Node.js</a> that is <strong>evented</strong>, <strong>concurrent</strong>,
-<strong>persistant</strong> and <strong>durable</strong>.</p>
+<strong>persistent</strong> and <strong>durable</strong>.</p>
 
 <p>Strata is <strong>evented</strong>. It uses asynchronous I/O to read and write b-tree
 pages, allowing your CPU to continue to do work while Strata waits on I/O.</p>
@@ -19,7 +19,7 @@ pages, allowing your CPU to continue to do work while Strata waits on I/O.</p>
 cache when it can, so requests can be satisifed, even when there are evented
 I/O requests outstanding.</p>
 
-<p>Strata is <strong>persistant</strong>. It stores your tree in page files. The page files
+<p>Strata is <strong>persistent</strong>. It stores your tree in page files. The page files
 are plain old JSON, text files that are easy to manage. You can open them up
 in a <code>vim</code> or EMACS, back them up using <code>tar</code>, check them into <code>git</code>, and
 munge them with JavaScript.</p>
@@ -103,8 +103,8 @@ the root branch page is split. It decreases when the root branch page is
 merged. The split of the root branch is a different operation from the split
 of a non-root branch, because the root branch does not have siblings.</p>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-2">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-2">&#182;</a>               </div>               <p>Requried node.js libraries.</p>             </td>             <td class="code">               <div class="highlight"><pre><span class="nv">fs = </span><span class="nx">require</span> <span class="s2">&quot;fs&quot;</span></pre></div>             </td>           </tr>                               <tr id="section-3">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-3">&#182;</a>               </div>               <p>Copy values from one hash into another.</p>             </td>             <td class="code">               <div class="highlight"><pre><span class="nv">extend = </span><span class="nf">(to, from) -&gt;</span>
   <span class="nx">to</span><span class="p">[</span><span class="nx">key</span><span class="p">]</span> <span class="o">=</span> <span class="nx">value</span> <span class="k">for</span> <span class="nx">key</span><span class="p">,</span> <span class="nx">value</span> <span class="k">of</span> <span class="nx">from</span>
-  <span class="nx">to</span></pre></div>             </td>           </tr>                               <tr id="section-4">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-4">&#182;</a>               </div>               <p>Useful for command debugging. If you don't see them called in the code, it
-means the code is absolutely bug free.</p>             </td>             <td class="code">               <div class="highlight"><pre><span class="nv">die = </span><span class="nf">(splat...) -&gt;</span>
+  <span class="nx">to</span></pre></div>             </td>           </tr>                               <tr id="section-4">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-4">&#182;</a>               </div>               <p>Useful for debugging. If you don't see them called in the code, it means the
+code is absolutely bug free.</p>             </td>             <td class="code">               <div class="highlight"><pre><span class="nv">die = </span><span class="nf">(splat...) -&gt;</span>
   <span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">.</span><span class="nx">apply</span> <span class="kc">null</span><span class="p">,</span> <span class="nx">splat</span> <span class="k">if</span> <span class="nx">splat</span><span class="p">.</span><span class="nx">length</span>
   <span class="nx">process</span><span class="p">.</span><span class="nx">exit</span> <span class="mi">1</span>
 <span class="nv">say = </span><span class="nf">(splat...) -&gt;</span> <span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">.</span><span class="nx">apply</span> <span class="kc">null</span><span class="p">,</span> <span class="nx">splat</span></pre></div>             </td>           </tr>                               <tr id="section-5">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-5">&#182;</a>               </div>               <h2>Collation</h2>
@@ -2117,19 +2117,4 @@ records.</p>             </td>             <td class="code">               <div 
 <ul>
 <li><a name="map"><strong>map</strong></a> &mdash; A JavaScript Object that is used as a key
 value store. We use the term <em>map</em>, because the term <em>object</em> is ambiguous.</li>
-</ul>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                </tbody>     </table>   </div> 
-
-<script type="text/javascript">
-  var _gauges = _gauges || [];
-  (function() {
-    var t   = document.createElement('script');
-    t.type  = 'text/javascript';
-    t.async = true;
-    t.id    = 'gauges-tracker';
-    t.setAttribute('data-site-id', '4f264d0dcb25bc7ce5000003');
-    t.src = '//secure.gaug.es/track.js';
-    var s = document.getElementsByTagName('script')[0];
-    s.parentNode.insertBefore(t, s);
-  })();
-</script>
-</body> </html> 
+</ul>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                </tbody>     </table>   </div> </body> </html> 
