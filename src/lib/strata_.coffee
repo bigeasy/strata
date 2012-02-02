@@ -10,7 +10,7 @@
 # 
 # Strata is a [b-tree](http://en.wikipedia.org/wiki/B-tree) implementation for
 # [Node.js](http://nodejs.org/) that is **evented**, **concurrent**,
-# **persistant** and **durable**.
+# **persistent** and **durable**.
 #
 # Strata is **evented**. It uses asynchronous I/O to read and write b-tree
 # pages, allowing your CPU to continue to do work while Strata waits on I/O.
@@ -19,7 +19,7 @@
 # cache when it can, so requests can be satisifed, even when there are evented
 # I/O requests outstanding.
 #
-# Strata is **persistant**. It stores your tree in page files. The page files
+# Strata is **persistent**. It stores your tree in page files. The page files
 # are plain old JSON, text files that are easy to manage. You can open them up
 # in a `vim` or EMACS, back them up using `tar`, check them into `git`, and
 # munge them with JavaScript.
