@@ -166,13 +166,6 @@ extractor = (a) -> a
 #
 # ## Page Storage
 #
-# <strke style="text-decoration: line-through">In memory, a pages are composed of integer arrays of page addresses or record
-# positions, with maps of addresses to JSON objects.  JavaScript array
-# implemenations are [clever about memory
-# usage](http://stackoverflow.com/questions/614126/why-is-array-push-sometimes-faster-than-arrayn-value/614255#614255).
-# Our JavaScript engine ought to be clever about growing the array address as
-# pages grow.</strike>
-#
 #
 # The `IO` class manages the reading and writing of leaf and branch pages to and
 # from disk, page locking and page caching. It also implements the binary search
@@ -188,16 +181,28 @@ class IO
   #
   # A ***leaf page file*** contains insert objects, delete objects and address
   # array objects, stored as JSON, one object per line, as described above. The
-  # JSON objects stored on behalf of the client are called *records* and they
-  # are contained within the insert objects.
+  # JSON objects stored on behalf of the client are called ***records*** and
+  # they are contained within the insert objects.
   #
   # A ***branch page file*** contains a single JSON object stored on a single
   # line that contains the array of child page addresses.
   #
   # When we read records and record keys off the disk, we store them in an
-  # object that acts as a cache for the page. We use a binary search to probe
-  # for keys and records, so we can avoid loading records we don't need.
-
+  # object that acts as a cache for the page. The in memory page object contains
+  # an array of integers that act as either page addresses or record positions.
+  # We call this the ***reference array***. The integers are stored in the
+  # reference array in the collation order of the stored records they reference.
+  #
+  # The in memory page object also contains a map of integer addresses to JSON
+  # objects. This is the ***record cache** for the page object. The integers in
+  # the reference array are always present when the page is loaded, so that the
+  # integer array is dense, but the record cache only contains entries for
+  # records that have been referenced. We use a binary search to probe for keys
+  # and records, so we can avoid loading records we don't need.
+  # 
+  # We count on our JavaScript array implemenation to be [clever about memory
+  # usage](http://stackoverflow.com/questions/614126/why-is-array-push-sometimes-faster-than-arrayn-value/614255\#614255).
+   
   # Set directory and extractor. Initialze the page cache and most-recently used
   # list.
   constructor: (@directory, @options) ->
@@ -263,18 +268,22 @@ class IO
   # certain number of requests, when a reference count reaches zero, or when
   # when a limit is reached.
   #
-  # For the records and page references in a cache entry, the bulk of the data
-  # in the cache, we take the limits approach. We use a maxmimum size for cached
-  # records and page references for the entire b-tree that will trigger a cache
-  # purge to bring it below the size. The purge will remove entries from the end
-  # of the most-recently used list until the limit is met.
+  # We take the limits approach. The bluk of a cached page is the size of the
+  # references array and the size of objects in records map. We keep track of
+  # those sizes. When we reach a maxmimum size for cached records and page
+  # references for the entire b-tree, we trigger a cache purge to bring it below
+  # the maxiumum size. The purge will remove entries from the end of the
+  # most-recently used list until the limit is met.
   #
-  # There will be cache entires loaded for house keeping only. When balancing
-  # the tree, the item count of a page is needed to determine page size. These
-  # cache entries can be purged of cached records and page references, but the
-  # entry itself cannot be deleted until it is no longer needed to calculate a
-  # merge. We use reference counting to determine if an entry is participating
-  # in balance calcuations.
+  # There may be cache entires loaded for housekeeping only. When balancing the
+  # tree, the order of a page, its count of items, is needed to determine if
+  # needs to be split, or if it can merged with a sibling page. We only need the
+  # count to create our balance plan, however, not the cached references and
+  # records. These cache entries can be purged of cached records and page
+  # references, but the entry itself cannot be deleted until it is no longer
+  # needed to calculate a merge.  We use reference counting to determine if an
+  # entry is participating in
+  # balance calcuations.
   #
   # #### JSON Size
   #
