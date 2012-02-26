@@ -10,6 +10,6 @@ edify.language "c"
     start:  /^\s*\s(.*)/
     end:    /^(.*)\*\//
     strip:  /^\s+\*/
-edify.parse "coffee", "code/src/lib", ".", /\.coffee$/
+edify.parse "coffee", "code/src/lib/strata_.coffee", "./index.html", /\.coffee$/
 edify.stencil /\/.*.coffee$/, "stencil/docco.stencil"
 edify.tasks task
