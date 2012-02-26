@@ -213,13 +213,6 @@ contains the record. That is a b-tree.</p>
 
 <h2>Page Storage</h2>
 
-<p><strke style="text-decoration: line-through">In memory, a pages are composed of integer arrays of page addresses or record
-positions, with maps of addresses to JSON objects.  JavaScript array
-implemenations are <a href="http://stackoverflow.com/questions/614126/<a href='http://github.com/why-is-array-push-sometimes-faster-than-arrayn-value/614255/issues/#issue/614255'>why-is-array-push-sometimes-faster-than-arrayn-value/614255#614255</a>">clever about memory
-usage</a>.
-Our JavaScript engine ought to be clever about growing the array address as
-pages grow.</strike></p>
-
 <p>The <code>IO</code> class manages the reading and writing of leaf and branch pages to and
 from disk, page locking and page caching. It also implements the binary search
 we use to search the pages.</p></td>
@@ -242,17 +235,29 @@ developer when the <code>Strata</code> object is constructed.</p>
 
 <p>A <strong><em>leaf page file</em></strong> contains insert objects, delete objects and address
 array objects, stored as JSON, one object per line, as described above. The
-JSON objects stored on behalf of the client are called <em>records</em> and they
-are contained within the insert objects.</p>
+JSON objects stored on behalf of the client are called <strong><em>records</em></strong> and
+they are contained within the insert objects.</p>
 
 <p>A <strong><em>branch page file</em></strong> contains a single JSON object stored on a single
 line that contains the array of child page addresses.</p>
 
 <p>When we read records and record keys off the disk, we store them in an
-object that acts as a cache for the page. We use a binary search to probe
-for keys and records, so we can avoid loading records we don't need.</p></td>
+object that acts as a cache for the page. The in memory page object contains
+an array of integers that act as either page addresses or record positions.
+We call this the <strong><em>reference array</em></strong>. The integers are stored in the
+reference array in the collation order of the stored records they reference.</p>
+
+<p>The in memory page object also contains a map of integer addresses to JSON
+objects. This is the <strong>*record cache</strong> for the page object. The integers in
+the reference array are always present when the page is loaded, so that the
+integer array is dense, but the record cache only contains entries for
+records that have been referenced. We use a binary search to probe for keys
+and records, so we can avoid loading records we don't need.</p>
+
+<p>We count on our JavaScript array implemenation to be <a href="http://stackoverflow.com/questions/614126/why-is-array-push-sometimes-faster-than-arrayn-value/614255#614255">clever about memory
+usage</a>.</p></td>
           <td class="code"><div class="highlight"><pre>
-</pre></div></td>
+   </pre></div></td>
         </tr>
       
         <tr>
@@ -337,18 +342,22 @@ end of the list, since they are the least recently used.</p>
 certain number of requests, when a reference count reaches zero, or when
 when a limit is reached.</p>
 
-<p>For the records and page references in a cache entry, the bulk of the data
-in the cache, we take the limits approach. We use a maxmimum size for cached
-records and page references for the entire b-tree that will trigger a cache
-purge to bring it below the size. The purge will remove entries from the end
-of the most-recently used list until the limit is met.</p>
+<p>We take the limits approach. The bluk of a cached page is the size of the
+references array and the size of objects in records map. We keep track of
+those sizes. When we reach a maxmimum size for cached records and page
+references for the entire b-tree, we trigger a cache purge to bring it below
+the maxiumum size. The purge will remove entries from the end of the
+most-recently used list until the limit is met.</p>
 
-<p>There will be cache entires loaded for house keeping only. When balancing
-the tree, the item count of a page is needed to determine page size. These
-cache entries can be purged of cached records and page references, but the
-entry itself cannot be deleted until it is no longer needed to calculate a
-merge. We use reference counting to determine if an entry is participating
-in balance calcuations.</p>
+<p>There may be cache entires loaded for housekeeping only. When balancing the
+tree, the order of a page, its count of items, is needed to determine if
+needs to be split, or if it can merged with a sibling page. We only need the
+count to create our balance plan, however, not the cached references and
+records. These cache entries can be purged of cached records and page
+references, but the entry itself cannot be deleted until it is no longer
+needed to calculate a merge.  We use reference counting to determine if an
+entry is participating in
+balance calcuations.</p>
 
 <h4>JSON Size</h4>
 
