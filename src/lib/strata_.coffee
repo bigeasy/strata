@@ -229,10 +229,9 @@ class IO
   # list.
   constructor: (@directory, @options) ->
     @cache          = {}
-    @mru            = {}
-    # TODO OUTGOING
-    @mru.core       = @createMRU()
-    @mru.balance    = @createMRU()
+    @mru            = { address: null }
+    @mru.next       = @mru
+    @mru.previous   = @mru
     @nextAddress    = 0
     @length         = 1024
     @balancer       = new Balancer
@@ -360,9 +359,6 @@ class IO
   # Create an most-recently used list head node and return it. We call this to
   # create the core and balance list in the constructor above.
   createMRU: ->
-    head            = { address: -1 }
-    head.next       = head
-    head.previous   = head
 
   # Link tier to the head of the most-recently used list.
   link: (head, entry) ->
@@ -430,7 +426,7 @@ class IO
   # of the next leaf page, and a cache that maps record file positions to
   # records that have been loaded from the file.
   createLeaf: (address, override) ->
-    page = @cache[address] = @link @mru.core,
+    page = @cache[address] = @link @mru,
       balancers: 0
       loaded: false
       leaf: true
@@ -934,7 +930,7 @@ class IO
 
   #
   createBranch: (address, override) ->
-    page = @cache[address] = @link @mru.core,
+    page = @cache[address] = @link @mru,
       balancers: 0
       count: 0
       penultimate: true
