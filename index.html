@@ -18,7 +18,7 @@
     <tbody>
       
         <tr>
-          <td class="docs"><p>A Streamline.js friendly evented I/O b-tree for Node.js.</p>
+          <td class="docs"><p>A Streamline.js friendly evented I/O b&#x2011;tree for Node.js.</p>
 
 <h2>Purpose</h2>
 
@@ -26,81 +26,99 @@
 choosing, indexed for fast retrieval.</p>
 
 <p>Strata is faster than a flat file, lighter than a database, with more capacity
-than an in memory tree.</p>
+than an in&#x2011;memory tree.</p>
 
-<p>Strata is a <a href="http://en.wikipedia.org/wiki/B-tree">b-tree</a> implementation for
-<a href="http://nodejs.org/">Node.js</a> that is <strong>evented</strong>, <strong>concurrent</strong>,
-<strong>persistent</strong> and <strong>durable</strong>.</p>
+<p>Strata is a <a href="http://en.wikipedia.org/wiki/B-tree">b&#x2011;tree</a>
+implementation for <a href="http://nodejs.org/">Node.js</a> that is <strong>evented</strong>,
+<strong>concurrent</strong>, <strong>persistent</strong> and <strong>durable</strong>.</p>
 
-<p>Strata is <strong>evented</strong>. It uses asynchronous I/O to read and write b-tree
-pages, allowing your CPU to continue to do work while Strata waits on I/O.</p>
+<p>Strata is <strong>evented</strong>. It uses asynchronous I/O to read and write
+b&#x2011;tree pages, allowing your CPU to continue to do work while Strata
+waits on I/O.</p>
 
-<p>Strata is <strong>concurrent</strong>. Strata will satisfy any queries from its in memory
-cache when it can, so requests can be satisifed, even when there are evented
-I/O requests outstanding.</p>
+<p>Strata is <strong>concurrent</strong>. Strata will answer any queries from its
+in&#x2011;memory cache when it can, so requests can be satisifed even when
+there are evented I/O requests outstanding.</p>
 
 <p>Strata is <strong>persistent</strong>. It stores your tree in page files. The page files
-are plain old JSON, text files that are easy to manage. You can open them up
-in a <code>vim</code> or EMACS, back them up using <code>tar</code>, check them into <code>git</code>, and
-munge them with JavaScript.</p>
+are plain old JSON, text files that are easy to manage. You can view them with
+<code>less</code> or <code>tail -f</code>, back them up hot using <code>rsync</code>, and version them with
+<code>git</code>.</p>
 
 <p>Strata is <strong>durable</strong>. It only appends records to to file, so a hard shutdown
 will only ever lose the few last records added. Pages are journaled when they
 are vacuumed or rewritten. </p>
 
-<p>Strata is a b-tree. A b-tree is a database primiative. Using Strata, you can
-start to experiment with database designs of your own. You can use Strata to
-build an MVCC database table, like PostgreSQL. You can create Strata b-trees
-to create relationship indexes. You can use Strata to store what ever form of
-JSON suits your needs like NoSQL databases.</p>
+<p>Strata is a b&#x2011;tree. A b&#x2011;tree is a database primiative. Using
+Strata, you can start to experiment with database designs of your own. You can
+use Strata to build an MVCC database table, like PostgreSQL. You can create
+Strata b&#x2011;trees to create indexes into structured data that is not
+already in a database, like monster log files. You can use Strata to store
+your data in what ever form of JSON suits you like a NoSQL database.</p>
 
-<p>Strata is two database primatives in one, because with a time series index,
-you can use Strata as a write ahead-log.</p>
+<p>As a bonus, Strata is two database primatives in one, because with a time
+series index, you can use Strata as a write&#x2011;ahead log.</p>
 
 <p>Strata runs anywhere that Node.js runs, in pure JavaScript.</p>
 
-<p>TK Transition.</p>
+<h2>Collaboration</h2>
+
+<p>Documentation for Strata is presented here, in literate programming style. API
+documentation is not yet available, so scoot down to the <code>Strata</code> class for an
+in-depth look at the API. Have a look at the extensive test suite for examples
+on the different operations.</p>
+
+<p>If you find a bug with Strata, please report it at the <a href="https://github.com/bigeasy/strata/issues">GitHub
+Issues</a>. If you want to leave a
+comment on the documentation or the code, you can ping me, Alan Gutierrez, at
+@<a href="https://twitter.com/#!/bigeasy">bigeasy</a> on Twitter.</p>
+
+<p>Feel free to fork and explore. Note that Strata is a database primitive, not a
+database in itself. Before you fork and add what you feel are missing
+features, please consult with me. Perhaps your ideas are better expressed as
+project that employs Strata, intead of to a patch to Strata itself.</p>
 
 <h2>Terminology</h2>
 
-<p>We refer to the nodes in our b-tree as <em>pages</em>. The term node conjures an
-image of a discrete component in a linked data structure that contains one,
-maybe two or three, values. Nodes in a b-tree contain hundreds or thousands of
-values. They are indexed. They are read from disk. They are allowed to fall
-out of memory when they have not been recently referenced. These are behaviors
-that conjure an image of a page of values.</p>
+<p>We refer to the nodes in our b&#x2011;tree as <strong><em>pages</em></strong>. The term node
+conjures an image of a discrete component in a linked data structure that
+contains one, maybe two or three, values. Nodes in a b&#x2011;tree contain
+hundreds or thousands of values. They are indexed. They are read from disk.
+They are allowed to fall out of memory when they have not been recently
+referenced. These are behaviors that people associate with a page of values.</p>
 
-<p>Otherwise, we use common teriminology for <em>height</em>, <em>depth</em>, <em>parent</em>,
-<em>child</em>, <em>split</em> and <em>merge</em>.</p>
+<p>Otherwise, we use common terminology for <strong><em>height</em></strong>, <strong><em>depth</em></strong>,
+<strong><em>parent</em></strong>, <strong><em>child</em></strong>, <strong><em>split</em></strong> and <strong><em>merge</em></strong>.</p>
 
 <p>There is no hard and fast definition for all the terms. A leaf is a fuzzy
-concept in b-tree literature, for example. We call a page that contains
-records a <em>leaf page</em>. We call a non-leaf page a <em>branch page</em>. The term
-<em>order</em> means different things to different people.  We define the order of a
-branch page to be the maximum number of child pages, while the order of a leaf
-page to be the maximum number of records.</p>
+concept in b&#x2011;tree literature, for example. We call a page that contains
+records a <strong><em>leaf page</em></strong>. We call a non-leaf page a <strong><em>branch page</em></strong>. The
+term <strong><em>order</em></strong> means different things to different people.  We define the
+order of a branch page to be the maximum number of child pages, while the
+order of a leaf page to be the maximum number of records.</p>
 
-<p>The term <em>b-tree</em> itself may not be correct. There are different names for
-b-tree that reflect the variations of implementation, but those distinctions
-have blurred over the years. Our implemenation may be considered a b+tree,
-since pages are linked, and records are stored only in the leaves.</p>
+<p>The term <strong><em>b&#x2011;tree</em></strong> itself may not be correct. There are different
+names for b&#x2011;tree that reflect the variations of implementation, but
+those distinctions have blurred over the years. Our implemenation may be
+considered a b+tree, since pages are linked, and records are stored only in
+the leaves.</p>
 
 <p>Terms specific to our implementation will be introduced as they are
 encountered in the document. </p>
 
-<h2>What is a b-tree?</h2>
+<h2>What is a b&#x2011;tree?</h2>
 
-<p>This documentation assumes that you understand the theory behind the b-tree,
-and know the variations of implementation. If you are interested in learning
-about b-trees you should start with the Wikipedia articles on
-<a href="http://en.wikipedia.org/wiki/B-tree">B-trees</a> and
-<a href="http://en.wikipedia.org/wiki/B%2B_tree">B+trees</a>. I was introduced to b-trees
-while reading <a href="http://www.amazon.com/dp/0201314525">Algorithms in C</a>, quite
-some time ago.</p>
+<p>This documentation assumes that you understand the theory behind the
+b&#x2011;tree, and know the variations of implementation. If you are
+interested in learning about b&#x2011;trees you should start with the
+Wikipedia articles on <a href="http://en.wikipedia.org/wiki/B-tree">B-trees</a> and
+<a href="http://en.wikipedia.org/wiki/B%2B_tree">B+trees</a>. I was introduced to
+b&#x2011;trees while reading <a href="http://www.amazon.com/dp/0201314525">Algorithms in
+C</a>, quite some time ago.</p>
 
-<h2>What flavor of b-tree is this?</h2>
+<h2>What flavor of b&#x2011;tree is this?</h2>
 
-<p>Strata is a b-tree with leaf pages that contain records ordered by the
+<p>Strata is a b&#x2011;tree with leaf pages that contain records ordered by the
 collation order of the tree. Records are stored for retrieval in constant
 time, addressed by an integer index, so that they can be found using binary
 search.</p>
@@ -108,9 +126,9 @@ search.</p>
 <p>Branch pages contain links to other pages, and do not store records
 themselves.</p>
 
-<p>Leaf pages are linked in ascending order for traversal by cursors. Branch
-pages are singly linked in ascending order to simplify implementation of
-branch page merges.</p>
+<p>Leaf pages are linked in ascending order to simply the implementatoin of
+traversal by cursors. Branch pages are singly linked in ascending order to
+simplify implementation of branch page merges.</p>
 
 <p>The order of a branch page is the maximum number of children for a branch
 page. The order of a leaf page is maximum number of records for a leaf page.
@@ -118,10 +136,11 @@ When a page exceeds its order it is split into two or more pages. When two
 sibling pages next to each other can be combined to create a page less than
 than the order they are merged.</p>
 
-<p>The b-tree always has a root branch page. The order of the tree increases when
-the root branch page is split. It decreases when the root branch page is
-merged. The split of the root branch is a different operation from the split
-of a non-root branch, because the root branch does not have siblings.</p></td>
+<p>The b&#x2011;tree always has a root branch page. The height of the tree
+increases when the root branch page is split. It decreases when the root
+branch page is merged. The split of the root branch is a different operation
+from the split of a non-root branch, because the root branch does not have
+siblings.</p></td>
           <td class="code"><div class="highlight"><pre><div class="highlight"><pre></pre></div></td>
         </tr>
       
@@ -142,7 +161,7 @@ of a non-root branch, because the root branch does not have siblings.</p></td>
         </tr>
       
         <tr>
-          <td class="docs"><p>Useful for debugging. If you don't see them called in the code, it means the
+          <td class="docs"><p>Used for debugging. If you don't see them called in the code, it means the
 code is absolutely bug free.</p></td>
           <td class="code"><div class="highlight"><pre>
 <span class="nv">die = </span><span class="nf">(splat...) -&gt;</span>
@@ -155,30 +174,32 @@ code is absolutely bug free.</p></td>
         <tr>
           <td class="docs"><h2>Collation</h2>
 
-<p>A b-tree has a collation defined by the application developer.</p>
+<p>A b&#x2011;tree has a collation defined by the application developer.</p>
 
 <p>The collation is determined by the combination of an extractor and a
 comparator. The extractor is used to extract a key from the stored record. The
 comparator is used to order records by comparing the key.</p>
 
-<p>Separating extraction from comparison allows us to cache the key.</p>
+<p>Separating extraction from comparison allows us to cache the key. We do not
+need the whole record for comparison, only the key. Keys are used to order the
+tree, so when we will constantly be reading records off the disk solely to get
+their key value.</p>
 
-<p>Keys are relevant even when the record itself is not of interest to the
-application developer. Keys are used to order the tree, so when we will
-constantly be reading records off the disk solely to get their key value.  If
-we don't need the actual record, it will eventually be collected by a cache
-purge, while the key will be retained. If the key is subset of a large record,
-purging the records and retaining the keys will reduce the in memory size of
-the b-tree.</p>
+<p>If a record is read for its key, but the record is not soon visited by a
+cursor, it will eventually be collected by a cache purge, If the key is
+frequently consulted by queries as they descend the tree, the key will be
+retained. If the key is subset of a large record, purging the records and
+retaining the keys will reduce the in&#x2011;memory size of the b&#x2011;tree.</p>
 
-<p>Also, the comparator is pretty easily generalized, while the exractor
-is invariably specialized. You might have a single string comparator that you
-use with many different extractors.</p>
+<p>Also, the comparator is pretty easily generalized, while the exractor is
+invariably specialized. You might have a single string comparator that you use
+with extractors specialized for different types of records.</p>
 
 <h3>Default Collation</h3>
 
 <p>You will almost certainly define your down extractors and comparators, but the
-b-tree has a default that works for b-tree that stores only JavaScript primitives.</p></td>
+b&#x2011;tree has a default that works for b&#x2011;tree that stores only
+JavaScript primitives.</p></td>
           <td class="code"><div class="highlight"><pre>
 </pre></div></td>
         </tr>
@@ -192,7 +213,7 @@ b-tree has a default that works for b-tree that stores only JavaScript primitive
         </tr>
       
         <tr>
-          <td class="docs"><p>Default extractor returns the value as whole, i.e. a b-tree of strings.</p></td>
+          <td class="docs"><p>Default extractor returns the value as whole, i.e. a b&#x2011;tree of strings.</p></td>
           <td class="code"><div class="highlight"><pre>
 <span class="nv">extractor = </span><span class="nf">(a) -&gt;</span> <span class="nx">a</span>
 </pre></div></td>
@@ -201,15 +222,15 @@ b-tree has a default that works for b-tree that stores only JavaScript primitive
         <tr>
           <td class="docs"><h2>Pages</h2>
 
-<p>Our b-tree has two types of pages. Leaf pages and branch pages.</p>
+<p>Our b&#x2011;tree has two types of pages. Leaf pages and branch pages.</p>
 
-<p>A <em>leaf page</em> contains records. A <em>branch page</em> contains references to other
-pages.</p>
+<p>A <strong><em>leaf page</em></strong> contains records. A <strong><em>branch page</em></strong> contains references to
+other pages.</p>
 
 <p>Both leaf pages and branch pages are ordered according to the collation.</p>
 
 <p>To find a record, we descend a tree of branch pages to find the leaf page that
-contains the record. That is a b-tree.</p>
+contains the record. That is a b&#x2011;tree.</p>
 
 <h2>Page Storage</h2>
 
@@ -231,12 +252,13 @@ we use to search the pages.</p></td>
 in a single directory. The directory is specified by the application
 developer when the <code>Strata</code> object is constructed.</p>
 
-<p>Page files contain one or more JSON strings, one string per line.</p>
+<p>Page files contain one or more JSON strings, one string per line. The line
+based JSON format plays nice with traditional UNIX text utilities.</p>
 
-<p>A <strong><em>leaf page file</em></strong> contains insert objects, delete objects and address
-array objects, stored as JSON, one object per line, as described above. The
-JSON objects stored on behalf of the client are called <strong><em>records</em></strong> and
-they are contained within the insert objects.</p>
+<p>A <strong><em>leaf page file</em></strong> contains <strong><em>insert objects</em></strong>, <strong><em>delete objects</em></strong>
+and <strong><em>position array objects</em></strong>, stored as JSON, one object per line, as
+described above. The JSON objects stored on behalf of the client are called
+<strong><em>records</em></strong> and they are contained within the insert objects.</p>
 
 <p>A <strong><em>branch page file</em></strong> contains a single JSON object stored on a single
 line that contains the array of child page addresses.</p>
@@ -248,7 +270,7 @@ We call this the <strong><em>reference array</em></strong>. The integers are sto
 reference array in the collation order of the stored records they reference.</p>
 
 <p>The in memory page object also contains a map of integer addresses to JSON
-objects. This is the <strong>*record cache</strong> for the page object. The integers in
+objects. This is the <strong><em>record cache</em></strong> for the page object. The integers in
 the reference array are always present when the page is loaded, so that the
 integer array is dense, but the record cache only contains entries for
 records that have been referenced. We use a binary search to probe for keys
@@ -266,7 +288,12 @@ list.</p></td>
           <td class="code"><div class="highlight"><pre>
   <span class="nv">constructor: </span><span class="nf">(@directory, @options) -&gt;</span>
     <span class="vi">@cache          = </span><span class="p">{}</span>
-    <span class="vi">@mru            = </span><span class="p">{}</span>
+    <span class="vi">@mru            = </span><span class="p">{}</span></pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>TODO OUTGOING</p></td>
+          <td class="code"><div class="highlight"><pre>
     <span class="vi">@mru.core       = </span><span class="nx">@createMRU</span><span class="p">()</span>
     <span class="vi">@mru.balance    = </span><span class="nx">@createMRU</span><span class="p">()</span>
     <span class="vi">@nextAddress    = </span><span class="mi">0</span>
@@ -283,6 +310,8 @@ list.</p></td>
 that is incremented as new pages are created. A page file has a file name that
 includes the page address.  When we load a page, we first derive the file name
 from the page address, then we load the file.</p>
+
+<p>TK Rewrite once we've finalized journaled balancing.</p>
 
 <p>The <code>filename</code> method accepts a suffix, so that we can create replacement
 files. Instead of overwriting an existing page file, we create a replacement
@@ -308,6 +337,12 @@ by appending, but on occasion we rewrite them to vaccum deleted records.</p></td
         </tr>
       
         <tr>
+          <td class="docs"><p>TODO I thought we broke this up?</p></td>
+          <td class="code"><div class="highlight"><pre>
+</pre></div></td>
+        </tr>
+      
+        <tr>
           <td class="docs"><p>Move a replacement page file into place. Unlink the existing page file, then
 rename the new page file to the permanent name of the page file.</p></td>
           <td class="code"><div class="highlight"><pre>
@@ -328,13 +363,16 @@ rename the new page file to the permanent name of the page file.</p></td>
         <tr>
           <td class="docs"><h3>Page Caching</h3>
 
-<p>We keep a map of page addresses to cached page objects.</p>
+<p>We keep an in&#x2011;memory map of page addresses to page objects. This is
+our <strong><em>page cache</em></strong>.</p>
 
 <h4>Most-Recently Used List</h4>
 
-<p>We also maintain a most-recently used linked list using the page objets as
-list nodes. When we want to cull the cache, we can remove the pages at the
-end of the list, since they are the least recently used.</p>
+<p>We also maintain a <strong><em>most-recently used list</em></strong> as a linked list using the
+page objects as list nodes. When we reference a page, we unlink it from the
+linked list and relink it at the head of the ist. When we want to cull the
+cache, we can remove the pages at the end of the linked list, since they are
+the least recently used.</p>
 
 <h4>Cache Purge Trigger</h4>
 
@@ -344,35 +382,43 @@ when a limit is reached.</p>
 
 <p>We take the limits approach. The bluk of a cached page is the size of the
 references array and the size of objects in records map. We keep track of
-those sizes. When we reach a maxmimum size for cached records and page
-references for the entire b-tree, we trigger a cache purge to bring it below
-the maxiumum size. The purge will remove entries from the end of the
-most-recently used list until the limit is met.</p>
+those sizes. When we reach an application developer specified maxmimum size
+for cached records and page references for the entire b&#x2011;tree, we
+trigger a cache purge to bring it below the maxiumum size. The purge will
+remove entries from the end of the most-recently used list until the limit
+is met.</p>
+
+<h4>Pages Held for Housekeeping</h4>
 
 <p>There may be cache entires loaded for housekeeping only. When balancing the
-tree, the order of a page, its count of items, is needed to determine if
-needs to be split, or if it can merged with a sibling page. We only need the
-count to create our balance plan, however, not the cached references and
-records. These cache entries can be purged of cached records and page
-references, but the entry itself cannot be deleted until it is no longer
-needed to calculate a merge.  We use reference counting to determine if an
-entry is participating in
-balance calcuations.</p>
+tree, the page item count is needed to determine if needs to be split, or if
+it can merged with a sibling page.</p>
+
+<p>We only need the <em>item count</em> to create our balance plan, however, not the
+cached references and records. These cache entries can be purged of cached
+records and page references, but the entry itself cannot be deleted until it
+is no longer needed to calculate a merge.</p>
+
+<p>We use reference counting to determine if an entry is participating in
+balance calcuations. We can purge the cached records, but we do not unlink
+the page object from the most-recenlty used list nor remove it from the
+cache.</p>
 
 <h4>JSON Size</h4>
 
-<p>Limits would be difficult to guage if we were an in memory data structure,
-but we can get an accuate relative measure of the size of a page using the
-length of the JSON strings used to store records and references. </p>
+<p>Limits would be difficult to guage if we out b&#x2011;tree were an
+in&#x2011;memory data structure, but we can get an accuate relative measure
+of the size of a page using the length of the JSON strings used to store
+records and references. </p>
 
 <p>The JSON size of a branch page is the string length of the JSON serialized
 page address array. The JSON size of leaf page is the string length of the
-file position array when serialized with JSOn, plus the string length of
+file position array when serialized with JSON, plus the string length of
 each record loaded in memory when JSON serialized with JSON.</p>
 
 <p>This is not an exact measure of the system memory committed to the in memory
-representation of the b-tree. It ignores the house keeping associated with
-each page.</p>
+representation of the b&#x2011;tree. It is a fuzzy measure of the relative
+heft of page in memory.</p>
 
 <p>An exact mesure is not necessary. We only need to be sure to trigger a cache
 purge at some point before we reach the limits imposed by sytem memory or
@@ -384,22 +430,14 @@ the V8 JavaScript engine.</p>
 
 <p>It is important that the page objects are unique, that we do not represent a
 page file with more than one page object, because the page objects house the
-locking mechanisms.</p>
+locking mechanisms. The page object acts as a mutex for page data.</p>
 
-<p>The cache entires are linked to form a doubly-linked list. A doubly-linked
-list of entries has a head node that has a null address, so that end of the
-list is unambiguous.</p>
-
-<p>There are two linked list heads. A core list of cache entries, and a
-balancing list for pages that were loaded for the sake of item counts while
-calculating a merge. The when it comes time to purge, the balance list is
-purged first.</p>
-
-<p>If a page cached for balance calculations, is needed for other purposes, it
-is unlinked from the balance list, and linked to the head of the core list.</p>
+<p>The cache entires are linked to form a doubly-linked list. The doubly-linked
+list of cache entries has a head node that has a null address, so that end
+of list traversal is unambiguous.</p>
 
 <p>We always move a page to the front of the core list when we reference it
-during b-tree descent.</p></td>
+during b&#x2011;tree descent.</p></td>
           <td class="code"><div class="highlight"><pre>
 </pre></div></td>
         </tr>
@@ -452,7 +490,7 @@ sake of the key, until the leaf page can be vacuumed.</li>
 <li>The leaf page file is a text file of JSON strings that is an append log of
 record insertions and deletions.</li>
 <li>A leaf page cannot contain two records that share the same key, therefore
-the b-tree cannot contain duplicates.</li>
+the b&#x2011;tree cannot contain duplicates.</li>
 </ul>
 
 <p>In the abstract, a leaf page is an array of records.  Given an integer, the
@@ -462,7 +500,7 @@ lookup is performed in constant time when the record is in memory.</p>
 <p>Our leaf page implemenation maintains an array of file positions called a
 positions array. A file position in the positions array references a record
 in the leaf page file by its file position. The positions in the positions
-array are sorted according to the b-tree collation of the referenced
+array are sorted according to the b&#x2011;tree collation of the referenced
 records.</p>
 
 <p>In the leaf page file, a record is stored as JSON string. The objects are
@@ -474,7 +512,7 @@ deserialized JSON objects.</p>
 can search for a record in a leaf page using binary search in logorithmic
 time.</p>
 
-<p>Leaf pages cannot contain duplicate records. Therefore, the b-tree cannot
+<p>Leaf pages cannot contain duplicate records. Therefore, the b&#x2011;tree cannot
 contain duplicate records. You can simulate duplicate records by adding a
 series value to your key. The cursor implementation is designed faciliate
 psuedo-duplicates in this fashion.</p>
@@ -640,12 +678,15 @@ are actually written and write the difference if we come up short.</p></td>
         <tr>
           <td class="docs"><h3>Leaf Page File Records</h3>
 
-<p>There are three types of objects in a leaf tier file, <strong><em>insert objects</em></strong>,
-<strong><em>delete objects</em></strong>, and <strong><em>address array objects</em></strong>.</p>
+<p>TODO address array objects are actually reference objects, or position
+objects? Right.</p>
 
-<p>An insert object contains a <strong><em>record</em></strong> and the index in the address array
-where the record's address would be inserted to preserve the sort order of
-the address array.</p>
+<p>There are three types of objects in a leaf tier file, <strong><em>insert objects</em></strong>,
+<strong><em>delete objects</em></strong>, and <strong><em>position array objects</em></strong>.</p>
+
+<p>An insert object contains a <strong><em>record</em></strong> and the index in the position array
+where the record's position would be inserted to preserve the sort order of
+the position array.</p>
 
 <p>Beginning with an empty position array and reading from the start of the
 file, the leaf tier is reconstituted by replaying the inserts and deletes
@@ -669,7 +710,7 @@ for the page, mapping the position to the record.</p></td>
         <tr>
           <td class="docs"><p>Write an insert object. Calculate the serialized JSON string length of the
 inserted record and add it to the in memory JSON size of the page and the in
-memory b-tree as a whole. We always use the JSON serialization we already
+memory b&#x2011;tree as a whole. We always use the JSON serialization we already
 perform for storage, instead of serializing for both storage and size
 calculation.</p></td>
           <td class="code"><div class="highlight"><pre>
@@ -692,7 +733,7 @@ deleted.</p>
         <tr>
           <td class="docs"><p>Write a delete object. Calculate the serialized JSON string length of the
 inserted record and add it to the in memory JSON size of the page and the in
-memory b-tree as a whole.</p>
+memory b&#x2011;tree as a whole.</p>
 
 <p>TODO Document <code>ghost</code>.</p></td>
           <td class="code"><div class="highlight"><pre>
@@ -891,8 +932,8 @@ the leaf page file.</p>
 
 <p>We open a file descriptor and then close it after the record has been read.
 The desire to cache the file descriptor is strong, but it would complicate
-the shutdown of the b-tree. As it stands, we can always simply let the
-b-tree succumb to the garbage collector, because we hold no other system
+the shutdown of the b&#x2011;tree. As it stands, we can always simply let the
+b&#x2011;tree succumb to the garbage collector, because we hold no other system
 resources that need to be explictly released.</p>
 
 <p>Note how we allow we keep track of the minimum buffer size that will
@@ -973,13 +1014,13 @@ the left most leaf page of a child and using the leaf page page key.</li>
 <li>The root branch page is always at address <code>0</code>.</li>
 </ul>
 
-<p>To find the a record in the b-tree, we first use a tree of branch pages to
+<p>To find the a record in the b&#x2011;tree, we first use a tree of branch pages to
 find the leaf page that contains our record.</p>
 
 <p>A branch page contains the addresses of child pages. This array of page
 addresses is essentially an <em>array of children</em>.</p>
 
-<p>The child addresses are ordered according to the b-tree collation of the
+<p>The child addresses are ordered according to the b&#x2011;tree collation of the
 keys of the directly or indirectly referenced leaf pages.</p>
 
 <p>There are three types of branch pages, penultimate branch pages, interior
@@ -990,12 +1031,13 @@ branch pages, and the root branch page.</p>
 <p>A penultimate branch page is a branch page whose children are leaf pages. If
 a branch page is not penultimate, then its children are branch pages.</p>
 
-<p>In a penultimate branch page, the array of children is ordered by the b-tree
+<p>In a penultimate branch page, the array of children is ordered by the
+b&#x2011;tree
 collation using a first record in the referenced leaf page for ordering.
 That is, the first record of the leaf page is used as the key associated
 with a page address in a penultimate branch page.</p>
 
-<p>The non-leaf nodes of a b-tree have the property that the number of node
+<p>The non-leaf nodes of a b&#x2011;tree have the property that the number of node
 children is one greater than the number of keys. We obtain this property by
 treating the first child as the left child of the entire page, and excluding
 its key from the search. We search the subsequent keys to find the first key
@@ -1029,14 +1071,14 @@ branch page as the left child of the entire page. Like the penultimate
 branch page the subsequent children have an associated key that is the first
 record of a leaf page.</p>
 
-<p>The key is obtained by decending the sub-tree referenced by the child. We
+<p>The key is obtained by decending the sub&#x2011;tree referenced by the child. We
 first visit the branch page referneced by the child. We then visit left
 children recursively, visiting the left child of the child, and the left
 child of any subsquently visited children, until we reach a leaf page.  The
 first record of that leaf page is the key to associate with the child
 address in the address array of the interior branch page.</p>
 
-<p>It is the nature of the b-tree that keys move up to the higher levels of the
+<p>It is the nature of the b&#x2011;tree that keys move up to the higher levels of the
 tree as pages split, while preserving the collation order of the keys. When
 a branch page splits, a key from the middle of the page is chosen as a
 partition. The partition is used as the key for the right half of the split
@@ -1066,7 +1108,7 @@ visit its left child, the leaf page whose first record is the key.</p>
 <h4>Root Branch Page</h4>
 
 <p>The root page is the first page we consult to find the desired leaf page.
-Our b-tree always contains a root page. The b-tree is never so empty that
+Our b&#x2011;tree always contains a root page. The b&#x2011;tree is never so empty that
 the root page disappears. The root page always has the same address.</p>
 
 <p>TK move. Until the root branch page is split, it is both the root branch
@@ -1096,7 +1138,7 @@ penultimate page do we face the possibility of displacing the first record
 of a leaf page, and that leaf page is the left most leaf page in the entire
 tree.</p>
 
-<p>This maintains a property of the b-tree that for every leaf page except the
+<p>This maintains a property of the b&#x2011;tree that for every leaf page except the
 left most leaf page, there exists a unique branch page key derived from the
 first record of the page.</p>
 
@@ -1158,7 +1200,7 @@ memory page is used for locking.</p></td>
           <td class="docs"><p>We write the branch page to a file as a single JSON object on a single line.
 We tuck the page properties into an object, and then serialize that object.
 We do not store the branch page keys. They are looked up as needed as
-described in the b-tree overview above.</p>
+described in the b&#x2011;tree overview above.</p>
 
 <p>We always write a page branch first to a replacement file, then move it
 until place using <code>relink</code>.</p></td>
@@ -1181,7 +1223,7 @@ until place using <code>relink</code>.</p></td>
         </tr>
       
         <tr>
-          <td class="docs"><p>Update in memory serialized JSON size of page and b-tree.</p></td>
+          <td class="docs"><p>Update in memory serialized JSON size of page and b&#x2011;tree.</p></td>
           <td class="code"><div class="highlight"><pre>
     <span class="nx">@size</span> <span class="o">-=</span> <span class="nx">page</span><span class="p">.</span><span class="nx">size</span> <span class="o">or</span> <span class="mi">0</span>
     <span class="nv">page.cache = </span><span class="p">{}</span>
@@ -1193,7 +1235,7 @@ until place using <code>relink</code>.</p></td>
         <tr>
           <td class="docs"><p>To read a branch page we read the entire page and evaluate it as JSON. We
 did not store the branch page keys. They are looked up as needed as
-described in the b-tree overview above.</p></td>
+described in the b&#x2011;tree overview above.</p></td>
           <td class="code"><div class="highlight"><pre>
 </pre></div></td>
         </tr>
@@ -1211,7 +1253,7 @@ described in the b-tree overview above.</p></td>
         </tr>
       
         <tr>
-          <td class="docs"><p>Set in memory serialized JSON size of page and add to b-tree.</p></td>
+          <td class="docs"><p>Set in memory serialized JSON size of page and add to b&#x2011;tree.</p></td>
           <td class="code"><div class="highlight"><pre>
     <span class="nv">page.size = </span><span class="nx">JSON</span><span class="p">.</span><span class="nx">stringify</span><span class="p">(</span><span class="nx">addresses</span><span class="p">).</span><span class="nx">length</span>
     <span class="nx">@size</span> <span class="o">+=</span> <span class="nx">page</span><span class="p">.</span><span class="nx">size</span>
@@ -1267,7 +1309,7 @@ the application developer by blithely obliterating an existing database.</p>
 child and no keys. The left child is a single leaf page that is empty.</p>
 
 <p>Note that the address of the root branch page is <code>0</code> and the address of the
-left most leaf page is <code>-1</code>. This will not change. Even as the b-tree is
+left most leaf page is <code>-1</code>. This will not change. Even as the b&#x2011;tree is
 balanced with splits and mergers of leaf pages, the root branch page is
 always <code>0</code> and left most leaf page is always <code>-1</code>.</p></td>
           <td class="code"><div class="highlight"><pre>
@@ -1377,34 +1419,36 @@ much locked before you use this, but I'm sure you know that.</p></td>
         <tr>
           <td class="docs"><h3>Concurrency</h3>
 
-<p>The b-tree must only be read and written by a single Node.js process. It is
+<p>The b&#x2011;tree must only be read and written by a single Node.js process. It is
 not suitable for use with multiple node processes, or the cluster API.</p>
 
-<p>Although there is only a single thread in a Node.js process, the b-tree is
+<p>Although there is only a single thread in a Node.js process, the
+b&#x2011;tree is
 still a concurrent data structure. Instead of thinking about concurrency in
-terms of threads we talk about concurrent <em>descents</em> of the b-tree.</p>
+terms of threads we talk about concurrent <em>descents</em> of the b&#x2011;tree.</p>
 
 <p>When we search the tree or alter the tree, we must descend the tree.</p>
 
-<p>Decents of the b-tree can become concurrent when descent encounters a page
+<p>Decents of the b&#x2011;tree can become concurrent when descent encounters a page
 that is not in memory. While it is waiting on evented I/O to load the page
 files, the main thread of the process can make progress on another request
-to search or alter the b-tree, it can make process on another descent.</p>
+to search or alter the b&#x2011;tree, it can make process on another descent.</p>
 
 <p>This concurrency keeps the CPU and I/O loaded.</p>
 
 <h3>Locking</h3>
 
 <p>Locking prevents race conditions where an evented I/O request returns to to
-find that the sub-tree it was descending has been altered in way that causes
+find that the sub&#x2011;tree it was descending has been altered in way that causes
 an error. Pages may have split or merged by the main thread, records may
-have been inserted or deleted. While evented I/O is performed, the sub-tree
+have been inserted or deleted. While evented I/O is performed, the
+sub&#x2011;tree
 needs to be locked to prevent it from being altered.</p>
 
-<p>The b-tree is locked page by page. We are able to lock only the pages of
+<p>The b&#x2011;tree is locked page by page. We are able to lock only the pages of
 interest to a particular descent of the tree.</p>
 
-<p>Futhermore, the b-tree destinguishes between shared read locks and exclusive
+<p>Futhermore, the b&#x2011;tree destinguishes between shared read locks and exclusive
 write locks. Multiple descents can read a traverse that is read locked, but
 only the descent that holds an exclusive write lock can traverse it or write
 to it.</p>
@@ -1584,7 +1628,14 @@ I/O, then another one will resume. Concurrency.</p></td>
     <span class="k">for</span> <span class="nx">page</span> <span class="k">in</span> <span class="nx">stack</span>
       <span class="nx">@unlock</span> <span class="nx">page</span>
     <span class="nx">key</span>
-
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>Binary search implemented, as always, by having a peek at <a href="http://www.informit.com/store/product.aspx?isbn=0201314525">Algorithms in
+C</a> by <a href="http://www.cs.princeton.edu/~rs/">Robert
+Sedgewick</a>.</p></td>
+          <td class="code"><div class="highlight"><pre>
   <span class="nv">find: </span><span class="nf">(page, key, low, _) -&gt;</span>
     <span class="p">{</span> <span class="nx">comparator</span> <span class="p">}</span> <span class="o">=</span> <span class="nx">@</span>
     <span class="nv">high = </span><span class="nx">page</span><span class="p">.</span><span class="nx">count</span> <span class="o">-</span> <span class="mi">1</span></pre></div></td>
@@ -1614,15 +1665,16 @@ I/O, then another one will resume. Concurrency.</p></td>
         <tr>
           <td class="docs"><h2>Descent</h2>
 
-<p>We use the term <em>descent</em> to describe b-tree operations, because all b-tree
-operations require a descent of the b-tree, a traversal of the b-tree starting
+<p>We use the term <em>descent</em> to describe b&#x2011;tree operations, because all
+b&#x2011;tree
+operations require a descent of the b&#x2011;tree, a traversal of the b&#x2011;tree starting
 from the root. Whenever we are search the tree, insert or delete records, or
 balance the tree with a page splits and merges, we first begin with a descent
-of the b-tree, from the root, to find the page we want to act upon.</p>
+of the b&#x2011;tree, from the root, to find the page we want to act upon.</p>
 
 <h4>Descent as Unit of Work</h4>
 
-<p>We use the term descent to describe the both traversal of the b-tree and the
+<p>We use the term descent to describe the both traversal of the b&#x2011;tree and the
 subsequent actions performed when when the desired page is found.</p>
 
 <p>The descent is the unit of work in our concurrency model.  A descent is
@@ -1636,8 +1688,8 @@ wait for evented I/O to read or write a page. While we wait, we can make
 progress on another descent in the main thread of execution.</p>
 
 <p>Because descents can make interleaved progress, we need to synchronize access
-to b-tree pages, just as we would with a multi-threaded b-tree implementation.
-When we descend the b-tree we need to make sure that we do not alter pages
+to b&#x2011;tree pages, just as we would with a multi-threaded b&#x2011;tree implementation.
+When we descend the b&#x2011;tree we need to make sure that we do not alter pages
 that another waiting descent needs to complete its descent when it awakes, nor
 read pages that a waiting descent had begun to alter before it had to wait.</p>
 
@@ -1646,27 +1698,28 @@ described in the <code>IO</code> class above to guard against these race conditi
 
 <h4>Classes of Descent</h4>
 
-<p>When we descend to leaf pages of a search b-tree to obtain records, we
-<em>search</em> the b-tree. When we change the size of the b-tree by adding or
-deleting records we <em>edit</em> the b-tree. When we change the structure of the
-b-tree by splitting or merging pages, we <em>balance</em> the b-tree.</p>
+<p>When we descend to leaf pages of a search b&#x2011;tree to obtain records, we
+<em>search</em> the b&#x2011;tree. When we change the size of the b&#x2011;tree by adding or
+deleting records we <em>edit</em> the b&#x2011;tree. When we change the structure of the
+b&#x2011;tree by splitting or merging pages, we <em>balance</em> the b&#x2011;tree.</p>
 
 <p>We talk about search descents, edit descents, and balance descents we we
-describe the interaction of b-tree operations.</p>
+describe the interaction of b&#x2011;tree operations.</p>
 
 <p>We use these terms in this document to save the chore of writing, and the
 confustion of reading; insert or delete, or split or merge. We also want to
-draw a distinction between changing the count of records stored in the b-tree,
-<em>editing</em>, and changing the height of the b-tree, the count of pages, or the
+draw a distinction between changing the count of records stored in the
+b&#x2011;tree,
+<em>editing</em>, and changing the height of the b&#x2011;tree, the count of pages, or the
 choice of keys, <em>balancing</em>.</p>
 
 <h4>Locking on Descent</h4>
 
-<p>Becase a search descent does not alter the structure of the b-tree, Multiple
+<p>Becase a search descent does not alter the structure of the b&#x2011;tree, Multiple
 search descents can be performed concurrently, without interfering with each
 other.</p>
 
-<p>Descents that alter the b-tree exclusive access, but only to the pages they
+<p>Descents that alter the b&#x2011;tree exclusive access, but only to the pages they
 alter. A search descent can still make progres in the presence of an
 alteration decent, so long as the search does not visit the pages being
 altered.</p>
@@ -1698,7 +1751,8 @@ direction of our descent.</p>
 
 <p>Both branch pages and leaf pages are singly linked to their right sibling. If
 you hold a lock on a page, you are allowed to obtain a lock on its right
-sibling. This left right ordering allows us to traverse a level of the b-tree,
+sibling. This left right ordering allows us to traverse a level of the
+b&#x2011;tree,
 which simplifies the implemtation of record cursors and page merges.</p>
 
 <p>When we move from a page to its right sibling, we hold the lock on the left
@@ -1790,7 +1844,7 @@ also able to insert or delete records into the current page.</p>
 <h3>Iterator</h3>
 
 <p>The application developer uses an iterator to move across the leaf pages of
-the b-tree in ascending collation order, one leaf page a time. The leaf pages
+the b&#x2011;tree in ascending collation order, one leaf page a time. The leaf pages
 themselves are visited one at a time, not the records. The iterator can
 randomly access any record a the currently visited leaf page.</p>
 
@@ -1818,7 +1872,7 @@ visited may by edited by another descent after we've visited them, however.</p><
 <p>As the result of a descent, we will know the index of the record that
 corresponds to the key used to find the leaf page. This is either the index
 of the key's record, or if there no record that could derive the key in the
-b-tree, the location where the key's record would be inserted.</p>
+b&#x2011;tree, the location where the key's record would be inserted.</p>
 
 <p>There are good reasons to search for key that does not exist in the tree. We
 may be interested in searching for time series data that occured between
@@ -1839,7 +1893,7 @@ without testing to see if it is less than the first record of the right
 sibling page.</p>
 
 <p>However, we do know that the first leaf page is the correct leaf page for
-the search key, because we used a b-tree descent to find the page. That is
+the search key, because we used a b&#x2011;tree descent to find the page. That is
 unambiguous. When we search for the search key in the leaf page, even if it
 does not exist, and is greater than the last record, we still know for
 certain that the key does not belong to any of the right siblings.</p>
@@ -1864,7 +1918,7 @@ more than one.</p>
 
 <p>Additional public properties of the <code>Iterator</code> are the <code>key</code> used to create
 the iterator, <code>found</code> which indicates whether or not the record actually
-exists in the b-tree, <code>count</code> which is the number of leaf pages visited by
+exists in the b&#x2011;tree, <code>count</code> which is the number of leaf pages visited by
 this iterator, and <code>exclusive</code> indicating whehter we are an iterator or
 a mutator. This properties are read-only, so make sure you only read them.</p></td>
           <td class="code"><div class="highlight"><pre>
@@ -1936,7 +1990,7 @@ the current leaf page is the last leaf page.</p></td>
           <td class="docs"><p>A mutator is an iterator that can also edit leaf pages. It can delete records
 from the currently visit leaf page. It can insert records into the current
 leaf page, if the record belongs in the current leaf page. Like an <code>Iterator</code>
-it  moves bacross the leaf pages of an the b-tree in ascending collation
+it  moves bacross the leaf pages of an the b&#x2011;tree in ascending collation
 order. It has random access to the records in the page using an index into the
 array of records.</p>
 
@@ -1951,11 +2005,11 @@ record really belongs to a right sibling leaf page page.</p>
 <p>As in the case of ambiguous range starts, an insert location is unambiguous if
 the key is the search key used to locate the first page of the mutator. The
 key is determined to belong inside the leaf page by virtue of a desent of the
-b-tree. That is unambiguous.</p>
+b&#x2011;tree. That is unambiguous.</p>
 
 <p>Using the example of time series data again, the application developer may
 have an hour of events she wishes to insert into a day of events, within a
-b-tree of years of events. Because the events took place within an hour, they
+b&#x2011;tree of years of events. Because the events took place within an hour, they
 would all be inserted into leaf pages that are close to each other, perhaps
 right next to each other, or maybe they all fall within a single leaf page.</p>
 
@@ -1974,7 +2028,7 @@ right sibling page. If the first key of the next sibling page is less than or
 equal to the insert key, then we are on the wrong page. Unless we inspect the
 next page, the insert location is ambiguous.</p>
 
-<p>To obtain an unambiguous insert location without descending the b-tree to
+<p>To obtain an unambiguous insert location without descending the b&#x2011;tree to
 create a new mutator, we add a <code>Mutator.peek</code> method.</p>
 
 <p>This gives the mutator permission to peek at the right sibling leaf page of
@@ -2099,7 +2153,7 @@ TODO No, we're not including the <code>0</code> in the range.</p></td>
         <tr>
           <td class="docs"><p>Since we need to fsync anyway, we open the file and and close the file
 when we append a JSON object to it. Because no file handles are kept
-open, the b-tree object can left to garbage collection.</p></td>
+open, the b&#x2011;tree object can left to garbage collection.</p></td>
           <td class="code"><div class="highlight"><pre>
         <span class="nv">filename = </span><span class="nx">@_io</span><span class="p">.</span><span class="nx">filename</span> <span class="nx">@_page</span><span class="p">.</span><span class="nx">address</span>
         <span class="nv">fd = </span><span class="nx">fs</span><span class="p">.</span><span class="nx">open</span> <span class="nx">filename</span><span class="p">,</span> <span class="s">&quot;a&quot;</span><span class="p">,</span> <span class="mi">0644</span><span class="p">,</span> <span class="nx">_</span>
@@ -2138,7 +2192,7 @@ records along the way. Balacing </p>
 
 <h4>Staccato Blanace Operations</h4>
 
-<p>The b-tree balance operations cascade by nature. If you insert a value into a
+<p>The b&#x2011;tree balance operations cascade by nature. If you insert a value into a
 leaf node, such that the leaf node is beyond capacity, you split the leaf
 node, adding a new child to the parent node. If the parent node is now beyond
 capacity, you split the parent node, adding a new child to its parent node.
@@ -2146,7 +2200,7 @@ When every node on the path to the leaf node is at capacity, a split of the
 leaf node will split every node all they way up to the root.</p>
 
 <p>Merges too move from leaves to root, so that a merge at one level of the
-b-tree potentially triggers a merge of the parent with one of its siblings.</p>
+b&#x2011;tree potentially triggers a merge of the parent with one of its siblings.</p>
 
 <p>However, we've established rules for lock acquisition that require that locks
 are obtained from the top down, and never from the bottom up. This is why we
@@ -2154,15 +2208,15 @@ do not perform balance operations as a part of a single pass. We instead
 descend the tree once to insert or delete records form the leaf pages. We then
 descend the tree once for each split or merge of a page.</p>
 
-<p>Much b-tree literature makes mention of a potential efficency where you split
+<p>Much b&#x2011;tree literature makes mention of a potential efficency where you split
 full pages on the way back up from an insert. You can determine which pages
-would split if the leaf split as you descend the b-tree, since you'll visit
+would split if the leaf split as you descend the b&#x2011;tree, since you'll visit
 every page that would participate in a split.</p>
 
 <p>That efficency applies only for split, and not for merge, because you have to
 inspect the left and right siblings of a page to determine if it is time to
 merge. If the left sibling page of a page, is not also child of that page's
-parent page, then the left sibling page is in a different sub-tree. It can not
+parent page, then the left sibling page is in a different sub&#x2011;tree. It can not
 be reached by the path that was used to find the leaf page where the delete
 occured.</p>
 
@@ -2194,9 +2248,9 @@ branch pages will be involved in a balance operation yet another order of
 mangniutde less frequently.</p>
 
 <p>Conserving descents during balance operations is a false economy. It
-complicates lock acquisition. It reduces the liveliness of the b-tree.</p>
+complicates lock acquisition. It reduces the liveliness of the b&#x2011;tree.</p>
 
-<p>The multiple descents will allow searches of the b-tree to make progress
+<p>The multiple descents will allow searches of the b&#x2011;tree to make progress
 between balance operations.</p>
 
 <h5>Descent as Unit of Work</h5>
@@ -2211,13 +2265,13 @@ single balance operation, searching </p>
 level the moment we've detected the need for one. If we fill a leaf page, we
 descend the tree again to split the leaf page.</p>
 
-<p>Because the b-tree is a concurrent structure, the leaf split descent may
+<p>Because the b&#x2011;tree is a concurrent structure, the leaf split descent may
 discover that another descent has removed a record, and a leaf split is no
 longer necessary. There may be, in fact, a descent on the way to the left
 sibling of the page, to check for the potential for a merge.</p>
 
 <p>The concurrent operation means that we have to deal with situation where we've
-undertaken a descent to balance the b-tree, but another series of descents
+undertaken a descent to balance the b&#x2011;tree, but another series of descents
 has rendered that plan invalid.</p>
 
 <p>As long as we're dealing with that problem, we may as well decouple insertion
@@ -2246,7 +2300,7 @@ operation until the previous one completes. In essence, we perform balancing
 in a separate thread of execution.</p>
 
 <p>Of course, a Node.js application really only has one thread of execution. In
-our b-tree, however, multiple descents can make progress at the time, or
+our b&#x2011;tree, however, multiple descents can make progress at the time, or
 rather, the progress made by one decent, while another descent waits on I/O.</p>
 
 <p>We ensure that only one descent at a time is making progress toward the
@@ -2261,7 +2315,7 @@ structure while the balance descent waits on I/O.</p>
 balance the tree, the <em>balancer</em>.</p>
 
 <p>The balancer maintains an offset count for each modified leaf page in the
-b-tree. When an insert is performed, the offset count for the leaf page is
+b&#x2011;tree. When an insert is performed, the offset count for the leaf page is
 incremented.  When a delete is performed, the offset count for the leaf page
 is decremented. This keeps track of the total change in size.</p>
 
@@ -2325,7 +2379,7 @@ cache.</p>
 <p>To split a leaf page, we start by obtaining the key value of the first record.
 We can do this by acquiring a read lock on the page, without performing a
 descent. The balancer gets to break some rules since it knows that we know
-that the b-tree is not being otherwise balanced.</p>
+that the b&#x2011;tree is not being otherwise balanced.</p>
 
 <p>We descend the tree until we encoutner the penultimate branch page that is the
 parent of the branch page.  We acquire an excsluive lock the branch page. We
@@ -2363,7 +2417,7 @@ don't hold their own keys, so they can't find them.  We'd have to have null
 keys in our tree. Even if we kept keys around, we're sending searches down a
 path to nowhere. There is no leaf page to visit. We get rid of these paths. We
 always balance the upper levels immediately, we perform the cascade. Our tree
-descent logic would have to account for these empty sub-trees. Much better to
+descent logic would have to account for these empty sub&#x2011;trees. Much better to
 balance and keep things orderly.</p>
 
 <p>This raises a concerns about live lock, that we might be balancing </p>
@@ -2403,9 +2457,9 @@ page, we use the right page.</p>
 <p>To merge a leaf page, we start by obtaining the key value of the first record.
 We can do this by acquiring a read lock on the page, without performing a
 descent. The balancer gets to break some rules since it knows that we know
-that the b-tree is not being otherwise balanced.</p>
+that the b&#x2011;tree is not being otherwise balanced.</p>
 
-<p>With that key, we descend the b-tree. We know that the key value cannot
+<p>With that key, we descend the b&#x2011;tree. We know that the key value cannot
 change, because it is the balancer that alters keys. The first record may be
 deleted by editing, but a ghost of the first record is preserved for the key
 value, which is the key value of the page.</p>
@@ -2427,7 +2481,7 @@ reassign the key. It will no longer be valid when the page is merged into its
 left sibling because the first record is now somewhere in the midst of the
 left sibling. We lock excluslively hand-over-hand thereafter to squeeze out
 any shared locks. Our exclusive lock on the parent containing the key prevents
-another descent from entering the sub-tree where we are performing the merge.</p>
+another descent from entering the sub&#x2011;tree where we are performing the merge.</p>
 
 <p>We now proceed down the path to the merge page as we would ordinarily, except
 that we acquire exclusive locks hand-over-hand instead of shared locks. This
@@ -2435,7 +2489,7 @@ will squeeze out any other descents.</p>
 
 <p>We retain the exclusive lock on the penultimate branch page. No other descent
 will be able to visit this penultimate branch, because we've blocked entry
-into the sub-tree and squeeed out the other descents. We still need to hold
+into the sub&#x2011;tree and squeeed out the other descents. We still need to hold
 onto the exclusive lock, however, otherwise the page might be discarded during
 a cache purge, which can happen concurently.</p>
 
@@ -2461,7 +2515,7 @@ that lost a child can be merged with one of its siblings. The procedure for
 merging branch pages other than the root branch page is the same regardless of
 the depth of the branch page.</p>
 
-<p>We acquire the key for the left most page in the sub-tree underneath the
+<p>We acquire the key for the left most page in the sub&#x2011;tree underneath the
 branch page. We do this by following the left most children until we reach a
 leaf page. We use that key to descend the tree.</p>
 
@@ -2484,7 +2538,7 @@ path on takes to find the left sibling.) We can then copy append addresses to
 the left sibling. Remove the merge sibling from its parent. Delete the key
 from where we found it, so it can be looked up again.</p>
 
-<p>Before we lose track of the sub-tree we're in, we descend to the poteinally
+<p>Before we lose track of the sub&#x2011;tree we're in, we descend to the poteinally
 new left most leaf of the parent, and obtain its key to repeat the process.</p>
 
 <h4>Filling the Root Page</h4>
@@ -2496,7 +2550,7 @@ root. We will have deleted the last key, merged everything to the left.</p>
 <p>We descend again, locking the root. We lock the one child of the root. We copy
 the contents of the one root child into the root and delete the child.</p>
 
-<p>This will decrease the height of the b-tree by one.</p>
+<p>This will decrease the height of the b&#x2011;tree by one.</p>
 
 <h4>Deleting Pages</h4>
 
@@ -2544,7 +2598,7 @@ gauntlet to run. The user can determine if balance will live lock. If there
 are a great many operations, then balance, wait a while, then balance, wait a
 while. It is up the the end user.</p>
 
-<p>The end user can use the b-tree a map, tucking in values, getting them out.
+<p>The end user can use the b&#x2011;tree a map, tucking in values, getting them out.
 Or else, as an index, to scan, perform table scans. We'll figure that out.</p>
 
 <p>Now I have an API problem. The client will have to know about pages to work
@@ -2560,12 +2614,12 @@ desire to link nodes to the back of the list or suspend purges.</p>
 
 <p>There is a desire to cache the addresses of the left sibling pages when
 possible, so I wouldn't have to descend the tree. Except that the
-most-recently used list works hand in hand with b-tree descent. The higher
+most-recently used list works hand in hand with b&#x2011;tree descent. The higher
 levels of the tree are kept in memory, because they are more frequently visted
 than lower levels. To much iteration along one level threatens to purge other
 levels.</p>
 
-<p>One can imagine that when balancing b-tree that has been left unbalanced for a
+<p>One can imagine that when balancing b&#x2011;tree that has been left unbalanced for a
 long time, reading in many unbalanced leaf pages will cause the first ones to
 flush, which is a pity, since we'll probably need one of them.</p>
 
@@ -2639,7 +2693,7 @@ has grown, but then, when we imagine that we've gathered all the pages
 necessary, it turns out that in the mean time, that page has shrunk so that
 it is now too small. We could create an outer loop that keeps on referencing
 cache entries until all are available, but then you have an outer strange
-condition where you might load the entire b-tree, because you're taking so
+condition where you might load the entire b&#x2011;tree, because you're taking so
 long, and every page is being touched. Allow balance to be imperfect.</p></td>
           <td class="code"><div class="highlight"><pre>
   <span class="nv">balance: </span><span class="nf">(@io, _) -&gt;</span></pre></div></td>
@@ -2711,7 +2765,7 @@ to the node containing the previous sibling, and a reference to the node
 containing the next sibling. If a sibling is not participating in our
 balance plan, then its link is null. This gives us one or more linked
 lists that reference a series of leaf pages ordered according to their
-order in the b-tree.</p>
+order in the b&#x2011;tree.</p>
 
 <p>We are always allowed to get a lock on a single page, so long as we're
 holding no other locks.</p></td>
@@ -2918,7 +2972,7 @@ link the head node to the right sibling of the right node.</p></td>
         </tr>
       
         <tr>
-          <td class="docs"><p>Perform the operations to balance the b-tree.</p></td>
+          <td class="docs"><p>Perform the operations to balance the b&#x2011;tree.</p></td>
           <td class="code"><div class="highlight"><pre>
     <span class="k">for</span> <span class="nx">operation</span> <span class="k">in</span> <span class="nx">@operations</span>
       <span class="nx">@</span><span class="p">[</span><span class="nx">operation</span><span class="p">.</span><span class="nx">method</span><span class="p">](</span><span class="nx">operation</span><span class="p">,</span> <span class="nx">_</span><span class="p">)</span>
@@ -3073,7 +3127,7 @@ use, for a key, a map that says <code>{ key: null, ordinal: 1 }</code>. Cookbook
         </tr>
       
         <tr>
-          <td class="docs"><p>Create a cassette to insert into b-tree.</p></td>
+          <td class="docs"><p>Create a cassette to insert into b&#x2011;tree.</p></td>
           <td class="code"><div class="highlight"><pre>
   <span class="nv">cassette: </span><span class="nf">(object) -&gt;</span> <span class="k">new</span> <span class="nx">Cassette</span><span class="p">(</span><span class="nx">object</span><span class="p">,</span> <span class="nx">@_io</span><span class="p">.</span><span class="nx">extractor</span><span class="p">(</span><span class="nx">object</span><span class="p">))</span>
 </pre></div></td>
