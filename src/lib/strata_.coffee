@@ -151,9 +151,9 @@ say = (splat...) -> console.log.apply null, splat
 # their key value.
 #
 # If a record is read for its key, but the record is not soon visited by a
-# cursor, it will eventually be collected by a cache purge, while the key will
-# be retained, if the key is frequently consulted by queries as they descend the
-# tree. If the key is subset of a large record, purging the records and
+# cursor, it will eventually be collected by a cache purge, If the key is
+# frequently consulted by queries as they descend the tree, the key will be
+# retained. If the key is subset of a large record, purging the records and
 # retaining the keys will reduce the in&#x2011;memory size of the b&#x2011;tree.
 #
 # Also, the comparator is pretty easily generalized, while the exractor is
@@ -177,8 +177,8 @@ extractor = (a) -> a
 #
 # Our b&#x2011;tree has two types of pages. Leaf pages and branch pages.
 #
-# A *leaf page* contains records. A *branch page* contains references to other
-# pages.
+# A ***leaf page*** contains records. A ***branch page*** contains references to
+# other pages.
 #
 # Both leaf pages and branch pages are ordered according to the collation.
 #
@@ -198,12 +198,13 @@ class IO
   # in a single directory. The directory is specified by the application
   # developer when the `Strata` object is constructed.
   #
-  # Page files contain one or more JSON strings, one string per line.
+  # Page files contain one or more JSON strings, one string per line. The line
+  # based JSON format plays nice with traditional UNIX text utilities.
   #
-  # A ***leaf page file*** contains insert objects, delete objects and address
-  # array objects, stored as JSON, one object per line, as described above. The
-  # JSON objects stored on behalf of the client are called ***records*** and
-  # they are contained within the insert objects.
+  # A ***leaf page file*** contains ***insert objects***, ***delete objects***
+  # and ***position array objects***, stored as JSON, one object per line, as
+  # described above. The JSON objects stored on behalf of the client are called
+  # ***records*** and they are contained within the insert objects.
   #
   # A ***branch page file*** contains a single JSON object stored on a single
   # line that contains the array of child page addresses.
@@ -521,12 +522,15 @@ class IO
 
   # ### Leaf Page File Records
   #
-  # There are three types of objects in a leaf tier file, ***insert objects***,
-  # ***delete objects***, and ***address array objects***.
+  # TODO address array objects are actually reference objects, or position
+  # objects? Right.
   #
-  # An insert object contains a ***record*** and the index in the address array
-  # where the record's address would be inserted to preserve the sort order of
-  # the address array.
+  # There are three types of objects in a leaf tier file, ***insert objects***,
+  # ***delete objects***, and ***position array objects***.
+  #
+  # An insert object contains a ***record*** and the index in the position array
+  # where the record's position would be inserted to preserve the sort order of
+  # the position array.
   #
   # Beginning with an empty position array and reading from the start of the
   # file, the leaf tier is reconstituted by replaying the inserts and deletes
