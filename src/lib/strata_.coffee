@@ -389,9 +389,18 @@ class IO
   # * A leaf page cannot contain two records that share the same key, therefore
   # the b&#x2011;tree cannot contain duplicates.
   #
+  # #### Constant Time
+  #
   # In the abstract, a leaf page is an array of records.  Given an integer, the
   # leaf page will return the record stored at the offset of the array. This
   # lookup is performed in constant time when the record is in memory.
+  #
+  # This lookup is performed in more or less constant time when the record is
+  # uncached, if you're willing to say that random access into a file is
+  # constant time for practical purposes, otherwise it is *O(log n)*, where *n*
+  # is the number of blocks in the leaf page.
+  #
+  # #### Binary Search
   #
   # Our leaf page implemenation maintains an array of file positions called a
   # positions array. A file position in the positions array references a record
@@ -401,17 +410,21 @@ class IO
   #
   # In the leaf page file, a record is stored as JSON string. The objects are
   # loaded from the file as needed, or else when the opportunity presents
-  # itself. The leaf page keeps a [map](#map) that maps file positions to
-  # deserialized JSON objects.
+  # itself. The leaf page keeps a map (a JavaScript `Object`) that maps file
+  # positions to deserialized records.
   #
   # Because the records are sorted, and because a lookup takes constant time, we
   # can search for a record in a leaf page using binary search in logorithmic
   # time.
   #
+  # #### No Duplicates
+  #
   # Leaf pages cannot contain duplicate records. Therefore, the b&#x2011;tree cannot
   # contain duplicate records. You can simulate duplicate records by adding a
   # series value to your key. The cursor implementation is designed faciliate
   # psuedo-duplicates in this fashion.
+  #
+  # #### Leaf Page Key
   #
   # The first record of every leaf page is the key value of the leaf page.
   #
@@ -419,7 +432,9 @@ class IO
   # keep a ghost of the record around, so we will know the key value of the leaf
   # page.
   #
-  # If a leaf page exceeds the leaf order, the leaf page is split.
+  # #### Leaf Page Split
+  #
+  # If the record count of leaf page exceeds the leaf order, the leaf page is split.
 
   # The in memory representation of the leaf page includes a flag to indicate
   # that the page is leaf page, the address of the leaf page, the page address
@@ -441,19 +456,17 @@ class IO
     extend page, override or {}
 
   # #### Leaf Page JSON Size
+  #
+  # JSON size is used as a fuzzy measure of the in&#x2011;memory size of a leaf page.
 
-  # We do not include the position size in the cached size because it is simple
-  # to calculate and the client cannot alter it.
-  cachePosition: (page, position) ->
-    size = if page.length is 1 then "[#{position}}" else ",#{position}"
-
-    page.size += size
-    @size += size
+  # #### Cached JSON Page Size
 
   # We have to cache the calcuated size of the record because we return the
-  # records to the client. We're not strict about ownership. The client may
-  # decide to alter the object we returned. We need to cache the JSON size and
-  # the key value when we load the object.
+  # records to the client.  We need to cache the JSON size and the key value
+  # when we load the object so we can deduct the proper amount from the page
+  # size and total size when we delete a record. We can't recalculate because
+  # we're not strict about ownership. The application programmer may decide to
+  # alter the object we returned.
   cacheRecord: (page, position, record) ->
     key = @extractor record
 
@@ -467,6 +480,14 @@ class IO
     @size += size
 
     entry
+
+  # We do not include the position size in the cached size because it is simple
+  # to calculate and the client cannot alter it.
+  cachePosition: (page, position) ->
+    size = if page.length is 1 then "[#{position}}" else ",#{position}"
+
+    page.size += size
+    @size += size
 
   # When we purge the record, we add the position length. We will only ever
   # delete a record that has been cached, so we do not have to create a function
@@ -2403,7 +2424,7 @@ class Balancer
     for operation in @operations
       @[operation.method](operation, _)
 
-    # Decrement the reference counts.
+    # Decrement the reference counts. TODO Why a count and not a boolean?
     for address, page of @referenced
       page.balancers--
 
