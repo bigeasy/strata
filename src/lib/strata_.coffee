@@ -1,4 +1,4 @@
-# A Streamline.js friendly evented I/O b-tree for Node.js.
+# A Streamline.js friendly evented I/O b&#x2011;tree for Node.js.
 #
 # ## Purpose
 #
@@ -6,33 +6,33 @@
 # choosing, indexed for fast retrieval.
 #
 # Strata is faster than a flat file, lighter than a database, with more capacity
-# than an in memory tree.
+# than an in&#x2011;memory tree.
 # 
-# Strata is a [b-tree](http://en.wikipedia.org/wiki/B-tree) implementation for
-# [Node.js](http://nodejs.org/) that is **evented**, **concurrent**,
-# **persistent** and **durable**.
+# Strata is a [b&#x2011;tree](http://en.wikipedia.org/wiki/B-tree)
+# implementation for [Node.js](http://nodejs.org/) that is **evented**,
+# **concurrent**, **persistent** and **durable**.
 #
-# Strata is **evented**. It uses asynchronous I/O to read and write b-tree
-# pages, allowing your CPU to continue to do work while Strata waits on I/O.
+# Strata is **evented**. It uses asynchronous I/O to read and write
+# b&#x2011;tree pages, allowing your CPU to continue to do work while Strata
+# waits on I/O.
 #
-# Strata is **concurrent**. Strata will satisfy any queries from its in memory
-# cache when it can, so requests can be satisifed, even when there are evented
-# I/O requests outstanding.
+# Strata is **concurrent**. Strata will answer any queries from its
+# in&#x2011;memory cache when it can, so requests can be satisifed even when
+# there are evented I/O requests outstanding.
 #
 # Strata is **persistent**. It stores your tree in page files. The page files
-# are plain old JSON, text files that are easy to manage. You can open them up
-# in a `vim` or EMACS, back them up using `tar`, check them into `git`, and
-# munge them with JavaScript.
+# are plain old JSON, text files that are easy to manage. You can view them with
+# `tail -f`, back them up hot using `rsync`, and version them with `git`.
 #
 # Strata is **durable**. It only appends records to to file, so a hard shutdown
 # will only ever lose the few last records added. Pages are journaled when they
 # are vacuumed or rewritten. 
 #
-# Strata is a b-tree. A b-tree is a database primiative. Using Strata, you can
-# start to experiment with database designs of your own. You can use Strata to
-# build an MVCC database table, like PostgreSQL. You can create Strata b-trees
-# to create relationship indexes. You can use Strata to store what ever form of
-# JSON suits your needs like NoSQL databases.
+# Strata is a b&#x2011;tree. A b&#x2011;tree is a database primiative. Using
+# Strata, you can start to experiment with database designs of your own. You can
+# use Strata to build an MVCC database table, like PostgreSQL. You can create
+# Strata b&#x2011;trees to create relationship indexes. You can use Strata to
+# store what ever form of JSON suits your needs like NoSQL databases.
 #
 # Strata is two database primatives in one, because with a time series index,
 # you can use Strata as a write ahead-log.
@@ -43,9 +43,9 @@
 #
 # ## Terminology
 #
-# We refer to the nodes in our b-tree as *pages*. The term node conjures an
+# We refer to the nodes in our b&#x2011;tree as *pages*. The term node conjures an
 # image of a discrete component in a linked data structure that contains one,
-# maybe two or three, values. Nodes in a b-tree contain hundreds or thousands of
+# maybe two or three, values. Nodes in a b&#x2011;tree contain hundreds or thousands of
 # values. They are indexed. They are read from disk. They are allowed to fall
 # out of memory when they have not been recently referenced. These are behaviors
 # that conjure an image of a page of values.
@@ -54,33 +54,35 @@
 # *child*, *split* and *merge*.
 #
 # There is no hard and fast definition for all the terms. A leaf is a fuzzy
-# concept in b-tree literature, for example. We call a page that contains
+# concept in b&#x2011;tree literature, for example. We call a page that contains
 # records a *leaf page*. We call a non-leaf page a *branch page*. The term
 # *order* means different things to different people.  We define the order of a
 # branch page to be the maximum number of child pages, while the order of a leaf
 # page to be the maximum number of records.
 #
-# The term *b-tree* itself may not be correct. There are different names for
-# b-tree that reflect the variations of implementation, but those distinctions
+# The term *b&#x2011;tree* itself may not be correct. There are different names for
+# b&#x2011;tree that reflect the variations of implementation, but those distinctions
 # have blurred over the years. Our implemenation may be considered a b+tree,
 # since pages are linked, and records are stored only in the leaves.
 #
 # Terms specific to our implementation will be introduced as they are
 # encountered in the document. 
 #
-# ## What is a b-tree?
+# ## What is a b&#x2011;tree?
 #
-# This documentation assumes that you understand the theory behind the b-tree,
+# This documentation assumes that you understand the theory behind the
+# b&#x2011;tree,
 # and know the variations of implementation. If you are interested in learning
-# about b-trees you should start with the Wikipedia articles on
+# about b&#x2011;trees you should start with the Wikipedia articles on
 # [B-trees](http://en.wikipedia.org/wiki/B-tree) and
-# [B+trees](http://en.wikipedia.org/wiki/B%2B_tree). I was introduced to b-trees
+# [B+trees](http://en.wikipedia.org/wiki/B%2B_tree). I was introduced to
+# b&#x2011;trees
 # while reading [Algorithms in C](http://www.amazon.com/dp/0201314525), quite
 # some time ago.
 #
-# ## What flavor of b-tree is this?
+# ## What flavor of b&#x2011;tree is this?
 #
-# Strata is a b-tree with leaf pages that contain records ordered by the
+# Strata is a b&#x2011;tree with leaf pages that contain records ordered by the
 # collation order of the tree. Records are stored for retrieval in constant
 # time, addressed by an integer index, so that they can be found using binary
 # search.
@@ -98,7 +100,7 @@
 # sibling pages next to each other can be combined to create a page less than
 # than the order they are merged.
 #
-# The b-tree always has a root branch page. The order of the tree increases when
+# The b&#x2011;tree always has a root branch page. The order of the tree increases when
 # the root branch page is split. It decreases when the root branch page is
 # merged. The split of the root branch is a different operation from the split
 # of a non-root branch, because the root branch does not have siblings.
@@ -120,7 +122,7 @@ say = (splat...) -> console.log.apply null, splat
 
 # ## Collation
 #
-# A b-tree has a collation defined by the application developer.
+# A b&#x2011;tree has a collation defined by the application developer.
 #
 # The collation is determined by the combination of an extractor and a
 # comparator. The extractor is used to extract a key from the stored record. The
@@ -134,7 +136,7 @@ say = (splat...) -> console.log.apply null, splat
 # we don't need the actual record, it will eventually be collected by a cache
 # purge, while the key will be retained. If the key is subset of a large record,
 # purging the records and retaining the keys will reduce the in memory size of
-# the b-tree.
+# the b&#x2011;tree.
 #
 # Also, the comparator is pretty easily generalized, while the exractor
 # is invariably specialized. You might have a single string comparator that you
@@ -143,18 +145,18 @@ say = (splat...) -> console.log.apply null, splat
 # ### Default Collation
 #
 # You will almost certainly define your down extractors and comparators, but the
-# b-tree has a default that works for b-tree that stores only JavaScript primitives.
+# b&#x2011;tree has a default that works for b&#x2011;tree that stores only JavaScript primitives.
 
 # Default comparator is good only for strings, use a - b for numbers.
 comparator = (a, b) ->
   if a < b then -1 else if a > b then 1 else 0
 
-# Default extractor returns the value as whole, i.e. a b-tree of strings.
+# Default extractor returns the value as whole, i.e. a b&#x2011;tree of strings.
 extractor = (a) -> a
 
 # ## Pages
 #
-# Our b-tree has two types of pages. Leaf pages and branch pages.
+# Our b&#x2011;tree has two types of pages. Leaf pages and branch pages.
 #
 # A *leaf page* contains records. A *branch page* contains references to other
 # pages.
@@ -162,7 +164,7 @@ extractor = (a) -> a
 # Both leaf pages and branch pages are ordered according to the collation.
 #
 # To find a record, we descend a tree of branch pages to find the leaf page that
-# contains the record. That is a b-tree.
+# contains the record. That is a b&#x2011;tree.
 #
 # ## Page Storage
 #
@@ -271,7 +273,7 @@ class IO
   # We take the limits approach. The bluk of a cached page is the size of the
   # references array and the size of objects in records map. We keep track of
   # those sizes. When we reach a maxmimum size for cached records and page
-  # references for the entire b-tree, we trigger a cache purge to bring it below
+  # references for the entire b&#x2011;tree, we trigger a cache purge to bring it below
   # the maxiumum size. The purge will remove entries from the end of the
   # most-recently used list until the limit is met.
   #
@@ -297,7 +299,7 @@ class IO
   # each record loaded in memory when JSON serialized with JSON.
   #
   # This is not an exact measure of the system memory committed to the in memory
-  # representation of the b-tree. It ignores the house keeping associated with
+  # representation of the b&#x2011;tree. It ignores the house keeping associated with
   # each page.
   #
   # An exact mesure is not necessary. We only need to be sure to trigger a cache
@@ -325,7 +327,7 @@ class IO
   # is unlinked from the balance list, and linked to the head of the core list.
   #
   # We always move a page to the front of the core list when we reference it
-  # during b-tree descent.
+  # during b&#x2011;tree descent.
 
   # Create an most-recently used list head node and return it. We call this to
   # create the core and balance list in the constructor above.
@@ -361,7 +363,7 @@ class IO
   # * The leaf page file is a text file of JSON strings that is an append log of
   # record insertions and deletions.
   # * A leaf page cannot contain two records that share the same key, therefore
-  # the b-tree cannot contain duplicates.
+  # the b&#x2011;tree cannot contain duplicates.
   #
   # In the abstract, a leaf page is an array of records.  Given an integer, the
   # leaf page will return the record stored at the offset of the array. This
@@ -370,7 +372,7 @@ class IO
   # Our leaf page implemenation maintains an array of file positions called a
   # positions array. A file position in the positions array references a record
   # in the leaf page file by its file position. The positions in the positions
-  # array are sorted according to the b-tree collation of the referenced
+  # array are sorted according to the b&#x2011;tree collation of the referenced
   # records.
   #
   # In the leaf page file, a record is stored as JSON string. The objects are
@@ -382,7 +384,7 @@ class IO
   # can search for a record in a leaf page using binary search in logorithmic
   # time.
   #
-  # Leaf pages cannot contain duplicate records. Therefore, the b-tree cannot
+  # Leaf pages cannot contain duplicate records. Therefore, the b&#x2011;tree cannot
   # contain duplicate records. You can simulate duplicate records by adding a
   # series value to your key. The cursor implementation is designed faciliate
   # psuedo-duplicates in this fashion.
@@ -525,7 +527,7 @@ class IO
 
   # Write an insert object. Calculate the serialized JSON string length of the
   # inserted record and add it to the in memory JSON size of the page and the in
-  # memory b-tree as a whole. We always use the JSON serialization we already
+  # memory b&#x2011;tree as a whole. We always use the JSON serialization we already
   # perform for storage, instead of serializing for both storage and size
   # calculation.
   writeInsert: (fd, page, index, record, _) ->
@@ -540,7 +542,7 @@ class IO
 
   # Write a delete object. Calculate the serialized JSON string length of the
   # inserted record and add it to the in memory JSON size of the page and the in
-  # memory b-tree as a whole.
+  # memory b&#x2011;tree as a whole.
   #
   # TODO Document `ghost`.
   writeDelete: (fd, page, index, ghost, _) ->
@@ -679,8 +681,8 @@ class IO
   #
   # We open a file descriptor and then close it after the record has been read.
   # The desire to cache the file descriptor is strong, but it would complicate
-  # the shutdown of the b-tree. As it stands, we can always simply let the
-  # b-tree succumb to the garbage collector, because we hold no other system
+  # the shutdown of the b&#x2011;tree. As it stands, we can always simply let the
+  # b&#x2011;tree succumb to the garbage collector, because we hold no other system
   # resources that need to be explictly released.
   #
   # Note how we allow we keep track of the minimum buffer size that will
@@ -743,13 +745,13 @@ class IO
   # the left most leaf page of a child and using the leaf page page key.
   # * The root branch page is always at address `0`.
   #
-  # To find the a record in the b-tree, we first use a tree of branch pages to
+  # To find the a record in the b&#x2011;tree, we first use a tree of branch pages to
   # find the leaf page that contains our record.
   #
   # A branch page contains the addresses of child pages. This array of page
   # addresses is essentially an *array of children*.
   #
-  # The child addresses are ordered according to the b-tree collation of the
+  # The child addresses are ordered according to the b&#x2011;tree collation of the
   # keys of the directly or indirectly referenced leaf pages.
   #
   # There are three types of branch pages, penultimate branch pages, interior
@@ -760,12 +762,13 @@ class IO
   # A penultimate branch page is a branch page whose children are leaf pages. If
   # a branch page is not penultimate, then its children are branch pages.
   #
-  # In a penultimate branch page, the array of children is ordered by the b-tree
+  # In a penultimate branch page, the array of children is ordered by the
+  # b&#x2011;tree
   # collation using a first record in the referenced leaf page for ordering.
   # That is, the first record of the leaf page is used as the key associated
   # with a page address in a penultimate branch page.
   #
-  # The non-leaf nodes of a b-tree have the property that the number of node
+  # The non-leaf nodes of a b&#x2011;tree have the property that the number of node
   # children is one greater than the number of keys. We obtain this property by
   # treating the first child as the left child of the entire page, and excluding
   # its key from the search. We search the subsequent keys to find the first key
@@ -799,14 +802,14 @@ class IO
   # branch page the subsequent children have an associated key that is the first
   # record of a leaf page.
   #
-  # The key is obtained by decending the sub-tree referenced by the child. We
+  # The key is obtained by decending the sub&#x2011;tree referenced by the child. We
   # first visit the branch page referneced by the child. We then visit left
   # children recursively, visiting the left child of the child, and the left
   # child of any subsquently visited children, until we reach a leaf page.  The
   # first record of that leaf page is the key to associate with the child
   # address in the address array of the interior branch page.
   #
-  # It is the nature of the b-tree that keys move up to the higher levels of the
+  # It is the nature of the b&#x2011;tree that keys move up to the higher levels of the
   # tree as pages split, while preserving the collation order of the keys. When
   # a branch page splits, a key from the middle of the page is chosen as a
   # partition. The partition is used as the key for the right half of the split
@@ -836,7 +839,7 @@ class IO
   # #### Root Branch Page
   #
   # The root page is the first page we consult to find the desired leaf page.
-  # Our b-tree always contains a root page. The b-tree is never so empty that
+  # Our b&#x2011;tree always contains a root page. The b&#x2011;tree is never so empty that
   # the root page disappears. The root page always has the same address.
   #
   # TK move. Until the root branch page is split, it is both the root branch
@@ -866,7 +869,7 @@ class IO
   # of a leaf page, and that leaf page is the left most leaf page in the entire
   # tree.
   #
-  # This maintains a property of the b-tree that for every leaf page except the
+  # This maintains a property of the b&#x2011;tree that for every leaf page except the
   # left most leaf page, there exists a unique branch page key derived from the
   # first record of the page.
   #
@@ -916,7 +919,7 @@ class IO
   # We write the branch page to a file as a single JSON object on a single line.
   # We tuck the page properties into an object, and then serialize that object.
   # We do not store the branch page keys. They are looked up as needed as
-  # described in the b-tree overview above.
+  # described in the b&#x2011;tree overview above.
   #
   # We always write a page branch first to a replacement file, then move it
   # until place using `relink`.
@@ -931,7 +934,7 @@ class IO
     buffer[json.length] = 0x0A
     fs.writeFile filename, buffer, "utf8", _
 
-    # Update in memory serialized JSON size of page and b-tree.
+    # Update in memory serialized JSON size of page and b&#x2011;tree.
     @size -= page.size or 0
     page.cache = {}
     page.size = JSON.stringify(page.addresses).length
@@ -939,7 +942,7 @@ class IO
 
   # To read a branch page we read the entire page and evaluate it as JSON. We
   # did not store the branch page keys. They are looked up as needed as
-  # described in the b-tree overview above.
+  # described in the b&#x2011;tree overview above.
 
   #
   readBranches: (page, _) ->
@@ -949,7 +952,7 @@ class IO
     [ right, addresses ] = record
     count = addresses.length
 
-    # Set in memory serialized JSON size of page and add to b-tree.
+    # Set in memory serialized JSON size of page and add to b&#x2011;tree.
     page.size = JSON.stringify(addresses).length
     @size += page.size
 
@@ -989,7 +992,7 @@ class IO
   # child and no keys. The left child is a single leaf page that is empty.
   #
   # Note that the address of the root branch page is `0` and the address of the
-  # left most leaf page is `-1`. This will not change. Even as the b-tree is
+  # left most leaf page is `-1`. This will not change. Even as the b&#x2011;tree is
   # balanced with splits and mergers of leaf pages, the root branch page is
   # always `0` and left most leaf page is always `-1`.
 
@@ -1067,34 +1070,36 @@ class IO
 
   # ### Concurrency
   #
-  # The b-tree must only be read and written by a single Node.js process. It is
+  # The b&#x2011;tree must only be read and written by a single Node.js process. It is
   # not suitable for use with multiple node processes, or the cluster API.
   #
-  # Although there is only a single thread in a Node.js process, the b-tree is
+  # Although there is only a single thread in a Node.js process, the
+  # b&#x2011;tree is
   # still a concurrent data structure. Instead of thinking about concurrency in
-  # terms of threads we talk about concurrent *descents* of the b-tree.
+  # terms of threads we talk about concurrent *descents* of the b&#x2011;tree.
   #
   # When we search the tree or alter the tree, we must descend the tree.
   #
-  # Decents of the b-tree can become concurrent when descent encounters a page
+  # Decents of the b&#x2011;tree can become concurrent when descent encounters a page
   # that is not in memory. While it is waiting on evented I/O to load the page
   # files, the main thread of the process can make progress on another request
-  # to search or alter the b-tree, it can make process on another descent.
+  # to search or alter the b&#x2011;tree, it can make process on another descent.
   #
   # This concurrency keeps the CPU and I/O loaded.
   #
   # ### Locking
   #
   # Locking prevents race conditions where an evented I/O request returns to to
-  # find that the sub-tree it was descending has been altered in way that causes
+  # find that the sub&#x2011;tree it was descending has been altered in way that causes
   # an error. Pages may have split or merged by the main thread, records may
-  # have been inserted or deleted. While evented I/O is performed, the sub-tree
+  # have been inserted or deleted. While evented I/O is performed, the
+  # sub&#x2011;tree
   # needs to be locked to prevent it from being altered.
   #
-  # The b-tree is locked page by page. We are able to lock only the pages of
+  # The b&#x2011;tree is locked page by page. We are able to lock only the pages of
   # interest to a particular descent of the tree.
   #
-  # Futhermore, the b-tree destinguishes between shared read locks and exclusive
+  # Futhermore, the b&#x2011;tree destinguishes between shared read locks and exclusive
   # write locks. Multiple descents can read a traverse that is read locked, but
   # only the descent that holds an exclusive write lock can traverse it or write
   # to it.
@@ -1252,15 +1257,16 @@ class IO
 
 # ## Descent
 #
-# We use the term *descent* to describe b-tree operations, because all b-tree
-# operations require a descent of the b-tree, a traversal of the b-tree starting
+# We use the term *descent* to describe b&#x2011;tree operations, because all
+# b&#x2011;tree
+# operations require a descent of the b&#x2011;tree, a traversal of the b&#x2011;tree starting
 # from the root. Whenever we are search the tree, insert or delete records, or
 # balance the tree with a page splits and merges, we first begin with a descent
-# of the b-tree, from the root, to find the page we want to act upon.
+# of the b&#x2011;tree, from the root, to find the page we want to act upon.
 #
 # #### Descent as Unit of Work
 #
-# We use the term descent to describe the both traversal of the b-tree and the
+# We use the term descent to describe the both traversal of the b&#x2011;tree and the
 # subsequent actions performed when when the desired page is found.
 # 
 # The descent is the unit of work in our concurrency model.  A descent is
@@ -1274,8 +1280,8 @@ class IO
 # progress on another descent in the main thread of execution.
 #
 # Because descents can make interleaved progress, we need to synchronize access
-# to b-tree pages, just as we would with a multi-threaded b-tree implementation.
-# When we descend the b-tree we need to make sure that we do not alter pages
+# to b&#x2011;tree pages, just as we would with a multi-threaded b&#x2011;tree implementation.
+# When we descend the b&#x2011;tree we need to make sure that we do not alter pages
 # that another waiting descent needs to complete its descent when it awakes, nor
 # read pages that a waiting descent had begun to alter before it had to wait.
 #
@@ -1284,27 +1290,28 @@ class IO
 #
 # #### Classes of Descent
 #
-# When we descend to leaf pages of a search b-tree to obtain records, we
-# *search* the b-tree. When we change the size of the b-tree by adding or
-# deleting records we *edit* the b-tree. When we change the structure of the
-# b-tree by splitting or merging pages, we *balance* the b-tree.
+# When we descend to leaf pages of a search b&#x2011;tree to obtain records, we
+# *search* the b&#x2011;tree. When we change the size of the b&#x2011;tree by adding or
+# deleting records we *edit* the b&#x2011;tree. When we change the structure of the
+# b&#x2011;tree by splitting or merging pages, we *balance* the b&#x2011;tree.
 #
 # We talk about search descents, edit descents, and balance descents we we
-# describe the interaction of b-tree operations.
+# describe the interaction of b&#x2011;tree operations.
 #
 # We use these terms in this document to save the chore of writing, and the
 # confustion of reading; insert or delete, or split or merge. We also want to
-# draw a distinction between changing the count of records stored in the b-tree,
-# *editing*, and changing the height of the b-tree, the count of pages, or the
+# draw a distinction between changing the count of records stored in the
+# b&#x2011;tree,
+# *editing*, and changing the height of the b&#x2011;tree, the count of pages, or the
 # choice of keys, *balancing*.
 #
 # #### Locking on Descent
 #
-# Becase a search descent does not alter the structure of the b-tree, Multiple
+# Becase a search descent does not alter the structure of the b&#x2011;tree, Multiple
 # search descents can be performed concurrently, without interfering with each
 # other.
 #
-# Descents that alter the b-tree exclusive access, but only to the pages they
+# Descents that alter the b&#x2011;tree exclusive access, but only to the pages they
 # alter. A search descent can still make progres in the presence of an
 # alteration decent, so long as the search does not visit the pages being
 # altered.
@@ -1336,7 +1343,8 @@ class IO
 #
 # Both branch pages and leaf pages are singly linked to their right sibling. If
 # you hold a lock on a page, you are allowed to obtain a lock on its right
-# sibling. This left right ordering allows us to traverse a level of the b-tree,
+# sibling. This left right ordering allows us to traverse a level of the
+# b&#x2011;tree,
 # which simplifies the implemtation of record cursors and page merges.
 #
 # When we move from a page to its right sibling, we hold the lock on the left
@@ -1420,7 +1428,7 @@ class Descent
 # ### Iterator
 #
 # The application developer uses an iterator to move across the leaf pages of
-# the b-tree in ascending collation order, one leaf page a time. The leaf pages
+# the b&#x2011;tree in ascending collation order, one leaf page a time. The leaf pages
 # themselves are visited one at a time, not the records. The iterator can
 # randomly access any record a the currently visited leaf page.
 #
@@ -1440,7 +1448,7 @@ class Iterator
   # As the result of a descent, we will know the index of the record that
   # corresponds to the key used to find the leaf page. This is either the index
   # of the key's record, or if there no record that could derive the key in the
-  # b-tree, the location where the key's record would be inserted.
+  # b&#x2011;tree, the location where the key's record would be inserted.
   #
   # There are good reasons to search for key that does not exist in the tree. We
   # may be interested in searching for time series data that occured between
@@ -1461,7 +1469,7 @@ class Iterator
   # sibling page.
   #
   # However, we do know that the first leaf page is the correct leaf page for
-  # the search key, because we used a b-tree descent to find the page. That is
+  # the search key, because we used a b&#x2011;tree descent to find the page. That is
   # unambiguous. When we search for the search key in the leaf page, even if it
   # does not exist, and is greater than the last record, we still know for
   # certain that the key does not belong to any of the right siblings.
@@ -1486,7 +1494,7 @@ class Iterator
   #
   # Additional public properties of the `Iterator` are the `key` used to create
   # the iterator, `found` which indicates whether or not the record actually
-  # exists in the b-tree, `count` which is the number of leaf pages visited by
+  # exists in the b&#x2011;tree, `count` which is the number of leaf pages visited by
   # this iterator, and `exclusive` indicating whehter we are an iterator or
   # a mutator. This properties are read-only, so make sure you only read them.
 
@@ -1534,7 +1542,7 @@ class Iterator
 # A mutator is an iterator that can also edit leaf pages. It can delete records
 # from the currently visit leaf page. It can insert records into the current
 # leaf page, if the record belongs in the current leaf page. Like an `Iterator`
-# it  moves bacross the leaf pages of an the b-tree in ascending collation
+# it  moves bacross the leaf pages of an the b&#x2011;tree in ascending collation
 # order. It has random access to the records in the page using an index into the
 # array of records.
 #
@@ -1549,11 +1557,11 @@ class Iterator
 # As in the case of ambiguous range starts, an insert location is unambiguous if
 # the key is the search key used to locate the first page of the mutator. The
 # key is determined to belong inside the leaf page by virtue of a desent of the
-# b-tree. That is unambiguous.
+# b&#x2011;tree. That is unambiguous.
 #
 # Using the example of time series data again, the application developer may
 # have an hour of events she wishes to insert into a day of events, within a
-# b-tree of years of events. Because the events took place within an hour, they
+# b&#x2011;tree of years of events. Because the events took place within an hour, they
 # would all be inserted into leaf pages that are close to each other, perhaps
 # right next to each other, or maybe they all fall within a single leaf page.
 # 
@@ -1572,7 +1580,7 @@ class Iterator
 # equal to the insert key, then we are on the wrong page. Unless we inspect the
 # next page, the insert location is ambiguous.
 #
-# To obtain an unambiguous insert location without descending the b-tree to
+# To obtain an unambiguous insert location without descending the b&#x2011;tree to
 # create a new mutator, we add a `Mutator.peek` method.
 #
 # This gives the mutator permission to peek at the right sibling leaf page of
@@ -1677,7 +1685,7 @@ class Mutator extends Iterator
 
         # Since we need to fsync anyway, we open the file and and close the file
         # when we append a JSON object to it. Because no file handles are kept
-        # open, the b-tree object can left to garbage collection.
+        # open, the b&#x2011;tree object can left to garbage collection.
         filename = @_io.filename @_page.address
         fd = fs.open filename, "a", 0644, _
         position = @_io.writeInsert fd, @_page, index, record, _
@@ -1713,7 +1721,7 @@ class Mutator extends Iterator
 #
 # #### Staccato Blanace Operations
 #
-# The b-tree balance operations cascade by nature. If you insert a value into a
+# The b&#x2011;tree balance operations cascade by nature. If you insert a value into a
 # leaf node, such that the leaf node is beyond capacity, you split the leaf
 # node, adding a new child to the parent node. If the parent node is now beyond
 # capacity, you split the parent node, adding a new child to its parent node.
@@ -1721,7 +1729,7 @@ class Mutator extends Iterator
 # leaf node will split every node all they way up to the root.
 #
 # Merges too move from leaves to root, so that a merge at one level of the
-# b-tree potentially triggers a merge of the parent with one of its siblings.
+# b&#x2011;tree potentially triggers a merge of the parent with one of its siblings.
 #
 # However, we've established rules for lock acquisition that require that locks
 # are obtained from the top down, and never from the bottom up. This is why we
@@ -1729,15 +1737,15 @@ class Mutator extends Iterator
 # descend the tree once to insert or delete records form the leaf pages. We then
 # descend the tree once for each split or merge of a page.
 #
-# Much b-tree literature makes mention of a potential efficency where you split
+# Much b&#x2011;tree literature makes mention of a potential efficency where you split
 # full pages on the way back up from an insert. You can determine which pages
-# would split if the leaf split as you descend the b-tree, since you'll visit
+# would split if the leaf split as you descend the b&#x2011;tree, since you'll visit
 # every page that would participate in a split.
 #
 # That efficency applies only for split, and not for merge, because you have to
 # inspect the left and right siblings of a page to determine if it is time to
 # merge. If the left sibling page of a page, is not also child of that page's
-# parent page, then the left sibling page is in a different sub-tree. It can not
+# parent page, then the left sibling page is in a different sub&#x2011;tree. It can not
 # be reached by the path that was used to find the leaf page where the delete
 # occured.
 #
@@ -1769,9 +1777,9 @@ class Mutator extends Iterator
 # mangniutde less frequently.
 #
 # Conserving descents during balance operations is a false economy. It
-# complicates lock acquisition. It reduces the liveliness of the b-tree.
+# complicates lock acquisition. It reduces the liveliness of the b&#x2011;tree.
 #
-# The multiple descents will allow searches of the b-tree to make progress
+# The multiple descents will allow searches of the b&#x2011;tree to make progress
 # between balance operations.
 #
 # ##### Descent as Unit of Work
@@ -1786,13 +1794,13 @@ class Mutator extends Iterator
 # level the moment we've detected the need for one. If we fill a leaf page, we
 # descend the tree again to split the leaf page.
 #
-# Because the b-tree is a concurrent structure, the leaf split descent may
+# Because the b&#x2011;tree is a concurrent structure, the leaf split descent may
 # discover that another descent has removed a record, and a leaf split is no
 # longer necessary. There may be, in fact, a descent on the way to the left
 # sibling of the page, to check for the potential for a merge.
 #
 # The concurrent operation means that we have to deal with situation where we've
-# undertaken a descent to balance the b-tree, but another series of descents
+# undertaken a descent to balance the b&#x2011;tree, but another series of descents
 # has rendered that plan invalid.
 #
 # As long as we're dealing with that problem, we may as well decouple insertion
@@ -1821,7 +1829,7 @@ class Mutator extends Iterator
 # in a separate thread of execution.
 #
 # Of course, a Node.js application really only has one thread of execution. In
-# our b-tree, however, multiple descents can make progress at the time, or
+# our b&#x2011;tree, however, multiple descents can make progress at the time, or
 # rather, the progress made by one decent, while another descent waits on I/O.
 #
 # We ensure that only one descent at a time is making progress toward the
@@ -1836,7 +1844,7 @@ class Mutator extends Iterator
 # balance the tree, the *balancer*.
 #
 # The balancer maintains an offset count for each modified leaf page in the
-# b-tree. When an insert is performed, the offset count for the leaf page is
+# b&#x2011;tree. When an insert is performed, the offset count for the leaf page is
 # incremented.  When a delete is performed, the offset count for the leaf page
 # is decremented. This keeps track of the total change in size.
 #
@@ -1900,7 +1908,7 @@ class Mutator extends Iterator
 # To split a leaf page, we start by obtaining the key value of the first record.
 # We can do this by acquiring a read lock on the page, without performing a
 # descent. The balancer gets to break some rules since it knows that we know
-# that the b-tree is not being otherwise balanced.
+# that the b&#x2011;tree is not being otherwise balanced.
 #
 # We descend the tree until we encoutner the penultimate branch page that is the
 # parent of the branch page.  We acquire an excsluive lock the branch page. We
@@ -1938,7 +1946,7 @@ class Mutator extends Iterator
 # keys in our tree. Even if we kept keys around, we're sending searches down a
 # path to nowhere. There is no leaf page to visit. We get rid of these paths. We
 # always balance the upper levels immediately, we perform the cascade. Our tree
-# descent logic would have to account for these empty sub-trees. Much better to
+# descent logic would have to account for these empty sub&#x2011;trees. Much better to
 # balance and keep things orderly.
 # 
 # This raises a concerns about live lock, that we might be balancing 
@@ -1978,9 +1986,9 @@ class Mutator extends Iterator
 # To merge a leaf page, we start by obtaining the key value of the first record.
 # We can do this by acquiring a read lock on the page, without performing a
 # descent. The balancer gets to break some rules since it knows that we know
-# that the b-tree is not being otherwise balanced.
+# that the b&#x2011;tree is not being otherwise balanced.
 #
-# With that key, we descend the b-tree. We know that the key value cannot
+# With that key, we descend the b&#x2011;tree. We know that the key value cannot
 # change, because it is the balancer that alters keys. The first record may be
 # deleted by editing, but a ghost of the first record is preserved for the key
 # value, which is the key value of the page.
@@ -2002,7 +2010,7 @@ class Mutator extends Iterator
 # left sibling because the first record is now somewhere in the midst of the
 # left sibling. We lock excluslively hand-over-hand thereafter to squeeze out
 # any shared locks. Our exclusive lock on the parent containing the key prevents
-# another descent from entering the sub-tree where we are performing the merge.
+# another descent from entering the sub&#x2011;tree where we are performing the merge.
 #
 # We now proceed down the path to the merge page as we would ordinarily, except
 # that we acquire exclusive locks hand-over-hand instead of shared locks. This
@@ -2010,7 +2018,7 @@ class Mutator extends Iterator
 #
 # We retain the exclusive lock on the penultimate branch page. No other descent
 # will be able to visit this penultimate branch, because we've blocked entry
-# into the sub-tree and squeeed out the other descents. We still need to hold
+# into the sub&#x2011;tree and squeeed out the other descents. We still need to hold
 # onto the exclusive lock, however, otherwise the page might be discarded during
 # a cache purge, which can happen concurently.
 #
@@ -2036,7 +2044,7 @@ class Mutator extends Iterator
 # merging branch pages other than the root branch page is the same regardless of
 # the depth of the branch page.
 #
-# We acquire the key for the left most page in the sub-tree underneath the
+# We acquire the key for the left most page in the sub&#x2011;tree underneath the
 # branch page. We do this by following the left most children until we reach a
 # leaf page. We use that key to descend the tree.
 #
@@ -2059,7 +2067,7 @@ class Mutator extends Iterator
 # the left sibling. Remove the merge sibling from its parent. Delete the key
 # from where we found it, so it can be looked up again.
 #
-# Before we lose track of the sub-tree we're in, we descend to the poteinally
+# Before we lose track of the sub&#x2011;tree we're in, we descend to the poteinally
 # new left most leaf of the parent, and obtain its key to repeat the process.
 #
 # #### Filling the Root Page
@@ -2071,7 +2079,7 @@ class Mutator extends Iterator
 # We descend again, locking the root. We lock the one child of the root. We copy
 # the contents of the one root child into the root and delete the child.
 #
-# This will decrease the height of the b-tree by one.
+# This will decrease the height of the b&#x2011;tree by one.
 #
 # #### Deleting Pages
 #
@@ -2119,7 +2127,7 @@ class Mutator extends Iterator
 # are a great many operations, then balance, wait a while, then balance, wait a
 # while. It is up the the end user.
 #
-# The end user can use the b-tree a map, tucking in values, getting them out.
+# The end user can use the b&#x2011;tree a map, tucking in values, getting them out.
 # Or else, as an index, to scan, perform table scans. We'll figure that out.
 #
 # Now I have an API problem. The client will have to know about pages to work
@@ -2131,12 +2139,12 @@ class Mutator extends Iterator
 #
 # There is a desire to cache the addresses of the left sibling pages when
 # possible, so I wouldn't have to descend the tree. Except that the
-# most-recently used list works hand in hand with b-tree descent. The higher
+# most-recently used list works hand in hand with b&#x2011;tree descent. The higher
 # levels of the tree are kept in memory, because they are more frequently visted
 # than lower levels. To much iteration along one level threatens to purge other
 # levels.
 #
-# One can imagine that when balancing b-tree that has been left unbalanced for a
+# One can imagine that when balancing b&#x2011;tree that has been left unbalanced for a
 # long time, reading in many unbalanced leaf pages will cause the first ones to
 # flush, which is a pity, since we'll probably need one of them.
 #
@@ -2190,7 +2198,7 @@ class Balancer
   # necessary, it turns out that in the mean time, that page has shrunk so that
   # it is now too small. We could create an outer loop that keeps on referencing
   # cache entries until all are available, but then you have an outer strange
-  # condition where you might load the entire b-tree, because you're taking so
+  # condition where you might load the entire b&#x2011;tree, because you're taking so
   # long, and every page is being touched. Allow balance to be imperfect.
   balance: (@io, _) ->
     # We only ever run one balance at a time. If there is a balance in progress,
@@ -2234,7 +2242,7 @@ class Balancer
       # containing the next sibling. If a sibling is not participating in our
       # balance plan, then its link is null. This gives us one or more linked
       # lists that reference a series of leaf pages ordered according to their
-      # order in the b-tree.
+      # order in the b&#x2011;tree.
       # 
       # We are always allowed to get a lock on a single page, so long as we're
       # holding no other locks.
@@ -2361,7 +2369,7 @@ class Balancer
         else
           delete ordered[address]
 
-    # Perform the operations to balance the b-tree.
+    # Perform the operations to balance the b&#x2011;tree.
     for operation in @operations
       @[operation.method](operation, _)
 
@@ -2472,7 +2480,7 @@ class exports.Strata
     cursor.insert(record)
     cursor.unlock()
 
-  # Create a cassette to insert into b-tree.
+  # Create a cassette to insert into b&#x2011;tree.
   cassette: (object) -> new Cassette(object, @_io.extractor(object))
 
   # Create an array of cassettes, sorted by the record key, from the array of
