@@ -22,7 +22,8 @@
 #
 # Strata is **persistent**. It stores your tree in page files. The page files
 # are plain old JSON, text files that are easy to manage. You can view them with
-# `tail -f`, back them up hot using `rsync`, and version them with `git`.
+# `less` or `tail -f`, back them up hot using `rsync`, and version them with
+# `git`.
 #
 # Strata is **durable**. It only appends records to to file, so a hard shutdown
 # will only ever lose the few last records added. Pages are journaled when they
@@ -31,39 +32,56 @@
 # Strata is a b&#x2011;tree. A b&#x2011;tree is a database primiative. Using
 # Strata, you can start to experiment with database designs of your own. You can
 # use Strata to build an MVCC database table, like PostgreSQL. You can create
-# Strata b&#x2011;trees to create relationship indexes. You can use Strata to
-# store what ever form of JSON suits your needs like NoSQL databases.
+# Strata b&#x2011;trees to create indexes into structured data that is not
+# already in a database, like monster log files. You can use Strata to store
+# your data in what ever form of JSON suits you like a NoSQL database.
 #
-# Strata is two database primatives in one, because with a time series index,
-# you can use Strata as a write ahead-log.
+# As a bonus, Strata is two database primatives in one, because with a time
+# series index, you can use Strata as a write&#x2011;ahead log.
 #
 # Strata runs anywhere that Node.js runs, in pure JavaScript.
 #
-# TK Transition.
+# ## Collaboration
+# 
+# Documentation for Strata is presented here, in literate programming style. API
+# documentation is not yet available, so scoot down to the `Strata` class for an
+# in-depth look at the API. Have a look at the extensive test suite for examples
+# on the different operations.
+#
+# If you find a bug with Strata, please report it at the [GitHub
+# Issues](https://github.com/bigeasy/strata/issues). If you want to leave a
+# comment on the documentation or the code, you can ping me, Alan Gutierrez, at
+# @[bigeasy](https://twitter.com/#!/bigeasy) on Twitter.
+#
+# Feel free to fork and explore. Note that Strata is a database primitive, not a
+# database in itself. Before you fork and add what you feel are missing
+# features, please consult with me. Perhaps your ideas are better expressed as
+# project that employs Strata, intead of to a patch to Strata itself.
 #
 # ## Terminology
 #
-# We refer to the nodes in our b&#x2011;tree as *pages*. The term node conjures an
-# image of a discrete component in a linked data structure that contains one,
-# maybe two or three, values. Nodes in a b&#x2011;tree contain hundreds or thousands of
-# values. They are indexed. They are read from disk. They are allowed to fall
-# out of memory when they have not been recently referenced. These are behaviors
-# that conjure an image of a page of values.
+# We refer to the nodes in our b&#x2011;tree as ***pages***. The term node
+# conjures an image of a discrete component in a linked data structure that
+# contains one, maybe two or three, values. Nodes in a b&#x2011;tree contain
+# hundreds or thousands of values. They are indexed. They are read from disk.
+# They are allowed to fall out of memory when they have not been recently
+# referenced. These are behaviors that people associate with a page of values.
 #
-# Otherwise, we use common teriminology for *height*, *depth*, *parent*,
-# *child*, *split* and *merge*.
+# Otherwise, we use common terminology for ***height***, ***depth***,
+# ***parent***, ***child***, ***split*** and ***merge***.
 #
 # There is no hard and fast definition for all the terms. A leaf is a fuzzy
 # concept in b&#x2011;tree literature, for example. We call a page that contains
-# records a *leaf page*. We call a non-leaf page a *branch page*. The term
-# *order* means different things to different people.  We define the order of a
-# branch page to be the maximum number of child pages, while the order of a leaf
-# page to be the maximum number of records.
+# records a ***leaf page***. We call a non-leaf page a ***branch page***. The
+# term ***order*** means different things to different people.  We define the
+# order of a branch page to be the maximum number of child pages, while the
+# order of a leaf page to be the maximum number of records.
 #
-# The term *b&#x2011;tree* itself may not be correct. There are different names for
-# b&#x2011;tree that reflect the variations of implementation, but those distinctions
-# have blurred over the years. Our implemenation may be considered a b+tree,
-# since pages are linked, and records are stored only in the leaves.
+# The term ***b&#x2011;tree*** itself may not be correct. There are different
+# names for b&#x2011;tree that reflect the variations of implementation, but
+# those distinctions have blurred over the years. Our implemenation may be
+# considered a b+tree, since pages are linked, and records are stored only in
+# the leaves.
 #
 # Terms specific to our implementation will be introduced as they are
 # encountered in the document. 
@@ -71,14 +89,12 @@
 # ## What is a b&#x2011;tree?
 #
 # This documentation assumes that you understand the theory behind the
-# b&#x2011;tree,
-# and know the variations of implementation. If you are interested in learning
-# about b&#x2011;trees you should start with the Wikipedia articles on
-# [B-trees](http://en.wikipedia.org/wiki/B-tree) and
+# b&#x2011;tree, and know the variations of implementation. If you are
+# interested in learning about b&#x2011;trees you should start with the
+# Wikipedia articles on [B-trees](http://en.wikipedia.org/wiki/B-tree) and
 # [B+trees](http://en.wikipedia.org/wiki/B%2B_tree). I was introduced to
-# b&#x2011;trees
-# while reading [Algorithms in C](http://www.amazon.com/dp/0201314525), quite
-# some time ago.
+# b&#x2011;trees while reading [Algorithms in
+# C](http://www.amazon.com/dp/0201314525), quite some time ago.
 #
 # ## What flavor of b&#x2011;tree is this?
 #
@@ -90,9 +106,9 @@
 # Branch pages contain links to other pages, and do not store records
 # themselves.
 #
-# Leaf pages are linked in ascending order for traversal by cursors. Branch
-# pages are singly linked in ascending order to simplify implementation of
-# branch page merges.
+# Leaf pages are linked in ascending order to simply the implementatoin of
+# traversal by cursors. Branch pages are singly linked in ascending order to
+# simplify implementation of branch page merges.
 #
 # The order of a branch page is the maximum number of children for a branch
 # page. The order of a leaf page is maximum number of records for a leaf page.
@@ -100,10 +116,11 @@
 # sibling pages next to each other can be combined to create a page less than
 # than the order they are merged.
 #
-# The b&#x2011;tree always has a root branch page. The order of the tree increases when
-# the root branch page is split. It decreases when the root branch page is
-# merged. The split of the root branch is a different operation from the split
-# of a non-root branch, because the root branch does not have siblings.
+# The b&#x2011;tree always has a root branch page. The height of the tree
+# increases when the root branch page is split. It decreases when the root
+# branch page is merged. The split of the root branch is a different operation
+# from the split of a non-root branch, because the root branch does not have
+# siblings.
 
 # Requried node.js libraries.
 fs = require "fs"
@@ -113,7 +130,7 @@ extend = (to, from) ->
   to[key] = value for key, value of from
   to
 
-# Useful for debugging. If you don't see them called in the code, it means the
+# Used for debugging. If you don't see them called in the code, it means the
 # code is absolutely bug free.
 die = (splat...) ->
   console.log.apply null, splat if splat.length
@@ -128,24 +145,26 @@ say = (splat...) -> console.log.apply null, splat
 # comparator. The extractor is used to extract a key from the stored record. The
 # comparator is used to order records by comparing the key.
 #
-# Separating extraction from comparison allows us to cache the key.
+# Separating extraction from comparison allows us to cache the key. We do not
+# need the whole record for comparison, only the key. Keys are used to order the
+# tree, so when we will constantly be reading records off the disk solely to get
+# their key value.
 #
-# Keys are relevant even when the record itself is not of interest to the
-# application developer. Keys are used to order the tree, so when we will
-# constantly be reading records off the disk solely to get their key value.  If
-# we don't need the actual record, it will eventually be collected by a cache
-# purge, while the key will be retained. If the key is subset of a large record,
-# purging the records and retaining the keys will reduce the in memory size of
-# the b&#x2011;tree.
+# If a record is read for its key, but the record is not soon visited by a
+# cursor, it will eventually be collected by a cache purge, while the key will
+# be retained, if the key is frequently consulted by queries as they descend the
+# tree. If the key is subset of a large record, purging the records and
+# retaining the keys will reduce the in&#x2011;memory size of the b&#x2011;tree.
 #
-# Also, the comparator is pretty easily generalized, while the exractor
-# is invariably specialized. You might have a single string comparator that you
-# use with many different extractors.
+# Also, the comparator is pretty easily generalized, while the exractor is
+# invariably specialized. You might have a single string comparator that you use
+# with extractors specialized for different types of records.
 #
 # ### Default Collation
 #
 # You will almost certainly define your down extractors and comparators, but the
-# b&#x2011;tree has a default that works for b&#x2011;tree that stores only JavaScript primitives.
+# b&#x2011;tree has a default that works for b&#x2011;tree that stores only
+# JavaScript primitives.
 
 # Default comparator is good only for strings, use a - b for numbers.
 comparator = (a, b) ->
