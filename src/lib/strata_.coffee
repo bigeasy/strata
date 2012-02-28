@@ -216,7 +216,7 @@ class IO
   # reference array in the collation order of the stored records they reference.
   #
   # The in memory page object also contains a map of integer addresses to JSON
-  # objects. This is the ***record cache** for the page object. The integers in
+  # objects. This is the ***record cache*** for the page object. The integers in
   # the reference array are always present when the page is loaded, so that the
   # integer array is dense, but the record cache only contains entries for
   # records that have been referenced. We use a binary search to probe for keys
@@ -230,6 +230,7 @@ class IO
   constructor: (@directory, @options) ->
     @cache          = {}
     @mru            = {}
+    # TODO OUTGOING
     @mru.core       = @createMRU()
     @mru.balance    = @createMRU()
     @nextAddress    = 0
@@ -243,6 +244,8 @@ class IO
   # that is incremented as new pages are created. A page file has a file name that
   # includes the page address.  When we load a page, we first derive the file name
   # from the page address, then we load the file.
+  #
+  # TK Rewrite once we've finalized journaled balancing.
   #
   # The `filename` method accepts a suffix, so that we can create replacement
   # files. Instead of overwriting an existing page file, we create a replacement
@@ -260,6 +263,8 @@ class IO
     padding = "00000000".substring(0, 8 - String(address).length)
     "#{@directory}/segment#{padding}#{address}#{suffix}"
 
+  # TODO I thought we broke this up?
+
   # Move a replacement page file into place. Unlink the existing page file, then
   # rename the new page file to the permanent name of the page file.
   relink: (page, _) ->
@@ -276,13 +281,16 @@ class IO
 
   # ### Page Caching
   #
-  # We keep a map of page addresses to cached page objects.
+  # We keep an in&#x2011;memory map of page addresses to page objects. This is
+  # our ***page cache***.
   #
   # #### Most-Recently Used List
   #
-  # We also maintain a most-recently used linked list using the page objets as
-  # list nodes. When we want to cull the cache, we can remove the pages at the
-  # end of the list, since they are the least recently used.
+  # We also maintain a ***most-recently used list*** as a linked list using the
+  # page objects as list nodes. When we reference a page, we unlink it from the
+  # linked list and relink it at the head of the ist. When we want to cull the
+  # cache, we can remove the pages at the end of the linked list, since they are
+  # the least recently used.
   #
   # #### Cache Purge Trigger
   #
@@ -292,35 +300,43 @@ class IO
   #
   # We take the limits approach. The bluk of a cached page is the size of the
   # references array and the size of objects in records map. We keep track of
-  # those sizes. When we reach a maxmimum size for cached records and page
-  # references for the entire b&#x2011;tree, we trigger a cache purge to bring it below
-  # the maxiumum size. The purge will remove entries from the end of the
-  # most-recently used list until the limit is met.
+  # those sizes. When we reach an application developer specified maxmimum size
+  # for cached records and page references for the entire b&#x2011;tree, we
+  # trigger a cache purge to bring it below the maxiumum size. The purge will
+  # remove entries from the end of the most-recently used list until the limit
+  # is met.
+  #
+  # #### Pages Held for Housekeeping
   #
   # There may be cache entires loaded for housekeeping only. When balancing the
-  # tree, the order of a page, its count of items, is needed to determine if
-  # needs to be split, or if it can merged with a sibling page. We only need the
-  # count to create our balance plan, however, not the cached references and
-  # records. These cache entries can be purged of cached records and page
-  # references, but the entry itself cannot be deleted until it is no longer
-  # needed to calculate a merge.  We use reference counting to determine if an
-  # entry is participating in
-  # balance calcuations.
+  # tree, the page item count is needed to determine if needs to be split, or if
+  # it can merged with a sibling page.
+  #
+  # We only need the *item count* to create our balance plan, however, not the
+  # cached references and records. These cache entries can be purged of cached
+  # records and page references, but the entry itself cannot be deleted until it
+  # is no longer needed to calculate a merge.
+  #
+  # We use reference counting to determine if an entry is participating in
+  # balance calcuations. We can purge the cached records, but we do not unlink
+  # the page object from the most-recenlty used list nor remove it from the
+  # cache.
   #
   # #### JSON Size
   #
-  # Limits would be difficult to guage if we were an in memory data structure,
-  # but we can get an accuate relative measure of the size of a page using the
-  # length of the JSON strings used to store records and references. 
+  # Limits would be difficult to guage if we out b&#x2011;tree were an
+  # in&#x2011;memory data structure, but we can get an accuate relative measure
+  # of the size of a page using the length of the JSON strings used to store
+  # records and references. 
   #
   # The JSON size of a branch page is the string length of the JSON serialized
   # page address array. The JSON size of leaf page is the string length of the
-  # file position array when serialized with JSOn, plus the string length of
+  # file position array when serialized with JSON, plus the string length of
   # each record loaded in memory when JSON serialized with JSON.
   #
   # This is not an exact measure of the system memory committed to the in memory
-  # representation of the b&#x2011;tree. It ignores the house keeping associated with
-  # each page.
+  # representation of the b&#x2011;tree. It is a fuzzy measure of the relative
+  # heft of page in memory.
   #
   # An exact mesure is not necessary. We only need to be sure to trigger a cache
   # purge at some point before we reach the limits imposed by sytem memory or
@@ -332,19 +348,11 @@ class IO
   #
   # It is important that the page objects are unique, that we do not represent a
   # page file with more than one page object, because the page objects house the
-  # locking mechanisms.
+  # locking mechanisms. The page object acts as a mutex for page data.
   #
-  # The cache entires are linked to form a doubly-linked list. A doubly-linked
-  # list of entries has a head node that has a null address, so that end of the
-  # list is unambiguous.
-  #
-  # There are two linked list heads. A core list of cache entries, and a
-  # balancing list for pages that were loaded for the sake of item counts while
-  # calculating a merge. The when it comes time to purge, the balance list is
-  # purged first.
-  #
-  # If a page cached for balance calculations, is needed for other purposes, it
-  # is unlinked from the balance list, and linked to the head of the core list.
+  # The cache entires are linked to form a doubly-linked list. The doubly-linked
+  # list of cache entries has a head node that has a null address, so that end
+  # of list traversal is unambiguous.
   #
   # We always move a page to the front of the core list when we reference it
   # during b&#x2011;tree descent.
