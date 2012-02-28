@@ -1239,6 +1239,9 @@ class IO
       @unlock page
     key
 
+  # Binary search implemented, as always, by having a peek at [Algorithms in
+  # C](http://www.informit.com/store/product.aspx?isbn=0201314525) by [Robert
+  # Sedgewick](http://www.cs.princeton.edu/~rs/).
   find: (page, key, low, _) ->
     { comparator } = @
     high = page.count - 1
