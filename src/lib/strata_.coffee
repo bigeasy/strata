@@ -262,12 +262,11 @@ class IO
     padding = "00000000".substring(0, 8 - String(address).length)
     "#{@directory}/segment#{padding}#{address}#{suffix}"
 
-  # TODO I thought we broke this up?
-
-  # Move a replacement page file into place. Unlink the existing page file, then
-  # rename the new page file to the permanent name of the page file.
-  relink: (page, _) ->
-    replacement = @filename(page.address, ".new")
+  # Move a replacement page file into place. Unlink the existing page file, if
+  # it exists, then rename the replacement page file to the permanent name of
+  # the page file.
+  replace: (page, suffix, _) ->
+    replacement = @filename(page.address, ".#{suffix}")
     stat = fs.stat replacement, _
     if not stat.isFile()
       throw new Error "not a file"
@@ -277,6 +276,15 @@ class IO
     catch e
       throw e unless e.code is "ENOENT"
     fs.rename replacement, permanent, _
+
+  # Rename a page file from a page file with one suffix to another suffix.
+  rename: (page, from, to, _) ->
+    fs.rename @filename(page.address, ".#{from}"),
+              @filename(page.address, ".#{to}"), _
+
+  # Unlink a page file with the given suffix.
+  unlink: (page, suffix, _) ->
+    fs.unlink @filename(page.address, ".#{suffix}"), _
 
   # ### Page Caching
   #
@@ -322,6 +330,8 @@ class IO
   # cache.
   #
   # #### JSON Size
+  #
+  # TODO All screwed up. Un-screw.
   #
   # Limits would be difficult to guage if we out b&#x2011;tree were an
   # in&#x2011;memory data structure, but we can get an accuate relative measure
@@ -441,7 +451,7 @@ class IO
   # of the next leaf page, and a cache that maps record file positions to
   # records that have been loaded from the file.
   createLeaf: (address, override) ->
-    page = @cache[address] = @link @mru,
+    page =
       balancers: 0
       loaded: false
       leaf: true
@@ -451,15 +461,21 @@ class IO
       deleted: 0
       count: 0
       size: 0
-      right: -1
+      right: 0
       locks: [[]]
     extend page, override or {}
+
+  # TK DOCUMENTATION
+  encache: (page) ->
+    @cache[page.address] = @link @mru, page
 
   # #### Leaf Page JSON Size
   #
   # JSON size is used as a fuzzy measure of the in&#x2011;memory size of a leaf page.
 
   # #### Cached JSON Page Size
+
+  # TODO Obviously, the cached size includes the size of all positions.
 
   # We have to cache the calcuated size of the record because we return the
   # records to the client.  We need to cache the JSON size and the key value
@@ -481,6 +497,10 @@ class IO
 
     entry
 
+  # TODO Split gets these off by a bit. Can we instead of being nutty about it,
+  # can we instead track only record sizes in the cache? We know the positions
+  # all have a weight. 
+
   # We do not include the position size in the cached size because it is simple
   # to calculate and the client cannot alter it.
   cachePosition: (page, position) ->
@@ -492,14 +512,35 @@ class IO
   # When we purge the record, we add the position length. We will only ever
   # delete a record that has been cached, so we do not have to create a function
   # to purge a position.
-  purgeRecord: (page, position) ->
+  #
+  # TK Purge is not quite right, because we're actually removing the record from
+  # the cache. Rename to uncacheRecord. Document.
+  #
+  # TK We delete the record, but we do not remove the position.
+  #
+  # This method is used to uncache a record before it is removed from the page,
+  # so we deduct the position size as well.
+  uncacheRecord: (page, position) ->
     if size = page.cache[position]?.size
-      size += if page.length is 1 then "[#{position}}" else ",#{position}"
+      size += if page.count is 1 then "[#{position}}" else ",#{position}"
 
       page.size -= size
       @size -= size
 
       delete page.cache[position]
+
+  # TODO We don't need to keep the size around, because the keys are never
+  # handed over to the user.
+  uncacheKey: (page, address) ->
+    if page.cache[address]
+      size = JSON.stringify(page.cache[address]).length
+
+      size += if page.count is 1 then "[#{address}}" else ",#{address}"
+
+      page.size -= size
+      @size -= size
+
+      delete page.cache[address]
 
   # ### Appends for Durability
   #
@@ -593,6 +634,7 @@ class IO
   # memory b&#x2011;tree as a whole.
   #
   # TODO Document `ghost`.
+  # TODO Ensure that we are correctly loading a ghost.
   writeDelete: (fd, page, index, ghost, _) ->
     @_writeJSON fd, page, [ -(index + 1), ghost ], _
   
@@ -769,17 +811,31 @@ class IO
   # immediately.
 
   # Note that we close the file descriptor before this function returns.
-  rewriteLeaves: (page, _) ->
-    filename = @filename page.address, ".new"
+  rewriteLeaves: (page, suffix, _) ->
+    filename = @filename page.address, ".#{suffix}"
+
     fd = fs.open filename, "a", 0644, _
     positions = []
     cache = {}
+    page.position = 0
+
+    # TODO Just figuring on this working, but not really thinking about it.
+    @size -= page.size
+    size = JSON.stringify(page.positions).length
+    page.size -= size
+
     for position, index in page.positions
-      object = page.cache[position] or @readRecord page, position, _
-      position = @writeInsert fd, page, index, object, _
+      object = @stash page, position, _
+      position = @writeInsert fd, page, index, object.record, _
       positions.push position
       cache[position] = object
     extend page, { positions, cache }
+
+    # TODO Must go. Getting annoying. It is resolved.
+    size = JSON.stringify(page.positions).length
+    page.size += size
+    @size += page.size
+
     @writePositions fd, page, _
     fs.close fd, _
 
@@ -836,9 +892,8 @@ class IO
   # the left leaf page, which accepts all the records less than the first key,
   # and therefore may accept a record less than its current least record.
   #
-  # An insertion can only insert a into the left most leaf page of a
-  # penumltimate branch page a record less than the least record of the leaf
-  # page.
+  # An insertion can only insert a into the left most leaf page of a penultimate
+  # branch page a record less than the least record of the leaf page.
   #
   # #### Interior Branch Pages
   #
@@ -896,7 +951,7 @@ class IO
   # ### Keys and First Records
   #
   # We said that it is only possible for an insertion to insert a into the left
-  # most child leaf page of a penumltimate branch page a record less than the
+  # most child leaf page of a penultimate branch page a record less than the
   # least record. We can say about a tree rooted by an interor branch page, that
   # an insertion is only able to insert into the left most leaf page in the
   # *entire tree* a record less than the least record.
@@ -951,7 +1006,7 @@ class IO
 
   #
   createBranch: (address, override) ->
-    page = @cache[address] = @link @mru,
+    page =
       balancers: 0
       count: 0
       penultimate: true
@@ -960,9 +1015,19 @@ class IO
       cache: {}
       locks: [[]]
       loaded: false
-      right: -1
+      right: 0
       size: 0
     extend page, override or {}
+
+  insert: (page, offset, value) ->
+    values = page.addresses or page.positions
+    values.splice(offset, 0, value)
+    page.count++
+
+  remove: (page, offset, count) ->
+    values = page.addresses or page.positions
+    values.splice(offset, count)
+    page.count -= count
 
   # We write the branch page to a file as a single JSON object on a single line.
   # We tuck the page properties into an object, and then serialize that object.
@@ -970,11 +1035,11 @@ class IO
   # described in the b&#x2011;tree overview above.
   #
   # We always write a page branch first to a replacement file, then move it
-  # until place using `relink`.
+  # until place using `replace`.
 
   #
-  rewriteBranches: (page, _) ->
-    filename = @filename page.address, ".new"
+  rewriteBranches: (page, suffix, _) ->
+    filename = @filename page.address, ".#{suffix}"
     record = [ page.right, page.addresses ]
     json = JSON.stringify(record)
     buffer = new Buffer(json.length + 1)
@@ -1053,14 +1118,14 @@ class IO
     if fs.readdir(@directory, _).filter((f) -> not /^\./.test(f)).length
       throw new Error "database #{@directory} is not empty."
     # Create a root branch with a single empty leaf.
-    root = @createBranch @nextAddress++, penultimate: true, loaded: true
-    leaf = @createLeaf -(@nextAddress++), loaded: true
+    root = @encache @createBranch @nextAddress++, penultimate: true, loaded: true
+    leaf = @encache @createLeaf -(@nextAddress++), loaded: true
     root.addresses.push leaf.address
     # Write the root branch.
-    @rewriteBranches root, _
-    @rewriteLeaves leaf, _
-    @relink leaf, _
-    @relink root, _
+    @rewriteBranches root, "replace", _
+    @rewriteLeaves leaf, "replace", _
+    @replace leaf, "replace", _
+    @replace root, "replace", _
 
   # #### Opening
   #
@@ -1082,8 +1147,8 @@ class IO
   # files would indicate that. We can probably delete the split. Hmm..
   #
   # We can add more to the suffix. `*.new.0`, or `*.commit`, which is the last
-  # relink. If we have a case where there is a file named `*.commit` that does
-  # not have a corresponding permanent file, then we have a case where the
+  # replacement. If we have a case where there is a file named `*.commit` that
+  # does not have a corresponding permanent file, then we have a case where the
   # permenant file has been deleted and not linked, but all the others have
   # been, since this operaiton will go last, so we complete it to go forward.
   #
@@ -1144,6 +1209,8 @@ class IO
   # sub&#x2011;tree
   # needs to be locked to prevent it from being altered.
   #
+  # Locks prevent cache purges.
+  #
   # The b&#x2011;tree is locked page by page. We are able to lock only the pages of
   # interest to a particular descent of the tree.
   #
@@ -1199,7 +1266,8 @@ class IO
     # grouped inside one of the arrays in the queue element. Exclusive locks are
     # queued alone as a single element in the array in the queue element.
     if not page = @cache[address]
-      page = @["create#{if address < 0 then "Leaf" else "Branch"}"](address)
+      creator = "create#{if address < 0 then "Leaf" else "Branch"}"
+      page = @encache @[creator](address)
 
     # If the page needs to be laoded, we must load the page only after a lock
     # has been obtained. Loading is a read, so we can load regardless of whether
@@ -1264,8 +1332,7 @@ class IO
     @unlock tier
     @lock tier.address, true, false, _
 
-  stash: (page, index, _) ->
-    position = page.positions[index]
+  stash: (page, position, _) ->
     if not stash = page.cache[position]
       record = @readRecord page, position, _
       stash = @cacheRecord page, position, record
@@ -1276,11 +1343,11 @@ class IO
     stack = []
     loop
       if page.leaf
-        key = @stash(page, index, _).key
+        key = @stash(page, page.positions[index], _).key
         break
       else
         address = page.addresses[index]
-        page = @lock address, false, page.penultimate, _
+        page = @lock address, false, _
         index = 0
         stack.push page
     for page in stack
@@ -1431,35 +1498,78 @@ class Descent
   # The constructor always felt like a dangerous place to be doing anything
   # meaningful in C++ or Java.
   constructor: (@io) ->
-    @locks      = []
-    @locked     = {}
     @first      = true
     @page       = { addresses: [ 0 ], leaf: false }
     @index      = 0
     @exact      = false
     @exclusive  = false
+    @depth      = 0
 
-  key: (key) ->
-    { io } = @
-    (page, _) -> io.find page, key, 1, _
+  # We use `fork` to create a new descent using the position of the current
+  # descent. The new descent will continue to descend the tree, but without
+  # releasing the lock on the page held by the descent from which we forked.
+  #
+  # When we split and merge pages other than the root page, we need to hold
+  # locks on pages at more than one level of the tree. Pages at the parent level
+  # will have nodes inserted or deleted. Pages at the child level will be split
+  # or merged. When we reach a parent, we use `fork` to create a new descent, so
+  # we don't release our lock on the parent when we visit the child.
+  #
+  # When we merge and delete leaf pages, we also need to update the key, which
+  # may be at any level of the tree. We need to hold our lock on the branch page
+  # that contains the key, while still descending the tree to find the two pages
+  # that need to be merged. The two pages to merge may not be immediate children
+  # of the same penultimate branch page. 
+  #
+  # TK Glurgh: We need to leave the key page locked, then go left and right to
+  # find two separate pages. We do not need to hold locks on all the pages down
+  # to the targets, just the pivot point and the targets  The hand-over-hand
+  # logic works fine. Descending hand-over-hand exclusive will cause us to wait
+  # for other descents to finish, squeezing the other descents out.
+  
+  # We create a new `Descent` which creates a dummy first page. We then assign
+  # the addresses current descent to the dummy page, and copy the current index.
+  fork: ->
+    fork = new Descent @io
+    fork.page.addresses = @page.addresses
+    extend fork, { @exclusive, @index }
+  
+  @key: (key) ->
+    (_) -> @io.find @page, key, 1, _
 
   iterate: (page) ->
     @first = false
 
-  leftMost: (page, _) -> 0
+  @leftMost: (_) -> 0
 
-  penultimate: (page) -> page.addresses[0] < 0
+  # Stop when we reach a penultimate branch page.
+  @penultimate: -> @page.addresses[0] < 0
 
-  leaf: (page) -> page.leaf
+  # Stop when we reach a leaf page.
+  @leaf: -> @page.leaf
 
+  # Follow the right most path.
+  @right: (_) -> @page.addresses.length - 1
+
+  # All subsequent locks acquired by the descent are exclusive.
   exclude: -> @exclusive = true
 
+  # Stop when we reach a certain depth in the tree.
+  @depth: (depth) -> -> @depth is depth
+
+  # Upgrade a lock from shared to exclusive. Works only with branch pages. All
+  # subsequent locks acquired by the descent are exclusive.
+  upgrade: (_) ->
+    @io.unlock @page
+    @page = @io.lock @page.address, @exclusive = true, _
+
   descend: (next, stop, _) ->
-    while not stop(@page, @index, @exact)
+    while not stop.call(@)
+      @depth++
       parent = @page
       @page = @io.lock parent.addresses[@index], @exclusive, _
       @io.unlock parent if parent.address?
-      @index = next @page, _
+      @index = next.call(@, _)
       if @index < 0
         @index = (~@index) - 1
         @exact = false
@@ -1563,7 +1673,7 @@ class Iterator
     if not (@index <= index < @length)
       throw new Error "index out of bounds"
 
-    @_io.stash(@_page, index, _).record
+    @_io.stash(@_page, @_page.positions[index], _).record
 
   # Go to the next leaf page. Returns true if there is a next, false if there
   # the current leaf page is the last leaf page.
@@ -1743,6 +1853,7 @@ class Mutator extends Iterator
         fs.close fd, _
 
         @_page.positions.splice index, 0, position
+        # TODO Why am I not caching the record?
         @_page.count++
         @length = @_page.positions.length
       else
@@ -1761,9 +1872,10 @@ class Mutator extends Iterator
     fs.close fd, _
     
     @_page.positions.splice index, 1 if index > 0 or @first
+    # TODO Why am I not deleting the cached record?
     @_page.count--
     @length = @_page.positions.length
-#
+
 # #### Insertion and Deletion Verus Balance
 #
 # We do not attempt to balance the tree with every insertion or deletion. The
@@ -2216,13 +2328,16 @@ class Mutator extends Iterator
 # Balancing the tree is maintainence. The balancer can take its time.
 
 class Balancer
-  constructor: ->
+  constructor: (@leafSize) ->
     @referenced = {}
     @counts = {}
     @operations = []
 
-  unbalanced: (page) ->
-    @counts[page.address] = page.count unless @counts[page.address]?
+  unbalanced: (page, force) ->
+    if force
+      @counts[page.address] = @leafSize
+    else
+      @counts[page.address]?= page.count
 
   # TODO If it is not exposed to the user, I don't underbar it.
   reference: (page) ->
@@ -2234,14 +2349,47 @@ class Balancer
   # good way for you to handle the error, or rather, you're going to have to
   # have some form of error callback, which is a pattern I'd like to avoid.
 
+  # TODO Uh, no. You can kind of launch this whenever the who, so long as you do
+  # not launch more than one at a time. Use a callback. The callback can record
+  # your errors to an error log. Do note that balance is always concurrent,
+  # though. Makes no sense to try to run more than one at a time, or it doesn't
+  # make sense to run a balance when a balance is running, or rather, it doens't
+  # make sense to make it a matter of running one after each insert. Horrible
+  # writing here. Do not use.
+
   # TODO Once loaded, and marked as part of the balancer, we can do our
   # calculations in one fell soop. This triggers the consternation over what all
   # these extranious pages do to the cache.
+
+  # TODO What is the procedure for vacuuming deleted keys? &mdash; We check
+  # every page that has been added to the balancer, regardless of whether it has
+  # grown, shrunk or returned to its original reported size. If the page is to
+  # be deleted, because the leaf page is empty, that negates any fussing with
+  # the key. Same goes for the case where the page is to be merged. 
 
   # Ah, also, when we do load these, when we want to get them from the cache, we
   # don't really need them to be loaded. We should reach in a probe the cache
   # ourselves. My former Java self would have to spend three days thinking about
   # encapsulation, probably create a new sub-project. Agony.
+ 
+  # Balancing will continue until morale improves. It may feel like a race
+  # condition, but that can't be helped. There may be degenerate use cases where
+  # the b&#x2011;tree cannot reach a balanced state. Inserts and deletes may be
+  # taking a set of pages from needing split to needing merge faster than the
+  # balance plan can figure it, and the balance operations can make it so.
+
+  # The balance plan is optimistic. It creates a plan based on the state of the
+  # tree a specific point in time. While implementing the plan, however, the
+  # state of the tree may change, invalidating aspects of the plan. In this
+  # case, an operation will be canceled. When an operation is canceled, we add
+  # the canceled pages to the next balancer.
+
+  # TODO Tracking the difference means we can short cut planning, if the page
+  # has only grown. This is a short cut. We consider its use carefully. We are
+  # not capricious with it. We are okay with having to load the sibling page
+  # counts to check for merge. A split will lead to a subsequent balance plan
+  # that will load four pages. In that regard, plits are not cheaper than
+  # merges.
 
   # No. Race condition. We want to gather all the pages in memory, so we can
   # evaluate them, without someone else changing them. We add a page because it
@@ -2310,7 +2458,6 @@ class Balancer
         if page.address isnt -1
           if not node.left
             descent = new Descent(@_io)
-            next = descent.key(node.key)
             descent.descend(descend.key(node.key), descent.found(key))
             # TODO You know that this would drive you mad and cost you three
             # days if you were a Java programmer. Ecapsulation! Encapsulation!
@@ -2362,7 +2509,10 @@ class Balancer
 
     # Break the lists on the nodes that we plucked because we expected that they
     # would split. Check to see that they didn't go from growing to shrinking
-    # while we were waiting evented I/O.
+    # while we were waiting evented I/O. Note how we drop the page if a split is
+    # not knecesarry.
+
+    #
     for address, count in Object.keys @counts
       node = ordered[address]
       difference = node.count - count
@@ -2370,7 +2520,7 @@ class Balancer
       # list, because we know it cannot merge with its neighbors.
       if difference > 0 and node.page.count > max
         # Schedule the split.
-        @operations.push method: "splitLeaf", address: node.page.address
+        @operations.push method: "splitLeaf", key: node.key
         # Unlink this split node, so that we don't consider it when merging.
         unlink node.left
         unlink node
@@ -2414,6 +2564,7 @@ class Balancer
             method: "mergeLeaves"
             left: node.page.address
             right: right.page.address
+            unbalanced: @counts
           node.count += right.count
           link node, unlink right
         # Remove any lists containing only one node.
@@ -2422,61 +2573,476 @@ class Balancer
 
     # Perform the operations to balance the b&#x2011;tree.
     for operation in @operations
-      @[operation.method](operation, _)
+      @[operation.method].call(@, operation, _)
 
     # Decrement the reference counts. TODO Why a count and not a boolean?
     for address, page of @referenced
       page.balancers--
 
-  splitLeaf: ({ address }, _) ->
-    say "SPLITTING #{address}"
+  # TODO What if the leaf has a deleted key record? Abandon. We need to have
+  # purged deleted key records before we get here. For example, it may be the
+  # case that a leaf page key has been deleted, requiring a page key swap. The
+  # page might also need to be split. We push the split onto the next balance.
+  # (Bad example, we really don't have to do this.)
+  #
+  # TODO When added to the balancer, we note the size of the leaf page when it
+  # was last known to be balanced in relation to its siblings. Until we can
+  # either delete it or run it through a plan where it is known to be balanced,
+  # it is in an unbalanced state.
+  #
+  # TK Docco.
 
-  _splitLeaf: (branch, key, _) ->
-    address = branch.addresses[@io.find(child, @key, 1, _)]
-    @exclusive.push leaf = @io.lock address, true, true, _
+  # 
+  splitLeaf: ({ key }, _) ->
+    # Keep track of our descents so we can unlock the pages at exit.
+    descents = []
 
-    # See that nothing has changed since we last descended.
-    { comparator: c, io, options: { leafSize: length } } = @
-    return if leaves.addresses.length < @options.leafSize
+    # We descend the tree directory directly to the leaf using the key.
+    descents.push penultimate = new Descent(@io)
+    sought = Descent.key(key)
 
-    # We might have let things go for so long, that we're going to have to split
-    # the page into more than two pages.
-    partitions = Math.floor leaf.count / @options.leafSize
-    while (partitions * @options.leafSize) <= leaves.addresses.length
-      # Find a partition.
-      partition = Math.floor leaves.addresses.length / (partitions + 1)
-      key = io.key leaves, partition, _
-      pivot = @io.find(child, key, _) + 1
+    # Descend to the penultimate branch page, from which a leaf page child will
+    # be removed.
+    penultimate.descend(sought, Descent.penultimate, _)
+    penultimate.upgrade(_)
 
-      addresses = leaf.positions.splice(partition)
-      right = io.allocateLeaves(addresses, leaves.right)
+    # Now descend to our leaf to split.
+    descents.push leaf = penultimate.fork()
+    leaf.descend(sought, Descent.leaf, _)
+    split = leaf.page
 
-      leaves.right = right.address
+    # If it turns out that our leaf has drained to the point where it does not
+    # need to be split, we should then check to see if it can be merged.
 
-      child.addresses.splice(pivot, 0, right.address)
+    # TODO We're not bothering with split when we've only grown a bit, right?
+    if split.count <= @io.options.leafSize
+      @_io.balancer.unbalanced(@_page)
 
-      # Order of rewrites is to first write the pages out. Then delete the old
-      # files. Then copy the new files. The presence of a new file without an
-      # old file means to roll forward. The presence of new files each with and
-      # old file means to roll back.
+    # Otherwise we perform our split.
+    else
+      # It may have been some time since we've split, so we might have to split
+      # into more than two pages.
+      pages = Math.ceil(split.count / @io.options.leafSize)
+      records = Math.floor(split.count / pages)
+      remainder = split.count % pages
+
+      right = split.right
+
+      replacements = []
+      uncached = []
+
+      # Never a remainder record on the first page.
+      offset = split.count
+      
+      # Create new pages.
+      while --pages
+        # Create a new leaf page.
+        page = @io.createLeaf -(@io.nextAddress++)
+
+        # Link the leaf page to its siblings.
+        page.right = right
+        right = page.address
+
+        # Add the address to our parent penultimate branch.
+        @io.insert(penultimate.page, ++penultimate.index, page.address)
+
+        # Determine the number of records to add to this page from the split
+        # leaf. Add an additonal record if we have a remainder.
+        count = if remainder-- > 0 then records + 1 else records
+        offset = split.count - count
+
+        for index in [offset...offset + count]
+          # Fetch the record before we uncache it.
+          position = split.positions[index]
+          record = @io.stash(split, position, _).record
+          @io.uncacheRecord split, position
+
+          # Add it to our new page.
+          @io.insert page, page.count, position
+          @io.cacheRecord page, position, record
+
+        # Remove the positions that have been merged.
+        @io.remove(split, offset, count)
+
+        # Write the new leaf page to a temporary file.
+        @io.rewriteLeaves page, "rename", _
+
+        replacements.push page
+        uncached.push page
+
+      # Link the leaf page to the last created new leaf page.
+      split.right = right
+
+      # Write the left most leaf page from which new pages were split.
+      @io.rewriteLeaves split, "rename", _
+      replacements.push split
+
+      # Write the branches
+      @io.rewriteBranches penultimate.page, "pending", _
+
+      # Now rename the last action, committing to our balance.
+      @io.rename penultimate.page, "pending", "commit"
+
+      # Rename our files to put them in their place.
+      for page in replacements
+        @io.replace page, "replace"
+
+      # Add our new pages to the cache.
+      for page in uncached
+        @io.encache page
+
+      # This last replacement will complete the transaction.
+      @io.replace penultimate.page, "commit"
+
+      # Our left-most and right-most page might be able to merge with the left
+      # and right siblings of the page we've just split. We compel a merge
+      # detection in the next balance plan by setting the last known size. We do
+      # not use the current size, because it is not **known** to be balanced. We
+      # cannot employ the split shortcut that only checks for split if a page
+      # has grown from being known to be balanced with siblings. Sorry, english
+      # bad, but great example. Imagine a page that has been full, but has a
+      # sibling that has only one record. We add a record to the full page and
+      # split it so that it is half empty. We then add it to the balancer with
+      # its half full record count. We want to check for merge and see  
       #
-      # TODO Split relink into unlink and rename.
+      # TODO Swipe &mdash; This always balance until perfect balance is still
+      # imperfect.  We may still manage to create a b&#x2011;tree that has leaf
+      # pages that alternate from full pages to pages contianing a single
+      # record, a degenerate case.
 
-      # Append an operation indciator. This would be a record that describes all
-      # the participants in the rewrite, in the order in which they are supposed
-      # to be rewritten. When found, we look at the last item in the list, then
-      # load that, and ensure that the last record is a complete operation
-      # record. If it is, we know that all of the temporary pages were written.
-      @io.rewriteLeaves(leaves, _)
-      @io.rewriteLeaves(right, _)
+      #
+      @io.balancer.unbalanced(leaf, true)
+      @io.balancer.unbalanced(page, true)
 
-      @io.rewriteBranches(child, _)
+    # Release the pages locked during descent. Seems premature because we're not
+    # done yet, but no other descent makes progress unless we invoke a callback. 
+    @io.unlock(descent.page) for descent in descents
 
-      @io.relink(right, _)
-      @io.relink(leaves, _)
-      @io.relink(child, _)
+  splitBranch: ({ key, depth }, _) ->
+    descents = []
 
-      --paritions
+    descents.push parent = new Descent(@io)
+    parent.descend sought = Descent.key(key), Descent.depth(depth - 1)
+    parent.upgrade()
+
+    descend.push child = parent.fork()
+    child.descend sought, Descent.depth(depth)
+
+    branchSize = @io.options.branchSize
+    pages = Math.ceil(split.count / branchSize)
+    remainder = split.count % pages
+
+    replacements = []
+
+    offset = leafSize
+
+    partition = @io.options.branchSize / 2
+    right = @io.createBranch @io.nextAddress++, { right: child.page.right }
+    child.page.right = right.address
+    for index in [partition...child.page.count]
+      address = child.page.addresses[index]
+      @io.uncacheKey child.page, address
+      @io.insert(right, right.count, address)
+
+    # TODO If we implement a splice method, or rather insert and delete,  in io,
+    # it can update the JSON size of the addresses or positions using an
+    # approximate value of 7. Means I must consider carefully range to remove.
+    @io.remove(child.page, partition, child.page.count - partition)
+    @io.insert(parent.page, parent.index + 1, right.address)
+
+    @io.rewriteBranch root, "pending", _
+    @io.rewriteBranch left, "replace", _
+    @io.rewriteBranch right, "replace", _
+
+    @io.rename root, "pending", "commit", _
+
+    @io.replace left, "replace", _
+    @io.replace right, "replace", _
+    @io.replace root, "commit", _
+
+  drainRoot: ({}, _) ->
+    page = @io.lock 0, true, _
+
+    right = @io.createBranch @io.nextAddress++
+    left = @io.createBranch @io.nextAddress++, { right: right.address }
+
+    partition = @io.options.branchSize / 2
+
+    for index in [0...partition]
+      left.addresses.push root.addresses[index]
+
+    for index in [partition...root.addresses.length]
+      right.addresses.push root.addresses[index]
+
+    @size -= root.size
+    root = extend root,
+      size: 0,
+      cache: {},
+      addresses: [ left.address, right.address ]
+
+    # TODO I can't tell if I care about the JSON size of the addresses array. My
+    # best guess as to how to handle this is to remove it, track only the size
+    # of the cache itself, and then add it later, carefully. It would take a day
+    # of careful reading, but I could put it on a branch. Also, I might have
+    # some test fixtures that will detect this. This is approaching a decision.
+    @io.encache left
+    @io.encache right
+
+    @io.rewriteBranch root, "pending", _
+    @io.rewriteBranch left, "replace", _
+    @io.rewriteBranch right, "replace", _
+
+    @io.rename root, "pending", "commit", _
+
+    @io.replace left, "replace", _
+    @io.replace right, "replace", _
+    @io.replace root, "commit", _
+
+  deleteKey: ({ key }, _) ->
+    descents = []
+
+    descents.push pivot = new Descent(io)
+    pivot.descend(sought = Descent.key(node.key), Descent.found(key))
+    pivot.upgrade()
+
+    descents.push leaf = pivot.fork()
+    leaf.descend(leaf, Descent.leaf)
+
+    # If the page has emptied since we made our plan, then we pass the page onto
+    # the next balancer. There will be no key to replace the one we delete. We
+    # need to delete the page.
+    if leaf.positions.length is 1
+      @io.balancer.unbalanced leaf, true
+    else
+      @io.uncacheRecord leaf, leaf.positions[0]
+      leaf.positions.shift()
+
+      # Seems as good a time to do this as any. This implementation cleans up
+      # after deletes rather aggressively.
+      @io.rewriteLeaves leaf, "pending", _
+      @io.rename leaf, "pending", "commit", _
+      @io.replace leaf, "commit", _
+
+    @io.unlock page for page in pages
+
+  # TODO Why delete? Is it not simply a merge? Yes. It is.
+  mergeLeaf: ({ key, unbalanced }, copy, _) ->
+    descents = []
+
+    descents.push pivot = new Descent(io)
+    pivot.descend(sought = Descent.key(node.key), Descent.found(key))
+    pivot.upgrade()
+    
+    penultimate = {}
+
+    penultimate.isPivot = pivot.page.addresses[0] < 0
+
+    penultimate.left = pivot.fork()
+    penultimate.left.index--
+    penultimate.left.descend Descent.right, Descent.penultimate
+
+    penultimate.right = pivot.fork()
+    penultimate.right.descend sought, Descent.penultimate
+
+    unless penultimate.isPivot
+      descents.push penultimate.left
+      descents.push penultimate.right
+
+    leaves = {}
+
+    descents.push leaves.left = penultimate.left.fork()
+    leaves.left.descend Descent.right, Descent.leaf
+
+    descents.push leaves.right = penultimate.right.fork()
+    leaves.right.descend sought, Descent.leaf
+
+    # Fixup the index. If the pivot is penultimate, then the it is not actually
+    # the right-most.
+    if penultimate.isPivot
+      leaves.left.index = leaves.right.index - 1
+
+    # Determine if we still have candidates for merge.
+    if leaves.left.page.count + leaves.right.page.count < @io.options.leafSize
+      # Uncache the pivot key. 
+      @io.uncacheKey pivot.page, pivot.page.addresses[pivot.index]
+
+      leaves.left.page.right = leaves.right.page.right
+
+      copy.call(@, left, right, _)
+
+      @io.size -= leaves.right.page.size
+
+      @io.rewriteLeaves leaves.left.page, "rename", _
+
+      leaves.right.page.positions.length = 0
+      @io.rewriteLeaves leaves.right.page, "unlink", _
+
+      if penultimate.isPivot
+        right = pivot.page
+        right.addresses.splice(pivot.index, 1)
+      else
+        right = penultimate.right.page
+        unless right.addresses.length is 1
+          @io.uncacheKey right, right.addresses[1]
+        right.addresses.shift()
+
+      @io.rewriteBranches right, "pending", _
+
+      # TODO If I succeed, how will I know to test the parents for balance? Got
+      # to think all over again in medic about who is whose parent?
+      @io.rename right, "pending", "commit", _
+
+      @io.replace leaves.left.page, "rename", _
+      @io.unlink leaves.right.page, "unlink", _
+      @io.replace right, "rename", _
+
+      if right.address isnt 0
+        @operations.unshift
+          method: "mergeBranches",
+          key: @io.key(right, 0, _),
+          address: right.address
+
+    # We cannot merge, so we queue one or both of pages for a merge test on the
+    # next balancer.
+    else
+      if unbalanced[leaves.left.page.address]
+        @io.balancer.unbalanced(leaves.left.page, true)
+      if unbalanced[leaves.right.page.address]
+        @io.balancer.unbalanced(leaves.right.page, true)
+
+    @io.unlock descent.page for descent in descents
+
+  mergeBranches: ({ key, address }, _) ->
+    descents = new Descent(@io)
+
+    # Roughly: First choose which to merge. Then merge.
+    #
+    # I beleive that, once we find the key, we have found 
+
+    # We need to go left then right when we see the key.
+    descent = new Descent(@io)
+    descent.descend sought = descent.key(key), descent.found(key), _
+    descent.index--
+    descent.descend Descent.right, descent.depth(depth - 1), _
+    # The binary search will put us at the last index. We are now where we need
+    # to be.
+    descent.descend sought, descent.depth(depth), _
+
+    # Get the page.
+    pages = [ page = descent.page ]
+
+    # Prevent purge?
+    page.balancing = true
+
+    while page.right and pages.length < 3
+      pages.push page = @io.lock page.right, false, _
+
+    branchSize = @io.options.branchSize
+
+    if pages.length > 1 and pages[0].count + pages[1].count < branchSize
+      merge = [ pages[0].address, pages[1].address ]
+    else if pages.length is 3 and pages[1].count + pages[2].count < branchSize
+      merge = [ pages[1].address, pages[1].address ]
+
+    @io.unlock page for page in pages
+
+    return unless merge
+
+    page = @io.lock merge[0], false, _
+    key = @io.key page, 0, _
+    @io.unlock page
+
+    descents = []
+    sought = Descent.key(key)
+
+    descents.push pivot = new Descent(@io)
+    pivot.descend sought, descent.found(key)
+
+    parent = {}
+
+    parent.left = pivot.fork()
+    parent.left.descend Decent.right, Decent.depth(depth - 1)
+
+    parent.right = piviot.fork()
+    parent.right.descend sought, Decent.depth(depth - 1)
+
+    parent.isPivot = parent.right.depth is pivot.depth
+
+    unless parent.isPivot
+      descents.splice(0, 0, parent.left, parent.right)
+
+    child = {}
+
+    descents.push child.left = parent.left.fork()
+    child.left.descend sought, Decent.depth(depth)
+    child.left.index-- if parent.isPivot
+
+    descents.push child.right = parent.right.fork()
+    child.right.descend sought, Decent.depth(depth)
+
+    for address in child.right.page.addresses
+      child.left.page.addresses.push address
+
+    @io.size -= child.right.page.size
+
+    @io.rewriteBranches child.left.page, "rename", _
+
+    child.right.page.addresses.length = 0
+    @io.rewriteBranches child.right.page, "unlink", _
+
+    if parent.isPivot
+      right = pivot.page
+      right.positions.splice(pivot.index, 1)
+    else
+      right = parent.right.page
+      unless right.addresses.length is 1
+        @io.uncacheKey right, right.addresses[1]
+      right.addresses.shift()
+
+    @io.rewriteBranches right, "pending", _
+
+    # TODO If I succeed, how will I know to test the parents for balance? Got
+    # to think all over again in medic about who is whose parent?
+    @io.rename right, "pending", "commit", _
+
+    @io.replace child.left.page, "rename", _
+    @io.unlink child.right.page, "unlink", _
+    @io.replace right, "commit", _
+
+    # We only check to fill the root if there are only two nodes in the root
+    # that can be combined to fill the root.
+    if right.address is 0 and right.count is 2
+      @operations.unshift method: "fillRoot"
+    else
+      @operations.unshift
+        method: "mergeBranches"
+        key: @io.key(right, 0, _)
+        depth: depth - 1
+
+    @io.unlock descent.page for descent in descents
+
+  fillRoot: ({}, _) ->
+    pages = []
+
+    pages.push root = @io.lock 0, true, _
+    pages.push left = @io.lock root.addresses[0], true, _
+    pages.push right = @io.lock root.addresses[1], true, _
+
+    if left.count + right.count <= @io.options.branchSize
+      @io.uncache page for page in pages
+      root.addresses = left.addresses.concat(right.addresses)
+
+    @io.rewriteBranches left, "unlink", _
+    @io.rewriteBranches right, "unlink", _
+
+    @io.rewriteBranches root, "pending", _
+
+    @io.rename root, "pending", "commit", _
+
+    @io.unlink page, "unlink", _ for page in [ left, right ]
+    @io.replace root, "commit", _
+      
+    @io.unlock page for page in pages
 
 class Cassette
   constructor: (@record, @key) ->
@@ -2508,10 +3074,11 @@ class exports.Strata
   # use, for a key, a map that says `{ key: null, ordinal: 1 }`. Cookbook it.
   _cursor: (key, exclusive, constructor, _) ->
     descent = new Descent(@_io)
-    next = if key? then descent.key(key) else descent.leftMost
-    descent.descend(next, descent.penultimate, _)
+    sought = if key? then Descent.key(key) else Descent.leftMost
+    descent.descend(sought, Descent.penultimate, _)
     descent.exclude() if exclusive
-    descent.descend(next, descent.leaf, _)
+    descent.descend(sought, Descent.leaf, _)
+    # TODO This needs to also be a part of balance planning.
     index = descent.page.deleted
     index = @_io.find(descent.page, key, index, _) if key?
     index = ~index if not (found = index >= 0)
