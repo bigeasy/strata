@@ -10,6 +10,6 @@
 , "lib" : "lib"
 , "main" : "./lib/strata"
 , "version" : "0.0.1"
-, "scripts" : { "test": "ace" }
+, "scripts" : { "test": "ace t/basics/get.t.coffee" }
 , "engines" : { "node": "> 0.6.0" }
 }
