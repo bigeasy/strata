@@ -7,9 +7,11 @@
 , "devDependencies":
   { "coffee-script": ">=1.1.3"
   , "ace.is.aces.in.my.book": ">=0.0.3" }
+, "dependencies":
+  { "streamline": ">=0.2.4" }
 , "lib" : "lib"
 , "main" : "./lib/strata"
 , "version" : "0.0.1"
-, "scripts" : { "test": "ace t/basics/get.t.coffee" }
+, "scripts" : { "test": "ace t/basics/split.t.coffee" }
 , "engines" : { "node": "> 0.6.0" }
 }

@@ -1,5 +1,4 @@
-#!/usr/bin/env coffee-streamline
-return if not require("streamline/module")(module)
+#!/usr/bin/env _coffee
 fs = require "fs"
 require("./harness") 2, ({ Strata, directory, fixture: { load, objectify, serialize } }, _) ->
   serialize "#{__dirname}/fixtures/split.before.json", directory, _

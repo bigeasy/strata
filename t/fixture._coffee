@@ -1,5 +1,3 @@
-#!/usr/bin/env coffee-streamline
-return if not require("streamline/module")(module)
 fs = require "fs"
 objectify = module.exports.objectify = (directory, _) ->
   segments = {}

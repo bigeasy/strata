@@ -2665,7 +2665,7 @@ class Balancer
         @io.remove(split, offset, count)
 
         # Write the new leaf page to a temporary file.
-        @io.rewriteLeaves page, "rename", _
+        @io.rewriteLeaves page, "replace", _
 
         replacements.push page
         uncached.push page
@@ -2674,25 +2674,25 @@ class Balancer
       split.right = right
 
       # Write the left most leaf page from which new pages were split.
-      @io.rewriteLeaves split, "rename", _
+      @io.rewriteLeaves split, "replace", _
       replacements.push split
 
       # Write the branches
       @io.rewriteBranches penultimate.page, "pending", _
 
       # Now rename the last action, committing to our balance.
-      @io.rename penultimate.page, "pending", "commit"
+      @io.rename penultimate.page, "pending", "commit", _
 
       # Rename our files to put them in their place.
       for page in replacements
-        @io.replace page, "replace"
+        @io.replace page, "replace", _
 
       # Add our new pages to the cache.
       for page in uncached
         @io.encache page
 
       # This last replacement will complete the transaction.
-      @io.replace penultimate.page, "commit"
+      @io.replace penultimate.page, "commit", _
 
       # Our left-most and right-most page might be able to merge with the left
       # and right siblings of the page we've just split. We compel a merge
@@ -2872,7 +2872,7 @@ class Balancer
 
       @io.size -= leaves.right.page.size
 
-      @io.rewriteLeaves leaves.left.page, "rename", _
+      @io.rewriteLeaves leaves.left.page, "replace", _
 
       leaves.right.page.positions.length = 0
       @io.rewriteLeaves leaves.right.page, "unlink", _
@@ -2892,9 +2892,9 @@ class Balancer
       # to think all over again in medic about who is whose parent?
       @io.rename right, "pending", "commit", _
 
-      @io.replace leaves.left.page, "rename", _
+      @io.replace leaves.left.page, "replace", _
       @io.unlink leaves.right.page, "unlink", _
-      @io.replace right, "rename", _
+      @io.replace right, "replace", _
 
       if right.address isnt 0
         @operations.unshift
@@ -2985,7 +2985,7 @@ class Balancer
 
     @io.size -= child.right.page.size
 
-    @io.rewriteBranches child.left.page, "rename", _
+    @io.rewriteBranches child.left.page, "replace", _
 
     child.right.page.addresses.length = 0
     @io.rewriteBranches child.right.page, "unlink", _
@@ -3005,7 +3005,7 @@ class Balancer
     # to think all over again in medic about who is whose parent?
     @io.rename right, "pending", "commit", _
 
-    @io.replace child.left.page, "rename", _
+    @io.replace child.left.page, "replace", _
     @io.unlink child.right.page, "unlink", _
     @io.replace right, "commit", _
 

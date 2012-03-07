@@ -1,6 +1,3 @@
-#!/usr/bin/env coffee-streamline
-return if not require("streamline/module")(module)
-
 fs        = require "fs"
 fixture   = require "./fixture"
 {Strata}  = require "../lib/strata"
