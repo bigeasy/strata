@@ -1,4 +1,4 @@
-#!/usr/bin/env coffee
+#!/usr/bin/env _coffee
 fixture = require "./fixture"
 [ directory ] = process.argv.slice(2)
 fixture.stringify directory, (error) -> throw error if error
