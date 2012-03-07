@@ -16,8 +16,14 @@ require("./harness") 2, ({ Strata, directory, fixture: { load, objectify, serial
     records.push cursor.get i, _
   cursor.unlock()
 
-  @deepEqual records, [ "a", "b", "c", "d" ]
+  @deepEqual records, [ "a", "b", "c", "d" ], "records"
 
   strata.balance _
 
-  @ok 1, "two"
+  expected = load "#{__dirname}/fixtures/split.after.json", _
+  actual = objectify directory, _
+
+  @say expected
+  @say actual
+
+  @deepEqual actual, expected, "split"
