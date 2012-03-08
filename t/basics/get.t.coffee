@@ -1,5 +1,4 @@
-#!/usr/bin/env coffee-streamline
-return if not require("streamline/module")(module)
+#!/usr/bin/env _coffee
 fs = require "fs"
 require("./harness") 5, ({ Strata, directory }, _) ->
   fs.writeFile "#{directory}/segment00000000", "#{JSON.stringify([-1,[-1]])}\n", "utf8", _
