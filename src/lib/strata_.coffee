@@ -1710,6 +1710,9 @@ class Iterator
       # We have advanced.
       true
 
+  # Get the index of the record from which the given key is derived, or else the
+  # bitwise compliment of index where record would be inserted if no such record
+  # exists in the leaf page.
   indexOf: (key, _) ->
     @_io.find @_page, key, @_page.deleted, _
 
@@ -1722,97 +1725,64 @@ class Iterator
 
 # A mutator is an iterator that can also edit leaf pages. It can delete records
 # from the currently visit leaf page. It can insert records into the current
-# leaf page, if the record belongs in the current leaf page. Like an `Iterator`
-# it  moves bacross the leaf pages of an the b&#x2011;tree in ascending
-# collation order. It has random access to the records in the page using an
-# index into the array of records.
+# leaf page, if the record belongs in the current leaf page.
 #
-# The application developer obtains an iterator by calling either
+# As with `Iterator`, it moves across the leaf pages of an the b&#x2011;tree in
+# ascending collation order. It has random access to the records in the page
+# using an index into the array of records.
+#
+# As with `Iterator`, the application developer obtains an iterator by calling
 # `Strata.mutator` with a search key.
+#
+# #### Ranged Inserts
+#
+# You can insert a range of records using a single mutator. This is efficient if
+# you have a range of records whose keys are close together, maybe so close that
+# they are all on the same page, so you can descend the tree to the correct page
+# and insert them in one fell swoop.
 #
 # #### Ambiguous Insert Locations
 # 
-# Like the ambiguous range starts above, insert locations for new records can be
-# ambiguous if the binary search indicates that a record should be inserted at
-# the end of the leaf page, after the current last record in the leaf page. If
-# the insert location is after the last record, it could be the case that the
-# record really belongs to a right sibling leaf page page.
+# Insert locations for ranged inserts can be ambiguous if the binary search
+# indicates that a record should be inserted at the end of the leaf page, after
+# the current last record in the leaf page. If the insert location is after the
+# last record, it could be the case that the record really belongs to a right
+# sibling leaf page.
 #
-# As in the case of ambiguous range starts, an insert location is unambiguous if
-# the key is the search key used to locate the first page of the mutator. The
-# key is determined to belong inside the leaf page by virtue of a desent of the
-# b&#x2011;tree. That is unambiguous.
+# This is only a problem when we insert a record whose key is not the key used
+# to create the mutator. An insert location is always unambiguous if the key is
+# the search key used to locate the first page. The key is determined to belong
+# inside the leaf page by virtue of a desent of the b&#x2011;tree. That is
+# unambiguous.
 #
-# Using the example of time series data again, the application developer may
-# have an hour of events she wishes to insert into a day of events, within a
-# b&#x2011;tree of years of events. Because the events took place within an hour, they
-# would all be inserted into leaf pages that are close to each other, perhaps
-# right next to each other, or maybe they all fall within a single leaf page.
-# 
-# Rather than inserting an event at a time, desecnding the tree for each event,
-# the application developer can create a mutator uses the earliest event as a
-# key. This will give her the correct page for that first event. She can then
-# insert the remainder of the events in their ascending order, while moving
-# forward with the mutator in ascending order. If an event does not belong in
-# the current leaf page, she can move the mutator forward to the next leaf page
-# and see if it belongs there.
+# To know if a subsequent record insert really does belong after the last record
+# but before the first record of the right sibling leaf page, we have to load
+# the right sibling leaf page and peek at the record. When we do this, we need
+# to keep the right sibling leaf page locked, so that the key of the right
+# sibling page cannot change.
 #
-# The problem is that, after inserting that first record, if we determine that
-# the  insert location for a subsequent record is after the last record on the
-# current page, then it could be the case that it really belongs in in some
-# right sibling page. If the first key of the next sibling page is less than or
-# equal to the insert key, then we are on the wrong page. Unless we inspect the
-# next page, the insert location is ambiguous.
-#
-# To obtain an unambiguous insert location without descending the b&#x2011;tree to
-# create a new mutator, we add a `Mutator.peek` method.
-#
-# This gives the mutator permission to peek at the right sibling leaf page of
-# the current leaf page, to determine if a record whose insert location is after
-# the last record of the current page.
-#
-# If you do not grant the mutator permission to peek, then you cannot use the
-# mutator to insert records into subsequent pages. You have to grant permission
-# to peek for each page.
-# 
-# Why would you want to deny permission to peek when you're inserting a set of
-# records? Maybe you're not certain that the records are close togther.
-#
-# Let's say our application developer wants to insert a set of events, but only
-# a few of those events occured at or about the same time. They are for the most
-# part in completely different months of the year.
-#
-# She might take the opportunity to see if the next event belongs on the current
-# leaf page, but if it is actually a month away, the insert location will
-# definately be after the last record in the page. She might not want to load
-# the next page to resolve the ambiguity, when it is not likely to be resovled
-# that the currnet leaf page is the correct leaf page.  Instead, she creates a
-# new mutator to resolve the ambiguity, even though there is a slight chance
-# she'll come back to the same page.
+# This peek has a cost. If you are inserting a range, and the records are more
+# often pages apart from each other than they are on the same page, it might not
+# be worth it to peek. It might be more efficient to assume that a the next
+# record is much futher along and create a new mutator for the remainder of the
+# insert range. In this case we're saying, see if you can insert the next record
+# on this page as long as we're here, but we leaf traversal is innefficent for
+# our range,  so don't try too hard.
 #
 # If she is only inserting a single record, there's no ambiguity, because she'll
 # use the key of the record to create the mutator. There is no need to enable
 # peek for a single insert, but there is no real cost either.
 #
-# TODO The lock must held because deleting the record definately can change
-# during editing. The balancer can swoop in and prune the dead first records and
-# thereby change the key. It could not delete the page nor merge the page, but
-# it can prune dead first records.
+# #### Duplicate Keys
 #
-# The lock is held becase the first record of the next sibling might otherwise
-# change, it might be deleted. When the first key is deleted, the range of the
-# the keys that valid for the current page increases. We have a race condition
-# where we might reject an insertion into the current record because it is
-# less than the first key of the next, but the first key of the next page has
-# been deleted, and the current record is less than the range of the new first
-# key, it is within the extended range.
+# Although duplicate keys are not allowed, abstracted duplicate keys are not
+# difficult for the application developer to implement given a mutator. The
+# application developer can move forward through a series and append a record
+# that has one greater than the maximum record.  Not a problem to worry about
+# ambiguity in this case. Ah, we need to peek though, because we need to get
+# that number.
 #
-# duplicate keys: Duplicate keys again. Now it occurs to me that duplicates are
-# actually not difficult for the application developer to implement given a
-# mutator. The application developer can move forward through a series and
-# append a record that has one greater than the maximum record.  Not a problem
-# to worry about ambiguity in this case. Ah, we need to peek though, because we
-# need to get that number.
+# TK Fix.
 #
 # In fact, given a key plus a maximum series value, you will always land after
 # the last one the series, or else a record that is less than the key, which
@@ -1824,21 +1794,49 @@ class Iterator
 
 #
 class Mutator extends Iterator
+  # For the current leaf page, give the mutator permission to peek at the right
+  # sibling leaf page if an insert determines that a records key is greater than
+  # the largest record in the current page. The record may belong in a right
+  # sibling page. Peeking at the next page is the only way to resolve the
+  # ambiguity, but loading a leaf has a cost, so we 
+  #
+  # If the insert index of the record is after the last record, but we do not
+  # have permission to peek at the right sibling leaf page to determine if it is
+  # less than the first element of the right sibling, the insert location is
+  # ambiguous and `insert` returns `null`.
+
+  # 
   peek: ->
     peeking = @_peek is @count
     @_peek = @count
     peeking
 
-  # TODO We've decided against duplicates, but I don't see us freaking out when
-  # we match a duplicate. This would be easier if we freaked out.
+  # Insert the object into the leaf. Returns the index where the object was
+  # inserted in the current leaf page if successful. Returns the bitwise
+  # compliment of the location of a record with same key, if a record with the
+  # same key already exists in the current leaf page.
+  #
+  # If the insert index of the record is after the last record, but we do not
+  # have permission to peek at the right sibling leaf page to determine if it is
+  # less than the first element of the right sibling, the insert location is
+  # ambiguous and `insert` returns `null`.
+  #
+  # If the insert index of the record is after the last record, and upon peeking
+  # at the first record of the right sibling leaf page we determine that the
+  # record belongs on a subsequent page, `insert` return `null`.
+  #
+  # An exception is raised if the record belongs in a page that is a left
+  # sibling leaf page of the current leaf page.
+
+  #  &mdash;
   insert: (object, _) ->
     if object instanceof Cassette
       { key, record } = object
     else
       [ record, key ]  = [ object, @_io.extractor object ]
 
-    # If we are at the first page and the key is equal to the key that created
-    # the mutator, than this is the correct leaf page for the record.
+    # If we are at the first leaf page and the key is the search key that got us
+    # here, then this is, without a doubt, the correct leaf page for the record.
     unambiguous = @count is 1 and @key and @_io.comparator(@key, key) is 0
 
     if unambiguous
@@ -1866,6 +1864,11 @@ class Mutator extends Iterator
     # TODO Should not be an else.
     else if index >= 0
       if not unambiguous and @_peek is @count
+        # The lock must held because the balancer can swoop in and prune the
+        # ghost first records and thereby change the key. It could not delete
+        # the page nor merge the page, but it can prune dead first records.
+
+        #
         unless unambiguous = page.next is -1
           @_next or= @_io.lock @_page.right, @_exclusive, true, _
           unambiguous = @_io.compare(key, @_io.key(@_next, 0, _)) < 0
