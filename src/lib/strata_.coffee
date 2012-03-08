@@ -483,8 +483,8 @@ class IO
   # size and total size when we delete a record. We can't recalculate because
   # we're not strict about ownership. The application programmer may decide to
   # alter the object we returned.
-  cacheRecord: (page, position, record) ->
-    key = @extractor record
+  cacheRecord: (page, position, record, key) ->
+    key ?= @extractor record
 
     size = 0
     size += JSON.stringify(record).length
@@ -1794,32 +1794,10 @@ class Iterator
 
 #
 class Mutator extends Iterator
-  # For the current leaf page, give the mutator permission to peek at the right
-  # sibling leaf page if an insert determines that a records key is greater than
-  # the largest record in the current page. The record may belong in a right
-  # sibling page. Peeking at the next page is the only way to resolve the
-  # ambiguity, but loading a leaf has a cost, so we 
-  #
-  # If the insert index of the record is after the last record, but we do not
-  # have permission to peek at the right sibling leaf page to determine if it is
-  # less than the first element of the right sibling, the insert location is
-  # ambiguous and `insert` returns `null`.
-
-  # 
-  peek: ->
-    peeking = @_peek is @count
-    @_peek = @count
-    peeking
-
   # Insert the object into the leaf. Returns the index where the object was
   # inserted in the current leaf page if successful. Returns the bitwise
   # compliment of the location of a record with same key, if a record with the
   # same key already exists in the current leaf page.
-  #
-  # If the insert index of the record is after the last record, but we do not
-  # have permission to peek at the right sibling leaf page to determine if it is
-  # less than the first element of the right sibling, the insert location is
-  # ambiguous and `insert` returns `null`.
   #
   # If the insert index of the record is after the last record, and upon peeking
   # at the first record of the right sibling leaf page we determine that the
@@ -1837,61 +1815,80 @@ class Mutator extends Iterator
 
     # If we are at the first leaf page and the key is the search key that got us
     # here, then this is, without a doubt, the correct leaf page for the record.
-    unambiguous = @count is 1 and @key and @_io.comparator(@key, key) is 0
+    if unambiguous = @key and @_io.comparator(@key, key) is 0
+      index = ~ @index
 
-    if unambiguous
-      [ index, found ] = [ @index, @found ]
+    # Otherwise we find the index. We skip the ghost record, which will allow us
+    # to reinsert the key of the ghost record.
     else
-      index = @_io.find @_page, key, @_page.deleted, _
-      unless found = (index >= 0)
-        index = ~index
-      unambiguous = index <= page.count
+      index = ~ @_io.find @_page, key, @_page.deleted, _
+      unambiguous = index <= @_page.count
 
-    if found
-      # TODO Special case: adding a first second copy of a record that has been
-      # deleted, but still exists. We put the new record after the first record
-      # and it exists as a special kind of duplicate.
-      # TODO Think harder about this. It seems like it would work.
-      # TODO No, we're not including the `0` in the range.
-      index = ~index
+    if index < 0
+      index
+    else
+      @insertAt record, key, index, unambiguous, _
 
+  # Exposed interal implementation of insert for application developers who want
+  # to control right sibling leaf page peeking.
+  #
+  # There is a cost involved with peeking at the right sibling leaf page to
+  # determine if a record greater than the greatest record in the current leaf
+  # page belongs in the current page, or in a subsequent leaf page. If the
+  # application developer does't want to peek, they can take matters into their
+  # own hands. They can determine the insert location using `indexOf`, and if it
+  # is after the last record, they can use a new mutator to find the insert
+  # location of the next page.
+  #
+  # There is no cost involved when inserting a range into the last leaf page, a
+  # common operation, because the right sibling leaf page does not exist, so
+  # there is no doubt that the records belong on the last page.
+  #
+  # When the application developer uses `insertAt`, the application developer is
+  # responsible for maintaining the collation order of the leaf page. The
+  # application developer must not insert duplicates. No asssertions are
+  # performed on the validity of the insert.
+
+  #
+  insertAt: (record, index, unambiguous, _) ->
     # On every leaf page except the first leave page, the least record is the
     # key, and inserted records are always greater than the key. We assert this
     # here. Do not catch this exception, debug your code.
     if index is 0 and @_page.address isnt -1
       throw new Error "lesser key"
 
-    # TODO Should not be an else.
-    else if index >= 0
-      if not unambiguous and @_peek is @count
-        # The lock must held because the balancer can swoop in and prune the
-        # ghost first records and thereby change the key. It could not delete
-        # the page nor merge the page, but it can prune dead first records.
+    if not (unambiguous or unambiguous = not page.right)
+      # The lock must held because the balancer can swoop in and prune the
+      # ghost first records and thereby change the key. It could not delete
+      # the page nor merge the page, but it can prune dead first records.
 
-        #
-        unless unambiguous = page.next is -1
-          @_next or= @_io.lock @_page.right, @_exclusive, true, _
-          unambiguous = @_io.compare(key, @_io.key(@_next, 0, _)) < 0
+      #
+      @_next or= @_io.lock @_page.right, @_exclusive, true, _
+      unambiguous = @_io.compare(key, @_io.key(@_next, 0, _)) < 0
 
-      if unambiguous
-        # Cache the current count.
-        @_io.balancer.unbalanced(@_page)
+    # If insert location is unambiguous, insert the record and return the insert
+    # index, otherwise return `undefined`.
+    if unambiguous
+      # Cache the current count.
+      @_io.balancer.unbalanced(@_page)
 
-        # Since we need to fsync anyway, we open the file and and close the file
-        # when we append a JSON object to it. Because no file handles are kept
-        # open, the b&#x2011;tree object can left to garbage collection.
-        filename = @_io.filename @_page.address
-        fd = fs.open filename, "a", 0644, _
-        position = @_io.writeInsert fd, @_page, index, record, _
-        fs.close fd, _
+      # Since we need to fsync anyway, we open the file and and close the file
+      # when we append a JSON object to it. Because no file handles are kept
+      # open, the b&#x2011;tree object can left to garbage collection.
+      filename = @_io.filename @_page.address
+      fd = fs.open filename, "a", 0644, _
+      position = @_io.writeInsert fd, @_page, index, record, _
+      fs.close fd, _
 
-        @_page.positions.splice index, 0, position
-        # TODO Why am I not caching the record?
-        @_page.count++
-        @length = @_page.positions.length
-      else
-        index = 0
-    index
+      # Insert the position into the page a cache the record.
+      @_io.insert(@_page, 0, position)
+      @_io.cacheRecord(@_page, position, record, key)
+
+      # Update the length of the current page.
+      @length = @_page.positions.length
+
+      # Return the inserted index.
+      index
 
   delete: (index, _) ->
     if not (@_page.deleted <= index < @_page.count)
