@@ -12,6 +12,6 @@
 , "lib" : "lib"
 , "main" : "./lib/strata"
 , "version" : "0.0.1"
-, "scripts" : { "test": "ace t/basics/*.t.coffee" }
+, "scripts" : { "test": "ace t/*/*.t.coffee" }
 , "engines" : { "node": "> 0.6.0" }
 }
