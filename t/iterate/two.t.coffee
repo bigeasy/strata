@@ -17,6 +17,7 @@ require("./harness") 7, ({ Strata, directory, fixture: { serialize } }, _) ->
 
   @equal cursor.count, 1, "same page"
   @equal cursor.index, 0, "same index"
+  cursor.unlock()
 
   records.push cursor.get(cursor.index + 1, _)
 

@@ -1701,7 +1701,11 @@ class Iterator
 
       # Advance to the next page.
       @_page = next
-      @_count++
+      @count++
+
+      # Adjust the range.
+      @index = @_page.deleted
+      @length = @_page.positions.length
 
       # We have advanced.
       true
@@ -1821,8 +1825,8 @@ class Iterator
 #
 class Mutator extends Iterator
   peek: ->
-    peeking = @_peek is @_count
-    @_peek = @_count
+    peeking = @_peek is @count
+    @_peek = @count
     peeking
 
   # TODO We've decided against duplicates, but I don't see us freaking out when
@@ -1861,7 +1865,7 @@ class Mutator extends Iterator
 
     # TODO Should not be an else.
     else if index >= 0
-      if not unambiguous and @_peek is @_count
+      if not unambiguous and @_peek is @count
         unless unambiguous = page.next is -1
           @_next or= @_io.lock @_page.right, @_exclusive, true, _
           unambiguous = @_io.compare(key, @_io.key(@_next, 0, _)) < 0

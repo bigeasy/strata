@@ -14,5 +14,6 @@ require("./harness") 4, ({ Strata, directory, fixture: { serialize } }, _) ->
   records = []
   for i in [cursor.index...cursor.length]
     records.push cursor.get(i, _)
+  cursor.unlock()
 
   @deepEqual records, [ "a" ], "records"

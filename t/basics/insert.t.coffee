@@ -9,13 +9,13 @@ require("./harness") 2, ({ Strata, directory, fixture: { load, objectify } }, _)
   console.error { cassette }
   cursor = strata.mutator "a", _
 
-  loop
-    index = cursor.insert "a", _
-    if index is 0 and cursor.peek()
-      break
-    else if index < 0
-      throw new Error "duplicates"
-
+  #loop
+  index = cursor.insert "a", _
+  #  @say { index }
+  #  if index is 0 and cursor.peek()
+  #    break
+  #  else if index < 0
+  #    throw new Error "duplicates"
   cursor.unlock()
 
   @equal strata._io.size, 4, "json size"
@@ -29,3 +29,5 @@ require("./harness") 2, ({ Strata, directory, fixture: { load, objectify } }, _)
   @say actual
 
   @deepEqual actual, expected, "insert"
+
+  @say expected.segment00000001
