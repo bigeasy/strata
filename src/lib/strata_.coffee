@@ -1606,6 +1606,8 @@ class Descent
 class Iterator
   # #### Ambiguous Range Start
   #
+  # TK You're thinking out loud here. It is actually quite simple.
+  #
   # As the result of a descent, we will know the index of the record that
   # corresponds to the key used to find the leaf page. This is either the index
   # of the key's record, or if there no record that could derive the key in the
@@ -1660,13 +1662,12 @@ class Iterator
   # a mutator. This properties are read-only, so make sure you only read them.
 
   # 
-  constructor: (@key, @index, @found, { io, page, first, exclusive }) ->
+  constructor: (@key, @index, @found, { io, page, exclusive }) ->
     @_page = page
     @_io = io
     @length = @_page.positions.length
     @count = 1
     @exclusive = exclusive
-    @first = first
 
   # Get a the record at the given `index` from the current leaf page.
   get: (index, _) ->
@@ -1678,17 +1679,26 @@ class Iterator
   # Go to the next leaf page. Returns true if there is a next, false if there
   # the current leaf page is the last leaf page.
   next: (_) ->
-    if @_page.right > 0
+    # If we are not the last leaf page, advance and return true.
+    if @_page.right
+      # If we are iterating for insert and delete, we may already have taken a
+      # peek at the next page.
       if @_next
         next = @_next
         @_next = null
+      # Otherwise fetch the next page.
       else
         next = @_io.lock @_page.right, @_exclusive, _
+
+      # Unlock the current page.
       @_io.unlock @_page
+
+      # Advance to the next page.
       @_page = next
+      @_count++
+
+      # We have advanced.
       true
-    else
-      false
 
   indexOf: (key, _) ->
     @_io.find @_page, key, @_page.deleted, _
@@ -1806,6 +1816,8 @@ class Mutator extends Iterator
     @_peek = @_count
     peeking
 
+  # TODO We've decided against duplicates, but I don't see us freaking out when
+  # we match a duplicate. This would be easier if we freaked out.
   insert: (object, _) ->
     if object instanceof Cassette
       { key, record } = object
@@ -1814,7 +1826,7 @@ class Mutator extends Iterator
 
     # If we are at the first page and the key is equal to the key that created
     # the mutator, than this is the correct leaf page for the record.
-    unambiguous = @count is 1 and @key and @_io.comparator(@key, key) is 0
+    unambiguous = @_count is 1 and @key and @_io.comparator(@key, key) is 0
 
     if unambiguous
       [ index, found ] = [ @index, @found ]
@@ -1832,8 +1844,13 @@ class Mutator extends Iterator
       # TODO No, we're not including the `0` in the range.
       index = ~index
 
-    if index is 0 and not @first
+    # On every leaf page except the first leave page, the least record is the
+    # key, and inserted records are always greater than the key. We assert this
+    # here. Do not catch this exception, debug your code.
+    if index is 0 and @_page.address isnt -1
       throw new Error "lesser key"
+
+    # TODO Should not be an else.
     else if index >= 0
       if not unambiguous and @_peek is @_count
         unless unambiguous = page.next is -1
@@ -1861,20 +1878,24 @@ class Mutator extends Iterator
     index
 
   delete: (index, _) ->
-    if not (0 <= index < @_page.count)
+    if not (@_page.deleted <= index < @_page.count)
       throw new Error "index out of bounds"
 
     @_io.balancer.unbalanced(@_page)
 
+    ghost = @_page.address isnt -1 and index is 0
+
     filename = @_io.filename @_page.address
     fd = fs.open filename, "a", 0644, _
-    position = @_io.writeDelete fd, @_page, index, index is 0 and not @first, _
+    position = @_io.writeDelete fd, @_page, index, ghost, _
     fs.close fd, _
     
-    @_page.positions.splice index, 1 if index > 0 or @first
-    # TODO Why am I not deleting the cached record?
-    @_page.count--
-    @length = @_page.positions.length
+    if ghost
+      @_page.deleted++
+    else
+      # TODO Why am I not deleting the cached record?
+      @_page.positions.splice index, 1 if index > 0 or first
+      @length = --@_page.count
 
 # #### Insertion and Deletion Verus Balance
 #
