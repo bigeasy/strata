@@ -2644,7 +2644,7 @@ class Balancer
         right = page.address
 
         # Add the address to our parent penultimate branch.
-        @io.insert(penultimate.page, ++penultimate.index, page.address)
+        @io.insert(penultimate.page, penultimate.index + 1, page.address)
 
         # Determine the number of records to add to this page from the split
         # leaf. Add an additonal record if we have a remainder.
