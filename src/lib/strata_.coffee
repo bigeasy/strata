@@ -722,7 +722,7 @@ class IO
           index = object.shift()
           if index is 0
             page.right = object.shift()
-            page.positions = object.shift()
+            positions = object.shift()
             end = 0
             break
           else
@@ -1579,89 +1579,94 @@ class Descent
           
 # ## Cursors
 # 
-# When the application developer requests a cursor, they receive either a read
-# only *iterator*, or a read/write *mutator*.
+# Application developers navigate the b&#x2011;tree using one of two types of
+# ***cursor***. To read records in the b&x2011;tree they use an ***iterator***.
+# To read records, as well as insert and delete records, they use ***mutator***.
 #
-# An interator provides random access to the records in a page. It can move from
+# An iterator provides random access to the records in a page. It can move from
 # a page to the right sibling of the page. A mutator does the same, but it is
 # also able to insert or delete records into the current page.
 #
 # ### Iterator
 #
 # The application developer uses an iterator to move across the leaf pages of
-# the b&#x2011;tree in ascending collation order, one leaf page a time. The leaf pages
-# themselves are visited one at a time, not the records. The iterator can
-# randomly access any record a the currently visited leaf page.
+# the b&#x2011;tree in ascending collation order, one leaf page a time.
 #
-# The application developer obtains an iterator by calling `Strata.cursor` and
-# providing a key. The key is used to find the page that would contain the key.
-# Alternatively, the application developer can obtain an iterator that begins at
-# the left most leaf page by by calling `Strata.first`. 
+# #### Search Keys
 #
-# By locking the pages left to right hand over hand, then there is now way for
-# the tree to mutate such that would defeat our iteration. Leaf pages that we've
-# visited may by edited by another descent after we've visited them, however.
+# The application developer obtains an iterator by calling `Strata.iterator`
+# with a ***search key***.  The search key is used to find the leaf page where
+# the record from which the key is derived belongs in the b&#x2011;tree. The
+# record may not actually exist in the b&#x2011;tree, in which case the iterator
+# begins with the leaf page where record *would* be.
+#
+# #### Page by Page
+#
+# The leaf pages themselves are visited one at a time, not the records.
+# The iterator can randomly access any record a the currently visited leaf page.
+#
+# When a page is visited is read locked, so that other descents can visit the
+# page, but they cannot insert or delete records. By locking the pages left to
+# right hand over hand, then there is no way for the tree to mutate such that
+# would defeat our iteration. Leaf pages that we've visited may by edited by
+# another descent after we've visited them, however.
+#
+# TK Definition of keys and records. Go back up and make sure one is there.
+#
+# #### Record Ranges
+# 
+# The cursor will define an `index` property and a `count` property. The `index`
+# is positioned at the first record in the page whose key is equal to or greater
+# than the search key. The `count` is count of records in the page. This defines
+# the range of records whose key is greater than or equal to the search key.
+#
+# On the first page visited, the key of the record at the `index` is greater
+# than or equal to the search key. Every key of every record that follows the
+# record at the index is greater than the search key.
+#
+# #### Full Tree Iteration
+#
+# The application developer can also obtain an iterator that begins at the left
+# most leaf page by calling `Strata.iterator` without a search key. This
+# positions the iterator a the first leaf page in the b&#x2011;tree and the
+# index at the first record in b&#x2011;tree.
+#
+# #### Double Loop
+#
+# The interface to iteration requires the application developer to implement
+# double loop to traverse the leaf pages. The outer loop moves from page to
+# page. The inner loop moves from record to record. The iterator interface does
+# not hide the underlying structure of the leaf pages.
+#
+# It is not indended to be an abstraction. It is intended to expose the
+# structure. Do not confuse the iterator with an iterator from other APIs that
+# exposes one item at a time. Our iterator exposes a range of records.
+#
+# #### Ranged Searches
+#
+# Ranged searches are performed by searching for the start of the range and
+# iterating to the end of the range. There is nothing to this. It is how
+# iterator is implemented.
+#
+# We may be interested in searching for time series data that occured between
+# noon and midnight, where are timestamp is POSIX time, milliseconds since the
+# epoch.  We create an iterator with a search key that is noon according to
+# POSIX time. It doesn't matter to us if there were no events that occured
+# exactly at the millisecond that defines noon. Our iterator begins at the point
+# that is either an event that occured millisecond that defines noon, or else
+# the first event that occured after the noon millisecond.
+#
+# When we encounter to the first event that occurs after midnight, we ignore
+# that event and terminate traversal. We've successfully found all the events in
+# our range.
+#
+# TODO Here count means something different than in pages. Either page `count`
+# is renamed `length` or else `count` here is renamed `visited`.
 
 #
 class Iterator
-  # #### Ambiguous Range Start
-  #
-  # TK You're thinking out loud here. It is actually quite simple.
-  #
-  # As the result of a descent, we will know the index of the record that
-  # corresponds to the key used to find the leaf page. This is either the index
-  # of the key's record, or if there no record that could derive the key in the
-  # b&#x2011;tree, the location where the key's record would be inserted.
-  #
-  # There are good reasons to search for key that does not exist in the tree. We
-  # may be interested in searching for time series data that occured between
-  # noon and midnight. It doesn't matter to us if there were no events that
-  # occured exactly at the millisecond that defines noon.
-  #
-  # We are interested in starting our iteration from where that record would be.
-  # That is the insert location of the millisecond that defines noon. We need a
-  # way to find an ***insert location*** for a record, in order to implement a
-  # ranged search.
-  #
-  # When we ask for the insert location of a key, if the key is greater than the
-  # largest record in the leaf page, then the index is the end of the leaf page.
-  # If this is the case, the real insert location might be in the right sibling
-  # leaf page, or in a page beyond the right sibling leaf page. We won't know
-  # for certain if the non-existing record would be in the current leaf page
-  # without testing to see if it is less than the first record of the right
-  # sibling page.
-  #
-  # However, we do know that the first leaf page is the correct leaf page for
-  # the search key, because we used a b&#x2011;tree descent to find the page. That is
-  # unambiguous. When we search for the search key in the leaf page, even if it
-  # does not exist, and is greater than the last record, we still know for
-  # certain that the key does not belong to any of the right siblings.
-  #
-  # The challenge here is an interface challenge. How do we convey the range to
-  # the application developer? We cannot expose the binary search, because the
-  # results of a binary search for a missing key are unambiguous only for the
-  # first leaf page, and only if the key is same search key that brought us to
-  # the first page.
-  #
-  # We expose an `index` property that is the index of the least record that is
-  # equal to or greater than the search key in the current page.
-  # 
-  # When we move to a right sibling leaf page, the index property is set to
-  # point to the first undeleted record in the leaf page. A leaf page will
-  # retain a delete first record until the next balance, perserving it because
-  # the record key is used as key in the branch pages. The index is zero if
-  # there is no ghost record, or one if there is a ghost record. It is never
-  # more than one.
-  # 
-  # Use the page index to begin iteration over the records in the leaf page.
-  #
-  # Additional public properties of the `Iterator` are the `key` used to create
-  # the iterator, `found` which indicates whether or not the record actually
-  # exists in the b&#x2011;tree, `count` which is the number of leaf pages visited by
-  # this iterator, and `exclusive` indicating whehter we are an iterator or
-  # a mutator. This properties are read-only, so make sure you only read them.
 
-  # 
+  # Iterators are initialized with the results of a descent.
   constructor: (@key, @index, @found, { io, page, exclusive }) ->
     @_page = page
     @_io = io
@@ -1669,15 +1674,16 @@ class Iterator
     @count = 1
     @exclusive = exclusive
 
-  # Get a the record at the given `index` from the current leaf page.
+  # Get a the record at a given index from the current leaf page.
   get: (index, _) ->
     if not (@index <= index < @length)
       throw new Error "index out of bounds"
 
     @_io.stash(@_page, @_page.positions[index], _).record
 
-  # Go to the next leaf page. Returns true if there is a next, false if there
-  # the current leaf page is the last leaf page.
+  # Go to the next leaf page, the right sibling leaf page. Returns true if there
+  # is a right sibling leaf page of the current page, false if there the current
+  # leaf page is the last leaf page in the b&#x2011;tree.
   next: (_) ->
     # If we are not the last leaf page, advance and return true.
     if @_page.right
@@ -1713,9 +1719,12 @@ class Iterator
 # A mutator is an iterator that can also edit leaf pages. It can delete records
 # from the currently visit leaf page. It can insert records into the current
 # leaf page, if the record belongs in the current leaf page. Like an `Iterator`
-# it  moves bacross the leaf pages of an the b&#x2011;tree in ascending collation
-# order. It has random access to the records in the page using an index into the
-# array of records.
+# it  moves bacross the leaf pages of an the b&#x2011;tree in ascending
+# collation order. It has random access to the records in the page using an
+# index into the array of records.
+#
+# The application developer obtains an iterator by calling either
+# `Strata.mutator` with a search key.
 #
 # #### Ambiguous Insert Locations
 # 
@@ -1826,12 +1835,12 @@ class Mutator extends Iterator
 
     # If we are at the first page and the key is equal to the key that created
     # the mutator, than this is the correct leaf page for the record.
-    unambiguous = @_count is 1 and @key and @_io.comparator(@key, key) is 0
+    unambiguous = @count is 1 and @key and @_io.comparator(@key, key) is 0
 
     if unambiguous
       [ index, found ] = [ @index, @found ]
     else
-      index = @_io.find page, key, page.deleted, _
+      index = @_io.find @_page, key, @_page.deleted, _
       unless found = (index >= 0)
         index = ~index
       unambiguous = index <= page.count
