@@ -17,8 +17,8 @@ require("./harness") 5, ({ Strata, directory }, _) ->
 
   @ok not cursor.exclusive, "shared"
   @equal cursor.index, 0, "index"
+  @equal cursor.offset, 0, "offset"
 
-  @ok cursor.found, "found"
-  @equal cursor.get(cursor.index, _), "a", "get"
+  @equal cursor.get(cursor.offset, _), "a", "get"
 
   cursor.unlock()

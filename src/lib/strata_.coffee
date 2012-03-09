@@ -1667,10 +1667,11 @@ class Descent
 class Iterator
 
   # Iterators are initialized with the results of a descent.
-  constructor: (@key, @index, @found, { io, page, exclusive }) ->
+  constructor: (@key, @index, { io, page, exclusive }) ->
     @_page = page
     @_io = io
     @length = @_page.positions.length
+    @offset = if @index < 0 then ~ @index else @index
     @count = 1
     @exclusive = exclusive
 
@@ -1850,7 +1851,7 @@ class Mutator extends Iterator
   # performed on the validity of the insert.
 
   #
-  insertAt: (record, index, unambiguous, _) ->
+  insertAt: (record, key, index, unambiguous, _) ->
     # On every leaf page except the first leave page, the least record is the
     # key, and inserted records are always greater than the key. We assert this
     # here. Do not catch this exception, debug your code.
@@ -1881,7 +1882,7 @@ class Mutator extends Iterator
       fs.close fd, _
 
       # Insert the position into the page a cache the record.
-      @_io.insert(@_page, 0, position)
+      @_io.insert(@_page, index, position)
       @_io.cacheRecord(@_page, position, record, key)
 
       # Update the length of the current page.
@@ -3115,8 +3116,7 @@ class exports.Strata
     # TODO This needs to also be a part of balance planning.
     index = descent.page.deleted
     index = @_io.find(descent.page, key, index, _) if key?
-    index = ~index if not (found = index >= 0)
-    new constructor(key, index, found, descent)
+    new constructor(key, index, descent)
 
   iterator: (splat..., callback) ->
     @_cursor splat.shift(), false, Iterator, callback

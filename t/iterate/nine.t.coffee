@@ -7,13 +7,13 @@ require("./harness") 4, ({ Strata, directory, fixture: { serialize } }, _) ->
   strata.open(_)
 
   cursor = strata.iterator("a", _)
-  @ok cursor.found, "found"
-  @equal cursor.index, 0, "found"
+  @equal cursor.index, 0, "index"
+  @equal cursor.offset, 0, "offset"
   @equal cursor.length, 3, "length"
 
   records = []
   loop
-    for i in [cursor.index...cursor.length]
+    for i in [cursor.offset...cursor.length]
       records.push cursor.get(i, _)
     break unless cursor.next(_)
   cursor.unlock()

@@ -18,7 +18,7 @@ require("./harness") 2, ({ Strata, directory, fixture: { load, objectify } }, _)
   #    throw new Error "duplicates"
   cursor.unlock()
 
-  @equal strata._io.size, 4, "json size"
+  @equal strata._io.size, 10, "json size"
 
   strata.close _
 
