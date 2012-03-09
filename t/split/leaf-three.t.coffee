@@ -6,7 +6,7 @@ require("./harness") 2, ({ Strata, directory, fixture: { load, objectify, serial
   strata.open _
 
   cursor = strata.mutator "b", _
-  index = cursor.insert "b", _
+  cursor.insert "b", "b", ~ cursor.index, _
   cursor.unlock()
 
   records = []

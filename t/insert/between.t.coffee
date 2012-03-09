@@ -1,14 +1,15 @@
 #!/usr/bin/env _coffee
 fs = require "fs"
 require("./harness") 3, ({ Strata, directory, fixture: { serialize, load, objectify } }, _) ->
-  serialize "#{__dirname}/fixtures/between.after.json", directory, _
+  serialize "#{__dirname}/fixtures/between.before.json", directory, _
 
   strata = new Strata directory: directory, leafSize: 3, branchSize: 3
   strata.open(_)
 
   cassette = strata.cassette("b")
   cursor = strata.mutator(cassette.key, _)
-  cursor.insert(cassette.record, _)
+  @say { index: cursor.index, cassette }
+  cursor.insert(cassette.record, cassette.key, ~ cursor.index,  _)
   cursor.unlock()
 
   expected = load "#{__dirname}/fixtures/between.after.json", _
@@ -25,7 +26,7 @@ require("./harness") 3, ({ Strata, directory, fixture: { serialize, load, object
 
   records = []
   cursor = strata.iterator("a", _)
-  for i in [cursor.index...cursor.length]
+  for i in [cursor.offset...cursor.length]
     records.push cursor.get(i, _)
   cursor.unlock()
 

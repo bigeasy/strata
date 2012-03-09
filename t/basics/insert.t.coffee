@@ -1,21 +1,16 @@
 #!/usr/bin/env _coffee
 fs = require "fs"
-require("./harness") 2, ({ Strata, directory, fixture: { load, objectify } }, _) ->
+require("./harness") 3, ({ Strata, directory, fixture: { load, objectify } }, _) ->
   strata = new Strata directory: directory, leafSize: 3, branchSize: 3
 
   strata.create _
 
   cassette = strata.cassette("a")
-  console.error { cassette }
   cursor = strata.mutator "a", _
 
-  #loop
-  index = cursor.insert "a", _
-  #  @say { index }
-  #  if index is 0 and cursor.peek()
-  #    break
-  #  else if index < 0
-  #    throw new Error "duplicates"
+  inserted = cursor.insert cassette.record, cassette.key, ~ cursor.index, _
+
+  @ok inserted, "inserted"
   cursor.unlock()
 
   @equal strata._io.size, 10, "json size"

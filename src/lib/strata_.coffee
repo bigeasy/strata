@@ -1795,11 +1795,6 @@ class Iterator
 
 #
 class Mutator extends Iterator
-  # Insert the object into the leaf. Returns the index where the object was
-  # inserted in the current leaf page if successful. Returns the bitwise
-  # compliment of the location of a record with same key, if a record with the
-  # same key already exists in the current leaf page.
-  #
   # If the insert index of the record is after the last record, and upon peeking
   # at the first record of the right sibling leaf page we determine that the
   # record belongs on a subsequent page, `insert` return `null`.
@@ -1808,30 +1803,28 @@ class Mutator extends Iterator
   # sibling leaf page of the current leaf page.
 
   #  &mdash;
-  insert: (object, _) ->
-    if object instanceof Cassette
-      { key, record } = object
-    else
-      [ record, key ]  = [ object, @_io.extractor object ]
 
-    # If we are at the first leaf page and the key is the search key that got us
-    # here, then this is, without a doubt, the correct leaf page for the record.
-    if unambiguous = @key and @_io.comparator(@key, key) is 0
-      index = ~ @index
-
-    # Otherwise we find the index. We skip the ghost record, which will allow us
-    # to reinsert the key of the ghost record.
-    else
-      index = ~ @_io.find @_page, key, @_page.deleted, _
-      unambiguous = index <= @_page.count
-
-    if index < 0
-      index
-    else
-      @insertAt record, key, index, unambiguous, _
-
-  # Exposed interal implementation of insert for application developers who want
-  # to control right sibling leaf page peeking.
+  # Insert the record with the given key at the given index. Obtain the correct
+  # index to preserve the sort order by calling `indexOf`.
+  #
+  # If the index is after the last record in the leaf page, this method will
+  # check that the record does not actually belong in a subsequent sibling leaf
+  # page.
+  #
+  # If there is a right sibling leaf page, it will load the right sibling leaf
+  # page and check that the leaf is less than the key of the right sibling leaf
+  # page. If the key of the insert record is greater than the key of the right
+  # sibling leaf page, then the record does not belong in this leaf page. The
+  # record will not be inserted. The method returns `false`.
+  #
+  # This method will happily accept all other forms of invalid data. The
+  # application developer is responsible for maintaining the collation order of
+  # the leaf page. The application developer must not insert duplicates. The
+  # application developer must make sure to provide a `record`, `key` and
+  # `index` that correspond to each other. No asssertions are performed on the
+  # validity of the insert.
+  #
+  # #### Avoiding the Peek
   #
   # There is a cost involved with peeking at the right sibling leaf page to
   # determine if a record greater than the greatest record in the current leaf
@@ -1845,20 +1838,33 @@ class Mutator extends Iterator
   # common operation, because the right sibling leaf page does not exist, so
   # there is no doubt that the records belong on the last page.
   #
-  # When the application developer uses `insertAt`, the application developer is
-  # responsible for maintaining the collation order of the leaf page. The
-  # application developer must not insert duplicates. No asssertions are
-  # performed on the validity of the insert.
 
   #
-  insertAt: (record, key, index, unambiguous, _) ->
-    # On every leaf page except the first leave page, the least record is the
+  insert: (record, key, index, _) ->
+    # On every leaf page except the first leaf page, the least record is the
     # key, and inserted records are always greater than the key. We assert this
     # here. Do not catch this exception, debug your code.
     if index is 0 and @_page.address isnt -1
       throw new Error "lesser key"
 
-    if not (unambiguous or unambiguous = not page.right)
+    # An insert location is ambiguous if it would append the record to the
+    # current leaf page.
+    unambiguous = index <= @_page.count
+
+    # If we are at the first leaf page and the key is the search key that got us
+    # here, then this is, without a doubt, the correct leaf page for the record.
+    unambiguous or= @key and @_io.comparator(@key, key) is 0
+
+    # If we are the last page, then there is no subsequent page to which the
+    # record could belong.
+    unambiguous or= not page.right
+
+    # TK Sibling leaf page? How can there be any other sort of leaf page? Leaf
+    # pages done't have children.
+
+    # If we have an ambiguous insert location, peek at the next leaf page to see
+    # if the record doesn't really belong to a subsequent leaf page.
+    if not unambiguous
       # The lock must held because the balancer can swoop in and prune the
       # ghost first records and thereby change the key. It could not delete
       # the page nor merge the page, but it can prune dead first records.
@@ -1888,17 +1894,21 @@ class Mutator extends Iterator
       # Update the length of the current page.
       @length = @_page.positions.length
 
-      # Return the inserted index.
-      index
+    # Return true if we inserted the record.
+    unambiguous
 
+  # Delete the record at the given index. The application developer is
+  # responsible for providing a valid index, in the range defined by the
+  # `offset` and `length` of the cursor, or else the `deleted` and `count` of
+  # the `page`.
   delete: (index, _) ->
-    if not (@_page.deleted <= index < @_page.count)
-      throw new Error "index out of bounds"
-
+    # Record the page as unbalanced.
     @_io.balancer.unbalanced(@_page)
 
+    # If we're deleting the leaf page key, we ghost the key.
     ghost = @_page.address isnt -1 and index is 0
 
+    # Append a delete object to the leaf page file.
     filename = @_io.filename @_page.address
     fd = fs.open filename, "a", 0644, _
     position = @_io.writeDelete fd, @_page, index, ghost, _
@@ -1906,9 +1916,10 @@ class Mutator extends Iterator
     
     if ghost
       @_page.deleted++
+      @offset++
     else
-      # TODO Why am I not deleting the cached record?
-      @_page.positions.splice index, 1 if index > 0 or first
+      @_io.uncacheRecord @_page, @_page.positions[index], _
+      @_io.remove(@_page, index, 1)
       @length = --@_page.count
 
 # #### Insertion and Deletion Verus Balance
