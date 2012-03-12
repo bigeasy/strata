@@ -23,7 +23,7 @@ require("./harness") 3, ({ Strata, directory, fixture: { load, objectify, serial
 
   records = []
   loop
-    for i in [cursor.index...cursor.length]
+    for i in [cursor.offset...cursor.length]
       records.push cursor.get i, _
     break unless cursor.next(_)
   cursor.unlock()

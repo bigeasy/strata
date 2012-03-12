@@ -2,6 +2,8 @@
 #
 # ## Purpose
 #
+# TK Define ***least child page***.
+#
 # Strata stores JSON objects on disk, according to a sort order of your
 # choosing, indexed for fast retrieval.
 #
@@ -305,7 +307,7 @@ class IO
   # certain number of requests, when a reference count reaches zero, or when
   # when a limit is reached.
   #
-  # We take the limits approach. The bluk of a cached page is the size of the
+  # We take the limits approach. The bulk of a cached page is the size of the
   # references array and the size of objects in records map. We keep track of
   # those sizes. When we reach an application developer specified maxmimum size
   # for cached records and page references for the entire b&#x2011;tree, we
@@ -313,43 +315,24 @@ class IO
   # remove entries from the end of the most-recently used list until the limit
   # is met.
   #
-  # #### Pages Held for Housekeeping
-  #
-  # There may be cache entires loaded for housekeeping only. When balancing the
-  # tree, the page item count is needed to determine if needs to be split, or if
-  # it can merged with a sibling page.
-  #
-  # We only need the *item count* to create our balance plan, however, not the
-  # cached references and records. These cache entries can be purged of cached
-  # records and page references, but the entry itself cannot be deleted until it
-  # is no longer needed to calculate a merge.
-  #
-  # We use reference counting to determine if an entry is participating in
-  # balance calcuations. We can purge the cached records, but we do not unlink
-  # the page object from the most-recenlty used list nor remove it from the
-  # cache.
-  #
   # #### JSON Size
   #
-  # TODO All screwed up. Un-screw.
+  # Cache size would be difficult to guage if our b&#x2011;tree were an
+  # in&#x2011;memory data structure, but we can get a good enough relative
+  # measure of the size of a page using the length of the JSON strings used to
+  # store records and references. 
   #
-  # Limits would be difficult to guage if we out b&#x2011;tree were an
-  # in&#x2011;memory data structure, but we can get an accuate relative measure
-  # of the size of a page using the length of the JSON strings used to store
-  # records and references. 
-  #
-  # The JSON size of a branch page is the string length of the JSON serialized
-  # page address array. The JSON size of leaf page is the string length of the
-  # file position array when serialized with JSON, plus the string length of
-  # each record loaded in memory when JSON serialized with JSON.
+  # The ***JSON size*** of a branch page is the string length of the address
+  # array when serialized to JSON, plus the string length of each key loaded
+  # into memory when serialized to JSON. The JSON size of leaf page is the
+  # string length of the file position array when serialized to JSON, plus the
+  # string length of each record loaded in memory when serialized to JSON.
   #
   # This is not an exact measure of the system memory committed to the in memory
   # representation of the b&#x2011;tree. It is a fuzzy measure of the relative
-  # heft of page in memory.
-  #
-  # An exact mesure is not necessary. We only need to be sure to trigger a cache
-  # purge at some point before we reach the limits imposed by sytem memory or
-  # the V8 JavaScript engine.
+  # heft of page in memory. An exact mesure is not necessary. We only need to be
+  # sure to trigger a cache purge at some point before we reach the hard limits
+  # imposed by sytem memory or the V8 JavaScript engine.
   #
   # #### Cache Entries
   #
@@ -365,10 +348,24 @@ class IO
   #
   # We always move a page to the front of the core list when we reference it
   # during b&#x2011;tree descent.
-
-  # Create an most-recently used list head node and return it. We call this to
-  # create the core and balance list in the constructor above.
-  createMRU: ->
+  #
+  # #### Pages Held for Housekeeping
+  #
+  # There may be page objects loaded for housekeeping only. When balancing the
+  # tree, the page length of a page is needed to determine if the page needs to
+  # be split, or if it can merged with a sibling page.
+  #
+  # We only need the length of the page to create our balance plan, however, not
+  # the cached references and records. The page object keeps a copy of the
+  # length in a `length` property. We can delete the page's reference array, as
+  # well as the page's object cache. The page object the page entry itself
+  # cannot be remove from the cache until it is no longer needed to calculate a
+  # split or merge.
+  #
+  # We use reference counting to determine if an entry is participating in
+  # balance calcuations. If the page is being referenced by a balancer, we purge
+  # the reference array cached records and keys, but we do not unlink the page
+  # object from the most-recenlty used list nor remove it from the cache.
 
   # Link tier to the head of the most-recently used list.
   link: (head, entry) ->
@@ -385,6 +382,11 @@ class IO
     next.previous = previous
     previous.next = next
     entry
+
+  # Adjust the JSON size of the given page and the entire b&#x2011;tree.
+  heft: (page, size) ->
+    page.size += size
+    @size += size
 
   # ### Leaf Pages
   #
@@ -408,7 +410,7 @@ class IO
   # This lookup is performed in more or less constant time when the record is
   # uncached, if you're willing to say that random access into a file is
   # constant time for practical purposes, otherwise it is *O(log n)*, where *n*
-  # is the number of blocks in the leaf page.
+  # is the number of file system blocks used to store the leaf page file.
   #
   # #### Binary Search
   #
@@ -418,10 +420,10 @@ class IO
   # array are sorted according to the b&#x2011;tree collation of the referenced
   # records.
   #
-  # In the leaf page file, a record is stored as JSON string. The objects are
-  # loaded from the file as needed, or else when the opportunity presents
-  # itself. The leaf page keeps a map (a JavaScript `Object`) that maps file
-  # positions to deserialized records.
+  # In the leaf page file, a record is stored as JSON string. Not all of the
+  # records are loaded when the page loads. Records that are not loaded when the
+  # page is loaded, are loaded as needed. The leaf page keeps a map (a
+  # JavaScript `Object`) that maps file positions to deserialized records.
   #
   # Because the records are sorted, and because a lookup takes constant time, we
   # can search for a record in a leaf page using binary search in logorithmic
@@ -444,7 +446,8 @@ class IO
   #
   # #### Leaf Page Split
   #
-  # If the record count of leaf page exceeds the leaf order, the leaf page is split.
+  # If the record count of leaf page, the page length, exceeds the leaf page
+  # order, the leaf page is split.
 
   # The in memory representation of the leaf page includes a flag to indicate
   # that the page is leaf page, the address of the leaf page, the page address
@@ -465,82 +468,57 @@ class IO
       locks: [[]]
     extend page, override or {}
 
-  # TK DOCUMENTATION
+  # Add a leaf page or a branch page to the page cache and link it to the head
+  # of the most-recently used list.
   encache: (page) ->
     @cache[page.address] = @link @mru, page
 
-  # #### Leaf Page JSON Size
+  # #### JSON Leaf Page Size
   #
-  # JSON size is used as a fuzzy measure of the in&#x2011;memory size of a leaf page.
-
-  # #### Cached JSON Page Size
-
-  # TODO Obviously, the cached size includes the size of all positions.
-
+  # The JSON size of leaf page is the string length of the file position array
+  # when serialized to JSON, plus the string length of each record loaded in
+  # memory when serialized to JSON.
+  #
+  # ##### JSON Record Size
+  #
   # We have to cache the calcuated size of the record because we return the
-  # records to the client.  We need to cache the JSON size and the key value
-  # when we load the object so we can deduct the proper amount from the page
-  # size and total size when we delete a record. We can't recalculate because
-  # we're not strict about ownership. The application programmer may decide to
-  # alter the object we returned.
+  # records to the application developer. We're not strict about ownership, we
+  # don't defensively copy the record before returning it or anything, so the
+  # application developer may alter the record. When we uncache the record, we
+  # won't be able to trust the recalcuated JSON size. We keep a copy of the size
+  # in an object in the leaf page cache.
+  #
+  # Each leaf page cache entry contains the record, key and the size of the
+  # object at the time of caching.
+
+  # 
   cacheRecord: (page, position, record, key) ->
+    # Uncache the exisiting record.
+    @uncacheRecord page, position
+
+    # Extract the key if none was provided.
     key ?= @extractor record
 
-    size = 0
-    size += JSON.stringify(record).length
-    size += JSON.stringify(key).length
+    # Create a cache entry.
+    entry = page.cache[position] = { record, key }
 
-    entry = page.cache[position] = { record, key, size }
+    # Calculate the size.
+    entry.size = JSON.stringify(entry).length
 
-    page.size += size
-    @size += size
+    # Increment the page size and the size of the b&#x2011;tree.
+    @heft page, entry.size
 
+    # Return our entry.
     entry
 
-  # TODO Split gets these off by a bit. Can we instead of being nutty about it,
-  # can we instead track only record sizes in the cache? We know the positions
-  # all have a weight. 
-
-  # We do not include the position size in the cached size because it is simple
-  # to calculate and the client cannot alter it.
-  cachePosition: (page, position) ->
-    size = if page.length is 1 then "[#{position}}" else ",#{position}"
-
-    page.size += size
-    @size += size
-
-  # When we purge the record, we add the position length. We will only ever
-  # delete a record that has been cached, so we do not have to create a function
-  # to purge a position.
-  #
-  # TK Purge is not quite right, because we're actually removing the record from
-  # the cache. Rename to uncacheRecord. Document.
-  #
-  # TK We delete the record, but we do not remove the position.
-  #
-  # This method is used to uncache a record before it is removed from the page,
-  # so we deduct the position size as well.
+  # Delete a record from the leaf page cache. Deduct the cached JSON size of the
+  # record entry from the size of the page and the size of b&#x2011;tree.
   uncacheRecord: (page, position) ->
     if size = page.cache[position]?.size
-      size += if page.count is 1 then "[#{position}}" else ",#{position}"
-
-      page.size -= size
-      @size -= size
-
+      @heft page, -size
       delete page.cache[position]
 
-  # TODO We don't need to keep the size around, because the keys are never
-  # handed over to the user.
-  uncacheKey: (page, address) ->
-    if page.cache[address]
-      size = JSON.stringify(page.cache[address]).length
 
-      size += if page.count is 1 then "[#{address}}" else ",#{address}"
-
-      page.size -= size
-      @size -= size
-
-      delete page.cache[address]
 
   # ### Appends for Durability
   #
@@ -683,6 +661,9 @@ class IO
     # Note that if we don't find a position array that has been written to the
     # leaf page file, then we'll start with an empty position array.
     positions = []
+    # Temporary cache of records read while searching for position array object.
+    cache     = {}
+
     #
     line      = ""
     offset    = -1
@@ -729,24 +710,33 @@ class IO
             position = start + read + 1
             splices.push [ index, position ]
             if index > 0
-              @cachePosition(page, position)
-              @cacheRecord(page, position, object.shift())
+              cache[position] = object.shift()
       eol = start + eos
+
+    # Prime our page with the positions array read from the leaf file, or else
+    # an empty positions array.
+    @splice page, 0, 0, positions
+
     # Now we replay the inserts and deletes described by the insert and delete
     # objects that we've gathered up in our splices array.
     splices.reverse()
     for splice in splices
       [ index, position ] = splice
       if index > 0
-        positions.splice(index - 1, 0, position)
+        @splice page, index - 1, 0, position
       else
-        positions.splice(-(index + 1), 1)
+        @splice page, -(index + 1), 1
+
+    # Cache the records we read while searching for the position array object.
+    for position in page.positions
+      if cache[position]
+        @cacheRecord page, position, cache[position]
+
     # Close the file descriptor.
     fs.close fd, _
-    
+
     # Return the loaded page.
-    count = positions.length
-    extend page, { positions, count, loaded: true }
+    extend page, { loaded: true }
 
   # Each line is terminated by a newline. In case your concerned that this
   # simple search will mistake a byte inside a multi-byte character for a
@@ -811,32 +801,42 @@ class IO
   # immediately.
 
   # Note that we close the file descriptor before this function returns.
-  rewriteLeaves: (page, suffix, _) ->
+  rewriteLeaf: (page, suffix, _) ->
     filename = @filename page.address, ".#{suffix}"
 
+    # Open the new leaf page file and reset our file position.
     fd = fs.open filename, "a", 0644, _
     positions = []
     cache = {}
     page.position = 0
 
-    # TODO Just figuring on this working, but not really thinking about it.
-    @size -= page.size
-    size = JSON.stringify(page.positions).length
-    page.size -= size
+    # Gather up the new positions.
+    positions = []
 
+    # Rewrite each object in the positions array.
     for position, index in page.positions
+      # Read the object from the current page, but then uncache it.
       object = @stash page, position, _
+      @uncacheRecord page, position
+
+      # Write the record to the new file.
       position = @writeInsert fd, page, index, object.record, _
+
+      # Stash the position and object.
       positions.push position
       cache[position] = object
-    extend page, { positions, cache }
 
-    # TODO Must go. Getting annoying. It is resolved.
-    size = JSON.stringify(page.positions).length
-    page.size += size
-    @size += page.size
+    # Replace our positions in the page.
+    @splice page, 0, page.count, positions
 
+    # Cache the objects we've read from the existing page.
+    for position, object of cache
+      @cacheRecord page, position, object.record, object.key
+
+    # Write out our positons.
     @writePositions fd, page, _
+
+    # Close our file.
     fs.close fd, _
 
   # ### Branch Pages
@@ -852,8 +852,8 @@ class IO
   # To find the a record in the b&#x2011;tree, we first use a tree of branch pages to
   # find the leaf page that contains our record.
   #
-  # A branch page contains the addresses of child pages. This array of page
-  # addresses is essentially an *array of children*.
+  # A branch page contains the addresses of ***child pages***. This array of
+  # page addresses is essentially an *array of children*.
   #
   # The child addresses are ordered according to the b&#x2011;tree collation of the
   # keys of the directly or indirectly referenced leaf pages.
@@ -879,7 +879,7 @@ class IO
   # that is grater than or equal to the record sought. Essentially, when we
   # encouter a key that is greater than our sought record, we know that the
   # record is contained in the leaf page child associated with the key before
-  # it. We are able to perform this search using binary search in logorithmic
+  # it. We are able to perform this search using binary search in logarithmic
   # time.
   #
   # By ignoring the key of the first leaf page, the penultimate branch page has
@@ -1019,15 +1019,76 @@ class IO
       size: 0
     extend page, override or {}
 
-  insert: (page, offset, value) ->
-    values = page.addresses or page.positions
-    values.splice(offset, 0, value)
-    page.count++
+  # #### Branch Page JSON Size
 
-  remove: (page, offset, count) ->
+  # The branch page JSON size is JSON string length of the address array, plus
+  # the JSON string length of each cached key.
+  #
+  # ##### JSON Reference Array Size
+  #
+  # The `splice` method adds or remove references from the reference array using
+  # the semantics similar to JavaScript's `Array.splice`. Similar, but not
+  # identical. The replacement values are passed in differently, and there is no
+  # return value, because we never need one.
+  #
+  # This wrapper for a basic array operation exists for the sake of the JSON
+  # size adjustments, which would otherwise be scattered around the code.  It is
+  # the only place where the JSON string length of the reference array is
+  # accounted for. 
+
+  # 
+  splice: (page, offset, count, insert) ->
+    # Get the references, either page addresses or record positions.
     values = page.addresses or page.positions
-    values.splice(offset, count)
-    page.count -= count
+
+    # We remove first, then append. We used the array returned by splice to
+    # generate a JSON substring, whose length we remove form the JSON size of
+    # the page. We also decrement the page length. 
+    if count
+      removals = values.splice(offset, count)
+
+      json = if values.length is 0
+        "[#{removals.join(",")}]"
+      else
+        ",#{removals.join(",")}"
+
+      @heft page, -json.length
+
+      page.count -= count
+
+    # Insert references.
+    if insert?
+      # Convert a single argument into an array.
+      insert = [ insert ] if not Array.isArray insert
+      # First we generate a JSON substring from the insert array, whose length
+      # we add to the JSON size of the page. We also increment the page length.
+      if insert.length
+        json = if values.length is 0
+          "[#{insert.join(",")}]"
+        else
+          ",#{insert.join(",")}"
+
+        @heft page, json.length
+
+        page.count += insert.length
+
+        values.splice.apply values, [ offset, 0 ].concat(insert)
+
+  # ##### JSON Key Size
+
+  # Add a key to the branch page cache and recalculate JSON size. Uncache any
+  # existig key for the address.
+  cacheKey: (page, address, key) ->
+    @uncacheKey page, address
+    @heft page, JSON.stringify(key).length
+    page.cache[address] = key
+
+  # Remove a key from the branch page cache if one exists for the address.
+  # Deduct the JSON string length of the key from the JSON size.
+  uncacheKey: (page, address) ->
+    if page.cache[address]
+      @heft page, -JSON.stringify(page.cache[address]).length
+      delete page.cache[address]
 
   # We write the branch page to a file as a single JSON object on a single line.
   # We tuck the page properties into an object, and then serialize that object.
@@ -1047,48 +1108,23 @@ class IO
     buffer[json.length] = 0x0A
     fs.writeFile filename, buffer, "utf8", _
 
-    # Update in memory serialized JSON size of page and b&#x2011;tree.
-    @size -= page.size or 0
-    page.cache = {}
-    page.size = JSON.stringify(page.addresses).length
-    @size += page.size
-
   # To read a branch page we read the entire page and evaluate it as JSON. We
   # did not store the branch page keys. They are looked up as needed as
   # described in the b&#x2011;tree overview above.
 
   #
   readBranches: (page, _) ->
+    # Read addresses from JSON branch file.
     filename = @filename page.address
     json = fs.readFile filename, "utf8", _
     record = JSON.parse json
     [ right, addresses ] = record
-    count = addresses.length
 
-    # Set in memory serialized JSON size of page and add to b&#x2011;tree.
-    page.size = JSON.stringify(addresses).length
-    @size += page.size
+    # Splice addresses into page.
+    @splice page, 0, 0, addresses
 
     # Extend the existing page with the properties read from file.
-    extend page, { right, addresses, count }
-
-  # Add a key to the branch page cache and recalculate JSON size.
-  cacheKey: (page, address, key) ->
-    size = JSON.stringify key
-
-    page.cache[address] or= {}
-    page.cache[address].key = key
-    page.cache[address].size = size
-
-    page.size += size
-    @size += size
-
-  # Purge a key from the branch page cache and recalculate JSON size.
-  purgeKey: (page, address) ->
-    if size = page.cache[address]?.size
-      page.size -= size
-      @size -= size
-      delete page.cache[address]
+    extend page, { right, loaded: true }
 
   # ### B-Tree Initialization
   #
@@ -1120,10 +1156,10 @@ class IO
     # Create a root branch with a single empty leaf.
     root = @encache @createBranch @nextAddress++, penultimate: true, loaded: true
     leaf = @encache @createLeaf -(@nextAddress++), loaded: true
-    root.addresses.push leaf.address
+    @splice root, 0, 0, leaf.address
     # Write the root branch.
     @rewriteBranches root, "replace", _
-    @rewriteLeaves leaf, "replace", _
+    @rewriteLeaf leaf, "replace", _
     @replace leaf, "replace", _
     @replace root, "replace", _
 
@@ -1269,21 +1305,58 @@ class IO
       creator = "create#{if address < 0 then "Leaf" else "Branch"}"
       page = @encache @[creator](address)
 
-    # If the page needs to be laoded, we must load the page only after a lock
+    # If the page needs to be loaded, we must load the page only after a lock
     # has been obtained. Loading is a read, so we can load regardless of whether
     # the lock is exclusive read/write or shared read.
-    if page.loaded
+
+    # Currently blocked out to force sizer to fire. 
+    if page.loaded and false
       lock = callback
     else
+      # Here's a temporary block of code that will assert that we're keeping an
+      # accurate count of the heft of our pages. After a while, this code will
+      # be removed, and we'll count on assertions in our unit tests to catch
+      # errors.
+
+      # We also put our relinker in here, so this will surivive a cull.
+      sizer = (error, page) =>
+        if error
+          callback error
+        else
+          # Move the page to the head of the most-recently user list.
+          @link @mru, @unlink page
+          # Check that the JSON size is correct for the current cached page
+          # contents.
+          size = 0
+          if page.address < 0
+            if page.positions.length
+              size += JSON.stringify(page.positions).length
+            for position, object of page.cache
+              { record, key } = object
+              if object.size isnt JSON.stringify({ record, key }).length
+                throw new Error "sizes are wrong"
+              size += object.size
+          else
+            if page.addresses.length
+              size += JSON.stringify(page.addresses).length
+            for position, object of page.cache
+              size += JSON.stringify(object).length
+          if size isnt page.size
+            throw new Error "sizes are wrong"
+          # Invoke the caller's callback.
+          callback null, page
+      # TODO Two descents, both reads, enter and then come though to this point,
+      # they both see the page as unloaded, they both load it. Need a loaders
+      # array, and we can wait for things to load.
       lock = (error, page) =>
         if error
           callback error
         else if page.loaded
-          callback null, page
+          sizer null, page
         else if address < 0
-          @readLeaf page, callback
+          @readLeaf page, sizer
         else
-          @readBranches page, callback
+          @readBranches page, sizer
 
     # The callback is always added to the queue, even if it is not blocked and
     # will execute immediately. The array in the queue element acts as a lock
@@ -1332,37 +1405,45 @@ class IO
     @unlock tier
     @lock tier.address, true, false, _
 
+  # Read a record cache entry from the cache. Load the record and cache it of it
+  # is not already cached.
   stash: (page, position, _) ->
     if not stash = page.cache[position]
       record = @readRecord page, position, _
       stash = @cacheRecord page, position, record
     stash
 
-  # TODO Descend. Ah, well, find is in `Descent`, so this moves to `Descent`.
+  # Get the key for the record in the case of a leaf page, or the key of the
+  # branch child page in the case of a branch page. Because this method operates
+  # on both branch pages and leaf pages, our binary search operates on both
+  # branch pages and leaf pages.
   key: (page, index, _) ->
-    stack = []
-    loop
-      if page.leaf
-        key = @stash(page, page.positions[index], _).key
-        break
-      else
-        address = page.addresses[index]
-        page = @lock address, false, _
-        index = 0
-        stack.push page
-    for page in stack
-      @unlock page
+    if page.address < 0
+      key = @stash(page, page.positions[index], _).key
+    else if not key = page.cache[page.addresses[index]]
+      [ iter, iterIndex, stack ] = [ page, index, [] ]
+      while iter.address >= 0
+        iter = @lock iter.addresses[iterIndex], false, _
+        iterIndex = 0
+        stack.push iter
+      key = @stash(iter, iter.positions[iterIndex], _).key
+      @unlock iter for iter in stack
+      @cacheKey page, page.addresses[index], key
     key
 
   # Binary search implemented, as always, by having a peek at [Algorithms in
   # C](http://www.informit.com/store/product.aspx?isbn=0201314525) by [Robert
   # Sedgewick](http://www.cs.princeton.edu/~rs/).
+  #
+  # We set `low` to `1` to exclude a deleted ghost first record in a leaf page,
+  # or the least child page of a branch page.
+  #
+  # Index is bitwise compliment of insert location if not found.
   find: (page, key, low, _) ->
     { comparator } = @
     high = page.count - 1
-    # Classic binary search.
     while low <= high
-      mid = (low + high) >>> 1
+      mid = low + ((high - low) >>> 1)
       compare = comparator key, @key(page, mid, _)
       if compare > 0
         low = mid + 1
@@ -1370,7 +1451,6 @@ class IO
         high = mid - 1
       else
         return mid
-    # Index is negative if not found.
     ~low
 
 # ## Descent
@@ -1888,8 +1968,8 @@ class Mutator extends Iterator
       fs.close fd, _
 
       # Insert the position into the page a cache the record.
-      @_io.insert(@_page, index, position)
-      @_io.cacheRecord(@_page, position, record, key)
+      @_io.splice @_page, index, 0, position
+      @_io.cacheRecord @_page, position, record, key
 
       # Update the length of the current page.
       @length = @_page.positions.length
@@ -1919,7 +1999,7 @@ class Mutator extends Iterator
       @offset++
     else
       @_io.uncacheRecord @_page, @_page.positions[index], _
-      @_io.remove(@_page, index, 1)
+      @_io.splice @_page, index, 1
       @length = --@_page.count
 
 # #### Insertion and Deletion Verus Balance
@@ -2683,14 +2763,14 @@ class Balancer
       # Create new pages.
       while --pages
         # Create a new leaf page.
-        page = @io.createLeaf -(@io.nextAddress++)
+        page = @io.createLeaf -(@io.nextAddress++), { loaded: true }
 
         # Link the leaf page to its siblings.
         page.right = right
         right = page.address
 
         # Add the address to our parent penultimate branch.
-        @io.insert(penultimate.page, penultimate.index + 1, page.address)
+        @io.splice penultimate.page, penultimate.index + 1, 0, page.address
 
         # Determine the number of records to add to this page from the split
         # leaf. Add an additonal record if we have a remainder.
@@ -2700,18 +2780,18 @@ class Balancer
         for index in [offset...offset + count]
           # Fetch the record before we uncache it.
           position = split.positions[index]
-          record = @io.stash(split, position, _).record
+          object = @io.stash(split, position, _)
           @io.uncacheRecord split, position
 
           # Add it to our new page.
-          @io.insert page, page.count, position
-          @io.cacheRecord page, position, record
+          @io.splice page, page.count, 0, position
+          @io.cacheRecord page, position, object.record, object.key
 
         # Remove the positions that have been merged.
-        @io.remove(split, offset, count)
+        @io.splice split, offset, count
 
         # Write the new leaf page to a temporary file.
-        @io.rewriteLeaves page, "replace", _
+        @io.rewriteLeaf page, "replace", _
 
         replacements.push page
         uncached.push page
@@ -2720,7 +2800,7 @@ class Balancer
       split.right = right
 
       # Write the left most leaf page from which new pages were split.
-      @io.rewriteLeaves split, "replace", _
+      @io.rewriteLeaf split, "replace", _
       replacements.push split
 
       # Write the branches
@@ -2788,13 +2868,13 @@ class Balancer
     for index in [partition...child.page.count]
       address = child.page.addresses[index]
       @io.uncacheKey child.page, address
-      @io.insert(right, right.count, address)
+      @io.splice right, right.count, 0, address
 
     # TODO If we implement a splice method, or rather insert and delete,  in io,
     # it can update the JSON size of the addresses or positions using an
     # approximate value of 7. Means I must consider carefully range to remove.
-    @io.remove(child.page, partition, child.page.count - partition)
-    @io.insert(parent.page, parent.index + 1, right.address)
+    @io.splice child.page, partition, child.page.count - partition
+    @io.splice parent.page, parent.index + 1, 0, right.address
 
     @io.rewriteBranch root, "pending", _
     @io.rewriteBranch left, "replace", _
@@ -2865,7 +2945,7 @@ class Balancer
 
       # Seems as good a time to do this as any. This implementation cleans up
       # after deletes rather aggressively.
-      @io.rewriteLeaves leaf, "pending", _
+      @io.rewriteLeaf leaf, "pending", _
       @io.rename leaf, "pending", "commit", _
       @io.replace leaf, "commit", _
 
@@ -2918,10 +2998,10 @@ class Balancer
 
       @io.size -= leaves.right.page.size
 
-      @io.rewriteLeaves leaves.left.page, "replace", _
+      @io.rewriteLeaf leaves.left.page, "replace", _
 
       leaves.right.page.positions.length = 0
-      @io.rewriteLeaves leaves.right.page, "unlink", _
+      @io.rewriteLeaf leaves.right.page, "unlink", _
 
       if penultimate.isPivot
         right = pivot.page
