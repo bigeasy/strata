@@ -449,23 +449,21 @@ class IO
   # If the record count of leaf page, the page length, exceeds the leaf page
   # order, the leaf page is split.
 
-  # The in memory representation of the leaf page includes a flag to indicate
-  # that the page is leaf page, the address of the leaf page, the page address
-  # of the next leaf page, and a cache that maps record file positions to
-  # records that have been loaded from the file.
+  # The in memory representation of the leaf page includes the address of the
+  # leaf page, the page address of the next leaf page, and a cache that maps
+  # record file positions to records that have been loaded from the file.
   createLeaf: (address, override) ->
     page =
-      balancers: 0
-      loaded: false
-      leaf: true
       address: address
-      positions: []
+      balancers: 0
       cache: {}
-      deleted: 0
-      count: 0
-      size: 0
-      right: 0
+      length: 0
+      loaded: false
       locks: [[]]
+      offset: 0
+      positions: []
+      right: 0
+      size: 0
     extend page, override or {}
 
   # Add a leaf page or a branch page to the page cache and link it to the head
@@ -827,7 +825,7 @@ class IO
       cache[position] = object
 
     # Replace our positions in the page.
-    @splice page, 0, page.count, positions
+    @splice page, 0, page.length, positions
 
     # Cache the objects we've read from the existing page.
     for position, object of cache
@@ -1007,14 +1005,14 @@ class IO
   #
   createBranch: (address, override) ->
     page =
-      balancers: 0
-      count: 0
-      penultimate: true
       address: address
       addresses: []
+      balancers: 0
       cache: {}
-      locks: [[]]
+      length: 0
       loaded: false
+      locks: [[]]
+      penultimate: true
       right: 0
       size: 0
     extend page, override or {}
@@ -1037,15 +1035,15 @@ class IO
   # accounted for. 
 
   # 
-  splice: (page, offset, count, insert) ->
+  splice: (page, offset, length, insert) ->
     # Get the references, either page addresses or record positions.
     values = page.addresses or page.positions
 
     # We remove first, then append. We used the array returned by splice to
     # generate a JSON substring, whose length we remove form the JSON size of
     # the page. We also decrement the page length. 
-    if count
-      removals = values.splice(offset, count)
+    if length
+      removals = values.splice(offset, length)
 
       json = if values.length is 0
         "[#{removals.join(",")}]"
@@ -1054,7 +1052,7 @@ class IO
 
       @heft page, -json.length
 
-      page.count -= count
+      page.length -= length
 
     # Insert references.
     if insert?
@@ -1070,7 +1068,7 @@ class IO
 
         @heft page, json.length
 
-        page.count += insert.length
+        page.length += insert.length
 
         values.splice.apply values, [ offset, 0 ].concat(insert)
 
@@ -1400,10 +1398,6 @@ class IO
       # I/O, then another one will resume. Concurrency.
       for callback in locks[0]
         do (callback) -> process.nextTick -> callback(null, page)
-      
-  upgrade: (tier, _) ->
-    @unlock tier
-    @lock tier.address, true, false, _
 
   # Read a record cache entry from the cache. Load the record and cache it of it
   # is not already cached.
@@ -1441,7 +1435,7 @@ class IO
   # Index is bitwise compliment of insert location if not found.
   find: (page, key, low, _) ->
     { comparator } = @
-    high = page.count - 1
+    high = page.length - 1
     while low <= high
       mid = low + ((high - low) >>> 1)
       compare = comparator key, @key(page, mid, _)
@@ -1499,9 +1493,8 @@ class IO
 # We use these terms in this document to save the chore of writing, and the
 # confustion of reading; insert or delete, or split or merge. We also want to
 # draw a distinction between changing the count of records stored in the
-# b&#x2011;tree,
-# *editing*, and changing the height of the b&#x2011;tree, the count of pages, or the
-# choice of keys, *balancing*.
+# b&#x2011;tree, *editing*, and changing the height of the b&#x2011;tree, the
+# count of pages, or the choice of keys, *balancing*.
 #
 # #### Locking on Descent
 #
@@ -1578,12 +1571,12 @@ class Descent
   # The constructor always felt like a dangerous place to be doing anything
   # meaningful in C++ or Java.
   constructor: (@io) ->
-    @first      = true
-    @page       = { addresses: [ 0 ], leaf: false }
-    @index      = 0
     @exact      = false
     @exclusive  = false
     @depth      = 0
+    @first      = true
+    @index      = 0
+    @page       = { addresses: [ 0 ], leaf: false }
 
   # We use `fork` to create a new descent using the position of the current
   # descent. The new descent will continue to descend the tree, but without
@@ -1626,7 +1619,7 @@ class Descent
   @penultimate: -> @page.addresses[0] < 0
 
   # Stop when we reach a leaf page.
-  @leaf: -> @page.leaf
+  @leaf: -> @page.address < 0
 
   # Follow the right most path.
   @right: (_) -> @page.addresses.length - 1
@@ -1695,10 +1688,11 @@ class Descent
 #
 # #### Record Ranges
 # 
-# The cursor will define an `index` property and a `count` property. The `index`
-# is positioned at the first record in the page whose key is equal to or greater
-# than the search key. The `count` is count of records in the page. This defines
-# the range of records whose key is greater than or equal to the search key.
+# The cursor will define an `offset` property and a `length` property. The
+# `offset` is positioned at the first record in the page whose key is equal to
+# or greater than the search key. The `length` is count of records in the page.
+# This defines the range of records whose key is greater than or equal to the
+# search key.
 #
 # On the first page visited, the key of the record at the `index` is greater
 # than or equal to the search key. Every key of every record that follows the
@@ -1739,27 +1733,20 @@ class Descent
 # When we encounter to the first event that occurs after midnight, we ignore
 # that event and terminate traversal. We've successfully found all the events in
 # our range.
-#
-# TODO Here count means something different than in pages. Either page `count`
-# is renamed `length` or else `count` here is renamed `visited`.
 
 #
 class Iterator
 
   # Iterators are initialized with the results of a descent.
   constructor: (@key, @index, { io, page, exclusive }) ->
-    @_page = page
     @_io = io
+    @_page = page
+    @exclusive = exclusive
     @length = @_page.positions.length
     @offset = if @index < 0 then ~ @index else @index
-    @count = 1
-    @exclusive = exclusive
 
   # Get a the record at a given index from the current leaf page.
   get: (index, _) ->
-    if not (@index <= index < @length)
-      throw new Error "index out of bounds"
-
     @_io.stash(@_page, @_page.positions[index], _).record
 
   # Go to the next leaf page, the right sibling leaf page. Returns true if there
@@ -1782,10 +1769,9 @@ class Iterator
 
       # Advance to the next page.
       @_page = next
-      @count++
 
       # Adjust the range.
-      @index = @_page.deleted
+      @offset = @_page.offset
       @length = @_page.positions.length
 
       # We have advanced.
@@ -1795,7 +1781,7 @@ class Iterator
   # bitwise compliment of index where record would be inserted if no such record
   # exists in the leaf page.
   indexOf: (key, _) ->
-    @_io.find @_page, key, @_page.deleted, _
+    @_io.find @_page, key, @_page.offset, _
 
   # Unlock all leaf pages held by the iterator.
   unlock: ->
@@ -1929,7 +1915,7 @@ class Mutator extends Iterator
 
     # An insert location is ambiguous if it would append the record to the
     # current leaf page.
-    unambiguous = index <= @_page.count
+    unambiguous = index <= @_page.length
 
     # If we are at the first leaf page and the key is the search key that got us
     # here, then this is, without a doubt, the correct leaf page for the record.
@@ -1956,7 +1942,7 @@ class Mutator extends Iterator
     # If insert location is unambiguous, insert the record and return the insert
     # index, otherwise return `undefined`.
     if unambiguous
-      # Cache the current count.
+      # Cache the current page length.
       @_io.balancer.unbalanced(@_page)
 
       # Since we need to fsync anyway, we open the file and and close the file
@@ -1979,7 +1965,7 @@ class Mutator extends Iterator
 
   # Delete the record at the given index. The application developer is
   # responsible for providing a valid index, in the range defined by the
-  # `offset` and `length` of the cursor, or else the `deleted` and `count` of
+  # `offset` and `length` of the cursor, or else the `offset` and `length` of
   # the `page`.
   delete: (index, _) ->
     # Record the page as unbalanced.
@@ -1995,12 +1981,12 @@ class Mutator extends Iterator
     fs.close fd, _
     
     if ghost
-      @_page.deleted++
+      @_page.offset++
       @offset++
     else
       @_io.uncacheRecord @_page, @_page.positions[index], _
       @_io.splice @_page, index, 1
-      @length = --@_page.count
+      @length = --@_page.length
 
 # #### Insertion and Deletion Verus Balance
 #
@@ -2455,15 +2441,15 @@ class Mutator extends Iterator
 
 class Balancer
   constructor: (@leafSize) ->
-    @referenced = {}
-    @counts = {}
+    @lengths = {}
     @operations = []
+    @referenced = {}
 
   unbalanced: (page, force) ->
     if force
-      @counts[page.address] = @leafSize
+      @lengths[page.address] = @leafSize
     else
-      @counts[page.address]?= page.count
+      @lengths[page.address]?= page.length
 
   # TODO If it is not exposed to the user, I don't underbar it.
   reference: (page) ->
@@ -2513,7 +2499,7 @@ class Balancer
   # TODO Tracking the difference means we can short cut planning, if the page
   # has only grown. This is a short cut. We consider its use carefully. We are
   # not capricious with it. We are okay with having to load the sibling page
-  # counts to check for merge. A split will lead to a subsequent balance plan
+  # lengths to check for merge. A split will lead to a subsequent balance plan
   # that will load four pages. In that regard, plits are not cheaper than
   # merges.
 
@@ -2532,7 +2518,7 @@ class Balancer
     return if @balancing
 
     # We do not proceed if there is nothing to consider.
-    addresses = Object.keys @counts
+    addresses = Object.keys @lengths
     return if addresses.length is 0
 
     max = @io.options.leafSize
@@ -2556,7 +2542,7 @@ class Balancer
     for address in addresses
       # Convert the address back to an integer.
       address = parseInt address, 10
-      count = @counts[address]
+      length = @lengths[address]
 
       # We create linked lists that contain the leaf pages we're considering in
       # our blanace plan. This is apart from the most-recently used list that
@@ -2580,7 +2566,7 @@ class Balancer
 
       # If the page has shrunk in size, we gather the size of the left sibling
       # page and the right sibling page. The right sibling page 
-      if node.page.count - count < 0
+      if node.page.length - length < 0
         if page.address isnt -1
           if not node.left
             descent = new Descent(@_io)
@@ -2617,7 +2603,7 @@ class Balancer
     # Gather the current counts of each page into the node itself, so we adjust
     # the count based on the merges we schedule.
     for address, node of ordered
-      node.count = node.page.count
+      node.length = node.page.length
 
     # Break the link to next right node and return it.
     unlink = (node) ->
@@ -2639,12 +2625,12 @@ class Balancer
     # not knecesarry.
 
     #
-    for address, count in Object.keys @counts
+    for address, length in Object.keys @lengths
       node = ordered[address]
-      difference = node.count - count
+      difference = node.length - length
       # If we've grown past capacity, split the leaf. Remove this page from its
       # list, because we know it cannot merge with its neighbors.
-      if difference > 0 and node.page.count > max
+      if difference > 0 and node.page.length > max
         # Schedule the split.
         @operations.push method: "splitLeaf", key: node.key
         # Unlink this split node, so that we don't consider it when merging.
@@ -2654,7 +2640,7 @@ class Balancer
       # be tested for merge, so we didn't grab its siblings, but it does now.
       # We ask the next balancer to consider it as we found it.
       else if difference < 0 and not (node.left and node.right)
-        @io.balancer.counts[node.page.address] = count
+        @io.balancer.lengths[node.page.address] = length
 
     # Now remove any node from our ordered collection that is not the left most,
     # so that we have a collection of heads of linked pages.
@@ -2672,7 +2658,7 @@ class Balancer
       for address in addresses
         node = ordered[address]
         while node.right
-          if node.count + node.right.count > max
+          if node.length + node.right.length > max
             node = unlink node
             ordered[node.address] = node
           else
@@ -2690,8 +2676,8 @@ class Balancer
             method: "mergeLeaves"
             left: node.page.address
             right: right.page.address
-            unbalanced: @counts
-          node.count += right.count
+            unbalanced: @lengths
+          node.length += right.length
           link node, unlink right
         # Remove any lists containing only one node.
         else
@@ -2701,7 +2687,7 @@ class Balancer
     for operation in @operations
       @[operation.method].call(@, operation, _)
 
-    # Decrement the reference counts. TODO Why a count and not a boolean?
+    # Decrement the reference lengths. TODO Why a length and not a boolean?
     for address, page of @referenced
       page.balancers--
 
@@ -2741,16 +2727,16 @@ class Balancer
     # need to be split, we should then check to see if it can be merged.
 
     # TODO We're not bothering with split when we've only grown a bit, right?
-    if split.count <= @io.options.leafSize
+    if split.length <= @io.options.leafSize
       @_io.balancer.unbalanced(@_page)
 
     # Otherwise we perform our split.
     else
       # It may have been some time since we've split, so we might have to split
       # into more than two pages.
-      pages = Math.ceil(split.count / @io.options.leafSize)
-      records = Math.floor(split.count / pages)
-      remainder = split.count % pages
+      pages = Math.ceil(split.length / @io.options.leafSize)
+      records = Math.floor(split.length / pages)
+      remainder = split.length % pages
 
       right = split.right
 
@@ -2758,7 +2744,7 @@ class Balancer
       uncached = []
 
       # Never a remainder record on the first page.
-      offset = split.count
+      offset = split.length
       
       # Create new pages.
       while --pages
@@ -2774,21 +2760,21 @@ class Balancer
 
         # Determine the number of records to add to this page from the split
         # leaf. Add an additonal record if we have a remainder.
-        count = if remainder-- > 0 then records + 1 else records
-        offset = split.count - count
+        length = if remainder-- > 0 then records + 1 else records
+        offset = split.length - length
 
-        for index in [offset...offset + count]
+        for index in [offset...offset + length]
           # Fetch the record before we uncache it.
           position = split.positions[index]
           object = @io.stash(split, position, _)
           @io.uncacheRecord split, position
 
           # Add it to our new page.
-          @io.splice page, page.count, 0, position
+          @io.splice page, page.length, 0, position
           @io.cacheRecord page, position, object.record, object.key
 
         # Remove the positions that have been merged.
-        @io.splice split, offset, count
+        @io.splice split, offset, length
 
         # Write the new leaf page to a temporary file.
         @io.rewriteLeaf page, "replace", _
@@ -2855,8 +2841,8 @@ class Balancer
     child.descend sought, Descent.depth(depth)
 
     branchSize = @io.options.branchSize
-    pages = Math.ceil(split.count / branchSize)
-    remainder = split.count % pages
+    pages = Math.ceil(split.length / branchSize)
+    remainder = split.length % pages
 
     replacements = []
 
@@ -2865,15 +2851,15 @@ class Balancer
     partition = @io.options.branchSize / 2
     right = @io.createBranch @io.nextAddress++, { right: child.page.right }
     child.page.right = right.address
-    for index in [partition...child.page.count]
+    for index in [partition...child.page.length]
       address = child.page.addresses[index]
       @io.uncacheKey child.page, address
-      @io.splice right, right.count, 0, address
+      @io.splice right, right.length, 0, address
 
     # TODO If we implement a splice method, or rather insert and delete,  in io,
     # it can update the JSON size of the addresses or positions using an
     # approximate value of 7. Means I must consider carefully range to remove.
-    @io.splice child.page, partition, child.page.count - partition
+    @io.splice child.page, partition, child.page.length - partition
     @io.splice parent.page, parent.index + 1, 0, right.address
 
     @io.rewriteBranch root, "pending", _
@@ -2988,7 +2974,7 @@ class Balancer
       leaves.left.index = leaves.right.index - 1
 
     # Determine if we still have candidates for merge.
-    if leaves.left.page.count + leaves.right.page.count < @io.options.leafSize
+    if leaves.left.page.length + leaves.right.page.length < @io.options.leafSize
       # Uncache the pivot key. 
       @io.uncacheKey pivot.page, pivot.page.addresses[pivot.index]
 
@@ -3065,9 +3051,9 @@ class Balancer
 
     branchSize = @io.options.branchSize
 
-    if pages.length > 1 and pages[0].count + pages[1].count < branchSize
+    if pages.length > 1 and pages[0].length + pages[1].length < branchSize
       merge = [ pages[0].address, pages[1].address ]
-    else if pages.length is 3 and pages[1].count + pages[2].count < branchSize
+    else if pages.length is 3 and pages[1].length + pages[2].length < branchSize
       merge = [ pages[1].address, pages[1].address ]
 
     @io.unlock page for page in pages
@@ -3137,7 +3123,7 @@ class Balancer
 
     # We only check to fill the root if there are only two nodes in the root
     # that can be combined to fill the root.
-    if right.address is 0 and right.count is 2
+    if right.address is 0 and right.length is 2
       @operations.unshift method: "fillRoot"
     else
       @operations.unshift
@@ -3154,7 +3140,7 @@ class Balancer
     pages.push left = @io.lock root.addresses[0], true, _
     pages.push right = @io.lock root.addresses[1], true, _
 
-    if left.count + right.count <= @io.options.branchSize
+    if left.length + right.length <= @io.options.branchSize
       @io.uncache page for page in pages
       root.addresses = left.addresses.concat(right.addresses)
 
@@ -3205,7 +3191,7 @@ class exports.Strata
     descent.exclude() if exclusive
     descent.descend(sought, Descent.leaf, _)
     # TODO This needs to also be a part of balance planning.
-    index = descent.page.deleted
+    index = descent.page.offset
     index = @_io.find(descent.page, key, index, _) if key?
     new constructor(key, index, descent)
 

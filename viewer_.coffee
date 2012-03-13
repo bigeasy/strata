@@ -18,7 +18,7 @@ usage = (message) ->
   process.exit 1
 
 try
-  options         = parser.parse process.argv.slice(2)
+  options = parser.parse process.argv.slice(2)
 catch e
   usage "Invalid arguments."
 
