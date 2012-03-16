@@ -20,9 +20,13 @@
         <tr>
           <td class="docs"><p>A Streamline.js friendly evented I/O b&#x2011;tree for Node.js.</p>
 
-<h2>Purpose</h2>
-
 <p>TK Define <strong><em>least child page</em></strong>.</p>
+
+<p><strong>REMEMBER</strong>: Alan! Your audience is you, or someone who knows enough Node.js,
+CoffeeScript and algorithms to hack on this. This is not a lesson on
+b&#x2011;trees. (Note to self as I write Docco.)</p>
+
+<h2>Purpose</h2>
 
 <p>Strata stores JSON objects on disk, according to a sort order of your
 choosing, indexed for fast retrieval.</p>
@@ -167,9 +171,9 @@ siblings.</p></td>
 code is absolutely bug free.</p></td>
           <td class="code"><div class="highlight"><pre>
 <span class="nv">die = </span><span class="nf">(splat...) -&gt;</span>
-  <span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">.</span><span class="nx">apply</span> <span class="kc">null</span><span class="p">,</span> <span class="nx">splat</span> <span class="k">if</span> <span class="nx">splat</span><span class="p">.</span><span class="nx">length</span>
+  <span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">.</span><span class="nx">apply</span> <span class="nx">console</span><span class="p">,</span> <span class="nx">splat</span> <span class="k">if</span> <span class="nx">splat</span><span class="p">.</span><span class="nx">length</span>
   <span class="nx">process</span><span class="p">.</span><span class="nx">exit</span> <span class="mi">1</span>
-<span class="nv">say = </span><span class="nf">(splat...) -&gt;</span> <span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">.</span><span class="nx">apply</span> <span class="kc">null</span><span class="p">,</span> <span class="nx">splat</span>
+<span class="nv">say = </span><span class="nf">(splat...) -&gt;</span> <span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">.</span><span class="nx">apply</span> <span class="nx">console</span><span class="p">,</span> <span class="nx">splat</span>
 </pre></div></td>
         </tr>
       
@@ -531,10 +535,17 @@ time.</p>
 
 <h4>No Duplicates</h4>
 
-<p>Leaf pages cannot contain duplicate records. Therefore, the b&#x2011;tree cannot
-contain duplicate records. You can simulate duplicate records by adding a
-series value to your key. The cursor implementation is designed faciliate
-psuedo-duplicates in this fashion.</p>
+<p>Leaf pages cannot contain duplicate records. Therefore, the b&#x2011;tree
+cannot contain duplicate records.</p>
+
+<p>You can simulate duplicate records by adding a series value to your key and
+which is stored in your record. The cursor implementation is designed
+facilitate <strong><em>pseudo-duplicate</em></strong> keys in this fashion.</p>
+
+<p>In theory, leaf pages can contain <code>null</code>, and <code>null</code> can be used as a key.
+However, if you want to allow <code>null</code> keys in your b&#x2011;tree, you almost
+certainly want to allow more than one <code>null</code> key, so you'll end up using the
+pseudo-duplicate strategy for <code>null</code> keys as well.</p>
 
 <h4>Leaf Page Key</h4>
 
@@ -553,24 +564,21 @@ order, the leaf page is split.</p></td>
         </tr>
       
         <tr>
-          <td class="docs"><p>The in memory representation of the leaf page includes a flag to indicate
-that the page is leaf page, the address of the leaf page, the page address
-of the next leaf page, and a cache that maps record file positions to
-records that have been loaded from the file.</p></td>
+          <td class="docs"><p>The in memory representation of the leaf page includes the address of the
+leaf page, the page address of the next leaf page, and a cache that maps
+record file positions to records that have been loaded from the file.</p></td>
           <td class="code"><div class="highlight"><pre>
   <span class="nv">createLeaf: </span><span class="nf">(address, override) -&gt;</span>
     <span class="nv">page =</span>
-      <span class="nv">balancers: </span><span class="mi">0</span>
-      <span class="nv">loaded: </span><span class="kc">false</span>
-      <span class="nv">leaf: </span><span class="kc">true</span>
       <span class="nv">address: </span><span class="nx">address</span>
-      <span class="nv">positions: </span><span class="p">[]</span>
+      <span class="nv">balancers: </span><span class="mi">0</span>
       <span class="nv">cache: </span><span class="p">{}</span>
-      <span class="nv">deleted: </span><span class="mi">0</span>
-      <span class="nv">count: </span><span class="mi">0</span>
-      <span class="nv">size: </span><span class="mi">0</span>
-      <span class="nv">right: </span><span class="mi">0</span>
+      <span class="nv">length: </span><span class="mi">0</span>
       <span class="nv">locks: </span><span class="p">[[]]</span>
+      <span class="nv">offset: </span><span class="mi">0</span>
+      <span class="nv">positions: </span><span class="p">[]</span>
+      <span class="nv">right: </span><span class="mi">0</span>
+      <span class="nv">size: </span><span class="mi">0</span>
     <span class="nx">extend</span> <span class="nx">page</span><span class="p">,</span> <span class="nx">override</span> <span class="o">or</span> <span class="p">{}</span>
 </pre></div></td>
         </tr>
@@ -981,7 +989,7 @@ objects that we've gathered up in our splices array.</p></td>
         <tr>
           <td class="docs"><p>Return the loaded page.</p></td>
           <td class="code"><div class="highlight"><pre>
-    <span class="nx">extend</span> <span class="nx">page</span><span class="p">,</span> <span class="p">{</span> <span class="nv">loaded: </span><span class="kc">true</span> <span class="p">}</span>
+    <span class="nx">page</span>
 </pre></div></td>
         </tr>
       
@@ -1124,7 +1132,7 @@ immediately.</p></td>
         <tr>
           <td class="docs"><p>Replace our positions in the page.</p></td>
           <td class="code"><div class="highlight"><pre>
-    <span class="nx">@splice</span> <span class="nx">page</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="nx">page</span><span class="p">.</span><span class="nx">count</span><span class="p">,</span> <span class="nx">positions</span>
+    <span class="nx">@splice</span> <span class="nx">page</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="nx">page</span><span class="p">.</span><span class="nx">length</span><span class="p">,</span> <span class="nx">positions</span>
 </pre></div></td>
         </tr>
       
@@ -1330,14 +1338,13 @@ memory page is used for locking.</p></td>
           <td class="code"><div class="highlight"><pre>
   <span class="nv">createBranch: </span><span class="nf">(address, override) -&gt;</span>
     <span class="nv">page =</span>
-      <span class="nv">balancers: </span><span class="mi">0</span>
-      <span class="nv">count: </span><span class="mi">0</span>
-      <span class="nv">penultimate: </span><span class="kc">true</span>
       <span class="nv">address: </span><span class="nx">address</span>
       <span class="nv">addresses: </span><span class="p">[]</span>
+      <span class="nv">balancers: </span><span class="mi">0</span>
       <span class="nv">cache: </span><span class="p">{}</span>
+      <span class="nv">length: </span><span class="mi">0</span>
       <span class="nv">locks: </span><span class="p">[[]]</span>
-      <span class="nv">loaded: </span><span class="kc">false</span>
+      <span class="nv">penultimate: </span><span class="kc">true</span>
       <span class="nv">right: </span><span class="mi">0</span>
       <span class="nv">size: </span><span class="mi">0</span>
     <span class="nx">extend</span> <span class="nx">page</span><span class="p">,</span> <span class="nx">override</span> <span class="o">or</span> <span class="p">{}</span>
@@ -1372,7 +1379,7 @@ accounted for. </p></td>
         <tr>
           <td class="docs"></td>
           <td class="code"><div class="highlight"><pre>
-  <span class="nv">splice: </span><span class="nf">(page, offset, count, insert) -&gt;</span></pre></div></td>
+  <span class="nv">splice: </span><span class="nf">(page, offset, length, insert) -&gt;</span></pre></div></td>
         </tr>
       
         <tr>
@@ -1387,8 +1394,8 @@ accounted for. </p></td>
 generate a JSON substring, whose length we remove form the JSON size of
 the page. We also decrement the page length. </p></td>
           <td class="code"><div class="highlight"><pre>
-    <span class="k">if</span> <span class="nx">count</span>
-      <span class="nv">removals = </span><span class="nx">values</span><span class="p">.</span><span class="nx">splice</span><span class="p">(</span><span class="nx">offset</span><span class="p">,</span> <span class="nx">count</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nx">length</span>
+      <span class="nv">removals = </span><span class="nx">values</span><span class="p">.</span><span class="nx">splice</span><span class="p">(</span><span class="nx">offset</span><span class="p">,</span> <span class="nx">length</span><span class="p">)</span>
 
       <span class="nv">json = </span><span class="k">if</span> <span class="nx">values</span><span class="p">.</span><span class="nx">length</span> <span class="o">is</span> <span class="mi">0</span>
         <span class="s">&quot;[</span><span class="si">#{</span><span class="nx">removals</span><span class="p">.</span><span class="nx">join</span><span class="p">(</span><span class="s">&quot;,&quot;</span><span class="p">)</span><span class="si">}</span><span class="s">]&quot;</span>
@@ -1397,7 +1404,7 @@ the page. We also decrement the page length. </p></td>
 
       <span class="nx">@heft</span> <span class="nx">page</span><span class="p">,</span> <span class="o">-</span><span class="nx">json</span><span class="p">.</span><span class="nx">length</span>
 
-      <span class="nx">page</span><span class="p">.</span><span class="nx">count</span> <span class="o">-=</span> <span class="nx">count</span>
+      <span class="nx">page</span><span class="p">.</span><span class="nx">length</span> <span class="o">-=</span> <span class="nx">length</span>
 </pre></div></td>
         </tr>
       
@@ -1425,7 +1432,7 @@ we add to the JSON size of the page. We also increment the page length.</p></td>
 
         <span class="nx">@heft</span> <span class="nx">page</span><span class="p">,</span> <span class="nx">json</span><span class="p">.</span><span class="nx">length</span>
 
-        <span class="nx">page</span><span class="p">.</span><span class="nx">count</span> <span class="o">+=</span> <span class="nx">insert</span><span class="p">.</span><span class="nx">length</span>
+        <span class="nx">page</span><span class="p">.</span><span class="nx">length</span> <span class="o">+=</span> <span class="nx">insert</span><span class="p">.</span><span class="nx">length</span>
 
         <span class="nx">values</span><span class="p">.</span><span class="nx">splice</span><span class="p">.</span><span class="nx">apply</span> <span class="nx">values</span><span class="p">,</span> <span class="p">[</span> <span class="nx">offset</span><span class="p">,</span> <span class="mi">0</span> <span class="p">].</span><span class="nx">concat</span><span class="p">(</span><span class="nx">insert</span><span class="p">)</span>
 </pre></div></td>
@@ -1474,7 +1481,7 @@ until place using <code>replace</code>.</p></td>
         <tr>
           <td class="docs"></td>
           <td class="code"><div class="highlight"><pre>
-  <span class="nv">rewriteBranches: </span><span class="nf">(page, suffix, _) -&gt;</span>
+  <span class="nv">rewriteBranch: </span><span class="nf">(page, suffix, _) -&gt;</span>
     <span class="nv">filename = </span><span class="nx">@filename</span> <span class="nx">page</span><span class="p">.</span><span class="nx">address</span><span class="p">,</span> <span class="s">&quot;.</span><span class="si">#{</span><span class="nx">suffix</span><span class="si">}</span><span class="s">&quot;</span>
     <span class="nv">record = </span><span class="p">[</span> <span class="nx">page</span><span class="p">.</span><span class="nx">right</span><span class="p">,</span> <span class="nx">page</span><span class="p">.</span><span class="nx">addresses</span> <span class="p">]</span>
     <span class="nv">json = </span><span class="nx">JSON</span><span class="p">.</span><span class="nx">stringify</span><span class="p">(</span><span class="nx">record</span><span class="p">)</span>
@@ -1496,7 +1503,7 @@ described in the b&#x2011;tree overview above.</p></td>
         <tr>
           <td class="docs"></td>
           <td class="code"><div class="highlight"><pre>
-  <span class="nv">readBranches: </span><span class="nf">(page, _) -&gt;</span></pre></div></td>
+  <span class="nv">readBranch: </span><span class="nf">(page, _) -&gt;</span></pre></div></td>
         </tr>
       
         <tr>
@@ -1519,7 +1526,7 @@ described in the b&#x2011;tree overview above.</p></td>
         <tr>
           <td class="docs"><p>Extend the existing page with the properties read from file.</p></td>
           <td class="code"><div class="highlight"><pre>
-    <span class="nx">extend</span> <span class="nx">page</span><span class="p">,</span> <span class="p">{</span> <span class="nx">right</span><span class="p">,</span> <span class="nv">loaded: </span><span class="kc">true</span> <span class="p">}</span>
+    <span class="nx">extend</span> <span class="nx">page</span><span class="p">,</span> <span class="p">{</span> <span class="nx">right</span> <span class="p">}</span>
 </pre></div></td>
         </tr>
       
@@ -1565,15 +1572,15 @@ always <code>0</code> and left most leaf page is always <code>-1</code>.</p></td
         <tr>
           <td class="docs"><p>Create a root branch with a single empty leaf.</p></td>
           <td class="code"><div class="highlight"><pre>
-    <span class="nv">root = </span><span class="nx">@encache</span> <span class="nx">@createBranch</span> <span class="nx">@nextAddress</span><span class="o">++</span><span class="p">,</span> <span class="nv">penultimate: </span><span class="kc">true</span><span class="p">,</span> <span class="nv">loaded: </span><span class="kc">true</span>
-    <span class="nv">leaf = </span><span class="nx">@encache</span> <span class="nx">@createLeaf</span> <span class="o">-</span><span class="p">(</span><span class="nx">@nextAddress</span><span class="o">++</span><span class="p">),</span> <span class="nv">loaded: </span><span class="kc">true</span>
+    <span class="nv">root = </span><span class="nx">@encache</span> <span class="nx">@createBranch</span> <span class="nx">@nextAddress</span><span class="o">++</span><span class="p">,</span> <span class="nv">penultimate: </span><span class="kc">true</span>
+    <span class="nv">leaf = </span><span class="nx">@encache</span> <span class="nx">@createLeaf</span> <span class="o">-</span><span class="p">(</span><span class="nx">@nextAddress</span><span class="o">++</span><span class="p">)</span>
     <span class="nx">@splice</span> <span class="nx">root</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="nx">leaf</span><span class="p">.</span><span class="nx">address</span></pre></div></td>
         </tr>
       
         <tr>
           <td class="docs"><p>Write the root branch.</p></td>
           <td class="code"><div class="highlight"><pre>
-    <span class="nx">@rewriteBranches</span> <span class="nx">root</span><span class="p">,</span> <span class="s">&quot;replace&quot;</span><span class="p">,</span> <span class="nx">_</span>
+    <span class="nx">@rewriteBranch</span> <span class="nx">root</span><span class="p">,</span> <span class="s">&quot;replace&quot;</span><span class="p">,</span> <span class="nx">_</span>
     <span class="nx">@rewriteLeaf</span> <span class="nx">leaf</span><span class="p">,</span> <span class="s">&quot;replace&quot;</span><span class="p">,</span> <span class="nx">_</span>
     <span class="nx">@replace</span> <span class="nx">leaf</span><span class="p">,</span> <span class="s">&quot;replace&quot;</span><span class="p">,</span> <span class="nx">_</span>
     <span class="nx">@replace</span> <span class="nx">root</span><span class="p">,</span> <span class="s">&quot;replace&quot;</span><span class="p">,</span> <span class="nx">_</span>
@@ -1634,71 +1641,94 @@ read only file system, or something..</p></td>
       <span class="k">if</span> <span class="nv">match = </span><span class="sr">/^segment(\d+)$/</span><span class="p">.</span><span class="nx">exec</span> <span class="nx">file</span>
         <span class="nv">address = </span><span class="nb">parseInt</span> <span class="nx">match</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="mi">10</span>
         <span class="vi">@nextAddress = </span><span class="nx">address</span> <span class="o">+</span> <span class="mi">1</span> <span class="k">if</span> <span class="nx">address</span> <span class="o">&gt;</span> <span class="nx">@nextAddress</span>
-
-  <span class="nv">close: </span><span class="nf">(_) -&gt;</span>
 </pre></div></td>
         </tr>
       
         <tr>
-          <td class="docs"><p>TODO Ensure that you close the current tier I/O. Also, you must also be very
-much locked before you use this, but I'm sure you know that.</p></td>
+          <td class="docs"><p>We close after every write, so there are no open file handles.</p>
+
+<p>TODO Close medic file.</p></td>
           <td class="code"><div class="highlight"><pre>
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>&mdash;</p></td>
+          <td class="code"><div class="highlight"><pre>
+  <span class="nv">close: </span><span class="nf">(_) -&gt;</span>
 </pre></div></td>
         </tr>
       
         <tr>
           <td class="docs"><h3>Concurrency</h3>
 
-<p>The b&#x2011;tree must only be read and written by a single Node.js process. It is
-not suitable for use with multiple node processes, or the cluster API.</p>
-
 <p>Although there is only a single thread in a Node.js process, the
-b&#x2011;tree is
-still a concurrent data structure. Instead of thinking about concurrency in
-terms of threads we talk about concurrent <em>descents</em> of the b&#x2011;tree.</p>
+b&#x2011;tree is still a concurrent data structure.</p>
 
-<p>When we search the tree or alter the tree, we must descend the tree.</p>
+<p>When we navigate the tree from the root to search for a key in the tree, we
+descend the b&x2011;. The act of descending the b&#x2011;tree is called a
+<strong><em>descent</em></strong>.</p>
 
-<p>Decents of the b&#x2011;tree can become concurrent when descent encounters a page
-that is not in memory. While it is waiting on evented I/O to load the page
-files, the main thread of the process can make progress on another request
-to search or alter the b&#x2011;tree, it can make process on another descent.</p>
+<p>A descent is a unit of work in our concurrency model. Once descent of the
+b&#x2011;tree can make progress while another descent of the tree is waiting
+on evented I/O.  Instead of thinking about concurrency in terms of threads
+we talk about concurrent descents of the b&#x2011;tree.</p>
+
+<p>Decents of the b&#x2011;tree can become concurrent when descent encounters a
+page that is not in memory. While it is waiting on evented I/O to load the
+page files, the main thread of the process can make progress on another
+request to search or alter the b&#x2011;tree, it can make process on another
+descent.</p>
 
 <p>This concurrency keeps the CPU and I/O loaded.</p>
 
+<p>Note that the b&#x2011;tree must only be read and written by a single
+Node.js process. You can't have two Node.js processes serving the same
+database directory.</p>
+
 <h3>Locking</h3>
 
-<p>Locking prevents race conditions where an evented I/O request returns to to
-find that the sub&#x2011;tree it was descending has been altered in way that causes
-an error. Pages may have split or merged by the main thread, records may
-have been inserted or deleted. While evented I/O is performed, the
-sub&#x2011;tree
-needs to be locked to prevent it from being altered.</p>
+<p>Every page has a read/write lock. Pages are obtained through the <code>IO.lock</code>
+method, so that every time we obtain a page, it comes to us locked.</p>
 
-<p>Locks prevent cache purges.</p>
+<p>Locking is internal and not exposed to the application developer. However,
+the application developer must remember to close cursors, in order to
+release the locks that cursors hold.</p>
 
-<p>The b&#x2011;tree is locked page by page. We are able to lock only the pages of
-interest to a particular descent of the tree.</p>
+<h4>Shared and Exclusive</h4>
 
-<p>Futhermore, the b&#x2011;tree destinguishes between shared read locks and exclusive
-write locks. Multiple descents can read a traverse that is read locked, but
-only the descent that holds an exclusive write lock can traverse it or write
-to it.</p>
+<p>When we obtain a lock to read the page, we obtain a <strong><em>shared lock</em></strong>. The
+shared lock allows other descents to also obtain a lock on the page. With a
+shared lock, you can read the page, knowing that it will not change.</p>
 
-<p>Of course, Node.js doesn't have the concept of mutexes to protect critical
-sections of code the way that threaded programming platforms do. There are
-no standard read and write lock APIs for use to use.</p>
+<p>When we obtain a lock to write the page, we obtain an <strong><em>exclusive lock</em></strong>.
+The exclusive lock prevents all other descents from obtaining any sort of
+lock on the page. No other page will be able to obtain neither a shared nor
+an exclusive lock.</p>
 
-<p>Nor do we use file system locking.</p>
+<h4>Locking Sub-Trees</h4>
 
-<p>Instead, we simulate locks using callbacks. A call to <code>lock</code> is an evented
-function call that provides a callback. If the <code>lock</code> method can grant the
-lock request to the caller, the lock method will invoke the callback.</p>
+<p>When we descend the tree, moving from parent page to child page, we obtain
+locks in descending order. This means that if we obtain an exclusive lock on
+a page, no other descent will be able to travel from the parent of that
+page, to the children of that page. It effectively blocks new descents from
+entering the <strong><em>sub&#x2011;tree</em></strong> that is defined by the exclusively
+locked page and all its children.</p>
 
-<p>If the <code>lock</code> method cannot grant the lock request, the <code>lock</code> method will
-queue the callback into a queue of callbacks assocated with the page. When
-other descents release the locks that prevent the lock request, the lock
-request callback is dequeued, and the callback invoked.</p>
+<h4>Rationale for Locking</h4>
+
+<p>Locking prevents race conditions where a descent that is waiting on an
+evented I/O request returns to find that the structure of the b&#x2011;tree
+has changed drastically. For example, while a descent was waiting for a leaf
+page to load into memory, another descent might load the same page into
+memory, merge the leaf page with its sibling, and delete it.</p>
+
+<h4>Caching</h4>
+
+<p>Locks prevent cache purges. When a cache purge is triggered, a page will not
+be purged from the cache, if there are outstanding locks on the page.</p>
+
+<h4>Lock Properties</h4>
 
 <p>The locking mechanism is a writer preferred shared read, exclusive write
 lock. If a descent holds an exclusive write lock, then all lock requests by
@@ -1706,30 +1736,13 @@ other descents are blocked. If one or more descents hold a shared read lock,
 then any request for an exclusive write lock is blocked. Any request for a
 shared read lock is granted, unless an exclusive write lock is queued. </p>
 
-<p>The locks are not re-entrant.</p>
-
-<h4>Lock</h4></td>
+<p>The locks are not re-entrant.</p></td>
           <td class="code"><div class="highlight"><pre>
 </pre></div></td>
         </tr>
       
         <tr>
-          <td class="docs"><p>TODO Signature: Address should go first.</p>
-
-<p>TODO If the page is not loaded, and we simply move forward when we encounter
-the page, that is, we have two descents, one encounters this unloaded page,
-but it is a read, so we go ahead, it makes an evented I/O call and waits,
-we make progress on a new descent, the desent encounters the unloaded page,
-and it loads the page, and waits.</p>
-
-<p>Maybe we can queue the people waiting on the load? The simplest thing would
-be to put the callbacks in an array of onloads.</p></td>
-          <td class="code"><div class="highlight"><pre>
-</pre></div></td>
-        </tr>
-      
-        <tr>
-          <td class="docs"></td>
+          <td class="docs"><p>&mdash;</p></td>
           <td class="code"><div class="highlight"><pre>
   <span class="nv">lock: </span><span class="nf">(address, exclusive, callback) -&gt;</span></pre></div></td>
         </tr>
@@ -1744,94 +1757,54 @@ There can be only one.</p>
 grouped inside one of the arrays in the queue element. Exclusive locks are
 queued alone as a single element in the array in the queue element.</p></td>
           <td class="code"><div class="highlight"><pre>
-    <span class="k">if</span> <span class="o">not</span> <span class="nv">page = </span><span class="nx">@cache</span><span class="p">[</span><span class="nx">address</span><span class="p">]</span>
-      <span class="nv">creator = </span><span class="s">&quot;create</span><span class="si">#{</span><span class="k">if</span> <span class="nx">address</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="k">then</span> <span class="s">&quot;Leaf&quot;</span> <span class="k">else</span> <span class="s">&quot;Branch&quot;</span><span class="si">}</span><span class="s">&quot;</span>
-      <span class="nv">page = </span><span class="nx">@encache</span> <span class="nx">@</span><span class="p">[</span><span class="nx">creator</span><span class="p">](</span><span class="nx">address</span><span class="p">)</span>
 </pre></div></td>
         </tr>
       
         <tr>
-          <td class="docs"><p>If the page needs to be loaded, we must load the page only after a lock
-has been obtained. Loading is a read, so we can load regardless of whether
-the lock is exclusive read/write or shared read.</p></td>
+          <td class="docs"></td>
           <td class="code"><div class="highlight"><pre>
-</pre></div></td>
-        </tr>
-      
-        <tr>
-          <td class="docs"><p>Currently blocked out to force sizer to fire. </p></td>
-          <td class="code"><div class="highlight"><pre>
-    <span class="k">if</span> <span class="nx">page</span><span class="p">.</span><span class="nx">loaded</span> <span class="o">and</span> <span class="kc">false</span>
-      <span class="nv">lock = </span><span class="nx">callback</span>
-    <span class="k">else</span></pre></div></td>
-        </tr>
-      
-        <tr>
-          <td class="docs"><p>Here's a temporary block of code that will assert that we're keeping an
-accurate count of the heft of our pages. After a while, this code will
-be removed, and we'll count on assertions in our unit tests to catch
-errors.</p></td>
-          <td class="code"><div class="highlight"><pre>
-</pre></div></td>
-        </tr>
-      
-        <tr>
-          <td class="docs"><p>We also put our relinker in here, so this will surivive a cull.</p></td>
-          <td class="code"><div class="highlight"><pre>
-      <span class="nv">sizer = </span><span class="p">(</span><span class="nx">error</span><span class="p">,</span> <span class="nx">page</span><span class="p">)</span> <span class="o">=&gt;</span>
-        <span class="k">if</span> <span class="nx">error</span>
-          <span class="nx">callback</span> <span class="nx">error</span>
-        <span class="k">else</span></pre></div></td>
+    <span class="k">if</span> <span class="nv">page = </span><span class="nx">@cache</span><span class="p">[</span><span class="nx">address</span><span class="p">]</span></pre></div></td>
         </tr>
       
         <tr>
           <td class="docs"><p>Move the page to the head of the most-recently user list.</p></td>
           <td class="code"><div class="highlight"><pre>
-          <span class="nx">@link</span> <span class="nx">@mru</span><span class="p">,</span> <span class="nx">@unlink</span> <span class="nx">page</span></pre></div></td>
+      <span class="nx">@link</span> <span class="nx">@mru</span><span class="p">,</span> <span class="nx">@unlink</span> <span class="nx">page</span></pre></div></td>
         </tr>
       
         <tr>
-          <td class="docs"><p>Check that the JSON size is correct for the current cached page
-contents.</p></td>
+          <td class="docs"></td>
           <td class="code"><div class="highlight"><pre>
-          <span class="nv">size = </span><span class="mi">0</span>
-          <span class="k">if</span> <span class="nx">page</span><span class="p">.</span><span class="nx">address</span> <span class="o">&lt;</span> <span class="mi">0</span>
-            <span class="k">if</span> <span class="nx">page</span><span class="p">.</span><span class="nx">positions</span><span class="p">.</span><span class="nx">length</span>
-              <span class="nx">size</span> <span class="o">+=</span> <span class="nx">JSON</span><span class="p">.</span><span class="nx">stringify</span><span class="p">(</span><span class="nx">page</span><span class="p">.</span><span class="nx">positions</span><span class="p">).</span><span class="nx">length</span>
-            <span class="k">for</span> <span class="nx">position</span><span class="p">,</span> <span class="nx">object</span> <span class="k">of</span> <span class="nx">page</span><span class="p">.</span><span class="nx">cache</span>
-              <span class="p">{</span> <span class="nx">record</span><span class="p">,</span> <span class="nx">key</span> <span class="p">}</span> <span class="o">=</span> <span class="nx">object</span>
-              <span class="k">if</span> <span class="nx">object</span><span class="p">.</span><span class="nx">size</span> <span class="o">isnt</span> <span class="nx">JSON</span><span class="p">.</span><span class="nx">stringify</span><span class="p">({</span> <span class="nx">record</span><span class="p">,</span> <span class="nx">key</span> <span class="p">}).</span><span class="nx">length</span>
-                <span class="k">throw</span> <span class="k">new</span> <span class="nb">Error</span> <span class="s">&quot;sizes are wrong&quot;</span>
-              <span class="nx">size</span> <span class="o">+=</span> <span class="nx">object</span><span class="p">.</span><span class="nx">size</span>
-          <span class="k">else</span>
-            <span class="k">if</span> <span class="nx">page</span><span class="p">.</span><span class="nx">addresses</span><span class="p">.</span><span class="nx">length</span>
-              <span class="nx">size</span> <span class="o">+=</span> <span class="nx">JSON</span><span class="p">.</span><span class="nx">stringify</span><span class="p">(</span><span class="nx">page</span><span class="p">.</span><span class="nx">addresses</span><span class="p">).</span><span class="nx">length</span>
-            <span class="k">for</span> <span class="nx">position</span><span class="p">,</span> <span class="nx">object</span> <span class="k">of</span> <span class="nx">page</span><span class="p">.</span><span class="nx">cache</span>
-              <span class="nx">size</span> <span class="o">+=</span> <span class="nx">JSON</span><span class="p">.</span><span class="nx">stringify</span><span class="p">(</span><span class="nx">object</span><span class="p">).</span><span class="nx">length</span>
-          <span class="k">if</span> <span class="nx">size</span> <span class="o">isnt</span> <span class="nx">page</span><span class="p">.</span><span class="nx">size</span>
-            <span class="k">throw</span> <span class="k">new</span> <span class="nb">Error</span> <span class="s">&quot;sizes are wrong&quot;</span></pre></div></td>
+    <span class="k">else</span></pre></div></td>
         </tr>
       
         <tr>
-          <td class="docs"><p>Invoke the caller's callback.</p></td>
+          <td class="docs"><p>Create a page to load with an empty <code>load</code> queue. The presence of the
+<code>load</code> queue indicates that the page needs to be read from file.</p></td>
           <td class="code"><div class="highlight"><pre>
-          <span class="nx">callback</span> <span class="kc">null</span><span class="p">,</span> <span class="nx">page</span></pre></div></td>
+      <span class="nv">creator = </span><span class="s">&quot;create</span><span class="si">#{</span><span class="k">if</span> <span class="nx">address</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="k">then</span> <span class="s">&quot;Leaf&quot;</span> <span class="k">else</span> <span class="s">&quot;Branch&quot;</span><span class="si">}</span><span class="s">&quot;</span>
+      <span class="nv">page = </span><span class="nx">@encache</span> <span class="nx">@</span><span class="p">[</span><span class="nx">creator</span><span class="p">](</span><span class="nx">address</span><span class="p">,</span> <span class="p">{</span> <span class="nv">load: </span><span class="p">[]</span> <span class="p">})</span>
+</pre></div></td>
         </tr>
       
         <tr>
-          <td class="docs"><p>TODO Two descents, both reads, enter and then come though to this point,
-they both see the page as unloaded, they both load it. Need a loaders
-array, and we can wait for things to load.</p></td>
+          <td class="docs"><h4>Lock Implementation</h4>
+
+<p>We don't use mutexes, of course, because Node.js doesn't have the concept
+of mutexes to protect critical sections of code the way that threaded
+programming platforms do. </p>
+
+<p>Nor do we use file system locking.</p>
+
+<p>Instead, we simulate locks using callbacks. A call to <code>lock</code> is an evented
+function call that provides a callback. If the <code>lock</code> method can grant the
+lock request to the caller, the lock method will invoke the callback.</p>
+
+<p>If the <code>lock</code> method cannot grant the lock request, the <code>lock</code> method will
+queue the callback into a queue of callbacks associated with the page.
+When other descents release the locks that prevent the lock request, the
+lock request callback is dequeued, and the callback invoked.</p></td>
           <td class="code"><div class="highlight"><pre>
-      <span class="nv">lock = </span><span class="p">(</span><span class="nx">error</span><span class="p">,</span> <span class="nx">page</span><span class="p">)</span> <span class="o">=&gt;</span>
-        <span class="k">if</span> <span class="nx">error</span>
-          <span class="nx">callback</span> <span class="nx">error</span>
-        <span class="k">else</span> <span class="k">if</span> <span class="nx">page</span><span class="p">.</span><span class="nx">loaded</span>
-          <span class="nx">sizer</span> <span class="kc">null</span><span class="p">,</span> <span class="nx">page</span>
-        <span class="k">else</span> <span class="k">if</span> <span class="nx">address</span> <span class="o">&lt;</span> <span class="mi">0</span>
-          <span class="nx">@readLeaf</span> <span class="nx">page</span><span class="p">,</span> <span class="nx">sizer</span>
-        <span class="k">else</span>
-          <span class="nx">@readBranches</span> <span class="nx">page</span><span class="p">,</span> <span class="nx">sizer</span>
 </pre></div></td>
         </tr>
       
@@ -1840,26 +1813,162 @@ array, and we can wait for things to load.</p></td>
 will execute immediately. The array in the queue element acts as a lock
 count.</p>
 
-<p>If the callback we add to the queue is added to the the first queue
-element is executed immediately. Otherwise, it will be executed when the
-preceeding queue elements have compeleted.</p>
+<p>If the callback we add to the queue is added to the first queue element is
+executed immediately. Otherwise, it will be executed when the preceding
+queue elements have completed.</p>
 
 <p>When an exclusive lock is queued, an empty array is appended to the queue.
-Subsequent read lock callbacks are appened to the array in the last
+Subsequent read lock callbacks are appended to the array in the last
 element. This gives exclusive lock callbacks priority.</p></td>
           <td class="code"><div class="highlight"><pre>
+
     <span class="nv">locks = </span><span class="nx">page</span><span class="p">.</span><span class="nx">locks</span>
     <span class="k">if</span> <span class="nx">exclusive</span>
       <span class="k">throw</span> <span class="k">new</span> <span class="nb">Error</span> <span class="s">&quot;already locked&quot;</span> <span class="nx">unless</span> <span class="nx">locks</span><span class="p">.</span><span class="nx">length</span> <span class="o">%</span> <span class="mi">2</span>
-      <span class="nx">locks</span><span class="p">.</span><span class="nx">push</span> <span class="p">[</span> <span class="nx">lock</span> <span class="p">]</span>
+      <span class="nx">locks</span><span class="p">.</span><span class="nx">push</span> <span class="p">[</span> <span class="nx">callback</span> <span class="p">]</span>
       <span class="nx">locks</span><span class="p">.</span><span class="nx">push</span> <span class="p">[]</span>
       <span class="k">if</span> <span class="nx">locks</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="nx">length</span> <span class="o">is</span> <span class="mi">0</span>
         <span class="nx">locks</span><span class="p">.</span><span class="nx">shift</span><span class="p">()</span>
-        <span class="nx">lock</span><span class="p">(</span><span class="kc">null</span><span class="p">,</span> <span class="nx">page</span><span class="p">)</span>
+        <span class="nx">@load</span> <span class="nx">page</span><span class="p">,</span> <span class="nx">callback</span>
     <span class="k">else</span>
-      <span class="nx">locks</span><span class="p">[</span><span class="nx">locks</span><span class="p">.</span><span class="nx">length</span> <span class="o">-</span> <span class="mi">1</span><span class="p">].</span><span class="nx">push</span> <span class="nx">lock</span>
+      <span class="nx">locks</span><span class="p">[</span><span class="nx">locks</span><span class="p">.</span><span class="nx">length</span> <span class="o">-</span> <span class="mi">1</span><span class="p">].</span><span class="nx">push</span> <span class="nx">callback</span>
       <span class="k">if</span> <span class="nx">locks</span><span class="p">.</span><span class="nx">length</span> <span class="o">is</span> <span class="mi">1</span>
-        <span class="nx">lock</span><span class="p">(</span><span class="kc">null</span><span class="p">,</span> <span class="nx">page</span><span class="p">)</span>
+        <span class="nx">@load</span> <span class="nx">page</span><span class="p">,</span> <span class="nx">callback</span>
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><h4>Check JSON Size</h4></td>
+          <td class="code"><div class="highlight"><pre>
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>Here's a temporary block of code that will assert that we're keeping an
+accurate count of the heft of our pages. After a while, this code will be
+removed, and we'll count on assertions in our unit tests to catch errors.</p></td>
+          <td class="code"><div class="highlight"><pre>
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>This only check that the JSON size is correct for the give page contents,
+not for the entire b&#x2011;tree.</p></td>
+          <td class="code"><div class="highlight"><pre>
+  <span class="vi">@checkJSONSize: </span><span class="nf">(page) -&gt;</span>
+    <span class="nv">size = </span><span class="mi">0</span>
+    <span class="k">if</span> <span class="nx">page</span><span class="p">.</span><span class="nx">address</span> <span class="o">&lt;</span> <span class="mi">0</span>
+      <span class="k">if</span> <span class="nx">page</span><span class="p">.</span><span class="nx">positions</span><span class="p">.</span><span class="nx">length</span>
+        <span class="nx">size</span> <span class="o">+=</span> <span class="nx">JSON</span><span class="p">.</span><span class="nx">stringify</span><span class="p">(</span><span class="nx">page</span><span class="p">.</span><span class="nx">positions</span><span class="p">).</span><span class="nx">length</span>
+      <span class="k">for</span> <span class="nx">position</span><span class="p">,</span> <span class="nx">object</span> <span class="k">of</span> <span class="nx">page</span><span class="p">.</span><span class="nx">cache</span>
+        <span class="p">{</span> <span class="nx">record</span><span class="p">,</span> <span class="nx">key</span> <span class="p">}</span> <span class="o">=</span> <span class="nx">object</span>
+        <span class="k">if</span> <span class="nx">object</span><span class="p">.</span><span class="nx">size</span> <span class="o">isnt</span> <span class="nx">JSON</span><span class="p">.</span><span class="nx">stringify</span><span class="p">({</span> <span class="nx">record</span><span class="p">,</span> <span class="nx">key</span> <span class="p">}).</span><span class="nx">length</span>
+          <span class="k">throw</span> <span class="k">new</span> <span class="nb">Error</span> <span class="s">&quot;sizes are wrong&quot;</span>
+        <span class="nx">size</span> <span class="o">+=</span> <span class="nx">object</span><span class="p">.</span><span class="nx">size</span>
+    <span class="k">else</span>
+      <span class="k">if</span> <span class="nx">page</span><span class="p">.</span><span class="nx">addresses</span><span class="p">.</span><span class="nx">length</span>
+        <span class="nx">size</span> <span class="o">+=</span> <span class="nx">JSON</span><span class="p">.</span><span class="nx">stringify</span><span class="p">(</span><span class="nx">page</span><span class="p">.</span><span class="nx">addresses</span><span class="p">).</span><span class="nx">length</span>
+      <span class="k">for</span> <span class="nx">position</span><span class="p">,</span> <span class="nx">object</span> <span class="k">of</span> <span class="nx">page</span><span class="p">.</span><span class="nx">cache</span>
+        <span class="nx">size</span> <span class="o">+=</span> <span class="nx">JSON</span><span class="p">.</span><span class="nx">stringify</span><span class="p">(</span><span class="nx">object</span><span class="p">).</span><span class="nx">length</span>
+    <span class="k">if</span> <span class="nx">size</span> <span class="o">isnt</span> <span class="nx">page</span><span class="p">.</span><span class="nx">size</span>
+      <span class="k">throw</span> <span class="k">new</span> <span class="nb">Error</span> <span class="s">&quot;sizes are wrong&quot;</span>
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><h3>Load</h3></td>
+          <td class="code"><div class="highlight"><pre>
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>One or more descents may encounter the same unloaded page. Only one descent
+should load it, the others should wait.</p>
+
+<p>In <code>load</code> we ensure that only the first descent will actually invoke the
+load function for the page. If we are the first to encounter an unloaded
+page, we push our callback onto the <code>load</code> queue of the page, and invoke the
+correct read function for the page time. We provide a callback that will
+invoke all the queued callbacks in the <code>load</code> queue to the read function.</p>
+
+<p>If we encounter an unloaded page, but there are already callbacks in the
+queue, we know that the first descent through has invoked read, and that our
+callback will be invoked if we will simply place it in the <code>load</code> queue and
+do nothing more.</p></td>
+          <td class="code"><div class="highlight"><pre>
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>&mdash;</p></td>
+          <td class="code"><div class="highlight"><pre>
+  <span class="nv">load: </span><span class="nf">(page, callback) -&gt;</span></pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>If the page is not loaded, load it.</p></td>
+          <td class="code"><div class="highlight"><pre>
+    <span class="k">if</span> <span class="nx">page</span><span class="p">.</span><span class="nx">load</span></pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>Add our callback to the list of waiting callback.</p></td>
+          <td class="code"><div class="highlight"><pre>
+      <span class="nx">page</span><span class="p">.</span><span class="nx">load</span><span class="p">.</span><span class="nx">push</span> <span class="nx">callback</span></pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>If we are the first one through, create a group callback function, then
+pass it to the load function for the page type.</p></td>
+          <td class="code"><div class="highlight"><pre>
+      <span class="k">if</span> <span class="nx">page</span><span class="p">.</span><span class="nx">load</span><span class="p">.</span><span class="nx">length</span> <span class="o">is</span> <span class="mi">1</span></pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>Create a callback that will invoke all the callbacks queued to wait
+for the page to load.</p></td>
+          <td class="code"><div class="highlight"><pre>
+        <span class="nv">loaded = </span><span class="nf">(error) -&gt;</span>
+          <span class="k">for</span> <span class="nx">callback</span> <span class="k">in</span> <span class="nx">page</span><span class="p">.</span><span class="nx">load</span>
+            <span class="nx">do</span> <span class="nf">(callback) -&gt;</span> <span class="nx">process</span><span class="p">.</span><span class="nx">nextTick</span> <span class="o">-&gt;</span> <span class="nx">callback</span> <span class="nx">error</span><span class="p">,</span> <span class="nx">page</span></pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>On error we reset the load list.</p></td>
+          <td class="code"><div class="highlight"><pre>
+          <span class="k">if</span> <span class="nx">error</span>
+            <span class="nv">page.load.length = </span><span class="mi">0</span></pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>Otherwise, we delete the load list, because no load list means the
+page is loaded.</p></td>
+          <td class="code"><div class="highlight"><pre>
+          <span class="k">else</span>
+            <span class="nx">IO</span><span class="p">.</span><span class="nx">checkJSONSize</span> <span class="nx">page</span>
+            <span class="k">delete</span> <span class="nx">page</span><span class="p">.</span><span class="nx">load</span></pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>Invoke the correct read function for the page type.</p></td>
+          <td class="code"><div class="highlight"><pre>
+        <span class="k">if</span> <span class="nx">page</span><span class="p">.</span><span class="nx">address</span> <span class="o">&lt;</span> <span class="mi">0</span>
+          <span class="nx">@readLeaf</span> <span class="nx">page</span><span class="p">,</span> <span class="nx">loaded</span>
+        <span class="k">else</span>
+          <span class="nx">@readBranch</span> <span class="nx">page</span><span class="p">,</span> <span class="nx">loaded</span></pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>If the page is already loaded, we wave the descent on through.</p></td>
+          <td class="code"><div class="highlight"><pre>
+    <span class="k">else</span></pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"></td>
+          <td class="code"><div class="highlight"><pre>
+      <span class="nx">IO</span><span class="p">.</span><span class="nx">checkJSONSize</span>
+      <span class="nx">callback</span> <span class="kc">null</span><span class="p">,</span> <span class="nx">page</span>
 </pre></div></td>
         </tr>
       
@@ -1881,7 +1990,14 @@ descent is the one that it queued.</p></td>
         <tr>
           <td class="docs"></td>
           <td class="code"><div class="highlight"><pre>
-  <span class="nv">unlock: </span><span class="nf">(page) -&gt;</span>
+  <span class="nv">unlock: </span><span class="nf">(page) -&gt;</span></pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>Note that it is not possible for this method to be called on an page that
+has not already been loaded.</p></td>
+          <td class="code"><div class="highlight"><pre>
+    <span class="nx">IO</span><span class="p">.</span><span class="nx">checkJSONSize</span> <span class="nx">page</span>
     <span class="nv">locks = </span><span class="nx">page</span><span class="p">.</span><span class="nx">locks</span>
     <span class="nv">locked = </span><span class="nx">locks</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
     <span class="nx">locked</span><span class="p">.</span><span class="nx">shift</span><span class="p">()</span>
@@ -1894,11 +2010,7 @@ descent is the one that it queued.</p></td>
 I/O, then another one will resume. Concurrency.</p></td>
           <td class="code"><div class="highlight"><pre>
       <span class="k">for</span> <span class="nx">callback</span> <span class="k">in</span> <span class="nx">locks</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-        <span class="nx">do</span> <span class="nf">(callback) -&gt;</span> <span class="nx">process</span><span class="p">.</span><span class="nx">nextTick</span> <span class="o">-&gt;</span> <span class="nx">callback</span><span class="p">(</span><span class="kc">null</span><span class="p">,</span> <span class="nx">page</span><span class="p">)</span>
-      
-  <span class="nv">upgrade: </span><span class="nf">(tier, _) -&gt;</span>
-    <span class="nx">@unlock</span> <span class="nx">tier</span>
-    <span class="nx">@lock</span> <span class="nx">tier</span><span class="p">.</span><span class="nx">address</span><span class="p">,</span> <span class="kc">true</span><span class="p">,</span> <span class="kc">false</span><span class="p">,</span> <span class="nx">_</span>
+        <span class="nx">do</span> <span class="nf">(callback) -&gt;</span> <span class="nx">process</span><span class="p">.</span><span class="nx">nextTick</span> <span class="o">-&gt;</span> <span class="nx">callback</span> <span class="nx">error</span><span class="p">,</span> <span class="nx">page</span>
 </pre></div></td>
         </tr>
       
@@ -1911,14 +2023,27 @@ is not already cached.</p></td>
       <span class="nv">record = </span><span class="nx">@readRecord</span> <span class="nx">page</span><span class="p">,</span> <span class="nx">position</span><span class="p">,</span> <span class="nx">_</span>
       <span class="nv">stash = </span><span class="nx">@cacheRecord</span> <span class="nx">page</span><span class="p">,</span> <span class="nx">position</span><span class="p">,</span> <span class="nx">record</span>
     <span class="nx">stash</span>
+
+  </pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>A note on the theoretical <code>null</code> key. If the collation order places <code>null</code>
+before all other values, that's a good choice, because that means that it
+will never be used for a branch key. If it is used as a branch key, the
+branch will never be able to cache the key value, it will always have to
+look it up, because its cache entry for the key will be <code>null</code>.</p>
+
+<p>But, don't use a <code>null</code> key. Create a pseudo-duplicate <code>null</code> instead.</p></td>
+          <td class="code"><div class="highlight"><pre>
 </pre></div></td>
         </tr>
       
         <tr>
           <td class="docs"><p>Get the key for the record in the case of a leaf page, or the key of the
 branch child page in the case of a branch page. Because this method operates
-on both branch pages and leaf pages, we can implement a binary search that
-operates on both branch pages and leaf pages.</p></td>
+on both branch pages and leaf pages, our binary search operates on both
+branch pages and leaf pages.</p></td>
           <td class="code"><div class="highlight"><pre>
   <span class="nv">key: </span><span class="nf">(page, index, _) -&gt;</span>
     <span class="k">if</span> <span class="nx">page</span><span class="p">.</span><span class="nx">address</span> <span class="o">&lt;</span> <span class="mi">0</span>
@@ -1944,11 +2069,11 @@ Sedgewick</a>.</p>
 <p>We set <code>low</code> to <code>1</code> to exclude a deleted ghost first record in a leaf page,
 or the least child page of a branch page.</p>
 
-<p>Index is bitwise compliment of insert location if not found.</p></td>
+<p>Index is bitwise compliment of the insert location if not found.</p></td>
           <td class="code"><div class="highlight"><pre>
   <span class="nv">find: </span><span class="nf">(page, key, low, _) -&gt;</span>
     <span class="p">{</span> <span class="nx">comparator</span> <span class="p">}</span> <span class="o">=</span> <span class="nx">@</span>
-    <span class="nv">high = </span><span class="nx">page</span><span class="p">.</span><span class="nx">count</span> <span class="o">-</span> <span class="mi">1</span>
+    <span class="nv">high = </span><span class="nx">page</span><span class="p">.</span><span class="nx">length</span> <span class="o">-</span> <span class="mi">1</span>
     <span class="k">while</span> <span class="nx">low</span> <span class="o">&lt;=</span> <span class="nx">high</span>
       <span class="nv">mid = </span><span class="nx">low</span> <span class="o">+</span> <span class="p">((</span><span class="nx">high</span> <span class="o">-</span> <span class="nx">low</span><span class="p">)</span> <span class="o">&gt;&gt;&gt;</span> <span class="mi">1</span><span class="p">)</span>
       <span class="nv">compare = </span><span class="nx">comparator</span> <span class="nx">key</span><span class="p">,</span> <span class="nx">@key</span><span class="p">(</span><span class="nx">page</span><span class="p">,</span> <span class="nx">mid</span><span class="p">,</span> <span class="nx">_</span><span class="p">)</span>
@@ -1966,11 +2091,11 @@ or the least child page of a branch page.</p>
           <td class="docs"><h2>Descent</h2>
 
 <p>We use the term <em>descent</em> to describe b&#x2011;tree operations, because all
-b&#x2011;tree
-operations require a descent of the b&#x2011;tree, a traversal of the b&#x2011;tree starting
-from the root. Whenever we are search the tree, insert or delete records, or
-balance the tree with a page splits and merges, we first begin with a descent
-of the b&#x2011;tree, from the root, to find the page we want to act upon.</p>
+b&#x2011;tree operations require a descent of the b&#x2011;tree, a traversal
+of the b&#x2011;tree starting from the root. Whenever we are search the tree,
+insert or delete records, or balance the tree with a page splits and merges,
+we first begin with a descent of the b&#x2011;tree, from the root, to find the
+page we want to act upon.</p>
 
 <h4>Descent as Unit of Work</h4>
 
@@ -2009,9 +2134,8 @@ describe the interaction of b&#x2011;tree operations.</p>
 <p>We use these terms in this document to save the chore of writing, and the
 confustion of reading; insert or delete, or split or merge. We also want to
 draw a distinction between changing the count of records stored in the
-b&#x2011;tree,
-<em>editing</em>, and changing the height of the b&#x2011;tree, the count of pages, or the
-choice of keys, <em>balancing</em>.</p>
+b&#x2011;tree, <em>editing</em>, and changing the height of the b&#x2011;tree, the
+count of pages, or the choice of keys, <em>balancing</em>.</p>
 
 <h4>Locking on Descent</h4>
 
@@ -2093,12 +2217,12 @@ pages.</p></td>
 meaningful in C++ or Java.</p></td>
           <td class="code"><div class="highlight"><pre>
   <span class="nv">constructor: </span><span class="nf">(@io) -&gt;</span>
-    <span class="vi">@first      = </span><span class="kc">true</span>
-    <span class="vi">@page       = </span><span class="p">{</span> <span class="nv">addresses: </span><span class="p">[</span> <span class="mi">0</span> <span class="p">],</span> <span class="nv">leaf: </span><span class="kc">false</span> <span class="p">}</span>
-    <span class="vi">@index      = </span><span class="mi">0</span>
     <span class="vi">@exact      = </span><span class="kc">false</span>
     <span class="vi">@exclusive  = </span><span class="kc">false</span>
     <span class="vi">@depth      = </span><span class="mi">0</span>
+    <span class="vi">@first      = </span><span class="kc">true</span>
+    <span class="vi">@index      = </span><span class="mi">0</span>
+    <span class="vi">@page       = </span><span class="p">{</span> <span class="nv">addresses: </span><span class="p">[</span> <span class="mi">0</span> <span class="p">],</span> <span class="nv">leaf: </span><span class="kc">false</span> <span class="p">}</span>
 </pre></div></td>
         </tr>
       
@@ -2157,7 +2281,7 @@ the addresses current descent to the dummy page, and copy the current index.</p>
         <tr>
           <td class="docs"><p>Stop when we reach a leaf page.</p></td>
           <td class="code"><div class="highlight"><pre>
-  <span class="vi">@leaf: </span><span class="o">-&gt;</span> <span class="nx">@page</span><span class="p">.</span><span class="nx">leaf</span>
+  <span class="vi">@leaf: </span><span class="o">-&gt;</span> <span class="nx">@page</span><span class="p">.</span><span class="nx">address</span> <span class="o">&lt;</span> <span class="mi">0</span>
 </pre></div></td>
         </tr>
       
@@ -2245,10 +2369,11 @@ another descent after we've visited them, however.</p>
 
 <h4>Record Ranges</h4>
 
-<p>The cursor will define an <code>index</code> property and a <code>count</code> property. The <code>index</code>
-is positioned at the first record in the page whose key is equal to or greater
-than the search key. The <code>count</code> is count of records in the page. This defines
-the range of records whose key is greater than or equal to the search key.</p>
+<p>The cursor will define an <code>offset</code> property and a <code>length</code> property. The
+<code>offset</code> is positioned at the first record in the page whose key is equal to
+or greater than the search key. The <code>length</code> is count of records in the page.
+This defines the range of records whose key is greater than or equal to the
+search key.</p>
 
 <p>On the first page visited, the key of the record at the <code>index</code> is greater
 than or equal to the search key. Every key of every record that follows the
@@ -2288,10 +2413,7 @@ the first event that occured after the noon millisecond.</p>
 
 <p>When we encounter to the first event that occurs after midnight, we ignore
 that event and terminate traversal. We've successfully found all the events in
-our range.</p>
-
-<p>TODO Here count means something different than in pages. Either page <code>count</code>
-is renamed <code>length</code> or else <code>count</code> here is renamed <code>visited</code>.</p></td>
+our range.</p></td>
           <td class="code"><div class="highlight"><pre>
 </pre></div></td>
         </tr>
@@ -2307,12 +2429,11 @@ is renamed <code>length</code> or else <code>count</code> here is renamed <code>
           <td class="docs"><p>Iterators are initialized with the results of a descent.</p></td>
           <td class="code"><div class="highlight"><pre>
   <span class="nv">constructor: </span><span class="nf">(@key, @index, { io, page, exclusive }) -&gt;</span>
-    <span class="vi">@_page = </span><span class="nx">page</span>
     <span class="vi">@_io = </span><span class="nx">io</span>
+    <span class="vi">@_page = </span><span class="nx">page</span>
+    <span class="vi">@exclusive = </span><span class="nx">exclusive</span>
     <span class="vi">@length = </span><span class="nx">@_page</span><span class="p">.</span><span class="nx">positions</span><span class="p">.</span><span class="nx">length</span>
     <span class="vi">@offset = </span><span class="k">if</span> <span class="nx">@index</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="k">then</span> <span class="o">~</span> <span class="nx">@index</span> <span class="k">else</span> <span class="nx">@index</span>
-    <span class="vi">@count = </span><span class="mi">1</span>
-    <span class="vi">@exclusive = </span><span class="nx">exclusive</span>
 </pre></div></td>
         </tr>
       
@@ -2320,9 +2441,6 @@ is renamed <code>length</code> or else <code>count</code> here is renamed <code>
           <td class="docs"><p>Get a the record at a given index from the current leaf page.</p></td>
           <td class="code"><div class="highlight"><pre>
   <span class="nv">get: </span><span class="nf">(index, _) -&gt;</span>
-    <span class="k">if</span> <span class="o">not</span> <span class="p">(</span><span class="nx">@index</span> <span class="o">&lt;=</span> <span class="nx">index</span> <span class="o">&lt;</span> <span class="nx">@length</span><span class="p">)</span>
-      <span class="k">throw</span> <span class="k">new</span> <span class="nb">Error</span> <span class="s">&quot;index out of bounds&quot;</span>
-
     <span class="nx">@_io</span><span class="p">.</span><span class="nx">stash</span><span class="p">(</span><span class="nx">@_page</span><span class="p">,</span> <span class="nx">@_page</span><span class="p">.</span><span class="nx">positions</span><span class="p">[</span><span class="nx">index</span><span class="p">],</span> <span class="nx">_</span><span class="p">).</span><span class="nx">record</span>
 </pre></div></td>
         </tr>
@@ -2369,14 +2487,13 @@ peek at the next page.</p></td>
           <td class="docs"><p>Advance to the next page.</p></td>
           <td class="code"><div class="highlight"><pre>
       <span class="vi">@_page = </span><span class="nx">next</span>
-      <span class="nx">@count</span><span class="o">++</span>
 </pre></div></td>
         </tr>
       
         <tr>
           <td class="docs"><p>Adjust the range.</p></td>
           <td class="code"><div class="highlight"><pre>
-      <span class="vi">@index = </span><span class="nx">@_page</span><span class="p">.</span><span class="nx">deleted</span>
+      <span class="vi">@offset = </span><span class="nx">@_page</span><span class="p">.</span><span class="nx">offset</span>
       <span class="vi">@length = </span><span class="nx">@_page</span><span class="p">.</span><span class="nx">positions</span><span class="p">.</span><span class="nx">length</span>
 </pre></div></td>
         </tr>
@@ -2394,7 +2511,7 @@ bitwise compliment of index where record would be inserted if no such record
 exists in the leaf page.</p></td>
           <td class="code"><div class="highlight"><pre>
   <span class="nv">indexOf: </span><span class="nf">(key, _) -&gt;</span>
-    <span class="nx">@_io</span><span class="p">.</span><span class="nx">find</span> <span class="nx">@_page</span><span class="p">,</span> <span class="nx">key</span><span class="p">,</span> <span class="nx">@_page</span><span class="p">.</span><span class="nx">deleted</span><span class="p">,</span> <span class="nx">_</span>
+    <span class="nx">@_io</span><span class="p">.</span><span class="nx">find</span> <span class="nx">@_page</span><span class="p">,</span> <span class="nx">key</span><span class="p">,</span> <span class="nx">@_page</span><span class="p">.</span><span class="nx">offset</span><span class="p">,</span> <span class="nx">_</span>
 </pre></div></td>
         </tr>
       
@@ -2567,7 +2684,7 @@ here. Do not catch this exception, debug your code.</p></td>
           <td class="docs"><p>An insert location is ambiguous if it would append the record to the
 current leaf page.</p></td>
           <td class="code"><div class="highlight"><pre>
-    <span class="nv">unambiguous = </span><span class="nx">index</span> <span class="o">&lt;=</span> <span class="nx">@_page</span><span class="p">.</span><span class="nx">count</span>
+    <span class="nv">unambiguous = </span><span class="nx">index</span> <span class="o">&lt;=</span> <span class="nx">@_page</span><span class="p">.</span><span class="nx">length</span>
 </pre></div></td>
         </tr>
       
@@ -2625,7 +2742,7 @@ index, otherwise return <code>undefined</code>.</p></td>
         </tr>
       
         <tr>
-          <td class="docs"><p>Cache the current count.</p></td>
+          <td class="docs"><p>Cache the current page length.</p></td>
           <td class="code"><div class="highlight"><pre>
       <span class="nx">@_io</span><span class="p">.</span><span class="nx">balancer</span><span class="p">.</span><span class="nx">unbalanced</span><span class="p">(</span><span class="nx">@_page</span><span class="p">)</span>
 </pre></div></td>
@@ -2668,7 +2785,7 @@ open, the b&#x2011;tree object can left to garbage collection.</p></td>
         <tr>
           <td class="docs"><p>Delete the record at the given index. The application developer is
 responsible for providing a valid index, in the range defined by the
-<code>offset</code> and <code>length</code> of the cursor, or else the <code>deleted</code> and <code>count</code> of
+<code>offset</code> and <code>length</code> of the cursor, or else the <code>offset</code> and <code>length</code> of
 the <code>page</code>.</p></td>
           <td class="code"><div class="highlight"><pre>
   <span class="k">delete</span><span class="o">:</span> <span class="nf">(index, _) -&gt;</span></pre></div></td>
@@ -2697,12 +2814,12 @@ the <code>page</code>.</p></td>
     <span class="nx">fs</span><span class="p">.</span><span class="nx">close</span> <span class="nx">fd</span><span class="p">,</span> <span class="nx">_</span>
     
     <span class="k">if</span> <span class="nx">ghost</span>
-      <span class="nx">@_page</span><span class="p">.</span><span class="nx">deleted</span><span class="o">++</span>
+      <span class="nx">@_page</span><span class="p">.</span><span class="nx">offset</span><span class="o">++</span>
       <span class="nx">@offset</span><span class="o">++</span>
     <span class="k">else</span>
       <span class="nx">@_io</span><span class="p">.</span><span class="nx">uncacheRecord</span> <span class="nx">@_page</span><span class="p">,</span> <span class="nx">@_page</span><span class="p">.</span><span class="nx">positions</span><span class="p">[</span><span class="nx">index</span><span class="p">],</span> <span class="nx">_</span>
       <span class="nx">@_io</span><span class="p">.</span><span class="nx">splice</span> <span class="nx">@_page</span><span class="p">,</span> <span class="nx">index</span><span class="p">,</span> <span class="mi">1</span>
-      <span class="vi">@length = </span><span class="o">--</span><span class="nx">@_page</span><span class="p">.</span><span class="nx">count</span>
+      <span class="vi">@length = </span><span class="o">--</span><span class="nx">@_page</span><span class="p">.</span><span class="nx">length</span>
 </pre></div></td>
         </tr>
       
@@ -3165,15 +3282,15 @@ application needs to do, and Strata needs to search and edit records.</p>
 
 <span class="k">class</span> <span class="nx">Balancer</span>
   <span class="nv">constructor: </span><span class="nf">(@leafSize) -&gt;</span>
-    <span class="vi">@referenced = </span><span class="p">{}</span>
-    <span class="vi">@counts = </span><span class="p">{}</span>
+    <span class="vi">@lengths = </span><span class="p">{}</span>
     <span class="vi">@operations = </span><span class="p">[]</span>
+    <span class="vi">@referenced = </span><span class="p">{}</span>
 
   <span class="nv">unbalanced: </span><span class="nf">(page, force) -&gt;</span>
     <span class="k">if</span> <span class="nx">force</span>
-      <span class="nx">@counts</span><span class="p">[</span><span class="nx">page</span><span class="p">.</span><span class="nx">address</span><span class="p">]</span> <span class="o">=</span> <span class="nx">@leafSize</span>
+      <span class="nx">@lengths</span><span class="p">[</span><span class="nx">page</span><span class="p">.</span><span class="nx">address</span><span class="p">]</span> <span class="o">=</span> <span class="nx">@leafSize</span>
     <span class="k">else</span>
-      <span class="nx">@counts</span><span class="p">[</span><span class="nx">page</span><span class="p">.</span><span class="nx">address</span><span class="p">]</span><span class="o">?=</span> <span class="nx">page</span><span class="p">.</span><span class="nx">count</span>
+      <span class="nx">@lengths</span><span class="p">[</span><span class="nx">page</span><span class="p">.</span><span class="nx">address</span><span class="p">]</span><span class="o">?=</span> <span class="nx">page</span><span class="p">.</span><span class="nx">length</span>
 </pre></div></td>
         </tr>
       
@@ -3258,7 +3375,7 @@ the canceled pages to the next balancer.</p></td>
           <td class="docs"><p>TODO Tracking the difference means we can short cut planning, if the page
 has only grown. This is a short cut. We consider its use carefully. We are
 not capricious with it. We are okay with having to load the sibling page
-counts to check for merge. A split will lead to a subsequent balance plan
+lengths to check for merge. A split will lead to a subsequent balance plan
 that will load four pages. In that regard, plits are not cheaper than
 merges.</p></td>
           <td class="code"><div class="highlight"><pre>
@@ -3290,7 +3407,7 @@ requested, so that we can continue to balance.</p></td>
         <tr>
           <td class="docs"><p>We do not proceed if there is nothing to consider.</p></td>
           <td class="code"><div class="highlight"><pre>
-    <span class="nv">addresses = </span><span class="nb">Object</span><span class="p">.</span><span class="nx">keys</span> <span class="nx">@counts</span>
+    <span class="nv">addresses = </span><span class="nb">Object</span><span class="p">.</span><span class="nx">keys</span> <span class="nx">@lengths</span>
     <span class="k">return</span> <span class="k">if</span> <span class="nx">addresses</span><span class="p">.</span><span class="nx">length</span> <span class="o">is</span> <span class="mi">0</span>
 
     <span class="nv">max = </span><span class="nx">@io</span><span class="p">.</span><span class="nx">options</span><span class="p">.</span><span class="nx">leafSize</span>
@@ -3330,7 +3447,7 @@ we pass it onto the next balancer for consideration at the next balance.</p></td
           <td class="docs"><p>Convert the address back to an integer.</p></td>
           <td class="code"><div class="highlight"><pre>
       <span class="nv">address = </span><span class="nb">parseInt</span> <span class="nx">address</span><span class="p">,</span> <span class="mi">10</span>
-      <span class="nv">count = </span><span class="nx">@counts</span><span class="p">[</span><span class="nx">address</span><span class="p">]</span>
+      <span class="nv">length = </span><span class="nx">@lengths</span><span class="p">[</span><span class="nx">address</span><span class="p">]</span>
 </pre></div></td>
         </tr>
       
@@ -3362,7 +3479,7 @@ holding no other locks.</p></td>
           <td class="docs"><p>If the page has shrunk in size, we gather the size of the left sibling
 page and the right sibling page. The right sibling page </p></td>
           <td class="code"><div class="highlight"><pre>
-      <span class="k">if</span> <span class="nx">node</span><span class="p">.</span><span class="nx">page</span><span class="p">.</span><span class="nx">count</span> <span class="o">-</span> <span class="nx">count</span> <span class="o">&lt;</span> <span class="mi">0</span>
+      <span class="k">if</span> <span class="nx">node</span><span class="p">.</span><span class="nx">page</span><span class="p">.</span><span class="nx">length</span> <span class="o">-</span> <span class="nx">length</span> <span class="o">&lt;</span> <span class="mi">0</span>
         <span class="k">if</span> <span class="nx">page</span><span class="p">.</span><span class="nx">address</span> <span class="o">isnt</span> <span class="o">-</span><span class="mi">1</span>
           <span class="k">if</span> <span class="o">not</span> <span class="nx">node</span><span class="p">.</span><span class="nx">left</span>
             <span class="nv">descent = </span><span class="k">new</span> <span class="nx">Descent</span><span class="p">(</span><span class="nx">@_io</span><span class="p">)</span>
@@ -3415,7 +3532,7 @@ Gather the current counts of each page into the node itself, so we adjust
 the count based on the merges we schedule.</p></td>
           <td class="code"><div class="highlight"><pre>
     <span class="k">for</span> <span class="nx">address</span><span class="p">,</span> <span class="nx">node</span> <span class="k">of</span> <span class="nx">ordered</span>
-      <span class="nv">node.count = </span><span class="nx">node</span><span class="p">.</span><span class="nx">page</span><span class="p">.</span><span class="nx">count</span>
+      <span class="nv">node.length = </span><span class="nx">node</span><span class="p">.</span><span class="nx">page</span><span class="p">.</span><span class="nx">length</span>
 </pre></div></td>
         </tr>
       
@@ -3453,16 +3570,16 @@ not knecesarry.</p></td>
         <tr>
           <td class="docs"></td>
           <td class="code"><div class="highlight"><pre>
-    <span class="k">for</span> <span class="nx">address</span><span class="p">,</span> <span class="nx">count</span> <span class="k">in</span> <span class="nb">Object</span><span class="p">.</span><span class="nx">keys</span> <span class="nx">@counts</span>
+    <span class="k">for</span> <span class="nx">address</span><span class="p">,</span> <span class="nx">length</span> <span class="k">in</span> <span class="nb">Object</span><span class="p">.</span><span class="nx">keys</span> <span class="nx">@lengths</span>
       <span class="nv">node = </span><span class="nx">ordered</span><span class="p">[</span><span class="nx">address</span><span class="p">]</span>
-      <span class="nv">difference = </span><span class="nx">node</span><span class="p">.</span><span class="nx">count</span> <span class="o">-</span> <span class="nx">count</span></pre></div></td>
+      <span class="nv">difference = </span><span class="nx">node</span><span class="p">.</span><span class="nx">length</span> <span class="o">-</span> <span class="nx">length</span></pre></div></td>
         </tr>
       
         <tr>
           <td class="docs"><p>If we've grown past capacity, split the leaf. Remove this page from its
 list, because we know it cannot merge with its neighbors.</p></td>
           <td class="code"><div class="highlight"><pre>
-      <span class="k">if</span> <span class="nx">difference</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="o">and</span> <span class="nx">node</span><span class="p">.</span><span class="nx">page</span><span class="p">.</span><span class="nx">count</span> <span class="o">&gt;</span> <span class="nx">max</span></pre></div></td>
+      <span class="k">if</span> <span class="nx">difference</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="o">and</span> <span class="nx">node</span><span class="p">.</span><span class="nx">page</span><span class="p">.</span><span class="nx">length</span> <span class="o">&gt;</span> <span class="nx">max</span></pre></div></td>
         </tr>
       
         <tr>
@@ -3484,7 +3601,7 @@ be tested for merge, so we didn't grab its siblings, but it does now.
 We ask the next balancer to consider it as we found it.</p></td>
           <td class="code"><div class="highlight"><pre>
       <span class="k">else</span> <span class="k">if</span> <span class="nx">difference</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="o">and</span> <span class="o">not</span> <span class="p">(</span><span class="nx">node</span><span class="p">.</span><span class="nx">left</span> <span class="o">and</span> <span class="nx">node</span><span class="p">.</span><span class="nx">right</span><span class="p">)</span>
-        <span class="nx">@io</span><span class="p">.</span><span class="nx">balancer</span><span class="p">.</span><span class="nx">counts</span><span class="p">[</span><span class="nx">node</span><span class="p">.</span><span class="nx">page</span><span class="p">.</span><span class="nx">address</span><span class="p">]</span> <span class="o">=</span> <span class="nx">count</span>
+        <span class="nx">@io</span><span class="p">.</span><span class="nx">balancer</span><span class="p">.</span><span class="nx">lengths</span><span class="p">[</span><span class="nx">node</span><span class="p">.</span><span class="nx">page</span><span class="p">.</span><span class="nx">address</span><span class="p">]</span> <span class="o">=</span> <span class="nx">length</span>
 </pre></div></td>
         </tr>
       
@@ -3518,7 +3635,7 @@ merge until the list of nodes to consider is empty.</p></td>
       <span class="k">for</span> <span class="nx">address</span> <span class="k">in</span> <span class="nx">addresses</span>
         <span class="nv">node = </span><span class="nx">ordered</span><span class="p">[</span><span class="nx">address</span><span class="p">]</span>
         <span class="k">while</span> <span class="nx">node</span><span class="p">.</span><span class="nx">right</span>
-          <span class="k">if</span> <span class="nx">node</span><span class="p">.</span><span class="nx">count</span> <span class="o">+</span> <span class="nx">node</span><span class="p">.</span><span class="nx">right</span><span class="p">.</span><span class="nx">count</span> <span class="o">&gt;</span> <span class="nx">max</span>
+          <span class="k">if</span> <span class="nx">node</span><span class="p">.</span><span class="nx">length</span> <span class="o">+</span> <span class="nx">node</span><span class="p">.</span><span class="nx">right</span><span class="p">.</span><span class="nx">length</span> <span class="o">&gt;</span> <span class="nx">max</span>
             <span class="nv">node = </span><span class="nx">unlink</span> <span class="nx">node</span>
             <span class="nx">ordered</span><span class="p">[</span><span class="nx">node</span><span class="p">.</span><span class="nx">address</span><span class="p">]</span> <span class="o">=</span> <span class="nx">node</span>
           <span class="k">else</span>
@@ -3544,8 +3661,8 @@ link the head node to the right sibling of the right node.</p></td>
             <span class="nv">method: </span><span class="s">&quot;mergeLeaves&quot;</span>
             <span class="nv">left: </span><span class="nx">node</span><span class="p">.</span><span class="nx">page</span><span class="p">.</span><span class="nx">address</span>
             <span class="nv">right: </span><span class="nx">right</span><span class="p">.</span><span class="nx">page</span><span class="p">.</span><span class="nx">address</span>
-            <span class="nv">unbalanced: </span><span class="nx">@counts</span>
-          <span class="nx">node</span><span class="p">.</span><span class="nx">count</span> <span class="o">+=</span> <span class="nx">right</span><span class="p">.</span><span class="nx">count</span>
+            <span class="nv">unbalanced: </span><span class="nx">@lengths</span>
+          <span class="nx">node</span><span class="p">.</span><span class="nx">length</span> <span class="o">+=</span> <span class="nx">right</span><span class="p">.</span><span class="nx">length</span>
           <span class="nx">link</span> <span class="nx">node</span><span class="p">,</span> <span class="nx">unlink</span> <span class="nx">right</span></pre></div></td>
         </tr>
       
@@ -3566,7 +3683,7 @@ link the head node to the right sibling of the right node.</p></td>
         </tr>
       
         <tr>
-          <td class="docs"><p>Decrement the reference counts. TODO Why a count and not a boolean?</p></td>
+          <td class="docs"><p>Decrement the reference lengths. TODO Why a length and not a boolean?</p></td>
           <td class="code"><div class="highlight"><pre>
     <span class="k">for</span> <span class="nx">address</span><span class="p">,</span> <span class="nx">page</span> <span class="k">of</span> <span class="nx">@referenced</span>
       <span class="nx">page</span><span class="p">.</span><span class="nx">balancers</span><span class="o">--</span>
@@ -3639,7 +3756,7 @@ need to be split, we should then check to see if it can be merged.</p></td>
         <tr>
           <td class="docs"><p>TODO We're not bothering with split when we've only grown a bit, right?</p></td>
           <td class="code"><div class="highlight"><pre>
-    <span class="k">if</span> <span class="nx">split</span><span class="p">.</span><span class="nx">count</span> <span class="o">&lt;=</span> <span class="nx">@io</span><span class="p">.</span><span class="nx">options</span><span class="p">.</span><span class="nx">leafSize</span>
+    <span class="k">if</span> <span class="nx">split</span><span class="p">.</span><span class="nx">length</span> <span class="o">&lt;=</span> <span class="nx">@io</span><span class="p">.</span><span class="nx">options</span><span class="p">.</span><span class="nx">leafSize</span>
       <span class="nx">@_io</span><span class="p">.</span><span class="nx">balancer</span><span class="p">.</span><span class="nx">unbalanced</span><span class="p">(</span><span class="nx">@_page</span><span class="p">)</span>
 </pre></div></td>
         </tr>
@@ -3654,9 +3771,9 @@ need to be split, we should then check to see if it can be merged.</p></td>
           <td class="docs"><p>It may have been some time since we've split, so we might have to split
 into more than two pages.</p></td>
           <td class="code"><div class="highlight"><pre>
-      <span class="nv">pages = </span><span class="nb">Math</span><span class="p">.</span><span class="nx">ceil</span><span class="p">(</span><span class="nx">split</span><span class="p">.</span><span class="nx">count</span> <span class="o">/</span> <span class="nx">@io</span><span class="p">.</span><span class="nx">options</span><span class="p">.</span><span class="nx">leafSize</span><span class="p">)</span>
-      <span class="nv">records = </span><span class="nb">Math</span><span class="p">.</span><span class="nx">floor</span><span class="p">(</span><span class="nx">split</span><span class="p">.</span><span class="nx">count</span> <span class="o">/</span> <span class="nx">pages</span><span class="p">)</span>
-      <span class="nv">remainder = </span><span class="nx">split</span><span class="p">.</span><span class="nx">count</span> <span class="o">%</span> <span class="nx">pages</span>
+      <span class="nv">pages = </span><span class="nb">Math</span><span class="p">.</span><span class="nx">ceil</span><span class="p">(</span><span class="nx">split</span><span class="p">.</span><span class="nx">length</span> <span class="o">/</span> <span class="nx">@io</span><span class="p">.</span><span class="nx">options</span><span class="p">.</span><span class="nx">leafSize</span><span class="p">)</span>
+      <span class="nv">records = </span><span class="nb">Math</span><span class="p">.</span><span class="nx">floor</span><span class="p">(</span><span class="nx">split</span><span class="p">.</span><span class="nx">length</span> <span class="o">/</span> <span class="nx">pages</span><span class="p">)</span>
+      <span class="nv">remainder = </span><span class="nx">split</span><span class="p">.</span><span class="nx">length</span> <span class="o">%</span> <span class="nx">pages</span>
 
       <span class="nv">right = </span><span class="nx">split</span><span class="p">.</span><span class="nx">right</span>
 
@@ -3668,7 +3785,7 @@ into more than two pages.</p></td>
         <tr>
           <td class="docs"><p>Never a remainder record on the first page.</p></td>
           <td class="code"><div class="highlight"><pre>
-      <span class="nv">offset = </span><span class="nx">split</span><span class="p">.</span><span class="nx">count</span>
+      <span class="nv">offset = </span><span class="nx">split</span><span class="p">.</span><span class="nx">length</span>
       </pre></div></td>
         </tr>
       
@@ -3704,10 +3821,10 @@ into more than two pages.</p></td>
           <td class="docs"><p>Determine the number of records to add to this page from the split
 leaf. Add an additonal record if we have a remainder.</p></td>
           <td class="code"><div class="highlight"><pre>
-        <span class="nv">count = </span><span class="k">if</span> <span class="nx">remainder</span><span class="o">--</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">then</span> <span class="nx">records</span> <span class="o">+</span> <span class="mi">1</span> <span class="k">else</span> <span class="nx">records</span>
-        <span class="nv">offset = </span><span class="nx">split</span><span class="p">.</span><span class="nx">count</span> <span class="o">-</span> <span class="nx">count</span>
+        <span class="nv">length = </span><span class="k">if</span> <span class="nx">remainder</span><span class="o">--</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">then</span> <span class="nx">records</span> <span class="o">+</span> <span class="mi">1</span> <span class="k">else</span> <span class="nx">records</span>
+        <span class="nv">offset = </span><span class="nx">split</span><span class="p">.</span><span class="nx">length</span> <span class="o">-</span> <span class="nx">length</span>
 
-        <span class="k">for</span> <span class="nx">index</span> <span class="k">in</span> <span class="p">[</span><span class="nx">offset</span><span class="p">...</span><span class="nx">offset</span> <span class="o">+</span> <span class="nx">count</span><span class="p">]</span></pre></div></td>
+        <span class="k">for</span> <span class="nx">index</span> <span class="k">in</span> <span class="p">[</span><span class="nx">offset</span><span class="p">...</span><span class="nx">offset</span> <span class="o">+</span> <span class="nx">length</span><span class="p">]</span></pre></div></td>
         </tr>
       
         <tr>
@@ -3722,7 +3839,7 @@ leaf. Add an additonal record if we have a remainder.</p></td>
         <tr>
           <td class="docs"><p>Add it to our new page.</p></td>
           <td class="code"><div class="highlight"><pre>
-          <span class="nx">@io</span><span class="p">.</span><span class="nx">splice</span> <span class="nx">page</span><span class="p">,</span> <span class="nx">page</span><span class="p">.</span><span class="nx">count</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="nx">position</span>
+          <span class="nx">@io</span><span class="p">.</span><span class="nx">splice</span> <span class="nx">page</span><span class="p">,</span> <span class="nx">page</span><span class="p">.</span><span class="nx">length</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="nx">position</span>
           <span class="nx">@io</span><span class="p">.</span><span class="nx">cacheRecord</span> <span class="nx">page</span><span class="p">,</span> <span class="nx">position</span><span class="p">,</span> <span class="nx">object</span><span class="p">.</span><span class="nx">record</span><span class="p">,</span> <span class="nx">object</span><span class="p">.</span><span class="nx">key</span>
 </pre></div></td>
         </tr>
@@ -3730,7 +3847,7 @@ leaf. Add an additonal record if we have a remainder.</p></td>
         <tr>
           <td class="docs"><p>Remove the positions that have been merged.</p></td>
           <td class="code"><div class="highlight"><pre>
-        <span class="nx">@io</span><span class="p">.</span><span class="nx">splice</span> <span class="nx">split</span><span class="p">,</span> <span class="nx">offset</span><span class="p">,</span> <span class="nx">count</span>
+        <span class="nx">@io</span><span class="p">.</span><span class="nx">splice</span> <span class="nx">split</span><span class="p">,</span> <span class="nx">offset</span><span class="p">,</span> <span class="nx">length</span>
 </pre></div></td>
         </tr>
       
@@ -3762,7 +3879,7 @@ leaf. Add an additonal record if we have a remainder.</p></td>
         <tr>
           <td class="docs"><p>Write the branches</p></td>
           <td class="code"><div class="highlight"><pre>
-      <span class="nx">@io</span><span class="p">.</span><span class="nx">rewriteBranches</span> <span class="nx">penultimate</span><span class="p">.</span><span class="nx">page</span><span class="p">,</span> <span class="s">&quot;pending&quot;</span><span class="p">,</span> <span class="nx">_</span>
+      <span class="nx">@io</span><span class="p">.</span><span class="nx">rewriteBranch</span> <span class="nx">penultimate</span><span class="p">.</span><span class="nx">page</span><span class="p">,</span> <span class="s">&quot;pending&quot;</span><span class="p">,</span> <span class="nx">_</span>
 </pre></div></td>
         </tr>
       
@@ -3841,8 +3958,8 @@ done yet, but no other descent makes progress unless we invoke a callback. </p><
     <span class="nx">child</span><span class="p">.</span><span class="nx">descend</span> <span class="nx">sought</span><span class="p">,</span> <span class="nx">Descent</span><span class="p">.</span><span class="nx">depth</span><span class="p">(</span><span class="nx">depth</span><span class="p">)</span>
 
     <span class="nv">branchSize = </span><span class="nx">@io</span><span class="p">.</span><span class="nx">options</span><span class="p">.</span><span class="nx">branchSize</span>
-    <span class="nv">pages = </span><span class="nb">Math</span><span class="p">.</span><span class="nx">ceil</span><span class="p">(</span><span class="nx">split</span><span class="p">.</span><span class="nx">count</span> <span class="o">/</span> <span class="nx">branchSize</span><span class="p">)</span>
-    <span class="nv">remainder = </span><span class="nx">split</span><span class="p">.</span><span class="nx">count</span> <span class="o">%</span> <span class="nx">pages</span>
+    <span class="nv">pages = </span><span class="nb">Math</span><span class="p">.</span><span class="nx">ceil</span><span class="p">(</span><span class="nx">split</span><span class="p">.</span><span class="nx">length</span> <span class="o">/</span> <span class="nx">branchSize</span><span class="p">)</span>
+    <span class="nv">remainder = </span><span class="nx">split</span><span class="p">.</span><span class="nx">length</span> <span class="o">%</span> <span class="nx">pages</span>
 
     <span class="nv">replacements = </span><span class="p">[]</span>
 
@@ -3851,10 +3968,10 @@ done yet, but no other descent makes progress unless we invoke a callback. </p><
     <span class="nv">partition = </span><span class="nx">@io</span><span class="p">.</span><span class="nx">options</span><span class="p">.</span><span class="nx">branchSize</span> <span class="o">/</span> <span class="mi">2</span>
     <span class="nv">right = </span><span class="nx">@io</span><span class="p">.</span><span class="nx">createBranch</span> <span class="nx">@io</span><span class="p">.</span><span class="nx">nextAddress</span><span class="o">++</span><span class="p">,</span> <span class="p">{</span> <span class="nv">right: </span><span class="nx">child</span><span class="p">.</span><span class="nx">page</span><span class="p">.</span><span class="nx">right</span> <span class="p">}</span>
     <span class="nv">child.page.right = </span><span class="nx">right</span><span class="p">.</span><span class="nx">address</span>
-    <span class="k">for</span> <span class="nx">index</span> <span class="k">in</span> <span class="p">[</span><span class="nx">partition</span><span class="p">...</span><span class="nx">child</span><span class="p">.</span><span class="nx">page</span><span class="p">.</span><span class="nx">count</span><span class="p">]</span>
+    <span class="k">for</span> <span class="nx">index</span> <span class="k">in</span> <span class="p">[</span><span class="nx">partition</span><span class="p">...</span><span class="nx">child</span><span class="p">.</span><span class="nx">page</span><span class="p">.</span><span class="nx">length</span><span class="p">]</span>
       <span class="nv">address = </span><span class="nx">child</span><span class="p">.</span><span class="nx">page</span><span class="p">.</span><span class="nx">addresses</span><span class="p">[</span><span class="nx">index</span><span class="p">]</span>
       <span class="nx">@io</span><span class="p">.</span><span class="nx">uncacheKey</span> <span class="nx">child</span><span class="p">.</span><span class="nx">page</span><span class="p">,</span> <span class="nx">address</span>
-      <span class="nx">@io</span><span class="p">.</span><span class="nx">splice</span> <span class="nx">right</span><span class="p">,</span> <span class="nx">right</span><span class="p">.</span><span class="nx">count</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="nx">address</span>
+      <span class="nx">@io</span><span class="p">.</span><span class="nx">splice</span> <span class="nx">right</span><span class="p">,</span> <span class="nx">right</span><span class="p">.</span><span class="nx">length</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="nx">address</span>
 </pre></div></td>
         </tr>
       
@@ -3863,7 +3980,7 @@ done yet, but no other descent makes progress unless we invoke a callback. </p><
 it can update the JSON size of the addresses or positions using an
 approximate value of 7. Means I must consider carefully range to remove.</p></td>
           <td class="code"><div class="highlight"><pre>
-    <span class="nx">@io</span><span class="p">.</span><span class="nx">splice</span> <span class="nx">child</span><span class="p">.</span><span class="nx">page</span><span class="p">,</span> <span class="nx">partition</span><span class="p">,</span> <span class="nx">child</span><span class="p">.</span><span class="nx">page</span><span class="p">.</span><span class="nx">count</span> <span class="o">-</span> <span class="nx">partition</span>
+    <span class="nx">@io</span><span class="p">.</span><span class="nx">splice</span> <span class="nx">child</span><span class="p">.</span><span class="nx">page</span><span class="p">,</span> <span class="nx">partition</span><span class="p">,</span> <span class="nx">child</span><span class="p">.</span><span class="nx">page</span><span class="p">.</span><span class="nx">length</span> <span class="o">-</span> <span class="nx">partition</span>
     <span class="nx">@io</span><span class="p">.</span><span class="nx">splice</span> <span class="nx">parent</span><span class="p">.</span><span class="nx">page</span><span class="p">,</span> <span class="nx">parent</span><span class="p">.</span><span class="nx">index</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="nx">right</span><span class="p">.</span><span class="nx">address</span>
 
     <span class="nx">@io</span><span class="p">.</span><span class="nx">rewriteBranch</span> <span class="nx">root</span><span class="p">,</span> <span class="s">&quot;pending&quot;</span><span class="p">,</span> <span class="nx">_</span>
@@ -4002,7 +4119,7 @@ the right-most.</p></td>
         <tr>
           <td class="docs"><p>Determine if we still have candidates for merge.</p></td>
           <td class="code"><div class="highlight"><pre>
-    <span class="k">if</span> <span class="nx">leaves</span><span class="p">.</span><span class="nx">left</span><span class="p">.</span><span class="nx">page</span><span class="p">.</span><span class="nx">count</span> <span class="o">+</span> <span class="nx">leaves</span><span class="p">.</span><span class="nx">right</span><span class="p">.</span><span class="nx">page</span><span class="p">.</span><span class="nx">count</span> <span class="o">&lt;</span> <span class="nx">@io</span><span class="p">.</span><span class="nx">options</span><span class="p">.</span><span class="nx">leafSize</span></pre></div></td>
+    <span class="k">if</span> <span class="nx">leaves</span><span class="p">.</span><span class="nx">left</span><span class="p">.</span><span class="nx">page</span><span class="p">.</span><span class="nx">length</span> <span class="o">+</span> <span class="nx">leaves</span><span class="p">.</span><span class="nx">right</span><span class="p">.</span><span class="nx">page</span><span class="p">.</span><span class="nx">length</span> <span class="o">&lt;</span> <span class="nx">@io</span><span class="p">.</span><span class="nx">options</span><span class="p">.</span><span class="nx">leafSize</span></pre></div></td>
         </tr>
       
         <tr>
@@ -4030,7 +4147,7 @@ the right-most.</p></td>
           <span class="nx">@io</span><span class="p">.</span><span class="nx">uncacheKey</span> <span class="nx">right</span><span class="p">,</span> <span class="nx">right</span><span class="p">.</span><span class="nx">addresses</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
         <span class="nx">right</span><span class="p">.</span><span class="nx">addresses</span><span class="p">.</span><span class="nx">shift</span><span class="p">()</span>
 
-      <span class="nx">@io</span><span class="p">.</span><span class="nx">rewriteBranches</span> <span class="nx">right</span><span class="p">,</span> <span class="s">&quot;pending&quot;</span><span class="p">,</span> <span class="nx">_</span>
+      <span class="nx">@io</span><span class="p">.</span><span class="nx">rewriteBranch</span> <span class="nx">right</span><span class="p">,</span> <span class="s">&quot;pending&quot;</span><span class="p">,</span> <span class="nx">_</span>
 </pre></div></td>
         </tr>
       
@@ -4111,9 +4228,9 @@ to be.</p></td>
 
     <span class="nv">branchSize = </span><span class="nx">@io</span><span class="p">.</span><span class="nx">options</span><span class="p">.</span><span class="nx">branchSize</span>
 
-    <span class="k">if</span> <span class="nx">pages</span><span class="p">.</span><span class="nx">length</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="o">and</span> <span class="nx">pages</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="nx">count</span> <span class="o">+</span> <span class="nx">pages</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="nx">count</span> <span class="o">&lt;</span> <span class="nx">branchSize</span>
+    <span class="k">if</span> <span class="nx">pages</span><span class="p">.</span><span class="nx">length</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="o">and</span> <span class="nx">pages</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="nx">length</span> <span class="o">+</span> <span class="nx">pages</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="nx">length</span> <span class="o">&lt;</span> <span class="nx">branchSize</span>
       <span class="nv">merge = </span><span class="p">[</span> <span class="nx">pages</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="nx">address</span><span class="p">,</span> <span class="nx">pages</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="nx">address</span> <span class="p">]</span>
-    <span class="k">else</span> <span class="k">if</span> <span class="nx">pages</span><span class="p">.</span><span class="nx">length</span> <span class="o">is</span> <span class="mi">3</span> <span class="o">and</span> <span class="nx">pages</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="nx">count</span> <span class="o">+</span> <span class="nx">pages</span><span class="p">[</span><span class="mi">2</span><span class="p">].</span><span class="nx">count</span> <span class="o">&lt;</span> <span class="nx">branchSize</span>
+    <span class="k">else</span> <span class="k">if</span> <span class="nx">pages</span><span class="p">.</span><span class="nx">length</span> <span class="o">is</span> <span class="mi">3</span> <span class="o">and</span> <span class="nx">pages</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="nx">length</span> <span class="o">+</span> <span class="nx">pages</span><span class="p">[</span><span class="mi">2</span><span class="p">].</span><span class="nx">length</span> <span class="o">&lt;</span> <span class="nx">branchSize</span>
       <span class="nv">merge = </span><span class="p">[</span> <span class="nx">pages</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="nx">address</span><span class="p">,</span> <span class="nx">pages</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="nx">address</span> <span class="p">]</span>
 
     <span class="nx">@io</span><span class="p">.</span><span class="nx">unlock</span> <span class="nx">page</span> <span class="k">for</span> <span class="nx">page</span> <span class="k">in</span> <span class="nx">pages</span>
@@ -4157,10 +4274,10 @@ to be.</p></td>
 
     <span class="nx">@io</span><span class="p">.</span><span class="nx">size</span> <span class="o">-=</span> <span class="nx">child</span><span class="p">.</span><span class="nx">right</span><span class="p">.</span><span class="nx">page</span><span class="p">.</span><span class="nx">size</span>
 
-    <span class="nx">@io</span><span class="p">.</span><span class="nx">rewriteBranches</span> <span class="nx">child</span><span class="p">.</span><span class="nx">left</span><span class="p">.</span><span class="nx">page</span><span class="p">,</span> <span class="s">&quot;replace&quot;</span><span class="p">,</span> <span class="nx">_</span>
+    <span class="nx">@io</span><span class="p">.</span><span class="nx">rewriteBranch</span> <span class="nx">child</span><span class="p">.</span><span class="nx">left</span><span class="p">.</span><span class="nx">page</span><span class="p">,</span> <span class="s">&quot;replace&quot;</span><span class="p">,</span> <span class="nx">_</span>
 
     <span class="nv">child.right.page.addresses.length = </span><span class="mi">0</span>
-    <span class="nx">@io</span><span class="p">.</span><span class="nx">rewriteBranches</span> <span class="nx">child</span><span class="p">.</span><span class="nx">right</span><span class="p">.</span><span class="nx">page</span><span class="p">,</span> <span class="s">&quot;unlink&quot;</span><span class="p">,</span> <span class="nx">_</span>
+    <span class="nx">@io</span><span class="p">.</span><span class="nx">rewriteBranch</span> <span class="nx">child</span><span class="p">.</span><span class="nx">right</span><span class="p">.</span><span class="nx">page</span><span class="p">,</span> <span class="s">&quot;unlink&quot;</span><span class="p">,</span> <span class="nx">_</span>
 
     <span class="k">if</span> <span class="nx">parent</span><span class="p">.</span><span class="nx">isPivot</span>
       <span class="nv">right = </span><span class="nx">pivot</span><span class="p">.</span><span class="nx">page</span>
@@ -4171,7 +4288,7 @@ to be.</p></td>
         <span class="nx">@io</span><span class="p">.</span><span class="nx">uncacheKey</span> <span class="nx">right</span><span class="p">,</span> <span class="nx">right</span><span class="p">.</span><span class="nx">addresses</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
       <span class="nx">right</span><span class="p">.</span><span class="nx">addresses</span><span class="p">.</span><span class="nx">shift</span><span class="p">()</span>
 
-    <span class="nx">@io</span><span class="p">.</span><span class="nx">rewriteBranches</span> <span class="nx">right</span><span class="p">,</span> <span class="s">&quot;pending&quot;</span><span class="p">,</span> <span class="nx">_</span>
+    <span class="nx">@io</span><span class="p">.</span><span class="nx">rewriteBranch</span> <span class="nx">right</span><span class="p">,</span> <span class="s">&quot;pending&quot;</span><span class="p">,</span> <span class="nx">_</span>
 </pre></div></td>
         </tr>
       
@@ -4191,7 +4308,7 @@ to think all over again in medic about who is whose parent?</p></td>
           <td class="docs"><p>We only check to fill the root if there are only two nodes in the root
 that can be combined to fill the root.</p></td>
           <td class="code"><div class="highlight"><pre>
-    <span class="k">if</span> <span class="nx">right</span><span class="p">.</span><span class="nx">address</span> <span class="o">is</span> <span class="mi">0</span> <span class="o">and</span> <span class="nx">right</span><span class="p">.</span><span class="nx">count</span> <span class="o">is</span> <span class="mi">2</span>
+    <span class="k">if</span> <span class="nx">right</span><span class="p">.</span><span class="nx">address</span> <span class="o">is</span> <span class="mi">0</span> <span class="o">and</span> <span class="nx">right</span><span class="p">.</span><span class="nx">length</span> <span class="o">is</span> <span class="mi">2</span>
       <span class="nx">@operations</span><span class="p">.</span><span class="nx">unshift</span> <span class="nv">method: </span><span class="s">&quot;fillRoot&quot;</span>
     <span class="k">else</span>
       <span class="nx">@operations</span><span class="p">.</span><span class="nx">unshift</span>
@@ -4208,14 +4325,14 @@ that can be combined to fill the root.</p></td>
     <span class="nx">pages</span><span class="p">.</span><span class="nx">push</span> <span class="nv">left = </span><span class="nx">@io</span><span class="p">.</span><span class="nx">lock</span> <span class="nx">root</span><span class="p">.</span><span class="nx">addresses</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="kc">true</span><span class="p">,</span> <span class="nx">_</span>
     <span class="nx">pages</span><span class="p">.</span><span class="nx">push</span> <span class="nv">right = </span><span class="nx">@io</span><span class="p">.</span><span class="nx">lock</span> <span class="nx">root</span><span class="p">.</span><span class="nx">addresses</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="kc">true</span><span class="p">,</span> <span class="nx">_</span>
 
-    <span class="k">if</span> <span class="nx">left</span><span class="p">.</span><span class="nx">count</span> <span class="o">+</span> <span class="nx">right</span><span class="p">.</span><span class="nx">count</span> <span class="o">&lt;=</span> <span class="nx">@io</span><span class="p">.</span><span class="nx">options</span><span class="p">.</span><span class="nx">branchSize</span>
+    <span class="k">if</span> <span class="nx">left</span><span class="p">.</span><span class="nx">length</span> <span class="o">+</span> <span class="nx">right</span><span class="p">.</span><span class="nx">length</span> <span class="o">&lt;=</span> <span class="nx">@io</span><span class="p">.</span><span class="nx">options</span><span class="p">.</span><span class="nx">branchSize</span>
       <span class="nx">@io</span><span class="p">.</span><span class="nx">uncache</span> <span class="nx">page</span> <span class="k">for</span> <span class="nx">page</span> <span class="k">in</span> <span class="nx">pages</span>
       <span class="nv">root.addresses = </span><span class="nx">left</span><span class="p">.</span><span class="nx">addresses</span><span class="p">.</span><span class="nx">concat</span><span class="p">(</span><span class="nx">right</span><span class="p">.</span><span class="nx">addresses</span><span class="p">)</span>
 
-    <span class="nx">@io</span><span class="p">.</span><span class="nx">rewriteBranches</span> <span class="nx">left</span><span class="p">,</span> <span class="s">&quot;unlink&quot;</span><span class="p">,</span> <span class="nx">_</span>
-    <span class="nx">@io</span><span class="p">.</span><span class="nx">rewriteBranches</span> <span class="nx">right</span><span class="p">,</span> <span class="s">&quot;unlink&quot;</span><span class="p">,</span> <span class="nx">_</span>
+    <span class="nx">@io</span><span class="p">.</span><span class="nx">rewriteBranch</span> <span class="nx">left</span><span class="p">,</span> <span class="s">&quot;unlink&quot;</span><span class="p">,</span> <span class="nx">_</span>
+    <span class="nx">@io</span><span class="p">.</span><span class="nx">rewriteBranch</span> <span class="nx">right</span><span class="p">,</span> <span class="s">&quot;unlink&quot;</span><span class="p">,</span> <span class="nx">_</span>
 
-    <span class="nx">@io</span><span class="p">.</span><span class="nx">rewriteBranches</span> <span class="nx">root</span><span class="p">,</span> <span class="s">&quot;pending&quot;</span><span class="p">,</span> <span class="nx">_</span>
+    <span class="nx">@io</span><span class="p">.</span><span class="nx">rewriteBranch</span> <span class="nx">root</span><span class="p">,</span> <span class="s">&quot;pending&quot;</span><span class="p">,</span> <span class="nx">_</span>
 
     <span class="nx">@io</span><span class="p">.</span><span class="nx">rename</span> <span class="nx">root</span><span class="p">,</span> <span class="s">&quot;pending&quot;</span><span class="p">,</span> <span class="s">&quot;commit&quot;</span><span class="p">,</span> <span class="nx">_</span>
 
@@ -4255,31 +4372,54 @@ that can be combined to fill the root.</p></td>
         </tr>
       
         <tr>
-          <td class="docs"><p>TODO NULL keys? No! Keys have to unique. We already determined that. What
-good is ONE and only ONE null key? Madness. How do you store nulls? Shiver.
-Okay, so you create a pseudo null value, you'd have to choose one. You might
-use, for a key, a map that says <code>{ key: null, ordinal: 1 }</code>. Cookbook it.</p></td>
+          <td class="docs"><p>The <code>key</code> is the splat array passed to <code>Strata.iterator</code> or
+<code>Strata.mutator</code>. If it is zero length, that means no argument was passed,
+indicating that we should place the cursor at first element in the entire
+tree. Otherwise, it is the key of the record or insert location to find.</p>
+
+<p>We use the length of the splat, instead of a existence check, so that the
+application developer can use <code>null</code> as a key, even though no one should
+ever use <code>null</code> as a key directly. Use a pseudo-duplicate <code>null</code> instead.</p></td>
           <td class="code"><div class="highlight"><pre>
-  <span class="nv">_cursor: </span><span class="nf">(key, exclusive, constructor, _) -&gt;</span>
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>&mdash;</p></td>
+          <td class="code"><div class="highlight"><pre>
+  <span class="nv">_cursor: </span><span class="nf">(key, exclusive, constructor, _) -&gt;</span></pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>In theory, we can support null keys, since we can test to see if we've
+been provided a key value by the arity of invocation.</p></td>
+          <td class="code"><div class="highlight"><pre>
+    <span class="nv">sought = </span><span class="k">if</span> <span class="nx">key</span><span class="p">.</span><span class="nx">length</span> <span class="k">then</span> <span class="nx">Descent</span><span class="p">.</span><span class="nx">key</span><span class="p">(</span><span class="nx">key</span><span class="p">)</span> <span class="k">else</span> <span class="nx">Descent</span><span class="p">.</span><span class="nx">leftMost</span>
+</pre></div></td>
+        </tr>
+      
+        <tr>
+          <td class="docs"><p>Desend to the penulimate branch page.</p></td>
+          <td class="code"><div class="highlight"><pre>
     <span class="nv">descent = </span><span class="k">new</span> <span class="nx">Descent</span><span class="p">(</span><span class="nx">@_io</span><span class="p">)</span>
-    <span class="nv">sought = </span><span class="k">if</span> <span class="nx">key</span><span class="o">?</span> <span class="k">then</span> <span class="nx">Descent</span><span class="p">.</span><span class="nx">key</span><span class="p">(</span><span class="nx">key</span><span class="p">)</span> <span class="k">else</span> <span class="nx">Descent</span><span class="p">.</span><span class="nx">leftMost</span>
     <span class="nx">descent</span><span class="p">.</span><span class="nx">descend</span><span class="p">(</span><span class="nx">sought</span><span class="p">,</span> <span class="nx">Descent</span><span class="p">.</span><span class="nx">penultimate</span><span class="p">,</span> <span class="nx">_</span><span class="p">)</span>
     <span class="nx">descent</span><span class="p">.</span><span class="nx">exclude</span><span class="p">()</span> <span class="k">if</span> <span class="nx">exclusive</span>
+
     <span class="nx">descent</span><span class="p">.</span><span class="nx">descend</span><span class="p">(</span><span class="nx">sought</span><span class="p">,</span> <span class="nx">Descent</span><span class="p">.</span><span class="nx">leaf</span><span class="p">,</span> <span class="nx">_</span><span class="p">)</span></pre></div></td>
         </tr>
       
         <tr>
           <td class="docs"><p>TODO This needs to also be a part of balance planning.</p></td>
           <td class="code"><div class="highlight"><pre>
-    <span class="nv">index = </span><span class="nx">descent</span><span class="p">.</span><span class="nx">page</span><span class="p">.</span><span class="nx">deleted</span>
+    <span class="nv">index = </span><span class="nx">descent</span><span class="p">.</span><span class="nx">page</span><span class="p">.</span><span class="nx">offset</span>
     <span class="nv">index = </span><span class="nx">@_io</span><span class="p">.</span><span class="nx">find</span><span class="p">(</span><span class="nx">descent</span><span class="p">.</span><span class="nx">page</span><span class="p">,</span> <span class="nx">key</span><span class="p">,</span> <span class="nx">index</span><span class="p">,</span> <span class="nx">_</span><span class="p">)</span> <span class="k">if</span> <span class="nx">key</span><span class="o">?</span>
     <span class="k">new</span> <span class="nx">constructor</span><span class="p">(</span><span class="nx">key</span><span class="p">,</span> <span class="nx">index</span><span class="p">,</span> <span class="nx">descent</span><span class="p">)</span>
 
   <span class="nv">iterator: </span><span class="nf">(splat..., callback) -&gt;</span>
-    <span class="nx">@_cursor</span> <span class="nx">splat</span><span class="p">.</span><span class="nx">shift</span><span class="p">(),</span> <span class="kc">false</span><span class="p">,</span> <span class="nx">Iterator</span><span class="p">,</span> <span class="nx">callback</span>
+    <span class="nx">@_cursor</span> <span class="nx">splat</span><span class="p">,</span> <span class="kc">false</span><span class="p">,</span> <span class="nx">Iterator</span><span class="p">,</span> <span class="nx">callback</span>
 
   <span class="nv">mutator: </span><span class="nf">(splat..., callback) -&gt;</span>
-    <span class="nx">@_cursor</span> <span class="nx">splat</span><span class="p">.</span><span class="nx">shift</span><span class="p">(),</span> <span class="kc">true</span><span class="p">,</span> <span class="nx">Mutator</span><span class="p">,</span> <span class="nx">callback</span>
+    <span class="nx">@_cursor</span> <span class="nx">splat</span><span class="p">,</span> <span class="kc">true</span><span class="p">,</span> <span class="nx">Mutator</span><span class="p">,</span> <span class="nx">callback</span>
 </pre></div></td>
         </tr>
       
