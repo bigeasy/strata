@@ -1,8 +1,12 @@
 # A Streamline.js friendly evented I/O b&#x2011;tree for Node.js.
 #
-# ## Purpose
-#
 # TK Define ***least child page***.
+#
+# **REMEMBER**: Alan! Your audience is you, or someone who knows enough Node.js,
+# CoffeeScript and algorithms to hack on this. This is not a lesson on
+# b&#x2011;trees. (Note to self as I write Docco.)
+#
+# ## Purpose
 #
 # Strata stores JSON objects on disk, according to a sort order of your
 # choosing, indexed for fast retrieval.
@@ -458,7 +462,6 @@ class IO
       balancers: 0
       cache: {}
       length: 0
-      loaded: false
       locks: [[]]
       offset: 0
       positions: []
@@ -734,7 +737,7 @@ class IO
     fs.close fd, _
 
     # Return the loaded page.
-    extend page, { loaded: true }
+    page
 
   # Each line is terminated by a newline. In case your concerned that this
   # simple search will mistake a byte inside a multi-byte character for a
@@ -1010,7 +1013,6 @@ class IO
       balancers: 0
       cache: {}
       length: 0
-      loaded: false
       locks: [[]]
       penultimate: true
       right: 0
@@ -1097,7 +1099,7 @@ class IO
   # until place using `replace`.
 
   #
-  rewriteBranches: (page, suffix, _) ->
+  rewriteBranch: (page, suffix, _) ->
     filename = @filename page.address, ".#{suffix}"
     record = [ page.right, page.addresses ]
     json = JSON.stringify(record)
@@ -1111,7 +1113,7 @@ class IO
   # described in the b&#x2011;tree overview above.
 
   #
-  readBranches: (page, _) ->
+  readBranch: (page, _) ->
     # Read addresses from JSON branch file.
     filename = @filename page.address
     json = fs.readFile filename, "utf8", _
@@ -1122,7 +1124,7 @@ class IO
     @splice page, 0, 0, addresses
 
     # Extend the existing page with the properties read from file.
-    extend page, { right, loaded: true }
+    extend page, { right }
 
   # ### B-Tree Initialization
   #
@@ -1152,11 +1154,11 @@ class IO
     if fs.readdir(@directory, _).filter((f) -> not /^\./.test(f)).length
       throw new Error "database #{@directory} is not empty."
     # Create a root branch with a single empty leaf.
-    root = @encache @createBranch @nextAddress++, penultimate: true, loaded: true
-    leaf = @encache @createLeaf -(@nextAddress++), loaded: true
+    root = @encache @createBranch @nextAddress++, penultimate: true
+    leaf = @encache @createLeaf -(@nextAddress++)
     @splice root, 0, 0, leaf.address
     # Write the root branch.
-    @rewriteBranches root, "replace", _
+    @rewriteBranch root, "replace", _
     @rewriteLeaf leaf, "replace", _
     @replace leaf, "replace", _
     @replace root, "replace", _
@@ -1210,63 +1212,82 @@ class IO
         address = parseInt match[1], 10
         @nextAddress = address + 1 if address > @nextAddress
 
-  close: (_) ->
+  # We close after every write, so there are no open file handles.
+  #
+  # TODO Close medic file.
 
-  # TODO Ensure that you close the current tier I/O. Also, you must also be very
-  # much locked before you use this, but I'm sure you know that.
+  # &mdash;
+  close: (_) ->
 
   # ### Concurrency
   #
-  # The b&#x2011;tree must only be read and written by a single Node.js process. It is
-  # not suitable for use with multiple node processes, or the cluster API.
-  #
   # Although there is only a single thread in a Node.js process, the
-  # b&#x2011;tree is
-  # still a concurrent data structure. Instead of thinking about concurrency in
-  # terms of threads we talk about concurrent *descents* of the b&#x2011;tree.
+  # b&#x2011;tree is still a concurrent data structure.
   #
-  # When we search the tree or alter the tree, we must descend the tree.
+  # When we navigate the tree from the root to search for a key in the tree, we
+  # descend the b&x2011;. The act of descending the b&#x2011;tree is called a
+  # ***descent***.
   #
-  # Decents of the b&#x2011;tree can become concurrent when descent encounters a page
-  # that is not in memory. While it is waiting on evented I/O to load the page
-  # files, the main thread of the process can make progress on another request
-  # to search or alter the b&#x2011;tree, it can make process on another descent.
+  # A descent is a unit of work in our concurrency model. Once descent of the
+  # b&#x2011;tree can make progress while another descent of the tree is waiting
+  # on evented I/O.  Instead of thinking about concurrency in terms of threads
+  # we talk about concurrent descents of the b&#x2011;tree.
+  #
+  # Decents of the b&#x2011;tree can become concurrent when descent encounters a
+  # page that is not in memory. While it is waiting on evented I/O to load the
+  # page files, the main thread of the process can make progress on another
+  # request to search or alter the b&#x2011;tree, it can make process on another
+  # descent.
   #
   # This concurrency keeps the CPU and I/O loaded.
   #
+  # Note that the b&#x2011;tree must only be read and written by a single
+  # Node.js process. You can't have two Node.js processes serving the same
+  # database directory.
+  #
   # ### Locking
   #
-  # Locking prevents race conditions where an evented I/O request returns to to
-  # find that the sub&#x2011;tree it was descending has been altered in way that causes
-  # an error. Pages may have split or merged by the main thread, records may
-  # have been inserted or deleted. While evented I/O is performed, the
-  # sub&#x2011;tree
-  # needs to be locked to prevent it from being altered.
+  # Every page has a read/write lock. Pages are obtained through the `IO.lock`
+  # method, so that every time we obtain a page, it comes to us locked.
   #
-  # Locks prevent cache purges.
+  # Locking is internal and not exposed to the application developer. However,
+  # the application developer must remember to close cursors, in order to
+  # release the locks that cursors hold.
   #
-  # The b&#x2011;tree is locked page by page. We are able to lock only the pages of
-  # interest to a particular descent of the tree.
+  # #### Shared and Exclusive
   #
-  # Futhermore, the b&#x2011;tree destinguishes between shared read locks and exclusive
-  # write locks. Multiple descents can read a traverse that is read locked, but
-  # only the descent that holds an exclusive write lock can traverse it or write
-  # to it.
+  # When we obtain a lock to read the page, we obtain a ***shared lock***. The
+  # shared lock allows other descents to also obtain a lock on the page. With a
+  # shared lock, you can read the page, knowing that it will not change.
   #
-  # Of course, Node.js doesn't have the concept of mutexes to protect critical
-  # sections of code the way that threaded programming platforms do. There are
-  # no standard read and write lock APIs for use to use.
+  # When we obtain a lock to write the page, we obtain an ***exclusive lock***.
+  # The exclusive lock prevents all other descents from obtaining any sort of
+  # lock on the page. No other page will be able to obtain neither a shared nor
+  # an exclusive lock.
   #
-  # Nor do we use file system locking.
+  # #### Locking Sub-Trees
   #
-  # Instead, we simulate locks using callbacks. A call to `lock` is an evented
-  # function call that provides a callback. If the `lock` method can grant the
-  # lock request to the caller, the lock method will invoke the callback.
+  # When we descend the tree, moving from parent page to child page, we obtain
+  # locks in descending order. This means that if we obtain an exclusive lock on
+  # a page, no other descent will be able to travel from the parent of that
+  # page, to the children of that page. It effectively blocks new descents from
+  # entering the ***sub&#x2011;tree*** that is defined by the exclusively
+  # locked page and all its children.
   #
-  # If the `lock` method cannot grant the lock request, the `lock` method will
-  # queue the callback into a queue of callbacks assocated with the page. When
-  # other descents release the locks that prevent the lock request, the lock
-  # request callback is dequeued, and the callback invoked.
+  # #### Rationale for Locking
+  #
+  # Locking prevents race conditions where a descent that is waiting on an
+  # evented I/O request returns to find that the structure of the b&#x2011;tree
+  # has changed drastically. For example, while a descent was waiting for a leaf
+  # page to load into memory, another descent might load the same page into
+  # memory, merge the leaf page with its sibling, and delete it.
+  #
+  # #### Caching
+  #
+  # Locks prevent cache purges. When a cache purge is triggered, a page will not
+  # be purged from the cache, if there are outstanding locks on the page.
+  #
+  # #### Lock Properties
   #
   # The locking mechanism is a writer preferred shared read, exclusive write
   # lock. If a descent holds an exclusive write lock, then all lock requests by
@@ -1275,21 +1296,8 @@ class IO
   # shared read lock is granted, unless an exclusive write lock is queued. 
   #
   # The locks are not re-entrant.
-  #
-  # #### Lock
 
-  # TODO Signature: Address should go first.
-  #
-  # TODO If the page is not loaded, and we simply move forward when we encounter
-  # the page, that is, we have two descents, one encounters this unloaded page,
-  # but it is a read, so we go ahead, it makes an evented I/O call and waits,
-  # we make progress on a new descent, the desent encounters the unloaded page,
-  # and it loads the page, and waits.
-  #
-  # Maybe we can queue the people waiting on the load? The simplest thing would
-  # be to put the callbacks in an array of onloads.
-
-  #
+  # &mdash;
   lock: (address, exclusive, callback) ->
     # We must make sure that we have one and only one page object to represent
     # the page. We the page object will maintain the lock queue for the page. It
@@ -1299,86 +1307,134 @@ class IO
     # The queue is implemented using an array of arrays. Shared locks are
     # grouped inside one of the arrays in the queue element. Exclusive locks are
     # queued alone as a single element in the array in the queue element.
-    if not page = @cache[address]
-      creator = "create#{if address < 0 then "Leaf" else "Branch"}"
-      page = @encache @[creator](address)
 
-    # If the page needs to be loaded, we must load the page only after a lock
-    # has been obtained. Loading is a read, so we can load regardless of whether
-    # the lock is exclusive read/write or shared read.
-
-    # Currently blocked out to force sizer to fire. 
-    if page.loaded and false
-      lock = callback
+    #
+    if page = @cache[address]
+      # Move the page to the head of the most-recently user list.
+      @link @mru, @unlink page
+    #
     else
-      # Here's a temporary block of code that will assert that we're keeping an
-      # accurate count of the heft of our pages. After a while, this code will
-      # be removed, and we'll count on assertions in our unit tests to catch
-      # errors.
+      # Create a page to load with an empty `load` queue. The presence of the
+      # `load` queue indicates that the page needs to be read from file.
+      creator = "create#{if address < 0 then "Leaf" else "Branch"}"
+      page = @encache @[creator](address, { load: [] })
 
-      # We also put our relinker in here, so this will surivive a cull.
-      sizer = (error, page) =>
-        if error
-          callback error
-        else
-          # Move the page to the head of the most-recently user list.
-          @link @mru, @unlink page
-          # Check that the JSON size is correct for the current cached page
-          # contents.
-          size = 0
-          if page.address < 0
-            if page.positions.length
-              size += JSON.stringify(page.positions).length
-            for position, object of page.cache
-              { record, key } = object
-              if object.size isnt JSON.stringify({ record, key }).length
-                throw new Error "sizes are wrong"
-              size += object.size
-          else
-            if page.addresses.length
-              size += JSON.stringify(page.addresses).length
-            for position, object of page.cache
-              size += JSON.stringify(object).length
-          if size isnt page.size
-            throw new Error "sizes are wrong"
-          # Invoke the caller's callback.
-          callback null, page
-      # TODO Two descents, both reads, enter and then come though to this point,
-      # they both see the page as unloaded, they both load it. Need a loaders
-      # array, and we can wait for things to load.
-      lock = (error, page) =>
-        if error
-          callback error
-        else if page.loaded
-          sizer null, page
-        else if address < 0
-          @readLeaf page, sizer
-        else
-          @readBranches page, sizer
+    # #### Lock Implementation
+    #
+    # We don't use mutexes, of course, because Node.js doesn't have the concept
+    # of mutexes to protect critical sections of code the way that threaded
+    # programming platforms do. 
+    #
+    # Nor do we use file system locking.
+    #
+    # Instead, we simulate locks using callbacks. A call to `lock` is an evented
+    # function call that provides a callback. If the `lock` method can grant the
+    # lock request to the caller, the lock method will invoke the callback.
+    #
+    # If the `lock` method cannot grant the lock request, the `lock` method will
+    # queue the callback into a queue of callbacks associated with the page.
+    # When other descents release the locks that prevent the lock request, the
+    # lock request callback is dequeued, and the callback invoked.
 
     # The callback is always added to the queue, even if it is not blocked and
     # will execute immediately. The array in the queue element acts as a lock
     # count.
     #
-    # If the callback we add to the queue is added to the the first queue
-    # element is executed immediately. Otherwise, it will be executed when the
-    # preceeding queue elements have compeleted.
+    # If the callback we add to the queue is added to the first queue element is
+    # executed immediately. Otherwise, it will be executed when the preceding
+    # queue elements have completed.
     #
     # When an exclusive lock is queued, an empty array is appended to the queue.
-    # Subsequent read lock callbacks are appened to the array in the last
+    # Subsequent read lock callbacks are appended to the array in the last
     # element. This gives exclusive lock callbacks priority.
+
     locks = page.locks
     if exclusive
       throw new Error "already locked" unless locks.length % 2
-      locks.push [ lock ]
+      locks.push [ callback ]
       locks.push []
       if locks[0].length is 0
         locks.shift()
-        lock(null, page)
+        @load page, callback
     else
-      locks[locks.length - 1].push lock
+      locks[locks.length - 1].push callback
       if locks.length is 1
-        lock(null, page)
+        @load page, callback
+
+  # #### Check JSON Size
+
+  # Here's a temporary block of code that will assert that we're keeping an
+  # accurate count of the heft of our pages. After a while, this code will be
+  # removed, and we'll count on assertions in our unit tests to catch errors.
+
+  # This only check that the JSON size is correct for the give page contents,
+  # not for the entire b&#x2011;tree.
+  @checkJSONSize: (page) ->
+    size = 0
+    if page.address < 0
+      if page.positions.length
+        size += JSON.stringify(page.positions).length
+      for position, object of page.cache
+        { record, key } = object
+        if object.size isnt JSON.stringify({ record, key }).length
+          throw new Error "sizes are wrong"
+        size += object.size
+    else
+      if page.addresses.length
+        size += JSON.stringify(page.addresses).length
+      for position, object of page.cache
+        size += JSON.stringify(object).length
+    if size isnt page.size
+      throw new Error "sizes are wrong"
+
+  # ### Load
+
+  # One or more descents may encounter the same unloaded page. Only one descent
+  # should load it, the others should wait.
+  #
+  # In `load` we ensure that only the first descent will actually invoke the
+  # load function for the page. If we are the first to encounter an unloaded
+  # page, we push our callback onto the `load` queue of the page, and invoke the
+  # correct read function for the page time. We provide a callback that will
+  # invoke all the queued callbacks in the `load` queue to the read function.
+  #
+  # If we encounter an unloaded page, but there are already callbacks in the
+  # queue, we know that the first descent through has invoked read, and that our
+  # callback will be invoked if we will simply place it in the `load` queue and
+  # do nothing more.
+
+  # &mdash;
+  load: (page, callback) ->
+    # If the page is not loaded, load it.
+    if page.load
+      # Add our callback to the list of waiting callback.
+      page.load.push callback
+      # If we are the first one through, create a group callback function, then
+      # pass it to the load function for the page type.
+      if page.load.length is 1
+        # Create a callback that will invoke all the callbacks queued to wait
+        # for the page to load.
+        loaded = (error) ->
+          for callback in page.load
+            do (callback) -> process.nextTick -> callback error, page
+          # On error we reset the load list.
+          if error
+            page.load.length = 0
+          # Otherwise, we delete the load list, because no load list means the
+          # page is loaded.
+          else
+            IO.checkJSONSize page
+            delete page.load
+        # Invoke the correct read function for the page type.
+        if page.address < 0
+          @readLeaf page, loaded
+        else
+          @readBranch page, loaded
+    # If the page is already loaded, we wave the descent on through.
+    else
+      #
+      IO.checkJSONSize
+      callback null, page
 
   # #### Unlock
 
@@ -1389,6 +1445,9 @@ class IO
 
   #
   unlock: (page) ->
+    # Note that it is not possible for this method to be called on an page that
+    # has not already been loaded.
+    IO.checkJSONSize page
     locks = page.locks
     locked = locks[0]
     locked.shift()
@@ -1397,7 +1456,7 @@ class IO
       # Each callback is scheduled using next tick. If any callback waits on
       # I/O, then another one will resume. Concurrency.
       for callback in locks[0]
-        do (callback) -> process.nextTick -> callback(null, page)
+        do (callback) -> process.nextTick -> callback error, page
 
   # Read a record cache entry from the cache. Load the record and cache it of it
   # is not already cached.
@@ -1450,11 +1509,11 @@ class IO
 # ## Descent
 #
 # We use the term *descent* to describe b&#x2011;tree operations, because all
-# b&#x2011;tree
-# operations require a descent of the b&#x2011;tree, a traversal of the b&#x2011;tree starting
-# from the root. Whenever we are search the tree, insert or delete records, or
-# balance the tree with a page splits and merges, we first begin with a descent
-# of the b&#x2011;tree, from the root, to find the page we want to act upon.
+# b&#x2011;tree operations require a descent of the b&#x2011;tree, a traversal
+# of the b&#x2011;tree starting from the root. Whenever we are search the tree,
+# insert or delete records, or balance the tree with a page splits and merges,
+# we first begin with a descent of the b&#x2011;tree, from the root, to find the
+# page we want to act upon.
 #
 # #### Descent as Unit of Work
 #
@@ -2790,7 +2849,7 @@ class Balancer
       replacements.push split
 
       # Write the branches
-      @io.rewriteBranches penultimate.page, "pending", _
+      @io.rewriteBranch penultimate.page, "pending", _
 
       # Now rename the last action, committing to our balance.
       @io.rename penultimate.page, "pending", "commit", _
@@ -2998,7 +3057,7 @@ class Balancer
           @io.uncacheKey right, right.addresses[1]
         right.addresses.shift()
 
-      @io.rewriteBranches right, "pending", _
+      @io.rewriteBranch right, "pending", _
 
       # TODO If I succeed, how will I know to test the parents for balance? Got
       # to think all over again in medic about who is whose parent?
@@ -3097,10 +3156,10 @@ class Balancer
 
     @io.size -= child.right.page.size
 
-    @io.rewriteBranches child.left.page, "replace", _
+    @io.rewriteBranch child.left.page, "replace", _
 
     child.right.page.addresses.length = 0
-    @io.rewriteBranches child.right.page, "unlink", _
+    @io.rewriteBranch child.right.page, "unlink", _
 
     if parent.isPivot
       right = pivot.page
@@ -3111,7 +3170,7 @@ class Balancer
         @io.uncacheKey right, right.addresses[1]
       right.addresses.shift()
 
-    @io.rewriteBranches right, "pending", _
+    @io.rewriteBranch right, "pending", _
 
     # TODO If I succeed, how will I know to test the parents for balance? Got
     # to think all over again in medic about who is whose parent?
@@ -3144,10 +3203,10 @@ class Balancer
       @io.uncache page for page in pages
       root.addresses = left.addresses.concat(right.addresses)
 
-    @io.rewriteBranches left, "unlink", _
-    @io.rewriteBranches right, "unlink", _
+    @io.rewriteBranch left, "unlink", _
+    @io.rewriteBranch right, "unlink", _
 
-    @io.rewriteBranches root, "pending", _
+    @io.rewriteBranch root, "pending", _
 
     @io.rename root, "pending", "commit", _
 
