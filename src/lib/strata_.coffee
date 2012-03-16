@@ -435,10 +435,17 @@ class IO
   #
   # #### No Duplicates
   #
-  # Leaf pages cannot contain duplicate records. Therefore, the b&#x2011;tree cannot
-  # contain duplicate records. You can simulate duplicate records by adding a
-  # series value to your key. The cursor implementation is designed faciliate
-  # psuedo-duplicates in this fashion.
+  # Leaf pages cannot contain duplicate records. Therefore, the b&#x2011;tree
+  # cannot contain duplicate records.
+  #
+  # You can simulate duplicate records by adding a series value to your key and
+  # which is stored in your record. The cursor implementation is designed
+  # facilitate ***pseudo-duplicate*** keys in this fashion.
+  #
+  # In theory, leaf pages can contain `null`, and `null` can be used as a key.
+  # However, if you want to allow `null` keys in your b&#x2011;tree, you almost
+  # certainly want to allow more than one `null` key, so you'll end up using the
+  # pseudo-duplicate strategy for `null` keys as well.
   #
   # #### Leaf Page Key
   #
@@ -1466,6 +1473,15 @@ class IO
       stash = @cacheRecord page, position, record
     stash
 
+  
+  # A note on the theoretical `null` key. If the collation order places `null`
+  # before all other values, that's a good choice, because that means that it
+  # will never be used for a branch key. If it is used as a branch key, the
+  # branch will never be able to cache the key value, it will always have to
+  # look it up, because its cache entry for the key will be `null`.
+  #
+  # But, don't use a `null` key. Create a pseudo-duplicate `null` instead.
+
   # Get the key for the record in the case of a leaf page, or the key of the
   # branch child page in the case of a branch page. Because this method operates
   # on both branch pages and leaf pages, our binary search operates on both
@@ -1491,7 +1507,7 @@ class IO
   # We set `low` to `1` to exclude a deleted ghost first record in a leaf page,
   # or the least child page of a branch page.
   #
-  # Index is bitwise compliment of insert location if not found.
+  # Index is bitwise compliment of the insert location if not found.
   find: (page, key, low, _) ->
     { comparator } = @
     high = page.length - 1
@@ -3239,15 +3255,26 @@ class exports.Strata
     mutation = new Descent(@, null, key, operation)
     mutation.descend callback
 
-  # TODO NULL keys? No! Keys have to unique. We already determined that. What
-  # good is ONE and only ONE null key? Madness. How do you store nulls? Shiver.
-  # Okay, so you create a pseudo null value, you'd have to choose one. You might
-  # use, for a key, a map that says `{ key: null, ordinal: 1 }`. Cookbook it.
+  # The `key` is the splat array passed to `Strata.iterator` or
+  # `Strata.mutator`. If it is zero length, that means no argument was passed,
+  # indicating that we should place the cursor at first element in the entire
+  # tree. Otherwise, it is the key of the record or insert location to find.
+  #
+  # We use the length of the splat, instead of a existence check, so that the
+  # application developer can use `null` as a key, even though no one should
+  # ever use `null` as a key directly. Use a pseudo-duplicate `null` instead.
+
+  # &mdash;
   _cursor: (key, exclusive, constructor, _) ->
+    # In theory, we can support null keys, since we can test to see if we've
+    # been provided a key value by the arity of invocation.
+    sought = if key.length then Descent.key(key) else Descent.leftMost
+
+    # Desend to the penulimate branch page.
     descent = new Descent(@_io)
-    sought = if key? then Descent.key(key) else Descent.leftMost
     descent.descend(sought, Descent.penultimate, _)
     descent.exclude() if exclusive
+
     descent.descend(sought, Descent.leaf, _)
     # TODO This needs to also be a part of balance planning.
     index = descent.page.offset
@@ -3255,10 +3282,10 @@ class exports.Strata
     new constructor(key, index, descent)
 
   iterator: (splat..., callback) ->
-    @_cursor splat.shift(), false, Iterator, callback
+    @_cursor splat, false, Iterator, callback
 
   mutator: (splat..., callback) ->
-    @_cursor splat.shift(), true, Mutator, callback
+    @_cursor splat, true, Mutator, callback
 
   # Insert a single record into the tree.
 
