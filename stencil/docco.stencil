@@ -7,6 +7,7 @@
 </head>
 <body>
 <div id="container">
+  <a href="http://github.com/bigeasy/strata"><img style="position: fixed; top: 0; right: 0; border: 0;" src="http://s3.amazonaws.com/github/ribbons/forkme_right_orange_ff7600.png" alt="Fork me on GitHub" /></a>
 <div id="background"></div>
   <table cellspacing="0" cellpadding="0">
     <thead>
