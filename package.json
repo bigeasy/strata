@@ -2,7 +2,7 @@
 , "description" : "Evented I/O B-tree"
 , "url" : "http://bigeasy.github.com/strata"
 , "keywords" : ["btree", "database", "json"]
-, "author" : "Alan Gutierrez <alan@blogometer.com>"
+, "author" : "Alan Gutierrez <alan@prettyrobots.com>"
 , "contributors" : []
 , "devDependencies":
   { "coffee-script": ">=1.1.3"

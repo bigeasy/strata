@@ -1035,22 +1035,22 @@ class IO
   #
   # The `splice` method adds or remove references from the reference array using
   # the semantics similar to JavaScript's `Array.splice`. Similar, but not
-  # identical. The replacement values are passed in differently, and there is no
-  # return value, because we never need one.
+  # identical. The replacement values are passed in as an array, not as
+  # arguments at the end of a variable argument list.
   #
   # This wrapper for a basic array operation exists for the sake of the JSON
   # size adjustments, which would otherwise be scattered around the code.  It is
   # the only place where the JSON string length of the reference array is
-  # accounted for. 
+  # accounted for.
 
-  # 
+  #
   splice: (page, offset, length, insert) ->
     # Get the references, either page addresses or record positions.
     values = page.addresses or page.positions
 
     # We remove first, then append. We used the array returned by splice to
     # generate a JSON substring, whose length we remove form the JSON size of
-    # the page. We also decrement the page length. 
+    # the page. We also decrement the page length.
     if length
       removals = values.splice(offset, length)
 
@@ -1062,6 +1062,8 @@ class IO
       @heft page, -json.length
 
       page.length -= length
+    else
+      removals = []
 
     # Insert references.
     if insert?
@@ -1080,6 +1082,8 @@ class IO
         page.length += insert.length
 
         values.splice.apply values, [ offset, 0 ].concat(insert)
+    # Return the removed references.
+    removals
 
   # ##### JSON Key Size
 
@@ -1704,6 +1708,9 @@ class Descent
 
   # Stop when we reach a certain depth in the tree.
   @depth: (depth) -> -> @depth is depth
+
+  # Stop before a we descend to a child with a certain address.
+  @address: (address) -> -> @address is address
 
   # Upgrade a lock from shared to exclusive. Works only with branch pages. All
   # subsequent locks acquired by the descent are exclusive.
@@ -2766,6 +2773,28 @@ class Balancer
     for address, page of @referenced
       page.balancers--
 
+  # ### Should We Split a Branch?
+  #
+  # Thank goodness for Streamline.js. We can recursively call split to split our
+  # branch pages, if they need to be split.
+  #
+  # We call this method with unlocked branch pages. That's okay, because only
+  # the balance can alter a branch page. Even if the unlocked branch page is
+  # purged from the cache, and subsequently reloaded, the address and length of
+  # the page it represents will not change.
+
+  # &mdash;
+  shouldSplitBranch: (branch, key, _) ->
+    # Are we larger than a branch page ought to be?
+    if branch.length > @io.options.branchSize
+      # Wait a tick!
+      process.nextTick _
+      # Either drain the root, or split the branch.
+      if branch.address is 0
+        @drainRoot _
+      else
+        @splitBranch branch.address, key, _
+
   # TODO What if the leaf has a deleted key record? Abandon. We need to have
   # purged deleted key records before we get here. For example, it may be the
   # case that a leaf page key has been deleted, requiring a page key swap. The
@@ -2779,7 +2808,7 @@ class Balancer
   #
   # TK Docco.
 
-  # 
+  #
   splitLeaf: ({ key }, _) ->
     # Keep track of our descents so we can unlock the pages at exit.
     descents = []
@@ -2905,9 +2934,16 @@ class Balancer
     # done yet, but no other descent makes progress unless we invoke a callback. 
     @io.unlock(descent.page) for descent in descents
 
+    # Although we've unlocked the penultimate branch page, we know that only the
+    # balancer edit a branch page, so we are safe to make a decision about
+    # whether to split the penultimate branch page while it is unlocked.
+    @shouldSplitBranch penultimate.page, key, _
+    
+
   splitBranch: ({ key, depth }, _) ->
     descents = []
 
+    # TODO Use address.
     descents.push parent = new Descent(@io)
     parent.descend sought = Descent.key(key), Descent.depth(depth - 1)
     parent.upgrade()
@@ -2931,9 +2967,6 @@ class Balancer
       @io.uncacheKey child.page, address
       @io.splice right, right.length, 0, address
 
-    # TODO If we implement a splice method, or rather insert and delete,  in io,
-    # it can update the JSON size of the addresses or positions using an
-    # approximate value of 7. Means I must consider carefully range to remove.
     @io.splice child.page, partition, child.page.length - partition
     @io.splice parent.page, parent.index + 1, 0, right.address
 
@@ -2947,43 +2980,83 @@ class Balancer
     @io.replace right, "replace", _
     @io.replace root, "commit", _
 
-  drainRoot: ({}, _) ->
-    page = @io.lock 0, true, _
+    @shouldSplitBranch parent, key, _
 
-    right = @io.createBranch @io.nextAddress++
-    left = @io.createBranch @io.nextAddress++, { right: right.address }
+  # ### Drain Root
+  #
+  # When the root branch page is full we don't split it so much as we drain it.
+  # We copy the child pages of the root branch page into new branch pages. The
+  # new branch pages become the new child pages of the root branch page.
+  #
+  # This balance operation will increase the height of the b&#x2011;tree. It is
+  # the only operation that will increase the height of the b&#x2011;tree.
 
-    partition = @io.options.branchSize / 2
+  # &mdash;
+  drainRoot: (_) ->
+    # Lock the root. No descent needed.
+    root = @io.lock 0, true, _
 
-    for index in [0...partition]
-      left.addresses.push root.addresses[index]
+    # It may have been some time since we've split, so we might have to split
+    # into more than two pages.
+    pages = Math.ceil(root.length / @io.options.branchSize)
+    records = Math.floor(root.length / pages)
+    remainder = root.length % pages
 
-    for index in [partition...root.addresses.length]
-      right.addresses.push root.addresses[index]
+    children = []
+    right = 0
+    while pages--
+      # Create a new branch page.
+      page = @io.createBranch @io.nextAddress++, { right }
 
-    @size -= root.size
-    root = extend root,
-      size: 0,
-      cache: {},
-      addresses: [ left.address, right.address ]
+      # Note the right address.
+      right = page.address
 
-    # TODO I can't tell if I care about the JSON size of the addresses array. My
-    # best guess as to how to handle this is to remove it, track only the size
-    # of the cache itself, and then add it later, carefully. It would take a day
-    # of careful reading, but I could put it on a branch. Also, I might have
-    # some test fixtures that will detect this. This is approaching a decision.
-    @io.encache left
-    @io.encache right
+      # Add the branch page to our list of new child branch pages.
+      children.push page
 
+      # Determine the number of records to move from the root branch into the
+      # new child branch page. Add an additonal record if we have a remainder.
+      length = if remainder-- > 0 then records + 1 else records
+      offset = root.length - length
+
+      # Cut off a chunk of addresses.
+      cut = @io.splice root, offset, length
+
+      # Uncache the keys from the root branch.
+      @io.uncacheKey root, address for address in cut
+
+      # Add the keys to our new branch page.
+      @io.splice page, 0, 0, cut
+
+    # Get our children in the right order. We were pushing above.
+    children.reverse()
+
+    # Push the child branch page addresses onto our empty root.
+    @io.splice root, 0, 0, (page.address for page in children)
+
+    # Write the child branch pages.
+    @io.rewriteBranch page, "replace", _ for page in children
+
+    # Rewrite our root.
     @io.rewriteBranch root, "pending", _
-    @io.rewriteBranch left, "replace", _
-    @io.rewriteBranch right, "replace", _
 
+    # Commit the changes.
     @io.rename root, "pending", "commit", _
 
-    @io.replace left, "replace", _
-    @io.replace right, "replace", _
+    # Write the child branch pages.
+    @io.replace page, "replace", _ for page in children
+
+    # Commit complete.
     @io.replace root, "commit", _
+
+    # Add our new children to the cache.
+    @io.encache page for page in children
+
+    # Release our lock on the root.
+    @io.unlock root
+
+    # Do we need to split the root again?
+    @drainRoot _ if root.length > @io.options.branchSize
 
   deleteKey: ({ key }, _) ->
     descents = []
