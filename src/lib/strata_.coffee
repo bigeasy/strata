@@ -813,7 +813,7 @@ class IO
     filename = @filename page.address, ".#{suffix}"
 
     # Open the new leaf page file and reset our file position.
-    fd = fs.open filename, "a", 0644, _
+    fd = fs.open filename, "a", 0o644, _
     positions = []
     cache = {}
     page.position = 0
@@ -2031,7 +2031,7 @@ class Mutator extends Iterator
       # when we append a JSON object to it. Because no file handles are kept
       # open, the b&#x2011;tree object can left to garbage collection.
       filename = @_io.filename @_page.address
-      fd = fs.open filename, "a", 0644, _
+      fd = fs.open filename, "a", 0o644, _
       position = @_io.writeInsert fd, @_page, index, record, _
       fs.close fd, _
 
@@ -2058,7 +2058,7 @@ class Mutator extends Iterator
 
     # Append a delete object to the leaf page file.
     filename = @_io.filename @_page.address
-    fd = fs.open filename, "a", 0644, _
+    fd = fs.open filename, "a", 0o644, _
     position = @_io.writeDelete fd, @_page, index, ghost, _
     fs.close fd, _
     
