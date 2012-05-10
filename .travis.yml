@@ -13,7 +13,6 @@ branches:
 # build output.
 
 before_install:
-  - npm install
-  - npm install coffee-script ace.is.aces.in.my.book
+  - npm install coffee-script proof streamline
   - git submodule init && git submodule update
   - cake compile
