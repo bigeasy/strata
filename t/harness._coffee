@@ -17,5 +17,5 @@ module.exports = (dirname) ->
       catch e
         throw e if e.code isnt "ENOENT"
     @cleanup _, (_) -> deltree(directory, _)
-    fs.mkdir directory, 0755, _
+    fs.mkdir directory, 0o755, _
     { Strata, directory, fixture }

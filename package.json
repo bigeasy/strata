@@ -2,13 +2,13 @@
 , "description" : "Evented I/O B-tree"
 , "url" : "http://bigeasy.github.com/strata"
 , "keywords" : ["btree", "database", "json"]
-, "author" : "Alan Gutierrez <alan@blogometer.com>"
+, "author" : "Alan Gutierrez <alan@prettyrobots.com>"
 , "contributors" : []
 , "devDependencies":
   { "coffee-script": ">=1.1.3"
   , "proof": ">=0.0.1" }
 , "dependencies":
-  { "streamline": ">=0.2.4", "streamliner_": ">=0.0.1" }
+  { "streamline": ">=0.2.4" }
 , "lib" : "lib"
 , "main" : "./lib/strata"
 , "version" : "0.0.1"
