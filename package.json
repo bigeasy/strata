@@ -12,6 +12,6 @@
 , "lib" : "lib"
 , "main" : "./lib/strata"
 , "version" : "0.0.1"
-, "scripts" : { "test": "proof t/*/*.t.coffee" }
+, "scripts" : { "test": "proof t/*/*.t" }
 , "engines" : { "node": "> 0.6.0" }
 }

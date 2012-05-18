@@ -1,6 +1,6 @@
 #!/usr/bin/env _coffee
 fs = require "fs"
-require("./harness") 6, ({ Strata, directory }, _) ->
+require("./proof") 6, ({ Strata, directory }, _) ->
   strata = new Strata directory: directory, leafSize: 3, branchSize: 3
   strata.create(_)
   @equal strata._io.size, 4, "json size"

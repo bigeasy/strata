@@ -2665,7 +2665,7 @@ class Balancer
     for address in addresses
       hit "865730cf41adf339f4b1459c89a036b2"
       # Convert the address back to an integer.
-      address = parseInt address, 10
+      address = + address
       length = @lengths[address]
 
       # We create linked lists that contain the leaf pages we're considering in
