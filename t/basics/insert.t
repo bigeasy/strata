@@ -1,6 +1,6 @@
 #!/usr/bin/env _coffee
 fs = require "fs"
-require("./harness") 3, ({ Strata, directory, fixture: { load, objectify } }, _) ->
+require("./proof") 3, ({ Strata, directory, fixture: { load, objectify } }, _) ->
   strata = new Strata directory: directory, leafSize: 3, branchSize: 3
 
   strata.create _
