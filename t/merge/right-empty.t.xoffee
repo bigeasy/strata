@@ -1,13 +1,15 @@
 #!/usr/bin/env _coffee
 fs = require "fs"
-require("./harness") 3, ({ Strata, directory, fixture: { load, objectify, serialize } }, _) ->
+require("./proof") 3, ({ Strata, directory, fixture: { load, objectify, serialize } }, _) ->
   serialize "#{__dirname}/fixtures/merge.before.json", directory, _
 
   strata = new Strata directory: directory, leafSize: 3, branchSize: 3
   strata.open _
 
   cursor = strata.mutator "b", _
-  cursor.delete cursor.index, _
+  cursor.next _
+  cursor.delete cursor.indexOf("c", _), _
+  cursor.delete cursor.indexOf("d", _), _
   cursor.unlock()
 
   records = []
@@ -18,11 +20,11 @@ require("./harness") 3, ({ Strata, directory, fixture: { load, objectify, serial
     break unless cursor.next(_)
   cursor.unlock()
 
-  @deepEqual records, [ "a", "c", "d" ], "records"
+  @deepEqual records, [ "a", "b" ], "records"
 
   strata.balance _
 
-  expected = load "#{__dirname}/fixtures/merge.after.json", _
+  expected = load "#{__dirname}/fixtures/right-empty.after.json", _
   actual = objectify directory, _
 
   @say expected
@@ -38,4 +40,4 @@ require("./harness") 3, ({ Strata, directory, fixture: { load, objectify, serial
     break unless cursor.next(_)
   cursor.unlock()
 
-  @deepEqual records, [ "a", "c", "d" ], "merged"
+  @deepEqual records, [ "a", "b" ], "merged"

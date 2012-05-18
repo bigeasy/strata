@@ -1,6 +1,6 @@
 #!/usr/bin/env _coffee
 fs = require "fs"
-require("./harness") 3, ({ Strata, directory, fixture: { serialize, load, objectify } }, _) ->
+require("./proof") 3, ({ Strata, directory, fixture: { serialize, load, objectify } }, _) ->
   serialize "#{__dirname}/fixtures/between.before.json", directory, _
 
   strata = new Strata directory: directory, leafSize: 3, branchSize: 3
