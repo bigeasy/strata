@@ -6,10 +6,8 @@ require("./proof") 3, ({ Strata, directory, fixture: { load, objectify, serializ
   strata = new Strata directory: directory, leafSize: 3, branchSize: 3
   strata.open _
 
-  cursor = strata.mutator "b", _
+  cursor = strata.mutator "c", _
   cursor.delete cursor.index, _
-  cursor.next _
-  cursor.delete cursor.indexOf("d", _), _
   cursor.unlock()
 
   records = []
@@ -20,24 +18,24 @@ require("./proof") 3, ({ Strata, directory, fixture: { load, objectify, serializ
     break unless cursor.next(_)
   cursor.unlock()
 
-  @deepEqual records, [ "a", "c" ], "records"
+  @deepEqual records, [ "a", "b", "d" ], "records"
 
   strata.balance _
 
-  expected = load "#{__dirname}/fixtures/leaf-less-than-max.after.json", _
+  records = []
+  cursor = strata.iterator "a", _
+  loop
+    for i in [cursor.offset...cursor.length]
+      records.push cursor.get i, _
+    break unless cursor.next(_)
+  cursor.unlock()
+
+  @deepEqual records, [ "a", "b", "d" ], "merged"
+
+  expected = load "#{__dirname}/fixtures/right-ghost.after.json", _
   actual = objectify directory, _
 
   @say expected
   @say actual
 
-  @deepEqual actual, expected, "merge"
-
-  records = []
-  cursor = strata.iterator "a", _
-  loop
-    for i in [cursor.offset...cursor.length]
-      records.push cursor.get i, _
-    break unless cursor.next(_)
-  cursor.unlock()
-
-  @deepEqual records, [ "a", "c" ], "merged"
+  @deepEqual actual, expected, "after"

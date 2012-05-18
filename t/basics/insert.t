@@ -13,7 +13,7 @@ require("./proof") 3, ({ Strata, directory, fixture: { load, objectify } }, _) -
   @ok inserted, "inserted"
   cursor.unlock()
 
-  @equal strata._io.size, 31, "json size"
+  @equal strata._io.size, 32, "json size"
 
   strata.close _
 
