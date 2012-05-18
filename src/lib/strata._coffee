@@ -145,6 +145,7 @@ die = (splat...) ->
   console.log.apply console, splat if splat.length
   process.exit 1
 say = (splat...) -> console.log.apply console, splat
+hit = (hash) -> say "# HIT #{hash}" if process.env.STRATA_COVERAGE
 
 # ## Collation
 #
@@ -275,7 +276,7 @@ class IO
   # it exists, then rename the replacement page file to the permanent name of
   # the page file.
   replace: (page, suffix, _) ->
-    replacement = @filename(page.address, ".#{suffix}")
+    replacement = @filename(page.address, suffix)
     stat = fs.stat replacement, _
     if not stat.isFile()
       throw new Error "not a file"
@@ -288,12 +289,12 @@ class IO
 
   # Rename a page file from a page file with one suffix to another suffix.
   rename: (page, from, to, _) ->
-    fs.rename @filename(page.address, ".#{from}"),
-              @filename(page.address, ".#{to}"), _
+    fs.rename @filename(page.address, from),
+              @filename(page.address, to), _
 
   # Unlink a page file with the given suffix.
   unlink: (page, suffix, _) ->
-    fs.unlink @filename(page.address, ".#{suffix}"), _
+    fs.unlink @filename(page.address, suffix), _
 
   # ### Page Caching
   #
@@ -333,7 +334,7 @@ class IO
     entry
 
   # Unlink a tier from the most-recently used list.
-  unlink: (entry) ->
+  _unlink: (entry) ->
     { next, previous } = entry
     next.previous = previous
     previous.next = next
@@ -627,6 +628,8 @@ class IO
 
   # * **TODO** Document `ghost`.
   # * **TODO** Ensure that we are correctly loading a ghost.
+  # * **TODO** Ensure that we are correctly rewriting a ghost, or else that they
+  # are never rewritten.
   
   # On occasion, we can store a position array object. An position array object
   # contains the position array itself.  We store a copy of a constructed
@@ -788,8 +791,8 @@ class IO
   # Note how we allow we keep track of the minimum buffer size that will
   # accommodate the largest possible buffer.
   #
-  # TODO Have a minimum buffer that we constantly reuse, uh no. That will be
-  # shared by descents.
+  # **TODO**: Have a minimum buffer that we constantly reuse, uh no. That will
+  # be shared by descents.
 
   #
   readRecord: (page, position, _) ->
@@ -825,7 +828,7 @@ class IO
 
   # Note that we close the file descriptor before this function returns.
   rewriteLeaf: (page, suffix, _) ->
-    filename = @filename page.address, ".#{suffix}"
+    filename = @filename page.address, suffix
 
     # Open the new leaf page file and reset our file position.
     fd = fs.open filename, "a", 0o644, _
@@ -1130,7 +1133,7 @@ class IO
 
   #
   rewriteBranch: (page, suffix, _) ->
-    filename = @filename page.address, ".#{suffix}"
+    filename = @filename page.address, suffix
     record = [ page.right, page.addresses ]
     json = JSON.stringify(record)
     buffer = new Buffer(json.length + 1)
@@ -1341,7 +1344,7 @@ class IO
     #
     if page = @cache[address]
       # Move the page to the head of the most-recently used list.
-      @link @mru, @unlink page
+      @link @mru, @_unlink page
     #
     else
       # Create a page to load with an empty `load` queue. The presence of the
@@ -1677,7 +1680,7 @@ class Descent
     @depth      = 0
     @first      = true
     @index      = 0
-    @page       = { addresses: [ 0 ], leaf: false }
+    @page       = { addresses: [ 0 ] }
 
   # We use `fork` to create a new descent using the position of the current
   # descent. The new descent will continue to descend the tree, but without
@@ -1705,12 +1708,13 @@ class Descent
   # We create a new `Descent` which creates a dummy first page. We then assign
   # the addresses current descent to the dummy page, and copy the current index.
   fork: ->
-    fork = new Descent @io
-    fork.page.addresses = @page.addresses
-    extend fork, { @exclusive, @index }
+    extend (new Descent @io), { @page, @exclusive, @index }
   
   @key: (key) ->
     (_) -> @io.find @page, key, 1, _
+
+  @found: (key)-> ->
+    @page.addresses[0] != 0 && @io.comparator(@page.cache[@page.addresses[@index]],  key) == 0
 
   iterate: (page) ->
     @first = false
@@ -1722,6 +1726,8 @@ class Descent
 
   # Stop when we reach a leaf page.
   @leaf: -> @page.address < 0
+
+  @discard: (_) -> 0
 
   # Follow the right most path.
   @right: (_) -> @page.addresses.length - 1
@@ -1746,8 +1752,9 @@ class Descent
       @depth++
       parent = @page
       @page = @io.lock parent.addresses[@index], @exclusive, _
-      @io.unlock parent if parent.address?
+      @io.unlock parent if @unlock
       @index = next.call(@, _)
+      @unlock = true
       if @index < 0
         @index = (~@index) - 1
         @exact = false
@@ -2086,12 +2093,13 @@ class Mutator extends Iterator
     fs.close fd, _
     
     if ghost
+      # **TODO**: If offset is not at 0?
       @_page.offset++
       @offset++
     else
-      @_io.uncacheRecord @_page, @_page.positions[index], _
+      @_io.uncacheRecord @_page, @_page.positions[index]
       @_io.splice @_page, index, 1
-      @length = --@_page.length
+      @length = @_page.length
 
 # #### Insertion and Deletion Versus Balance
 #
@@ -2655,6 +2663,7 @@ class Balancer
     # For each page that has changed we add it to a doubly linked list.
     ordered = {}
     for address in addresses
+      hit "865730cf41adf339f4b1459c89a036b2"
       # Convert the address back to an integer.
       address = parseInt address, 10
       length = @lengths[address]
@@ -2673,6 +2682,7 @@ class Balancer
       # We are always allowed to get a lock on a single page, so long as we're
       # holding no other locks.
       if not node = ordered[address]
+        hit "9542e06ace5cf0348025669c959605c3"
         page = @io.lock address, false, _
         @reference(page)
         node = { page, key: @io.key(page, 0, _)  }
@@ -2682,11 +2692,14 @@ class Balancer
       # If the page has shrunk in size, we gather the size of the left sibling
       # page and the right sibling page. The right sibling page 
       if node.page.length - length < 0
-        if page.address isnt -1
+        hit "f349ecda729348fd6584808d362ccbe0"
+        if node.page.address isnt -1
+          hit "d8016f324e06790f7946568f0587947d"
           if not node.left
+            hit "7e6857af475a750affb42d11df04b825"
             descent = new Descent(@_io)
             descent.descend(descend.key(node.key), descent.found(key))
-            # TODO You know that this would drive you mad and cost you three
+            # **TODO**: You know that this would drive you mad and cost you 3
             # days if you were a Java programmer. Encapsulation! Encapsulation!
             descent.index--
             descent.descend(descend.right(), descent.leaf())
@@ -2699,18 +2712,21 @@ class Balancer
 
             left.right = node
             node.left = left
-        if not node.right and page.right isnt -1
+        if not node.right and node.page.right
+          hit "3175111e9f52d1ca2ee17752a303d847"
           if not right = ordered[page.right]
-            ordred[page.right] = right = {}
-            right.page = @io.lock address, false, _
+            hit "29dcf1e23e38e591067b26ecac75fbb3"
+            ordered[node.page.right] = right = { page: @io.lock(page.right, false, _) }
+            right.key = @io.key(right.page, 0, _)
             @reference(right.page)
-            node = { page: right.page, key: @io.key(right.page, 0, _)  }
             @io.unlock right.page
           node.right = right
           right.left = node
+
       # Save us the trouble of possibly going left for a future count, if we
       # have an opportunity to make that link from the right free of a descent.
       else if not node.right and right =ordered[page.right]
+        hit "79538567b69d7f9cd75393cf9eaa90c7"
         node.right = right
         right.left = node
 
@@ -2718,6 +2734,7 @@ class Balancer
     # Gather the current counts of each page into the node itself, so we adjust
     # the count based on the merges we schedule.
     for address, node of ordered
+      hit "c7c40fcf0412d8ef67d6aebf13bf4578"
       node.length = node.page.length
 
     # Break the link to next right node and return it.
@@ -2740,12 +2757,14 @@ class Balancer
     # not necessary.
 
     #
-    for address, length in Object.keys @lengths
+    for address, length of @lengths
+      hit "c3e49bad2a714b71d8f02ba6a5d0c1ed"
       node = ordered[address]
       difference = node.length - length
       # If we've grown past capacity, split the leaf. Remove this page from its
       # list, because we know it cannot merge with its neighbors.
       if difference > 0 and node.page.length > max
+        hit "f7c05e6daecc9482b0a56033bf82979b"
         # Schedule the split.
         @operations.push method: "splitLeaf", key: node.key
         # Unlink this split node, so that we don't consider it when merging.
@@ -2754,12 +2773,14 @@ class Balancer
       # Lost a race condition. When we fetched pages, this page didn't need to
       # be tested for merge, so we didn't grab its siblings, but it does now.
       # We ask the next balancer to consider it as we found it.
-      else if difference < 0 and not (node.left and node.right)
+      else if difference < 0 and not ((node.page.address is -1 or node.left) and (node.page.right is 0 or node.right))
+        hit "00472eae15631d485559e87d85475060"
         @io.balancer.lengths[node.page.address] = length
 
     # Now remove any node from our ordered collection that is not the left most,
     # so that we have a collection of heads of linked pages.
     for address in Object.keys ordered
+      hit "6357544596e24b3bf1500768c7d28e7a"
       delete ordered[address] if ordered[address].left
 
     # We schedule merges, removing the nodes we merge and the nodes we can't
@@ -2768,15 +2789,20 @@ class Balancer
       # We're done where there are no more nodes to consider.
       addresses = Object.keys ordered
       break if addresses.length is 0
+      hit "a99a8d4110b74e78e38872f61460f3f6"
 
       # Break the links between pages that cannot merge.
       for address in addresses
+        hit "d24e07a6f1b65a4d7cddb734d8fc742b"
         node = ordered[address]
         while node.right
+          hit "b71fce84e1cbc61be53656f7a54aa1b7"
           if node.length + node.right.length > max
+            hit "d5c4684a7e3501d218f3a4e17dcd00cc"
             node = unlink node
             ordered[node.address] = node
           else
+            hit "cc831aedf992c3ed86c7f521a01bc4a7"
             node = node.right
 
       # Merge the node to the right of each head node into the head node.
@@ -2789,8 +2815,7 @@ class Balancer
           right = unlink node
           @operations.push
             method: "mergeLeaves"
-            left: node.page.address
-            right: right.page.address
+            key: right.key
             unbalanced: @lengths
           node.length += right.length
           link node, unlink right
@@ -2902,7 +2927,7 @@ class Balancer
         offset = split.length - length
 
         for index in [offset...offset + length]
-          # Fetch the record before we uncache it.
+          # Fetch the record and read it from cache or file.
           position = split.positions[index]
           object = @io.stash(split, position, _)
           @io.uncacheRecord split, position
@@ -2915,7 +2940,7 @@ class Balancer
         @io.splice split, offset, length
 
         # Write the new leaf page to a temporary file.
-        @io.rewriteLeaf page, "replace", _
+        @io.rewriteLeaf page, ".replace", _
 
         replacements.push page
         uncached.push page
@@ -2924,25 +2949,25 @@ class Balancer
       split.right = right
 
       # Write the left most leaf page from which new pages were split.
-      @io.rewriteLeaf split, "replace", _
+      @io.rewriteLeaf split, ".replace", _
       replacements.push split
 
       # Write the branches
-      @io.rewriteBranch penultimate.page, "pending", _
+      @io.rewriteBranch penultimate.page, ".pending", _
 
       # Now rename the last action, committing to our balance.
-      @io.rename penultimate.page, "pending", "commit", _
+      @io.rename penultimate.page, ".pending", ".commit", _
 
       # Rename our files to put them in their place.
       for page in replacements
-        @io.replace page, "replace", _
+        @io.replace page, ".replace", _
 
       # Add our new pages to the cache.
       for page in uncached
         @io.encache page
 
       # This last replacement will complete the transaction.
-      @io.replace penultimate.page, "commit", _
+      @io.replace penultimate.page, ".commit", _
 
       # Our left-most and right-most page might be able to merge with the left
       # and right siblings of the page we've just split. We compel a merge
@@ -3069,19 +3094,19 @@ class Balancer
     @io.splice root, 0, 0, (page.address for page in children)
 
     # Write the child branch pages.
-    @io.rewriteBranch page, "replace", _ for page in children
+    @io.rewriteBranch page, ".replace", _ for page in children
 
     # Rewrite our root.
-    @io.rewriteBranch root, "pending", _
+    @io.rewriteBranch root, ".pending", _
 
     # Commit the changes.
-    @io.rename root, "pending", "commit", _
+    @io.rename root, ".pending", ".commit", _
 
     # Write the child branch pages.
-    @io.replace page, "replace", _ for page in children
+    @io.replace page, ".replace", _ for page in children
 
     # Commit complete.
-    @io.replace root, "commit", _
+    @io.replace root, ".commit", _
 
     # Add our new children to the cache.
     @io.encache page for page in children
@@ -3119,89 +3144,115 @@ class Balancer
 
     @io.unlock page for page in pages
 
-  # **TODO**: Why delete? Is it not simply a merge? Yes. It is.
-  mergeLeaf: ({ key, unbalanced }, copy, _) ->
+  mergeLeaves: ({ key, unbalanced }, _) ->
+    # Create a list of descents whose pages we'll unlock before we leave.
     descents = []
 
-    descents.push pivot = new Descent(io)
-    pivot.descend(sought = Descent.key(node.key), Descent.found(key))
+    # Descend the tree until we find the key of the leaf page we're going to
+    # merge in a branch page.
+    descents.push pivot = new Descent(@io)
+    pivot.descend(sought = Descent.key(key), Descent.found(key), _)
     pivot.upgrade()
     
+    # Descend to the penultimate page, but first, take note of whether or not
+    # the branch page that contains our key is also the penultimate page. We go
+    # to the right-most descendant of the left child to find the left leaf page
+    # of the merge. We follow the key to find the right leaf page of the merge.
     penultimate = {}
 
     penultimate.isPivot = pivot.page.addresses[0] < 0
 
     penultimate.left = pivot.fork()
     penultimate.left.index--
-    penultimate.left.descend Descent.right, Descent.penultimate
+    penultimate.left.descend Descent.right, Descent.penultimate, _
 
     penultimate.right = pivot.fork()
-    penultimate.right.descend sought, Descent.penultimate
-
+    penultimate.right.descend sought, Descent.penultimate, _
+    
+    # If the leaf page key was found in the penultimate page, then we do not
+    # want to key the penultimate pages for release, because they are the same
+    # as the branch key page, and the branch key page is already queued for
+    # release.
     unless penultimate.isPivot
       descents.push penultimate.left
       descents.push penultimate.right
 
+    # Descend to the leaves. Note that if we're on the penultimate page, the
+    # next descent will follow the index we decremented above, the leaf page to
+    # the left of the keyed page, instead of going to the right-most leaf page.
+    # 
+    # We use `leftMost` in both cases, because we don't need an index into the
+    # leaf page, only a lock on the leaf page.
     leaves = {}
 
     descents.push leaves.left = penultimate.left.fork()
-    leaves.left.descend Descent.right, Descent.leaf
+    leaves.left.descend Descent.leftMost, Descent.leaf, _
 
     descents.push leaves.right = penultimate.right.fork()
-    leaves.right.descend sought, Descent.leaf
+    leaves.right.descend Descent.leftMost, Descent.leaf, _
 
-    # Fix up the index. If the pivot is penultimate, then the it is not actually
-    # the right-most.
-    if penultimate.isPivot
-      leaves.left.index = leaves.right.index - 1
+    # Fix up the index. If the pivot is penultimate, then it is not actually the
+    # right-most. TODO: Necessary?
+    # if penultimate.isPivot
+      # die "eca0523772ceb82cda7d827ebf8e449d", leaves.left.index, leaves.right.index, leaves.left.page.address, penultimate.left.page.address
+      # leaves.left.index = leaves.right.index - 1
 
     # Determine if we still have candidates for merge.
-    if leaves.left.page.length + leaves.right.page.length < @io.options.leafSize
+    if leaves.left.page.length + leaves.right.page.length <= @io.options.leafSize
       # Uncache the pivot key. 
       @io.uncacheKey pivot.page, pivot.page.addresses[pivot.index]
 
+      # The right leaf page of of the merged page is the right leaf page of the
+      # right page of the merge.
       leaves.left.page.right = leaves.right.page.right
 
-      copy.call(@, left, right, _)
+      # Append all of the records
+      for index in [0...leaves.right.page.length]
+        # Fetch the record and read it from cache or file.
+        position = leaves.right.page.positions[index]
+        object = @io.stash leaves.right.page, position, _
+        @io.uncacheRecord leaves.right.page, position
 
-      @io.size -= leaves.right.page.size
+        # Add it to our new page. The negative positions are temproary. We'll
+        # get real file positions when we rewrite.
+        @io.splice leaves.left.page, leaves.left.page.length, 0, -(position + 1)
+        @io.cacheRecord leaves.left.page, -(position + 1), object.record, object.key
 
-      @io.rewriteLeaf leaves.left.page, "replace", _
+      # Remove the positions the outgoing page to update the JSON size of the
+      # b&#x2011;tree.
+      @io.splice leaves.right.page, 0, leaves.right.page.length
 
-      leaves.right.page.positions.length = 0
-      @io.rewriteLeaf leaves.right.page, "unlink", _
+      # Rewrite the left leaf page. Move the right leaf page aside for the
+      # pending unlink.
+      @io.rewriteLeaf leaves.left.page, ".replace", _
+      @io.rename leaves.right.page, "", ".unlink", _
 
-      if penultimate.isPivot
-        right = pivot.page
-        right.addresses.splice(pivot.index, 1)
-      else
-        right = penultimate.right.page
-        unless right.addresses.length is 1
-          @io.uncacheKey right, right.addresses[1]
-        right.addresses.shift()
+      @io.uncacheKey pivot.page, pivot.page.addresses[pivot.index]
+      @io.splice penultimate.right.page, penultimate.right.index, 1
 
-      @io.rewriteBranch right, "pending", _
+      @io.rewriteBranch penultimate.right.page, ".pending", _
 
       # **TODO**: If I succeed, how will I know to test the parents for balance?
-      # Got to think all over again in medic about who is whose parent?
-      @io.rename right, "pending", "commit", _
+      # **TODO**: Uh, can't the medic just note that this page needs to be
+      # rebalanced? It can force a propagation of balance and merge checking of
+      # the parent. 
 
-      @io.replace leaves.left.page, "replace", _
-      @io.unlink leaves.right.page, "unlink", _
-      @io.replace right, "replace", _
+      # Renaming pending to commit will cause the merge to roll forward. 
+      @io.rename penultimate.right.page, ".pending", ".commit", _
 
-      if right.address isnt 0
-        @operations.unshift
-          method: "mergeBranches",
-          key: @io.key(right, 0, _),
-          address: right.address
+      @io.replace leaves.left.page, ".replace", _
+      @io.unlink leaves.right.page, ".unlink", _
+      @io.replace penultimate.right.page, ".commit", _
 
     # We cannot merge, so we queue one or both of pages for a merge test on the
     # next balancer.
     else
+      die "3c49b727e770705625e625f7ddca5405"
       if unbalanced[leaves.left.page.address]
+        die "133bb6b9d2e789d073f00ae19caf62ee"
         @io.balancer.unbalanced(leaves.left.page, true)
       if unbalanced[leaves.right.page.address]
+        die "139419730d062be5ac0c3826e5e96bb2"
         @io.balancer.unbalanced(leaves.right.page, true)
 
     @io.unlock descent.page for descent in descents
