@@ -1,8 +1,7 @@
 {Twinkie}       = require "./vendor/twinkie/lib/twinkie"
 
 twinkie = new Twinkie
-twinkie.ignore "docs", "lib/*"
-twinkie.master "javascript"
+twinkie.ignore "lib/*"
+twinkie.master "coffeescript"
 twinkie.coffee  "src/lib", "lib"
-twinkie.copy    "src/lib", "lib", /\.js$/
-twinkie.tasks task, "compile", "idl", "docco", "gitignore"
+twinkie.tasks task, "compile", "gitignore"
