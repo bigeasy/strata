@@ -12,7 +12,7 @@ require("./proof") 4, ({ Strata, directory, fixture: { serialize } }, _) ->
   @equal cursor.length, 1, "length"
 
   records = []
-  for i in [cursor.index...cursor.length]
+  for i in [cursor.offset...cursor.length]
     records.push cursor.get(i, _)
   cursor.unlock()
 

@@ -13,4 +13,4 @@ require("./proof") 6, ({ Strata, directory }, _) ->
   lines = fs.readFile("#{directory}/segment00000001", "utf8", _).split(/\n/)
   lines.pop()
   @equal lines.length, 1, "leaf lines"
-  @deepEqual JSON.parse(lines[0]), [ 0, 0, [] ], "leaf"
+  @deepEqual JSON.parse(lines[0]), [ 0, 0, 0, [] ], "leaf"
