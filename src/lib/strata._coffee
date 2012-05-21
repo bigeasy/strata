@@ -83,8 +83,8 @@
 # order of a branch page to be the maximum number of child pages, while the
 # order of a leaf page to be the maximum number of records.
 #
-# **TODO**: We introduce the term order here, but use length throughout the code
-# and documentation.
+# We refer to the actual number of child pages in a branch page or the actual
+# number of records in a leaf page as the page ***length***.
 #
 # The term ***b&#x2011;tree*** itself may not be correct. There are different
 # names for b&#x2011;tree that reflect the variations of implementation, but
@@ -383,15 +383,15 @@ class IO
   # #### Pages Held for Housekeeping
   #
   # There may be page objects loaded for housekeeping only. When balancing the
-  # tree, the page length of a page is needed to determine if the page needs to
-  # be split, or if it can merged with a sibling page.
+  # tree, the length of a page is needed to determine if the page needs to be
+  # split, or if it can merged with a sibling page.
   #
-  # We only need the length of the page to create our balance plan, however, not
-  # the cached references and records. The page object keeps a copy of the
-  # length in a `length` property. We can delete the page's reference array, as
-  # well as the page's object cache. The page object the page entry itself
-  # cannot be removed from the cache until it is no longer needed to calculate a
-  # split or merge.
+  # We only need the order of the page to create our balance plan, however, not
+  # the cached references and records. The page object keeps a copy of the order
+  # in a `order` property. We can delete the page's reference array, as well as
+  # the page's object cache. The page object the page entry itself cannot be
+  # removed from the cache until it is no longer needed to calculate a split or
+  # merge.
   #
   # We use reference counting to determine if an entry is participating in
   # balance calculations. If the page is being referenced by a balancer, we
@@ -422,8 +422,8 @@ class IO
   #
   # This lookup is performed in more or less constant time when the record is
   # uncached, so long you're willing to say that random access into a file is
-  # constant time for practical purposes. Otherwise, lookup is *O(log n)*, where
-  # *n* is the number of file system blocks used to store the leaf page file.
+  # constant time for our purposes. Otherwise, lookup is *O(log n)*, where *n*
+  # is the number of file system blocks used to store the leaf page file.
   #
   # #### Binary Search
   #
@@ -456,18 +456,22 @@ class IO
   # certainly want to allow more than one `null` key, so you'll end up using the
   # pseudo-duplicate strategy for `null` keys as well.
   #
-  # #### Leaf Page Key
+  # #### Ghosts and Leaf Page Length
   #
-  # The first record of every leaf page is the key value of the leaf page.
+  # When we delete the first record of a leaf page, we keep the first record
+  # around, because its key value is the key value for the leaf page. Changing
+  # the key of a leaf page requries re-balancing the tree, so we need to wait
+  # until we balance to vacuum the deleted first record.
   #
-  # When we delete records from the leaf page, if we delete the first record, we
-  # keep a ghost of the record around, so we will know the key value of the leaf
-  # page.
+  # When we delete the first record we increment the `ghosts` property of the
+  # page by `1`. The acutal length of a leaf page is the value `length` less the
+  # value of the `ghosts` property. Only the first record is ever turned into a
+  # ghost if deleted, so the value `ghosts` property is only ever `0` or `1`.
   #
   # #### Leaf Page Split
   #
-  # If the record count of leaf page, the page length, exceeds the leaf page
-  # order, the leaf page is split.
+  # If the length of a leaf page exceeds the leaf page order, the leaf page is
+  # split when the b&#x2011;tree is balanced.
 
   # The in memory representation of the leaf page includes the address of the
   # leaf page, the page address of the next leaf page, and a cache that maps
@@ -479,7 +483,7 @@ class IO
       cache: {}
       length: 0
       locks: [[]]
-      offset: 0
+      ghosts: 0
       positions: []
       right: 0
       size: 0
@@ -545,13 +549,11 @@ class IO
   # file, so that the operating system will flush our writes to disk. This gives
   # us durability.
   # 
-  # Append an object to the leaf page file as a single line of JSON.
-  #
-  # We call the append method to both append new records to an existing leaf
-  # page file, as well as to create whole new replacement leaf page file that
-  # will be relinked to replace the existing leaf page file. The caller
-  # determines which file should be written, so it opens and closes the file
-  # descriptor.
+  # The caller determines which file should be written, so it opens and closes
+  # the file descriptor. For record insertions and deletions, a file descriptor
+  # is opened and closed for a single append. When rewriting an existing leaf
+  # page in order to compact it, the file descriptor is kept open for the
+  # multiple appends of the rewrite.
   #
   # The file descriptor must be open for for append.
 
@@ -581,65 +583,93 @@ class IO
     # Return the file position of the appended JSON object.
     position
 
-  # ### Leaf Page File Records
+  # ### Leaf Page Journal
   #
-  # TODO address array objects are actually reference objects, or position
-  # objects? Right.
+  # The leaf page acts as an edit journal recording edit events. Each event is
+  # stored as a ***journal entry***. These journal entires are appended to the
+  # leaf page files as JSON arrays, one JSON array per line in the file.
   #
-  # There are three types of objects in a leaf tier file, ***insert objects***,
-  # ***delete objects***, and ***position array objects***.
+  # There are three types of journal entires recorded in a leaf page; ***insert
+  # entires***, ***delete entries***, and ***position array entries***.
   #
-  # An insert object contains a ***record*** and the index in the position array
-  # where the record's position would be inserted to preserve the sort order of
-  # the position array.
+  # The insert and delete entries record changes to the the leaf page. Beginning
+  # with an empty position array and reading from the start of the file, the
+  # leaf tier is reconstituted by replaying the inserts and deletes described by
+  # the insert and delete entries.
   #
-  # Beginning with an empty position array and reading from the start of the
-  # file, the leaf tier is reconstituted by replaying the inserts and deletes
-  # described by the insert and delete objects.
+  # Position array entries record the state of the position array later on in
+  # the history of the leaf page file, so that we don't have to replay the
+  # entire history of the leaf page file in order to load the leaf page.
   #
-  # The JSON objects stored in the leaf array are JSON arrays. The first element
-  # is used as a flag to indicate the type of object.
+  # #### Position Array
+  #
+  # Each leaf page has a ***position array***. The position array references the
+  # position in the leaf page file where an insert entry records the insertion
+  # fo a record into the leaf page. When we want the record, if it is not in
+  # memory, then we read it from the leaf page file at the given file position.
+  #
+  # When the record has been read from the leaf page file, it is cached in the
+  # `cache` object property of the in&#x2011;memory page object indexed by its
+  # file position.
+  #
+  # When we write an insert entry, we take note of the insert entries file
+  # position in the leaf page and use that position as its place holder in the
+  # position array.
+  #
+  # The position array mainatins the file positions of the inert entries in the
+  # collation order of the b&#x2011;tree.
+  #
+  # #### Insert Entries
+  #
+  # We determine if an entry is an insert entry by examining the first element
+  # in the entry JSON array.
   #
   # If the first element is an integer greater than zero, it indicates an insert
-  # object.  The integer is the one based index into the zero based position
+  # entry. The integer is the one based index into the zero based position
   # array, indicating the index where the position of the current insert object
-  # should be inserted. The second element of the leaf tier object array is the
+  # should be inserted. The second element of the insert entry JSON array is the
   # record object.
   #
-  # When we read the insert object, we will place the record in the record cache
+  # When we read the insert entry, we will place the record in the record cache
   # for the page, mapping the position to the record.
 
   # Write an insert object. 
   writeInsert: (fd, page, index, record, _) ->
     @_writeJSON fd, page, [ index + 1, record ], _
 
-  # **TK** Insert objects are actually JavaScript arrays. That's confusing.
+  # #### Delete Entries
   #
-  # If the first element of our insert object is less than zero, it indicates a
-  # delete object. The absolute value of the integer is the one based index into
-  # the zero based position array, indicating the index of address array element
-  # that should be deleted.
+  # If the first element of our entry is less than zero, it indicates a delete
+  # entry. The absolute value of the integer is the one based index into the
+  # zero based position array, indicating the index of the position array
+  # element that should be deleted.
   #
-  # There are no other elements in the delete object.
+  # Special handling of a deleted first record is required when we replay the
+  # journal. The first record of a leaf page is not actually deleted from their
+  # in-memory pages, but ghosted. We keep them around because the key of the
+  # first record is the key for a page.
+  #
+  # There is no special accounting necessary to record the fact that the first
+  # record is a ghost in the delete entry. We can see that it was the first
+  # record that was deleted.
+  #
+  # There are no other elements in the JSON array for a delete entry, just the
+  # negated one&#x2011;based index of the record to delete.
 
   # Write a delete object.
-  writeDelete: (fd, page, index, ghost, _) ->
-    @_writeJSON fd, page, [ -(index + 1), ghost ], _
+  writeDelete: (fd, page, index, _) ->
+    @_writeJSON fd, page, [ -(index + 1) ], _
 
-  # * **TODO** Document `ghost`.
-  # * **TODO** Ensure that we are correctly loading a ghost.
-  # * **TODO** Ensure that we are correctly rewriting a ghost, or else that they
-  # are never rewritten.
-  
-  # On occasion, we can store a position array object. An position array object
-  # contains the position array itself.  We store a copy of a constructed
-  # position array object in the leaf page file so that we can read a large leaf
-  # page file quickly.
+  # #### Position Array Entires
+  #
+  # An position array entry contains the position array itself. On occasion, we
+  # store a copy of a constructed position array entry in the leaf page file so
+  # that we can read a large leaf page file quickly.
   #
   # When we read a leaf page file, if we read from the back of the file toward
-  # the front, we can read backward until we find an position array object. Then
+  # the front, we can read backward until we find a position array entry. Then
   # we can read forward to the end of the file, applying the inserts and deletes
-  # that occurred after we wrote the position array object. 
+  # that occurred after we wrote the position array entry. 
   # 
   # When a leaf page file is large, stashing the constructed position array at
   # the end means that the leaf page can be loaded quickly, because we will only
@@ -648,14 +678,20 @@ class IO
   # with the inserts and deletes that occurred after it was written.
   #
   # Not all of the records will be loaded when we go backwards, but we have
-  # their file position from the address array, so we can jump to them and load
+  # their file position from the position array, so we can jump to them and load
   # them as we need them. That is, if we need them, because owing to binary
   # search, we might only need a few records out of a great many records to find
   # the record we're looking for.
+  #
+  # We write an array with the number of ghosts in the leaf page, the right
+  # sibling leaf page address, and the page positions. The first element of the
+  # array is zero to differentiate the position array entry from insert and
+  # delete entries.
 
-  # Write an address array object.
+  # Write an position array entry.
   writePositions: (fd, page, _) ->
-    @_writeJSON fd, page, [ 0, page.right, page.positions ], _
+    if typeof page.ghosts isnt "number" then throw new Error 0
+    @_writeJSON fd, page, [ 0, page.right, page.ghosts, page.positions ], _
 
   # Here is the backward search for a position in array in practice. We don't
   # really ever start from the beginning. The backwards than forwards read is
@@ -725,6 +761,7 @@ class IO
           index = object.shift()
           if index is 0
             page.right = object.shift()
+            page.ghosts = object.shift()
             positions = object.shift()
             end = 0
             break
@@ -746,9 +783,12 @@ class IO
       [ index, position ] = splice
       if index > 0
         @splice page, index - 1, 0, position
+      else if ~index is 0 and page.address isnt -1
+        if page.ghosts then throw new Error "double ghosts"
+        page.ghosts++
       else
         @splice page, -(index + 1), 1
-
+    
     # Cache the records we read while searching for the position array object.
     for position in page.positions
       if cache[position]
@@ -1246,6 +1286,8 @@ class IO
         @nextAddress = address + 1 if address > @nextAddress
 
   # We close after every write, so there are no open file handles.
+  #
+  # **TODO**: Need to actually purge cache and set sizes to zero.
 
   # &mdash;
   close: (_) ->
@@ -1675,7 +1717,6 @@ class Descent
   # The constructor always felt like a dangerous place to be doing anything
   # meaningful in C++ or Java.
   constructor: (@io) ->
-    @exact      = false
     @exclusive  = false
     @depth      = 0
     @first      = true
@@ -1711,15 +1752,12 @@ class Descent
     extend (new Descent @io), { @page, @exclusive, @index }
   
   @key: (key) ->
-    (_) -> @io.find @page, key, 1, _
+    (_) -> @io.find @page, key, (if @page.address < 0 then @page.ghosts else 1), _
 
   @found: (key)-> ->
     @page.addresses[0] != 0 && @io.comparator(@page.cache[@page.addresses[@index]],  key) == 0
 
-  iterate: (page) ->
-    @first = false
-
-  @leftMost: (_) -> 0
+  @leftMost: (_) -> @page.ghosts or 0
 
   # Stop when we reach a penultimate branch page.
   @penultimate: -> @page.addresses[0] < 0
@@ -1729,8 +1767,9 @@ class Descent
 
   @discard: (_) -> 0
 
-  # Follow the right most path.
-  @right: (_) -> @page.addresses.length - 1
+  # Follow the right most path. **TODO**: How much confusion do I save if I
+  # replace addresses and positions with references?
+  @right: (_) -> (@page.addresses or @page.positions).length - 1
 
   # All subsequent locks acquired by the descent are exclusive.
   exclude: -> @exclusive = true
@@ -1755,12 +1794,8 @@ class Descent
       @io.unlock parent if @unlock
       @index = next.call(@, _)
       @unlock = true
-      if @index < 0
+      if @page.address >= 0 and @index < 0
         @index = (~@index) - 1
-        @exact = false
-      else
-        @exact = true
-      @first and= @index is 0
           
 # ## Cursors
 # 
@@ -1850,7 +1885,7 @@ class Descent
 class Iterator
 
   # Iterators are initialized with the results of a descent.
-  constructor: (@key, @index, { io, page, exclusive }) ->
+  constructor: (@key, { @index, io, page, exclusive }) ->
     @_io = io
     @_page = page
     @exclusive = exclusive
@@ -1883,7 +1918,7 @@ class Iterator
       @_page = next
 
       # Adjust the range.
-      @offset = @_page.offset
+      @offset = @_page.ghosts
       @length = @_page.positions.length
 
       # We have advanced.
@@ -1893,7 +1928,7 @@ class Iterator
   # bitwise compliment of index where record would be inserted if no such record
   # exists in the leaf page.
   indexOf: (key, _) ->
-    @_io.find @_page, key, @_page.offset, _
+    @_io.find @_page, key, @_page.ghosts, _
 
   # Unlock all leaf pages held by the iterator.
   unlock: ->
@@ -2077,7 +2112,7 @@ class Mutator extends Iterator
 
   # Delete the record at the given index. The application developer is
   # responsible for providing a valid index, in the range defined by the
-  # `offset` and `length` of the cursor, or else the `offset` and `length` of
+  # `offset` and `length` of the cursor, or else the `ghosts` and `length` of
   # the `page`.
   delete: (index, _) ->
     # Record the page as unbalanced.
@@ -2089,13 +2124,16 @@ class Mutator extends Iterator
     # Append a delete object to the leaf page file.
     filename = @_io.filename @_page.address
     fd = fs.open filename, "a", 0o644, _
-    position = @_io.writeDelete fd, @_page, index, ghost, _
+    position = @_io.writeDelete fd, @_page, index, _
     fs.close fd, _
-    
+
+    # If we've created a ghost record, we don't delete the record, we simply
+    # move the `ghosts` for the page forward to `1`. If the current offset of
+    # the cursor is `0`, we move that forward to `1`. Otherwise, we uncache and
+    # splice the record.
     if ghost
-      # **TODO**: If offset is not at 0?
-      @_page.offset++
-      @offset++
+      @_page.ghosts++
+      @offset or @offset++
     else
       @_io.uncacheRecord @_page, @_page.positions[index]
       @_io.splice @_page, index, 1
@@ -2567,11 +2605,17 @@ class Balancer
     @operations = []
     @referenced = {}
 
+  # Mark a page as having been altered, now requiring a test for balance. If the
+  # `force` flag is set, the value is set to the leaf order, so that if the
+  # record count of the page is less than the order of the leaf page, it will be
+  # test for merge. If it is greater than the order of the leaf page, it will be
+  # split. Of course, if it the order of the page, it can not be merged, nor
+  # should it be split.
   unbalanced: (page, force) ->
     if force
       @lengths[page.address] = @leafSize
     else
-      @lengths[page.address]?= page.length
+      @lengths[page.address]?= page.length - page.ghosts
 
   # TODO If it is not exposed to the user, I don't underbar it.
   reference: (page) ->
@@ -2643,6 +2687,7 @@ class Balancer
     addresses = Object.keys @lengths
     return if addresses.length is 0
 
+    ghosts = {}
     max = @io.options.leafSize
  
     # We put a new balancer in place of the current balancer. Any edits will be
@@ -2684,28 +2729,32 @@ class Balancer
       if not node = ordered[address]
         hit "9542e06ace5cf0348025669c959605c3"
         page = @io.lock address, false, _
-        @reference(page)
-        node = { page, key: @io.key(page, 0, _)  }
+        node = { page, length: page.length - page.ghosts, key: @io.key(page, 0, _)  }
+        @reference page
         @io.unlock page
         ordered[page.address] = node
 
+      if node.page.ghosts
+        hit "94b9d95f933238d1c84ae03309882549"
+        ghosts[node.page.address] = node
+
       # If the page has shrunk in size, we gather the size of the left sibling
       # page and the right sibling page. The right sibling page 
-      if node.page.length - length < 0
+      if node.length - length < 0
         hit "f349ecda729348fd6584808d362ccbe0"
         if node.page.address isnt -1
           hit "d8016f324e06790f7946568f0587947d"
           if not node.left
             hit "7e6857af475a750affb42d11df04b825"
-            descent = new Descent(@_io)
-            descent.descend(descend.key(node.key), descent.found(key))
+            descent = new Descent(@io)
+            descent.descend Descent.key(node.key), Descent.found(node.key), _
             # **TODO**: You know that this would drive you mad and cost you 3
             # days if you were a Java programmer. Encapsulation! Encapsulation!
             descent.index--
-            descent.descend(descend.right(), descent.leaf())
+            descent.descend Descent.right, Descent.leaf, _
             # Check to make sure we don't already have a node for the page.
-            left = { page: descent.page, key: @io.key(descent.page, 0, _) }
-            @reference(left.page)
+            left = { page: descent.page, length: descent.page.length - descent.page.ghosts, key: @io.key(descent.page, 0, _) }
+            @reference left.page
             @io.unlock left.page
 
             ordered[left.page.address] = left
@@ -2716,16 +2765,16 @@ class Balancer
           hit "3175111e9f52d1ca2ee17752a303d847"
           if not right = ordered[page.right]
             hit "29dcf1e23e38e591067b26ecac75fbb3"
-            ordered[node.page.right] = right = { page: @io.lock(page.right, false, _) }
-            right.key = @io.key(right.page, 0, _)
-            @reference(right.page)
-            @io.unlock right.page
+            page = @io.lock page.right, false, _
+            ordered[node.page.right] = right = { page, length: page.length - page.ghosts, key: @io.key(page, 0, _) }
+            @reference page
+            @io.unlock page
           node.right = right
           right.left = node
 
       # Save us the trouble of possibly going left for a future count, if we
       # have an opportunity to make that link from the right free of a descent.
-      else if not node.right and right =ordered[page.right]
+      else if not node.right and right = ordered[page.right]
         hit "79538567b69d7f9cd75393cf9eaa90c7"
         node.right = right
         right.left = node
@@ -2735,7 +2784,7 @@ class Balancer
     # the count based on the merges we schedule.
     for address, node of ordered
       hit "c7c40fcf0412d8ef67d6aebf13bf4578"
-      node.length = node.page.length
+      node.length = node.page.length - node.page.ghosts
 
     # Break the link to next right node and return it.
     unlink = (node) ->
@@ -2763,7 +2812,7 @@ class Balancer
       difference = node.length - length
       # If we've grown past capacity, split the leaf. Remove this page from its
       # list, because we know it cannot merge with its neighbors.
-      if difference > 0 and node.page.length > max
+      if difference > 0 and node.length > max
         hit "f7c05e6daecc9482b0a56033bf82979b"
         # Schedule the split.
         @operations.push method: "splitLeaf", key: node.key
@@ -2807,12 +2856,16 @@ class Balancer
 
       # Merge the node to the right of each head node into the head node.
       for address in addresses
+        hit "5e49179d14c5d9c8e985576606544b36"
         node = ordered[address]
         # Schedule the merge. After we schedule the merge, we increase the size
         # of the head node and link the head node to the right sibling of the
-        # right node.
+        # right node. Note that a leaf page merged into its left sibling will
+        # be destoryed, so we don't have to tidy up its ghosts.
         if node.right
+          hit "585b636910747266f2e8c8e05bbf83fa"
           right = unlink node
+          delete ghosts[right.page.address]
           @operations.push
             method: "mergeLeaves"
             key: right.key
@@ -2822,6 +2875,12 @@ class Balancer
         # Remove any lists containing only one node.
         else
           delete ordered[address]
+
+    # Rewrite position arrays to remove ghosts. 
+    for address, node of ghosts
+      @operations.unshift
+        method: "deleteGhost"
+        key: node.key
 
     # Perform the operations to balance the b&#x2011;tree.
     for operation in @operations
@@ -3117,32 +3176,27 @@ class Balancer
     # Do we need to split the root again?
     @drainRoot _ if root.length > @io.options.branchSize
 
-  deleteKey: ({ key }, _) ->
+  deleteGhost: ({ key }, _) ->
     descents = []
 
-    descents.push pivot = new Descent(io)
-    pivot.descend(sought = Descent.key(node.key), Descent.found(key))
+    sought = Descent.key(key)
+
+    descents.push pivot = new Descent(@io)
+    pivot.descend sought, Descent.found(key), _
     pivot.upgrade()
 
     descents.push leaf = pivot.fork()
-    leaf.descend(leaf, Descent.leaf)
+    leaf.descend sought, Descent.leaf, _
 
-    # If the page has emptied since we made our plan, then we pass the page onto
-    # the next balancer. There will be no key to replace the one we delete. We
-    # need to delete the page.
-    if leaf.positions.length is 1
-      @io.balancer.unbalanced leaf, true
-    else
-      @io.uncacheRecord leaf, leaf.positions[0]
-      leaf.positions.shift()
+    @io.splice leaf.page, 0, 1
+    leaf.page.ghosts = 0
 
-      # Seems as good a time to do this as any. This implementation cleans up
-      # after deletes rather aggressively.
-      @io.rewriteLeaf leaf, "pending", _
-      @io.rename leaf, "pending", "commit", _
-      @io.replace leaf, "commit", _
+    filename = @io.filename leaf.page.address
+    fd = fs.open filename, "a", 0o644, _
+    position = @io.writePositions fd, leaf.page, _
+    fs.close fd, _
 
-    @io.unlock page for page in pages
+    @io.unlock descent.page for descent in descents
 
   mergeLeaves: ({ key, unbalanced }, _) ->
     # Create a list of descents whose pages we'll unlock before we leave.
@@ -3198,7 +3252,7 @@ class Balancer
       # leaves.left.index = leaves.right.index - 1
 
     # Determine if we still have candidates for merge.
-    if leaves.left.page.length + leaves.right.page.length <= @io.options.leafSize
+    if leaves.left.page.length - leaves.left.page.ghosts + leaves.right.page.length - leaves.right.page.ghosts <= @io.options.leafSize
       # Uncache the pivot key. 
       @io.uncacheKey pivot.page, pivot.page.addresses[pivot.index]
 
@@ -3206,8 +3260,8 @@ class Balancer
       # right page of the merge.
       leaves.left.page.right = leaves.right.page.right
 
-      # Append all of the records
-      for index in [0...leaves.right.page.length]
+      # Append all of the records of the right leaf page, excluding any ghosts.
+      for index in [leaves.right.page.ghosts...leaves.right.page.length]
         # Fetch the record and read it from cache or file.
         position = leaves.right.page.positions[index]
         object = @io.stash leaves.right.page, position, _
@@ -3426,7 +3480,7 @@ class exports.Strata
   _cursor: (key, exclusive, constructor, _) ->
     # In theory, we can support null keys, since we can test to see if we've
     # been provided a key value by the arity of invocation.
-    sought = if key.length then Descent.key(key) else Descent.leftMost
+    sought = if key.length then Descent.key(key[0]) else Descent.leftMost
 
     # Descend to the penultimate branch page.
     descent = new Descent(@_io)
@@ -3434,10 +3488,8 @@ class exports.Strata
     descent.exclude() if exclusive
 
     descent.descend(sought, Descent.leaf, _)
-    # **TODO**: This needs to also be a part of balance planning.
-    index = descent.page.offset
-    index = @_io.find(descent.page, key, index, _) if key?
-    new constructor(key, index, descent)
+
+    new constructor(key, descent)
 
   iterator: (splat..., callback) ->
     @_cursor splat, false, Iterator, callback
