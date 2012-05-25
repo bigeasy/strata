@@ -1251,7 +1251,7 @@ class IO
   # until place using `replace`.
 
   #
-  rewriteBranch: (page, suffix, _) ->
+  writeBranch: (page, suffix, _) ->
     filename = @filename page.address, suffix
     record = [ page.right, page.addresses ]
     json = JSON.stringify(record)
@@ -1309,7 +1309,7 @@ class IO
     leaf = @encache @createLeaf -(@nextAddress++)
     @splice root, 0, 0, leaf.address
     # Write the root branch.
-    @rewriteBranch root, ".replace", _
+    @writeBranch root, ".replace", _
     @rewriteLeaf leaf, ".replace", _
     @replace leaf, ".replace", _
     @replace root, ".replace", _
@@ -3090,7 +3090,7 @@ class Balancer
       replacements.push split
 
       # Write the branches
-      @io.rewriteBranch penultimate.page, ".pending", _
+      @io.writeBranch penultimate.page, ".pending", _
 
       # Now rename the last action, committing to our balance.
       @io.rename penultimate.page, ".pending", ".commit", _
@@ -3166,9 +3166,9 @@ class Balancer
     @io.splice child.page, partition, child.page.length - partition
     @io.splice parent.page, parent.index + 1, 0, right.address
 
-    @io.rewriteBranch root, "pending", _
-    @io.rewriteBranch left, "replace", _
-    @io.rewriteBranch right, "replace", _
+    @io.writeBranch root, "pending", _
+    @io.writeBranch left, "replace", _
+    @io.writeBranch right, "replace", _
 
     @io.rename root, "pending", "commit", _
 
@@ -3231,10 +3231,10 @@ class Balancer
     @io.splice root, 0, 0, (page.address for page in children)
 
     # Write the child branch pages.
-    @io.rewriteBranch page, ".replace", _ for page in children
+    @io.writeBranch page, ".replace", _ for page in children
 
     # Rewrite our root.
-    @io.rewriteBranch root, ".pending", _
+    @io.writeBranch root, ".pending", _
 
     # Commit the changes.
     @io.rename root, ".pending", ".commit", _
@@ -3362,7 +3362,7 @@ class Balancer
       @io.uncacheKey pivot.page, pivot.page.addresses[pivot.index]
       @io.splice penultimate.right.page, penultimate.right.index, 1
 
-      @io.rewriteBranch penultimate.right.page, ".pending", _
+      @io.writeBranch penultimate.right.page, ".pending", _
 
       # **TODO**: If I succeed, how will I know to test the parents for balance?
       # **TODO**: Uh, can't the medic just note that this page needs to be
@@ -3462,10 +3462,10 @@ class Balancer
 
     @io.size -= child.right.page.size
 
-    @io.rewriteBranch child.left.page, "replace", _
+    @io.writeBranch child.left.page, "replace", _
 
     child.right.page.addresses.length = 0
-    @io.rewriteBranch child.right.page, "unlink", _
+    @io.writeBranch child.right.page, "unlink", _
 
     if parent.isPivot
       right = pivot.page
@@ -3476,7 +3476,7 @@ class Balancer
         @io.uncacheKey right, right.addresses[1]
       right.addresses.shift()
 
-    @io.rewriteBranch right, "pending", _
+    @io.writeBranch right, "pending", _
 
     # **TODO**: If I succeed, how will I know to test the parents for balance?
     # Got to think all over again in medic about who is whose parent?
@@ -3509,10 +3509,10 @@ class Balancer
       @io.uncache page for page in pages
       root.addresses = left.addresses.concat(right.addresses)
 
-    @io.rewriteBranch left, "unlink", _
-    @io.rewriteBranch right, "unlink", _
+    @io.writeBranch left, "unlink", _
+    @io.writeBranch right, "unlink", _
 
-    @io.rewriteBranch root, "pending", _
+    @io.writeBranch root, "pending", _
 
     @io.rename root, "pending", "commit", _
 
