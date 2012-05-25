@@ -6,6 +6,7 @@ An Evented I/O B-tree for Node.js.
     Source:         http://github.com/bigeasy/strata
     Documentation:  http://github.com/bigeasy/strata/wiki
 
+    Build Status:   http://travis-ci.org/bigeasy/strata
     Issues:         https://github.com/bigeasy/strata/issues
 
     License:        The MIT License
