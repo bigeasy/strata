@@ -2,10 +2,6 @@
 #
 # TK Define ***least child page***.
 #
-# **REMEMBER**: Alan! Your audience is you, or someone who knows enough Node.js,
-# CoffeeScript and algorithms to hack on this. This is not a lesson on
-# b&#x2011;trees. (Note to self as I write Docco.)
-#
 # ## Purpose
 #
 # Strata stores JSON objects on disk, according to a sort order of your
@@ -172,7 +168,7 @@ hit = (hash) -> say "# HIT #{hash}" if process.env.STRATA_COVERAGE
 #
 # ### Default Collation
 #
-# You will almost certainly define your down extractors and comparators, but the
+# You will almost certainly define your own extractors and comparators, but the
 # b&#x2011;tree has a default that works for b&#x2011;tree that stores only
 # JavaScript primitives.
 
@@ -196,7 +192,7 @@ extractor = (a) -> a
 # To find a record, we descend a tree of branch pages to find the leaf page that
 # contains the record. That is a b&#x2011;tree.
 #
-# ## Page Storage
+# ### Page I/O
 #
 # The `IO` class manages the reading and writing of leaf and branch pages to and
 # from disk, page locking and page caching. It also implements the binary search
@@ -204,20 +200,28 @@ extractor = (a) -> a
 
 #
 class IO
+  # ### Checksummed Lines of JSON
+  
   # Each page is stored in its own ***page file***. The page files are all kept
   # in a single directory. The directory is specified by the application
   # developer when the `Strata` object is constructed.
   #
-  # Page files contain one or more JSON strings, one string per line. The line
-  # based JSON format plays nice with traditional UNIX text utilities.
+  # Page files contain one or more JSON strings, one string per line. The JSON
+  # strings are checksummed. The checksum follows the JSON string on the line.
+  # The checksum is written as a hexadecimal number.
   #
-  # A ***leaf page file*** contains ***insert objects***, ***delete objects***
-  # and ***position array objects***, stored as JSON, one object per line, as
-  # described above. The JSON objects stored on behalf of the client are called
-  # ***records***. Records are contained within insert objects.
+  # The line based JSON format plays nice with traditional UNIX text utilities.
+  #
+  # A ***leaf page file*** acts as journal recording edit events. A JSON string
+  # is appended to the leaf page file to record a record insert or delete.
   #
   # A ***branch page file*** contains a single JSON object stored on a single
   # line that contains the array of child page addresses.
+  #
+  # **TK**: Documentation damage. We're now calling a reference array a position
+  # array in a leaf page and an address array in a branch page. Do we want to
+  # consolidate to reference array? I'm beginning to think so. May actions on
+  # this array are the same for both leaf pages and branch pages.
   #
   # When we read records and record keys off the disk, we store them in an
   # object that acts as a cache for the page. The in memory page object contains
@@ -231,13 +235,21 @@ class IO
   # integer array is dense, but the record cache only contains entries for
   # records that have been referenced. We use a binary search to probe for keys
   # and records, so we can avoid loading records we don't need.
+  #
+  # **TK**: Damage mentioned above ends here.
   # 
   # We count on our JavaScript array implementation to be [clever about memory
   # usage](http://stackoverflow.com/questions/614126/why-is-array-push-sometimes-faster-than-arrayn-value/614255\#614255).
    
   # Set directory and extractor. Initialize the page cache and most-recently
   # used list.
+  # 
+  # The checksum will become CRC 32 by default in future releases and
+  # configurable to use any of the `crypto` module hashes or no checksum at all.
   constructor: (@directory, @options) ->
+    { @extractor
+    , @comparator } = @options
+
     @cache          = {}
     @mru            = { address: null }
     @mru.next       = @mru
@@ -246,8 +258,33 @@ class IO
     @length         = 1024
     @balancer       = new Balancer
     @size           = 0
-    { @extractor
-    , @comparator } = @options
+
+    @checksum       = switch hash = @options.checksum or "sha1"
+      when "none" then -> 0
+      else
+        (m) -> require("crypto").createHash(hash).update(m).digest("hex")
+
+  # #### Verifying Checksums
+
+  # When we read a line from a branch page file or a leaf page file, we always
+  # verify the checksum. We use the checksum algorithm specified in the `Strata`
+  # constructor.
+  #
+  # In our branch page files and leaf page files, we store a JSON string one per
+  # line. The checksum is written as a hexadecimal number following the JSON
+  # string. We checksum the JSON string to and compare it to the stored
+  # checksum.
+  #
+  # A hyphen stored in place of the hexadecimal indicates no checksum.
+
+  #
+  _readLine: (line) ->
+    match = /^\s?(.*)\s((?:-|[\da-f]+))\s?$/i.exec line
+    if not match
+      throw new Error "corrupt line: cannot split line: #{line}"
+    if match[2] isnt "-" and @checksum(match[1]) isnt match[2]
+      throw new Error "corrupt line: invalid checksum"
+    JSON.parse(match[1])
 
   # Pages are identified by an integer page address. The page address is a number
   # that is incremented as new pages are created. A page file has a file name that
@@ -481,6 +518,7 @@ class IO
       address: address
       balancers: 0
       cache: {}
+      entries: 0
       length: 0
       locks: [[]]
       ghosts: 0
@@ -539,8 +577,6 @@ class IO
       @heft page, -size
       delete page.cache[position]
 
-
-
   # ### Appends for Durability
   #
   # A leaf page file contains JSON objects, one object on each line. The objects
@@ -561,15 +597,18 @@ class IO
   _writeJSON: (fd, page, object, _) ->
     page.position or= fs.fstat(fd, _).size
 
+    # Format the line with checksums.
+    json = JSON.stringify object
+    line = "#{json} #{@checksum(json)}"
+
     # Calcuate a buffer length. Take note of the current page position.
-    json            = JSON.stringify object
     position        = page.position
-    length          = Buffer.byteLength(json, "utf8")
+    length          = Buffer.byteLength(line, "utf8")
     buffer          = new Buffer(length + 1)
     offset          = 0
 
     # Write JSON and newline.
-    buffer.write json
+    buffer.write line
     buffer[length] = 0x0A
 
     # Write may be interrupted by a signal, so we keep track of how many bytes
@@ -605,7 +644,7 @@ class IO
   #
   # Each leaf page has a ***position array***. The position array references the
   # position in the leaf page file where an insert entry records the insertion
-  # fo a record into the leaf page. When we want the record, if it is not in
+  # of a record into the leaf page. When we want the record, if it is not in
   # memory, then we read it from the leaf page file at the given file position.
   #
   # When the record has been read from the leaf page file, it is cached in the
@@ -616,8 +655,25 @@ class IO
   # position in the leaf page and use that position as its place holder in the
   # position array.
   #
-  # The position array mainatins the file positions of the inert entries in the
+  # The position array maintains the file positions of the inert entries in the
   # collation order of the b&#x2011;tree.
+  #
+  # #### Per-Entry Housekeeping
+  #
+  # Each entry include a count of entries in the leaf page. The count of entries
+  # is always increasing by one. It is essentially a line number. We can detect
+  # missing lines by detecting a break in the series. We perform this check when
+  # loading a leaf page, to an extent. We can perform it against the entire leaf
+  # page if we suspect corruption. **TIDY**
+  #
+  # Each insert or delete entry also includes the count of records in the leaf
+  # page including the effects of the entry itself. The position array entry
+  # includes the count of records implicitly, since it includes the position
+  # array, which contains a position for each entry.
+  #
+  # **TODO** Including or prior to. I almost like prior to better. Almost easier
+  # to document. No, prior to is easier to document, but then it becomes
+  # inconsistent with entry number.
   #
   # #### Insert Entries
   #
@@ -627,15 +683,23 @@ class IO
   # If the first element is an integer greater than zero, it indicates an insert
   # entry. The integer is the one based index into the zero based position
   # array, indicating the index where the position of the current insert object
-  # should be inserted. The second element of the insert entry JSON array is the
-  # record object.
+  # should be inserted. The next two elements are the journal housekeeping. The
+  # last element is of the insert entry is the record object.
+  #
+  # The JSON array elements form a structure as follows.
+  #
+  #  * One-based index into position array.
+  #  * Count of records in leaf page including insert.
+  #  * Count of entries in leaf page including insert.
+  #  * Record to insert.
   #
   # When we read the insert entry, we will place the record in the record cache
   # for the page, mapping the position to the record.
 
   # Write an insert object. 
   writeInsert: (fd, page, index, record, _) ->
-    @_writeJSON fd, page, [ index + 1, record ], _
+    entry = [ index + 1, page.length - page.ghosts + 1, ++page.entries, record ]
+    @_writeJSON fd, page, entry, _
 
   # #### Delete Entries
   #
@@ -643,6 +707,15 @@ class IO
   # entry. The absolute value of the integer is the one based index into the
   # zero based position array, indicating the index of the position array
   # element that should be deleted.
+  #
+  # The next two elements are the journal housekeeping. The last element is of
+  # the insert entry is the record object.
+  #
+  # The JSON array elements of a delete entry form a structure as follows.
+  #
+  #  * Negated one-based index into position array.
+  #  * Count of records in leaf page including delete.
+  #  * Count of entries in leaf page including delete.
   #
   # Special handling of a deleted first record is required when we replay the
   # journal. The first record of a leaf page is not actually deleted from their
@@ -658,11 +731,12 @@ class IO
 
   # Write a delete object.
   writeDelete: (fd, page, index, _) ->
-    @_writeJSON fd, page, [ -(index + 1) ], _
+    entry = [ -(index + 1), page.length - page.ghosts - 1, ++page.entries ]
+    @_writeJSON fd, page, entry, _
 
   # #### Position Array Entires
   #
-  # An position array entry contains the position array itself. On occasion, we
+  # A position array entry contains the position array itself. On occasion, we
   # store a copy of a constructed position array entry in the leaf page file so
   # that we can read a large leaf page file quickly.
   #
@@ -683,15 +757,36 @@ class IO
   # search, we might only need a few records out of a great many records to find
   # the record we're looking for.
   #
-  # We write an array with the number of ghosts in the leaf page, the right
-  # sibling leaf page address, and the page positions. The first element of the
-  # array is zero to differentiate the position array entry from insert and
-  # delete entries.
+  # The position array entry includes some constant properties of the leaf page.
+  #
+  # We write an array with a leaf page file format version number, indicating
+  # the version of the leaf page file format, and therefore the version of
+  # entire the b&#x2011;tree file format.
+  #
+  # We also include the address of the right sibling. This address will only
+  # change when the leaf page file is rewritten.
+  #
+  # The JSON array elements of a delete entry form a structure as follows.
+  # 
+  #  * Zero to indicate a position array entry.
+  #  * Leaf page file format version number.
+  #  * Address of the right sibling leaf page.
+  #  * Count of ghost records, only ever `0` or `1`.
+  #  * Count of entries in leaf page including insert.
+  #  * The position array.
+  #
+  # The position array entry also acts as a header. We always place one at the
+  # start of a leaf page, so that we can look at the head of the head of a leaf
+  # page file to find its version and right sibling leaf page.
+  #
+  # **TK**: Counted b&#x2011;trees.
 
   # Write an position array entry.
   writePositions: (fd, page, _) ->
-    if typeof page.ghosts isnt "number" then throw new Error 0
-    @_writeJSON fd, page, [ 0, page.right, page.ghosts, page.positions ], _
+    entry = [ 0, 1, page.right, page.ghosts, ++page.entries, page.positions ]
+    @_writeJSON fd, page, entry, _
+
+  # #### Reading Leaves
 
   # Here is the backward search for a position in array in practice. We don't
   # really ever start from the beginning. The backwards than forwards read is
@@ -717,59 +812,37 @@ class IO
 
     #
     line      = ""
-    offset    = -1
     end       = stat.size
     eol       = stat.size
     buffer    = new Buffer(1024)
-    # **TODO**: (No home for this point.) You can edit your files, and you can
-    # certainly read them, but know that they are fragile. We treat extra
-    # whitespace as corruption, an indication that something is wrong. We're not
-    # forgiving, because that would complicate the code, also introduce
-    # ambiguities. If this were a binary file format, there would be no
-    # forgiveness. If we were truly a human format, then certainly there would
-    # be forgiveness, but we're not, not really a text format for editing, only
-    # one for sanity checking. Thus a line alway ends with `"]\n"`, so we know
-    # that something is wrong. If the last line does not end this way, it is
-    # treated as a bad write and the record is discarded. Now, we could do that,
-    # but the chances that a developer will dip into the files and make an edit
-    # are rather high. Hmm...
-    #
-    # But we store file positions, so making an edit will corrupt the files.
-    #
-    # **TODO**: Thinking about using SHA1 as a checksum and resuming it for each line.
-    #
-    # **TODO**: Actually, for some reason, thinking about this again. Easy
-    # enough to do something like a single function that checksums a string, so
-    # you can use whatever checksum you like, but the default always returns
-    # zero.
     while end
       end     = eol
       start   = end - buffer.length
       start   = 0 if start < 0
       read    = fs.read fd, buffer, 0, buffer.length, start, _
       end    -= read
-      offset  = read
       if buffer[--read] isnt 0x0A
-        throw new Error "corrupt leaves"
-      eos     = read + 1
-      stop    = if start is 0 then 0 else -1
+        throw new Error "corrupt leaves: no newline at end of file"
+      eos     = read
       while read != 0
         read = read - 1
-        if buffer[read] is 0x0A or read is stop
-          object = JSON.parse buffer.toString("utf8", read, eos)
-          eos   = read + 1
-          index = object.shift()
+        if buffer[read] is 0x0A or start is 0 and read is 0
+          entry = @_readLine buffer.toString "utf8", read, eos
+          eos   = read
+          index = entry.shift()
           if index is 0
-            page.right = object.shift()
-            page.ghosts = object.shift()
-            positions = object.shift()
+            entry.shift() # leaf page file format version
+            page.right = entry.shift()
+            page.ghosts = entry.shift()
+            page.entries = entry.shift()
+            positions = entry.shift()
             end = 0
             break
           else
             position = start + read + 1
-            splices.push [ index, position ]
             if index > 0
-              cache[position] = object.shift()
+              cache[position] = entry.pop()
+            splices.push [ index, position, entry.pop() ]
       eol = start + eos
 
     # Prime our page with the positions array read from the leaf file, or else
@@ -780,7 +853,9 @@ class IO
     # objects that we've gathered up in our splices array.
     splices.reverse()
     for splice in splices
-      [ index, position ] = splice
+      [ index, position, entry ] = splice
+      if entry isnt ++page.entries
+        throw new Error "leaf corrupt: incorrect entry position"
       if index > 0
         @splice page, index - 1, 0, position
       else if ~index is 0 and page.address isnt -1
@@ -812,7 +887,7 @@ class IO
   _readJSON: (buffer, read) ->
     for offset in [0...read]
       if buffer[offset] is 0x0A
-        return JSON.parse buffer.toString("utf8", 0, offset + 1)
+        return @_readLine buffer.toString("utf8", 0, offset + 1)
 
   # Our backward read can load a position array that has been written to the
   # leaf page file, without having to load all of the records referenced by the
@@ -842,13 +917,13 @@ class IO
     loop
       buffer = new Buffer(@length)
       read = fs.read fd, buffer, 0, buffer.length, position, _
-      if json = @_readJSON(buffer, read)
+      if entry = @_readJSON(buffer, read)
         break
       if @length > page.position - position
         throw new Error "cannot find end of record."
       @length += @length >>> 1
     fs.close fd, _
-    json.pop()
+    entry.pop()
   
 
   # Over time, a leaf page file can grow fat with deleted records. Each deleted
@@ -875,12 +950,16 @@ class IO
     positions = []
     cache = {}
     page.position = 0
+    page.entries = 0
 
-    # Gather up the new positions.
-    positions = []
+    # Capture the positions, while truncating the page position array.
+    positions = @splice page, 0, page.length
+
+    # Write an empty positions array to act as a header.
+    @writePositions fd, page, _
 
     # Rewrite each object in the positions array.
-    for position, index in page.positions
+    for position, index in positions
       # Read the object from the current page, but then uncache it.
       object = @stash page, position, _
       @uncacheRecord page, position
@@ -888,19 +967,20 @@ class IO
       # Write the record to the new file.
       position = @writeInsert fd, page, index, object.record, _
 
+      # Append the position to the page.
+      @splice page, page.length, 0, position
+
       # Stash the position and object.
-      positions.push position
       cache[position] = object
 
-    # Replace our positions in the page.
-    @splice page, 0, page.length, positions
+    # If we are not an empty page, then append a positions array.
+    if page.positions.length
+      # Cache the objects we've read from the existing page.
+      for position, object of cache
+        @cacheRecord page, position, object.record, object.key
 
-    # Cache the objects we've read from the existing page.
-    for position, object of cache
-      @cacheRecord page, position, object.record, object.key
-
-    # Write out our positions.
-    @writePositions fd, page, _
+      # Write out our positions.
+      @writePositions fd, page, _
 
     # Close our file.
     fs.close fd, _
@@ -1176,9 +1256,10 @@ class IO
     filename = @filename page.address, suffix
     record = [ page.right, page.addresses ]
     json = JSON.stringify(record)
-    buffer = new Buffer(json.length + 1)
-    buffer.write json
-    buffer[json.length] = 0x0A
+    line = "#{json} #{@checksum(json)}"
+    buffer = new Buffer(line.length + 1)
+    buffer.write line
+    buffer[line.length] = 0x0A
     fs.writeFile filename, buffer, "utf8", _
 
   # To read a branch page we read the entire page and evaluate it as JSON. We
@@ -1189,9 +1270,7 @@ class IO
   readBranch: (page, _) ->
     # Read addresses from JSON branch file.
     filename = @filename page.address
-    json = fs.readFile filename, "utf8", _
-    record = JSON.parse json
-    [ right, addresses ] = record
+    [ right, addresses ]  = @_readLine fs.readFile filename, "utf8", _
 
     # Splice addresses into page.
     @splice page, 0, 0, addresses
@@ -1231,10 +1310,10 @@ class IO
     leaf = @encache @createLeaf -(@nextAddress++)
     @splice root, 0, 0, leaf.address
     # Write the root branch.
-    @rewriteBranch root, "replace", _
-    @rewriteLeaf leaf, "replace", _
-    @replace leaf, "replace", _
-    @replace root, "replace", _
+    @rewriteBranch root, ".replace", _
+    @rewriteLeaf leaf, ".replace", _
+    @replace leaf, ".replace", _
+    @replace root, ".replace", _
 
   # #### Opening
   #

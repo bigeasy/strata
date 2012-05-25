@@ -1,10 +1,10 @@
 #!/usr/bin/env _coffee
 fs = require "fs"
 require("./proof") 6, ({ Strata, directory }, _) ->
-  fs.writeFile "#{directory}/segment00000000", "#{JSON.stringify([-1,[-1]])}\n", "utf8", _
+  fs.writeFile "#{directory}/segment00000000", "#{JSON.stringify([-1,[-1]])} -\n", "utf8", _
   fs.writeFile "#{directory}/segment00000001", """
-    #{JSON.stringify([0,0,0,[]])}
-    #{JSON.stringify([1,"a"])}
+    #{JSON.stringify([0,1,0,0,1,[]])} -
+    #{JSON.stringify([1,1,2,"a"])} -
 
   """, "utf8", _
 

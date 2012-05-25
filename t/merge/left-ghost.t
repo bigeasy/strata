@@ -13,9 +13,7 @@ require("./proof") 3, ({ Strata, directory, fixture: { load, objectify, serializ
   records = []
   cursor = strata.iterator "a", _
   loop
-    console.log cursor._page.address, cursor.offset, cursor.length, cursor._page.length, cursor._page.positions.length
     for i in [cursor.offset...cursor.length]
-      @say("i " + i)
       records.push cursor.get i, _
     break unless cursor.next(_)
   cursor.unlock()
@@ -27,7 +25,6 @@ require("./proof") 3, ({ Strata, directory, fixture: { load, objectify, serializ
   records = []
   cursor = strata.iterator "a", _
   loop
-    console.log cursor._page.ghosts, cursor.offset, cursor.length, cursor._page.positions
     for i in [cursor.offset...cursor.length]
       records.push cursor.get i, _
     break unless cursor.next(_)
