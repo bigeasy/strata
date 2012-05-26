@@ -1587,7 +1587,7 @@ class IO
     # If the page is already loaded, we wave the descent on through.
     else
       #
-      IO.checkJSONSize
+      IO.checkJSONSize page
       callback null, page
 
   # #### Unlock
@@ -1987,7 +1987,7 @@ class Iterator
         @_next = null
       # Otherwise fetch the next page.
       else
-        next = @_io.lock @_page.right, @_exclusive, _
+        next = @_io.lock @_page.right, @exclusive, _
 
       # Unlock the current page.
       @_io.unlock @_page
@@ -2140,29 +2140,27 @@ class Mutator extends Iterator
 
     # An insert location is ambiguous if it would append the record to the
     # current leaf page.
-    unambiguous = index <= @_page.length
+    unambiguous = index < @_page.length
 
     # If we are at the first leaf page and the key is the search key that got us
     # here, then this is, without a doubt, the correct leaf page for the record.
     unambiguous or= @key and @_io.comparator(@key, key) is 0
 
-    # If we are the last page, then there is no subsequent page to which the
-    # record could belong.
-    unambiguous or= not page.right
+    # An insert location is unambiguous if  we are the last page. There is no
+    # subsequent page to which the record could belong.
+    unambiguous or= not @_page.right
 
-    # **TK**: Sibling leaf page? How can there be any other sort of leaf page?
-    # Leaf pages doesn't have children.
-
-    # If we have an ambiguous insert location, peek at the next leaf page to see
-    # if the record doesn't really belong to a subsequent leaf page.
+    # An insert location is ambiguous if we have an ambiguous insert location,
+    # peek at the next leaf page to see if the record doesn't really belong to a
+    # subsequent leaf page.
     if not unambiguous
       # The lock must held because the balancer can swoop in and prune the ghost
       # first records and thereby change the key. It could not delete the page
       # nor merge the page, but it can prune dead first records.
 
       #
-      @_next or= @_io.lock @_page.right, @_exclusive, true, _
-      unambiguous = @_io.compare(key, @_io.key(@_next, 0, _)) < 0
+      @_next or= @_io.lock @_page.right, @exclusive, _
+      unambiguous = @_io.comparator(key, @_io.key(@_next, 0, _)) < 0
 
     # If insert location is unambiguous, insert the record and return the insert
     # index, otherwise return `undefined`.
