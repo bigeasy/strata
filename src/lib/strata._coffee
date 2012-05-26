@@ -9,7 +9,7 @@
 #
 # Strata is faster than a flat file, lighter than a database, with more capacity
 # than an in&#x2011;memory tree.
-# 
+#
 # Strata is a [b&#x2011;tree](http://en.wikipedia.org/wiki/B-tree)
 # implementation for [Node.js](http://nodejs.org/) that is **evented**,
 # **concurrent**, **persistent** and **durable**.
@@ -29,7 +29,7 @@
 #
 # Strata is **durable**. It only appends records to to file, so a hard shutdown
 # will only ever lose the few last records added. Pages are journaled when they
-# are vacuumed or rewritten. 
+# are vacuumed or rewritten.
 #
 # Strata is a b&#x2011;tree. A b&#x2011;tree is a database primitive. Using
 # Strata, you can start to experiment with database designs of your own. You can
@@ -44,7 +44,7 @@
 # Strata runs anywhere that Node.js runs, in pure JavaScript.
 #
 # ## Collaboration
-# 
+#
 # Documentation for Strata is presented here, in literate programming style. API
 # documentation is not yet available, so scoot down to the `Strata` class for an
 # in-depth look at the API. Have a look at the extensive test suite for examples
@@ -89,7 +89,7 @@
 # the leaves.
 #
 # Terms specific to our implementation will be introduced as they are
-# encountered in the document. 
+# encountered in the document.
 #
 # ## What is a b&#x2011;tree?
 #
@@ -201,7 +201,7 @@ extractor = (a) -> a
 #
 class IO
   # ### Checksummed Lines of JSON
-  
+
   # Each page is stored in its own ***page file***. The page files are all kept
   # in a single directory. The directory is specified by the application
   # developer when the `Strata` object is constructed.
@@ -237,13 +237,13 @@ class IO
   # and records, so we can avoid loading records we don't need.
   #
   # **TK**: Damage mentioned above ends here.
-  # 
+  #
   # We count on our JavaScript array implementation to be [clever about memory
   # usage](http://stackoverflow.com/questions/614126/why-is-array-push-sometimes-faster-than-arrayn-value/614255\#614255).
-   
+
   # Set directory and extractor. Initialize the page cache and most-recently
   # used list.
-  # 
+  #
   # The checksum will become CRC 32 by default in future releases and
   # configurable to use any of the `crypto` module hashes or no checksum at all.
   constructor: (@directory, @options) ->
@@ -395,9 +395,9 @@ class IO
   #
   # There is no way to get the size of a JavaScript object in memory, so we
   # don't have a way to know the actual size of cached pages in memory.
-  # 
+  #
   # We can get a pretty good relative measure of the size of a page, however,
-  # using the length of the JSON strings used to store records and references. 
+  # using the length of the JSON strings used to store records and references.
   #
   # The ***JSON size*** of a branch page is the string length of the address
   # array when serialized to JSON, plus the string length of each key loaded
@@ -416,7 +416,7 @@ class IO
   heft: (page, size) ->
     page.size += size
     @size += size
-  
+
   # #### Pages Held for Housekeeping
   #
   # There may be page objects loaded for housekeeping only. When balancing the
@@ -550,7 +550,7 @@ class IO
   # Each leaf page cache entry contains the record, key and the size of the
   # object at the time of caching.
 
-  # 
+  #
   cacheRecord: (page, position, record, key) ->
     # Uncache the exisiting record.
     @uncacheRecord page, position
@@ -584,7 +584,7 @@ class IO
   # essentially a log. Each time we write to the log, we open and close the
   # file, so that the operating system will flush our writes to disk. This gives
   # us durability.
-  # 
+  #
   # The caller determines which file should be written, so it opens and closes
   # the file descriptor. For record insertions and deletions, a file descriptor
   # is opened and closed for a single append. When rewriting an existing leaf
@@ -696,7 +696,7 @@ class IO
   # When we read the insert entry, we will place the record in the record cache
   # for the page, mapping the position to the record.
 
-  # Write an insert object. 
+  # Write an insert object.
   writeInsert: (fd, page, index, record, _) ->
     entry = [ index + 1, page.length - page.ghosts + 1, ++page.entries, record ]
     @_writeJSON fd, page, entry, _
@@ -743,8 +743,8 @@ class IO
   # When we read a leaf page file, if we read from the back of the file toward
   # the front, we can read backward until we find a position array entry. Then
   # we can read forward to the end of the file, applying the inserts and deletes
-  # that occurred after we wrote the position array entry. 
-  # 
+  # that occurred after we wrote the position array entry.
+  #
   # When a leaf page file is large, stashing the constructed position array at
   # the end means that the leaf page can be loaded quickly, because we will only
   # have to read backwards a few entries to find a mostly completed position
@@ -767,7 +767,7 @@ class IO
   # change when the leaf page file is rewritten.
   #
   # The JSON array elements of a delete entry form a structure as follows.
-  # 
+  #
   #  * Zero to indicate a position array entry.
   #  * Leaf page file format version number.
   #  * Address of the right sibling leaf page.
@@ -791,7 +791,7 @@ class IO
   # Here is the backward search for a position in array in practice. We don't
   # really ever start from the beginning. The backwards than forwards read is
   # just as resilient.
-  
+
   #
   readLeaf: (page, _) ->
     # We don't cache file descriptors after the leaf page file read. We will
@@ -863,7 +863,7 @@ class IO
         page.ghosts++
       else
         @splice page, -(index + 1), 1
-    
+
     # Cache the records we read while searching for the position array object.
     for position in page.positions
       if cache[position]
@@ -924,7 +924,6 @@ class IO
       @length += @length >>> 1
     fs.close fd, _
     entry.pop()
-  
 
   # Over time, a leaf page file can grow fat with deleted records. Each deleted
   # record means there's an insert object that is no longer useful. The delete
@@ -1066,7 +1065,7 @@ class IO
   # split page in the parent page.
   #
   # Our implementation does not store the keys, as you may have noticed, but
-  # descends down to the leaf page to fetch the record to use as a key. 
+  # descends down to the leaf page to fetch the record to use as a key.
   #
   # We start from a penultimate page as a root page. When a leaf page fills, we
   # split it, creating a new right leaf page. The penultimate page uses the
@@ -1252,7 +1251,7 @@ class IO
   # until place using `replace`.
 
   #
-  rewriteBranch: (page, suffix, _) ->
+  writeBranch: (page, suffix, _) ->
     filename = @filename page.address, suffix
     record = [ page.right, page.addresses ]
     json = JSON.stringify(record)
@@ -1310,7 +1309,7 @@ class IO
     leaf = @encache @createLeaf -(@nextAddress++)
     @splice root, 0, 0, leaf.address
     # Write the root branch.
-    @rewriteBranch root, ".replace", _
+    @writeBranch root, ".replace", _
     @rewriteLeaf leaf, ".replace", _
     @replace leaf, ".replace", _
     @replace root, ".replace", _
@@ -1347,7 +1346,7 @@ class IO
   #
   # Probably need "r" to not create the crash file, in case we're reading from a
   # read only file system, or something.
-  
+
   # &mdash;
   open: (_) ->
     try
@@ -1447,7 +1446,7 @@ class IO
   # lock. If a descent holds an exclusive write lock, then all lock requests by
   # other descents are blocked. If one or more descents hold a shared read lock,
   # then any request for an exclusive write lock is blocked. Any request for a
-  # shared read lock is granted, unless an exclusive write lock is queued. 
+  # shared read lock is granted, unless an exclusive write lock is queued.
   #
   # The locks are not re-entrant.
 
@@ -1477,7 +1476,7 @@ class IO
     #
     # We don't use mutexes, of course, because Node.js doesn't have the concept
     # of mutexes to protect critical sections of code the way that threaded
-    # programming platforms do. 
+    # programming platforms do.
     #
     # Nor do we use file system locking.
     #
@@ -1588,7 +1587,7 @@ class IO
     # If the page is already loaded, we wave the descent on through.
     else
       #
-      IO.checkJSONSize
+      IO.checkJSONSize page
       callback null, page
 
   # #### Unlock
@@ -1621,7 +1620,7 @@ class IO
       stash = @cacheRecord page, position, record
     stash
 
-  
+
   # A note on the theoretical `null` key. If the collation order places `null`
   # before all other values, that's a good choice, because that means that it
   # will never be used for a branch key. If it is used as a branch key, the
@@ -1683,7 +1682,7 @@ class IO
 #
 # We use the term descent to describe the both traversal of the b&#x2011;tree
 # and the subsequent actions performed when when the desired page is found.
-# 
+#
 # The descent is the unit of work in our concurrency model.  A descent is
 # analogous to a thread, because when a descent waits on I/O, other descents can
 # make progress.
@@ -1747,7 +1746,7 @@ class IO
 # that compares our search key against the keys in the root page. We determine
 # the correct child page to visit to continue our search. We lock the child
 # page. We then release the lock on the parent page.
-# 
+#
 # We repeat the process of locking a page, searching it, locking a child, and
 # then releasing the lock on the child's parent.
 #
@@ -1770,7 +1769,7 @@ class IO
 # #### Deadlock Prevention and Traversal Direction
 #
 # To prevent deadlock, we always move form a parent node to a child node, or
-# form a left sibling to a right sibling. 
+# form a left sibling to a right sibling.
 #
 # **TK**: Chunky.
 #
@@ -1816,7 +1815,7 @@ class Descent
   # may be at any level of the tree. We need to hold our lock on the branch page
   # that contains the key, while still descending the tree to find the two pages
   # that need to be merged. The two pages to merge may not be immediate children
-  # of the same penultimate branch page. 
+  # of the same penultimate branch page.
   #
   # **TK** Glurgh: We need to leave the key page locked, then go left and right
   # to find two separate pages. We do not need to hold locks on all the pages
@@ -1824,12 +1823,12 @@ class Descent
   # hand-over-hand logic works fine. Descending hand-over-hand exclusive will
   # cause us to wait for other descents to finish, squeezing the other descents
   # out.
-  
+
   # We create a new `Descent` which creates a dummy first page. We then assign
   # the addresses current descent to the dummy page, and copy the current index.
   fork: ->
     extend (new Descent @io), { @page, @exclusive, @index }
-  
+
   @key: (key) ->
     (_) -> @io.find @page, key, (if @page.address < 0 then @page.ghosts else 1), _
 
@@ -1875,9 +1874,9 @@ class Descent
       @unlock = true
       if @page.address >= 0 and @index < 0
         @index = (~@index) - 1
-          
+
 # ## Cursors
-# 
+#
 # Application developers navigate the b&#x2011;tree using one of two types of
 # ***cursor***. To read records in the b&x2011;tree they use an ***iterator***.
 # To read records, as well as insert and delete records, they use ***mutator***.
@@ -1913,7 +1912,7 @@ class Descent
 # **TK**: Definition of keys and records. Go back up and make sure one is there.
 #
 # #### Record Ranges
-# 
+#
 # The cursor will define an `offset` property and a `length` property. The
 # `offset` is positioned at the first record in the page whose key is equal to
 # or greater than the search key. The `length` is the count of records in the
@@ -1988,7 +1987,7 @@ class Iterator
         @_next = null
       # Otherwise fetch the next page.
       else
-        next = @_io.lock @_page.right, @_exclusive, _
+        next = @_io.lock @_page.right, @exclusive, _
 
       # Unlock the current page.
       @_io.unlock @_page
@@ -2035,7 +2034,7 @@ class Iterator
 # and insert them in one fell swoop.
 #
 # #### Ambiguous Insert Locations
-# 
+#
 # Insert locations for ranged inserts can be ambiguous if the binary search
 # indicates that a record should be inserted at the end of the leaf page, after
 # the current last record in the leaf page. If the insert location is after the
@@ -2141,29 +2140,27 @@ class Mutator extends Iterator
 
     # An insert location is ambiguous if it would append the record to the
     # current leaf page.
-    unambiguous = index <= @_page.length
+    unambiguous = index < @_page.length
 
     # If we are at the first leaf page and the key is the search key that got us
     # here, then this is, without a doubt, the correct leaf page for the record.
     unambiguous or= @key and @_io.comparator(@key, key) is 0
 
-    # If we are the last page, then there is no subsequent page to which the
-    # record could belong.
-    unambiguous or= not page.right
+    # An insert location is unambiguous if  we are the last page. There is no
+    # subsequent page to which the record could belong.
+    unambiguous or= not @_page.right
 
-    # **TK**: Sibling leaf page? How can there be any other sort of leaf page?
-    # Leaf pages doesn't have children.
-
-    # If we have an ambiguous insert location, peek at the next leaf page to see
-    # if the record doesn't really belong to a subsequent leaf page.
+    # An insert location is ambiguous if we have an ambiguous insert location,
+    # peek at the next leaf page to see if the record doesn't really belong to a
+    # subsequent leaf page.
     if not unambiguous
       # The lock must held because the balancer can swoop in and prune the ghost
       # first records and thereby change the key. It could not delete the page
       # nor merge the page, but it can prune dead first records.
 
       #
-      @_next or= @_io.lock @_page.right, @_exclusive, true, _
-      unambiguous = @_io.compare(key, @_io.key(@_next, 0, _)) < 0
+      @_next or= @_io.lock @_page.right, @exclusive, _
+      unambiguous = @_io.comparator(key, @_io.key(@_next, 0, _)) < 0
 
     # If insert location is unambiguous, insert the record and return the insert
     # index, otherwise return `undefined`.
@@ -2224,7 +2221,7 @@ class Mutator extends Iterator
 # client may obtain a cursor to the leaf pages, iterate through them deleting
 # records along the way. As the client alters leaf records, they are marked as
 # candidates for balance. Balancing will take place periodically, where a single
-# thread of control **TK** will 
+# thread of control **TK** will
 #
 # #### Staccato Balance Operations
 #
@@ -2265,7 +2262,7 @@ class Mutator extends Iterator
 #
 # There are compromises, but rather than create a complicated locking apparatus,
 # with upgrades, we're going to simplify our algorithm greatly, by descending
-# the tree once for each split or merge. 
+# the tree once for each split or merge.
 #
 # When we travel to the unbalanced page, we acquire shared locks in the hand
 # over hand fashion used for search. We acquire exclusive locks only on those
@@ -2295,7 +2292,7 @@ class Mutator extends Iterator
 #
 # We can see that a descent of the tree is analogous to a thread in
 # multi-threaded operation. A decent is an actor on the tree, performing a
-# single balance operation, searching 
+# single balance operation, searching
 #
 # ##### Delayed Balance
 #
@@ -2458,8 +2455,8 @@ class Mutator extends Iterator
 # always balance the upper levels immediately, we perform the cascade. Our tree
 # descent logic would have to account for these empty sub&#x2011;trees. Much
 # better to balance and keep things orderly.
-# 
-# This raises a concerns about live lock, that we might be balancing 
+#
+# This raises a concerns about live lock, that we might be balancing
 #
 # **TK**: Yes file times are enough. Even if the system clock changes
 # drastically, the file times are all relative to one another. It it changes
@@ -2486,7 +2483,7 @@ class Mutator extends Iterator
 # Merge is from right to left. When we merge we always merge a page into its
 # left sibling. If we've determined that a page from which records have been
 # deleted is supposed to merge with its right sibling, we apply our merge
-# algorithm to the right sibling, so that is is merged with its left sibling. 
+# algorithm to the right sibling, so that is is merged with its left sibling.
 #
 # When we compare a page from which records have been deleted against its
 # siblings, if the left sibling is to be merged, we use the page itself, the
@@ -2599,7 +2596,7 @@ class Mutator extends Iterator
 # merge page. We have to make an exception when the empty page is the left most
 # page in the entire tree, which is not uncommon for time series data where the
 # oldest records are regularly purged.
-# 
+#
 # #### Purging Deleted First Keys
 #
 # Now we merge the parents. We find a penultimate page by the key of the left
@@ -2722,13 +2719,13 @@ class Balancer
   # every page that has been added to the balancer, regardless of whether it has
   # grown, shrunk or returned to its original reported size. If the page is to
   # be deleted, because the leaf page is empty, that negates any fussing with
-  # the key. Same goes for the case where the page is to be merged. 
+  # the key. Same goes for the case where the page is to be merged.
 
   # Ah, also, when we do load these, when we want to get them from the cache, we
   # don't really need them to be loaded. We should reach in a probe the cache
   # ourselves. My former Java self would have to spend three days thinking about
   # encapsulation, probably create a new sub-project. Agony.
- 
+
   # Balancing will continue until morale improves. It may feel like a race
   # condition, but that can't be helped. There may be degenerate use cases where
   # the b&#x2011;tree cannot reach a balanced state. Inserts and deletes may be
@@ -2768,7 +2765,7 @@ class Balancer
 
     ghosts = {}
     max = @io.options.leafSize
- 
+
     # We put a new balancer in place of the current balancer. Any edits will be
     # considered by the next balancer.
     @io.balancer = new Balancer
@@ -2783,7 +2780,7 @@ class Balancer
     # page size. When we detect that we can't make an informed decision on a
     # page, we pass it onto the next balancer for consideration at the next
     # balance.
-    
+
     # For each page that has changed we add it to a doubly linked list.
     ordered = {}
     for address in addresses
@@ -2795,14 +2792,14 @@ class Balancer
       # We create linked lists that contain the leaf pages we're considering in
       # our balance plan. This is apart from the most-recently used list that
       # the pages themselves form.
-      # 
+      #
       # The linked list nodes contain a reference to the page, plus a reference
       # to the node containing the previous sibling, and a reference to the node
       # containing the next sibling. If a sibling is not participating in our
       # balance plan, then its link is null. This gives us one or more linked
       # lists that reference a series of leaf pages ordered according to their
       # order in the b&#x2011;tree.
-      # 
+      #
       # We are always allowed to get a lock on a single page, so long as we're
       # holding no other locks.
       if not node = ordered[address]
@@ -2818,7 +2815,7 @@ class Balancer
         ghosts[node.page.address] = node
 
       # If the page has shrunk in size, we gather the size of the left sibling
-      # page and the right sibling page. The right sibling page 
+      # page and the right sibling page. The right sibling page
       if node.length - length < 0
         hit "f349ecda729348fd6584808d362ccbe0"
         if node.page.address isnt -1
@@ -2873,7 +2870,7 @@ class Balancer
           right.left = null
       right
 
-    # Link a node 
+    # Link a node
     link = (node, right) ->
       if right
         right.left = node
@@ -2955,7 +2952,7 @@ class Balancer
         else
           delete ordered[address]
 
-    # Rewrite position arrays to remove ghosts. 
+    # Rewrite position arrays to remove ghosts.
     for address, node of ghosts
       @operations.unshift
         method: "deleteGhost"
@@ -3046,7 +3043,7 @@ class Balancer
 
       # Never a remainder record on the first page.
       offset = split.length
-      
+
       # Create new pages.
       while --pages
         # Create a new leaf page.
@@ -3091,7 +3088,7 @@ class Balancer
       replacements.push split
 
       # Write the branches
-      @io.rewriteBranch penultimate.page, ".pending", _
+      @io.writeBranch penultimate.page, ".pending", _
 
       # Now rename the last action, committing to our balance.
       @io.rename penultimate.page, ".pending", ".commit", _
@@ -3116,7 +3113,7 @@ class Balancer
       # bad, but great example. Imagine a page that has been full, but has a
       # sibling that has only one record. We add a record to the full page and
       # split it so that it is half empty. We then add it to the balancer with
-      # its half full record count. We want to check for merge and see  
+      # its half full record count. We want to check for merge and see
       #
       # **TODO**: Swipe &mdash; This always balance until perfect balance is
       # still imperfect.  We may still manage to create a b&#x2011;tree that has
@@ -3128,14 +3125,14 @@ class Balancer
       @io.balancer.unbalanced(page, true)
 
     # Release the pages locked during descent. Seems premature because we're not
-    # done yet, but no other descent makes progress unless we invoke a callback. 
+    # done yet, but no other descent makes progress unless we invoke a callback.
     @io.unlock(descent.page) for descent in descents
 
     # Although we've unlocked the penultimate branch page, we know that only the
     # balancer edit a branch page, so we are safe to make a decision about
     # whether to split the penultimate branch page while it is unlocked.
     @shouldSplitBranch penultimate.page, key, _
-    
+
 
   splitBranch: ({ key, depth }, _) ->
     descents = []
@@ -3167,9 +3164,9 @@ class Balancer
     @io.splice child.page, partition, child.page.length - partition
     @io.splice parent.page, parent.index + 1, 0, right.address
 
-    @io.rewriteBranch root, "pending", _
-    @io.rewriteBranch left, "replace", _
-    @io.rewriteBranch right, "replace", _
+    @io.writeBranch root, "pending", _
+    @io.writeBranch left, "replace", _
+    @io.writeBranch right, "replace", _
 
     @io.rename root, "pending", "commit", _
 
@@ -3232,10 +3229,10 @@ class Balancer
     @io.splice root, 0, 0, (page.address for page in children)
 
     # Write the child branch pages.
-    @io.rewriteBranch page, ".replace", _ for page in children
+    @io.writeBranch page, ".replace", _ for page in children
 
     # Rewrite our root.
-    @io.rewriteBranch root, ".pending", _
+    @io.writeBranch root, ".pending", _
 
     # Commit the changes.
     @io.rename root, ".pending", ".commit", _
@@ -3286,7 +3283,7 @@ class Balancer
     descents.push pivot = new Descent(@io)
     pivot.descend(sought = Descent.key(key), Descent.found(key), _)
     pivot.upgrade()
-    
+
     # Descend to the penultimate page, but first, take note of whether or not
     # the branch page that contains our key is also the penultimate page. We go
     # to the right-most descendant of the left child to find the left leaf page
@@ -3301,7 +3298,7 @@ class Balancer
 
     penultimate.right = pivot.fork()
     penultimate.right.descend sought, Descent.penultimate, _
-    
+
     # If the leaf page key was found in the penultimate page, then we do not
     # want to key the penultimate pages for release, because they are the same
     # as the branch key page, and the branch key page is already queued for
@@ -3313,7 +3310,7 @@ class Balancer
     # Descend to the leaves. Note that if we're on the penultimate page, the
     # next descent will follow the index we decremented above, the leaf page to
     # the left of the keyed page, instead of going to the right-most leaf page.
-    # 
+    #
     # We use `leftMost` in both cases, because we don't need an index into the
     # leaf page, only a lock on the leaf page.
     leaves = {}
@@ -3332,7 +3329,7 @@ class Balancer
 
     # Determine if we still have candidates for merge.
     if leaves.left.page.length - leaves.left.page.ghosts + leaves.right.page.length - leaves.right.page.ghosts <= @io.options.leafSize
-      # Uncache the pivot key. 
+      # Uncache the pivot key.
       @io.uncacheKey pivot.page, pivot.page.addresses[pivot.index]
 
       # The right leaf page of of the merged page is the right leaf page of the
@@ -3363,14 +3360,14 @@ class Balancer
       @io.uncacheKey pivot.page, pivot.page.addresses[pivot.index]
       @io.splice penultimate.right.page, penultimate.right.index, 1
 
-      @io.rewriteBranch penultimate.right.page, ".pending", _
+      @io.writeBranch penultimate.right.page, ".pending", _
 
       # **TODO**: If I succeed, how will I know to test the parents for balance?
       # **TODO**: Uh, can't the medic just note that this page needs to be
       # rebalanced? It can force a propagation of balance and merge checking of
-      # the parent. 
+      # the parent.
 
-      # Renaming pending to commit will cause the merge to roll forward. 
+      # Renaming pending to commit will cause the merge to roll forward.
       @io.rename penultimate.right.page, ".pending", ".commit", _
 
       @io.replace leaves.left.page, ".replace", _
@@ -3395,7 +3392,7 @@ class Balancer
 
     # Roughly: First choose which to merge. Then merge.
     #
-    # I believe that, once we find the key, we have found 
+    # I believe that, once we find the key, we have found
 
     # We need to go left then right when we see the key.
     descent = new Descent(@io)
@@ -3463,10 +3460,10 @@ class Balancer
 
     @io.size -= child.right.page.size
 
-    @io.rewriteBranch child.left.page, "replace", _
+    @io.writeBranch child.left.page, "replace", _
 
     child.right.page.addresses.length = 0
-    @io.rewriteBranch child.right.page, "unlink", _
+    @io.writeBranch child.right.page, "unlink", _
 
     if parent.isPivot
       right = pivot.page
@@ -3477,7 +3474,7 @@ class Balancer
         @io.uncacheKey right, right.addresses[1]
       right.addresses.shift()
 
-    @io.rewriteBranch right, "pending", _
+    @io.writeBranch right, "pending", _
 
     # **TODO**: If I succeed, how will I know to test the parents for balance?
     # Got to think all over again in medic about who is whose parent?
@@ -3510,16 +3507,16 @@ class Balancer
       @io.uncache page for page in pages
       root.addresses = left.addresses.concat(right.addresses)
 
-    @io.rewriteBranch left, "unlink", _
-    @io.rewriteBranch right, "unlink", _
+    @io.writeBranch left, "unlink", _
+    @io.writeBranch right, "unlink", _
 
-    @io.rewriteBranch root, "pending", _
+    @io.writeBranch root, "pending", _
 
     @io.rename root, "pending", "commit", _
 
     @io.unlink page, "unlink", _ for page in [ left, right ]
     @io.replace root, "commit", _
-      
+
     @io.unlock page for page in pages
 
 class Cassette
@@ -3600,6 +3597,6 @@ class exports.Strata
   balance: (_) -> @_io.balancer.balance(@_io, _)
 
 # ## Glossary
-# 
+#
 # * <a name="map">**map**</a> &mdash; A JavaScript Object that is used as a key
 # value store. We use the term *map*, because the term *object* is ambiguous.
