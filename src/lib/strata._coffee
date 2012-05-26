@@ -3041,9 +3041,6 @@ class Balancer
       replacements = []
       uncached = []
 
-      # Never a remainder record on the first page.
-      offset = split.length
-
       # Create new pages.
       while --pages
         # Create a new leaf page.
