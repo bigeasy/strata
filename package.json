@@ -6,12 +6,9 @@
 , "author" : "Alan Gutierrez <alan@prettyrobots.com>"
 , "contributors" : []
 , "devDependencies":
-  { "coffee-script": ">=1.1.3"
-  , "proof": ">=0.0.1" }
-, "dependencies":
-  { "streamline": ">=0.2.4" }
+  { "proof": "0.0.5" }
 , "lib" : "lib"
-, "main" : "./lib/strata"
+, "main" : "./lib/enclosed"
 , "scripts" : { "test": "proof t/*/*.t" }
 , "engines" : { "node": "> 0.6.0" }
 }
