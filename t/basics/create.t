@@ -1,23 +1,30 @@
-#!/usr/bin/env _coffee
-fs = require "fs"
-require("./proof") 4, ({ Strata, directory, fixture: { load, objectify } }, _) ->
-  strata = new Strata directory: directory, leafSize: 3, branchSize: 3
-  strata.create _
-  @equal strata._io.size, 4, "json size"
-  strata.close _
-  @ok 1, "created"
+#!/usr/bin/env node
 
-  expected = load "#{__dirname}/fixtures/create.after.json", _
-  actual = objectify directory, _
+var fs = require("fs"), strata;
+require("./proof")(4, function (Strata, tmp, load, objectify, callback) {
+  strata = new Strata(tmp, { leafSize: 3, branchSize: 3 });
+  strata.create(callback());
+}, function (callback, equal) {
+  equal(strata.stats().size, 4, "json size");
+  strata.close(callback());
+}, function (callback, ok, tmp, load) {
+  ok(1, "created");
+  load(__dirname + "/fixtures/create.after.json", callback("expected"));
+}, function (callback, tmp, objectify) {
+  actual = objectify(tmp, callback("actual"));
+  // TODO DRY this up.
+}, function (callback, tmp, actual, expected, say, deepEqual, equal, Strata) {
+  say(actual);
+  say(expected);
 
-  @say expected
-  @say actual
+  deepEqual(actual, expected, "written");
 
-  @deepEqual actual, expected, "written"
-
-  strata = new Strata directory: directory, leafSize: 3, branchSize: 3
-  strata.open _
-  cursor = strata.iterator "a", _
-  @equal cursor.length - cursor.offset, 0, "empty"
-  cursor.unlock()
-  strata.close _
+  strata = new Strata(tmp, { leafSize: 3, branchSize: 3 });
+  strata.open(callback());
+}, function (callback) {
+  strata.iterator("a", callback("cursor"));
+}, function (callback, cursor, equal) {
+  equal(cursor.length - cursor.offset, 0, "empty");
+ // cursor.unlock()
+ // strata.close(callback());
+});
