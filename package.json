@@ -6,7 +6,7 @@
 , "author" : "Alan Gutierrez <alan@prettyrobots.com>"
 , "contributors" : []
 , "devDependencies":
-  { "proof": "0.0.7" }
+  { "proof": "0.0.9" }
 , "lib" : "lib"
 , "main" : "./lib/enclosed"
 , "scripts" : { "test": "proof t/*/*.t" }
