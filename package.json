@@ -7,7 +7,7 @@
 , "contributors" : []
 , "devDependencies":
   { "coffee-script": ">=1.1.3"
-  , "proof": ">=0.0.1" }
+  , "proof": "0.0.4" }
 , "dependencies":
   { "streamline": ">=0.2.4" }
 , "lib" : "lib"
