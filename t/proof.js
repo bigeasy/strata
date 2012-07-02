@@ -68,13 +68,13 @@ function serialize (segments, directory, callback) {
 
     files.forEach(function (segment) {
       var records = [];
-      segments[file].forEach(function (line) {
-        record = [ JSON.string(line) ];
+      segments[segment].forEach(function (line) {
+        var record = [ JSON.stringify(line) ];
         record.push(crypto.createHash("sha1").update(record[0]).digest("hex"));
         records.push(record.join(" "));
       });
       records = records.join("\n") + "\n";
-      fs.writeFile(path.resolve(directory, file), records, "utf8", check(callback, written));
+      fs.writeFile(path.resolve(directory, segment), records, "utf8", check(callback, written));
     });
 
     function written () { if (++count == files.length) callback(null) }

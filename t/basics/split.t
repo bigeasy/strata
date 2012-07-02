@@ -1,9 +1,9 @@
 #!/usr/bin/env _coffee
 fs = require "fs"
-require("./proof") 2, ({ Strata, directory, fixture: { load, objectify, serialize } }, _) ->
-  serialize "#{__dirname}/fixtures/split.before.json", directory, _
+require("./proof") 2, (Strata, tmp, load, objectify, serialize, _) ->
+  serialize "#{__dirname}/fixtures/split.before.json", tmp, _
 
-  strata = new Strata directory: directory, leafSize: 3, branchSize: 3
+  strata = new Strata tmp, leafSize: 3, branchSize: 3
   strata.open _
 
   cursor = strata.mutator "b", _
@@ -21,7 +21,7 @@ require("./proof") 2, ({ Strata, directory, fixture: { load, objectify, serializ
   strata.balance _
 
   expected = load "#{__dirname}/fixtures/split.after.json", _
-  actual = objectify directory, _
+  actual = objectify tmp, _
 
   @say expected
   @say actual
