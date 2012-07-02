@@ -10,7 +10,7 @@ function (Strata, equal, deepEqual, say, tmp, callback) {
 
   }, function () {
 
-    equal(strata.stats().size, 4, "json size");
+    equal(strata.stats.size, 4, "json size");
     strata.close(callback());
     
   }, function (ok, load) {

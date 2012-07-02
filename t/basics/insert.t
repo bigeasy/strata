@@ -1,4 +1,7 @@
 #!/usr/bin/env _coffee
+
+var fs = require("fs"), strata;
+require("./proof")(6, function (tmp, equal, callback) {
 fs = require "fs"
 require("./proof") 3, ({ Strata, directory, fixture: { load, objectify } }, _) ->
   strata = new Strata directory: directory, leafSize: 3, branchSize: 3
