@@ -59,6 +59,24 @@ function load (segments, callback) {
   function parse (json) { callback(null, JSON.parse(json)) }
 }
 
+function gather (cursor, start, end, callback) {
+  var records = [];
+
+  test();
+
+  function test () {
+    if (start < end) get();
+    else callback(null, records);
+  }
+  function get () {
+    cursor.get(start++, check(callback, push));
+  }
+  function push (record) {
+    records.push(record);
+    test();
+  }
+}
+
 function serialize (segments, directory, callback) {
   if (typeof segments == "string") load(segments, check(callback, write));
   else write (segments);
@@ -139,6 +157,7 @@ module.exports = function (dirname) {
            , load: load
            , stringify: stringify
            , serialize: serialize
+           , gather: gather
            , objectify: objectify
            };
   });

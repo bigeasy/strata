@@ -1,29 +1,38 @@
-#!/usr/bin/env _coffee
-fs = require "fs"
-require("./proof") 2, (Strata, tmp, load, objectify, serialize, _) ->
-  serialize "#{__dirname}/fixtures/split.before.json", tmp, _
+#!/usr/bin/env node
 
-  strata = new Strata tmp, leafSize: 3, branchSize: 3
-  strata.open _
+require("./proof")(2, function (callback, tmp) {
+  var fs = require("fs"), strata, records = [];
 
-  cursor = strata.mutator "b", _
-  cursor.insert "b", "b", ~ cursor.index, _
-  cursor.unlock()
+  callback(function (serialize) {
+    serialize(__dirname + "/fixtures/split.before.json", tmp, callback());
+  }, function (Strata) {
+    strata = new Strata(tmp, { leafSize: 3, branchSize: 3 });
+    strata.open(callback());
+  }, function () {
+    strata.mutator("b", callback("cursor"));
+  }, function (cursor) {
+    cursor.insert("b", "b", ~ cursor.index, callback());
+  }, function (cursor) {
+    cursor.unlock();
 
-  records = []
-  cursor = strata.iterator "a", _
-  for i in [cursor.offset...cursor.length]
-    records.push cursor.get i, _
-  cursor.unlock()
+    records = [];
+    strata.iterator("a", callback("cursor"));
+  }, function (cursor, gather) {
+    gather(cursor, cursor.offset, cursor.length, callback("records"));
+  }, function (cursor) {
+    cursor.unlock();
+  }, function (records, deepEqual) {
+    deepEqual(records, [ "a", "b", "c", "d" ], "records");
+  }, function () {
+    strata.balance(callback());
+  }, function (load) {
+    load(__dirname + "/fixtures/split.after.json", callback("expected"));
+  }, function (objectify) {
+    objectify(tmp, callback("actual"));
+  }, function(actual, expected, say, deepEqual) {
+    say(expected);
+    say(actual);
 
-  @deepEqual records, [ "a", "b", "c", "d" ], "records"
-
-  strata.balance _
-
-  expected = load "#{__dirname}/fixtures/split.after.json", _
-  actual = objectify tmp, _
-
-  @say expected
-  @say actual
-
-  @deepEqual actual, expected, "split"
+    deepEqual(actual, expected, "split");
+  });
+});
