@@ -1,27 +1,25 @@
-#!/usr/bin/env _coffee
-fs = require "fs"
-require("./proof") 2, (Strata, tmp,  serialize, load, objectify, _) ->
-  serialize "#{__dirname}/fixtures/split.before.json", tmp, _
-
-  strata = new Strata tmp, leafSize: 3, branchSize: 3
-  strata.open _
-
-  records = []
-  cursor = strata.iterator "a", _
-  for i in [cursor.offset...cursor.length]
-    records.push cursor.get i, _
-  cursor.unlock()
-
-  @deepEqual records, [ "a", "c", "d" ], "records"
-
-  cursor = strata.mutator "a", _
-  cursor.remove cursor.indexOf("c", _), _
-  cursor.unlock()
-
-  records = []
-  cursor = strata.iterator "a", _
-  for i in [cursor.offset...cursor.length]
-    records.push cursor.get i, _
-  cursor.unlock()
-
-  @deepEqual records, [ "a", "d" ], "deleted"
+#!/usr/bin/env node
+var fs = require('fs');
+require('./proof')(2, function (Strata, async, tmp,  load, objectify, _) {
+  var strata = new Strata(tmp, { leafSize: 3, branchSize: 3 });
+  async(function (serialize) {
+    serialize(__dirname + '/fixtures/split.before.json', tmp, async());
+  }, function () {
+    strata.open(async());
+  }, function (async, gather) {
+    gather(async, strata);
+  }, function (records, deepEqual) {
+    deepEqual(records, [ "a", "c", "d" ], "records");
+  }, function () {
+    strata.mutator("a", async());
+  }, function (cursor) {
+    cursor.indexOf("c", async())
+  }, function (i, cursor) {
+    cursor.remove(i, async());
+  }, function (async, gather, cursor) {
+    cursor.unlock()
+    gather(async, strata);
+  }, function (records, deepEqual) {
+    deepEqual(records, [ "a", "d" ], "records");
+  });
+});

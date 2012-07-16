@@ -59,22 +59,27 @@ function load (segments, callback) {
   function parse (json) { callback(null, JSON.parse(json)) }
 }
 
-function gather (cursor, start, end, callback) {
+function gather (async, strata) {
   var records = [];
-
-  test();
-
-  function test () {
-    if (start < end) get();
-    else callback(null, records);
-  }
-  function get () {
-    cursor.get(start++, check(callback, push));
-  }
-  function push (record) {
+  async(function () {
+    records = []
+    strata.iterator("a", async());
+  }, function (cursor) {
+    return true;
+  }, function page (more, cursor) {
+    if (more) return 0;
+    cursor.unlock();
+    async(null, records);
+  }, function item (i, cursor, page) {
+    if (i < cursor.length) {
+      cursor.get(i, async()); 
+    } else {
+      cursor.next(async(page));
+    }
+  }, function (record, i, item) {
     records.push(record);
-    test();
-  }
+    async(item)(null, i + 1);
+  });
 }
 
 function serialize (segments, directory, callback) {
@@ -147,18 +152,20 @@ function deltree (directory, callback) {
 
 module.exports = function (dirname) {
   var tmp = dirname + "/tmp";
-  return require("proof")(function cleanup (callback) {
-    deltree(tmp, callback());
-  }, function (callback) {
-    fs.mkdir(tmp, 0755, callback());
-  }, function () {
-    return { Strata: Strata
-           , tmp: tmp
-           , load: load
-           , stringify: stringify
-           , serialize: serialize
-           , gather: gather
-           , objectify: objectify
-           };
+  return require("proof")(function cleanup (async) {
+    deltree(tmp, async());
+  }, function (async) {
+    async(function () {
+      fs.mkdir(tmp, 0755, async());
+    }, function () {
+      return { Strata: Strata
+             , tmp: tmp
+             , load: load
+             , stringify: stringify
+             , serialize: serialize
+             , gather: gather
+             , objectify: objectify
+             };
+    });
   });
 };

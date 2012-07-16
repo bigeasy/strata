@@ -2,25 +2,25 @@
 
 var fs = require("fs"), strata;
 require("./proof")(4,
-function (Strata, equal, deepEqual, say, tmp, callback) {
-  callback(function () {
+function (Strata, equal, deepEqual, say, tmp, async) {
+  async(function () {
 
     strata = new Strata(tmp, { leafSize: 3, branchSize: 3 });
-    strata.create(callback());
+    strata.create(async());
 
   }, function () {
 
     equal(strata.stats.size, 4, "json size");
-    strata.close(callback());
+    strata.close(async());
     
   }, function (ok, load) {
 
     ok(1, "created");
-    load(__dirname + "/fixtures/create.after.json", callback("expected"));
+    load(__dirname + "/fixtures/create.after.json", async());
 
-  }, function (objectify) {
+  }, function (expected, objectify) {
 
-    objectify(tmp, callback("actual"));
+    objectify(tmp, async());
 
   }, function (actual, expected) {
 
@@ -30,13 +30,13 @@ function (Strata, equal, deepEqual, say, tmp, callback) {
     deepEqual(actual, expected, "written");
 
     strata = new Strata(tmp, { leafSize: 3, branchSize: 3 });
-    strata.open(callback());
+    strata.open(async());
 
-  }, function (callback) {
+  }, function () {
 
-    strata.iterator("a", callback("cursor"));
+    strata.iterator("a", async());
 
-  }, function (callback, cursor, equal) {
+  }, function (cursor, equal) {
 
     equal(cursor.length - cursor.offset, 0, "empty");
     //cursor.unlock()

@@ -1,23 +1,23 @@
 #!/usr/bin/env node
 
-require("./proof")(3, function (callback, tmp) {
+require("./proof")(3, function (async, tmp) {
   var fs = require("fs"), strata;
 
-  callback(function (Strata) {
+  async(function (Strata) {
 
     strata = new Strata(tmp, { leafSize: 3, branchSize: 3 });
-    strata.create(callback());
+    strata.create(async());
 
   }, function () {
 
-    strata.mutator("a", callback("cursor"));
+    strata.mutator("a", async());
 
   }, function (cursor) {
 
     var cassette = strata.cassette("a");
-    cursor.insert(cassette.record, cassette.key, ~ cursor.index, callback("inserted"));
+    cursor.insert(cassette.record, cassette.key, ~ cursor.index, async());
 
-  }, function (cursor, inserted, ok, equal) {
+  }, function (inserted, cursor, ok, equal) {
 
     ok(inserted, "inserted");
 
@@ -25,12 +25,15 @@ require("./proof")(3, function (callback, tmp) {
 
     equal(strata.stats.size, 32, "json size");
 
-    strata.close(callback());
+    strata.close(async());
 
-  }, function (load, objectify) {
+  }, function (load) {
 
-    load(__dirname + "/fixtures/insert.json", callback("expected"));
-    objectify(tmp, callback("actual"));
+    load(__dirname + "/fixtures/insert.json", async());
+
+  }, function (expected, objectify) {
+
+    objectify(tmp, async());
 
   }, function (actual, expected, say, deepEqual) {
 
