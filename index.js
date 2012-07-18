@@ -2581,7 +2581,7 @@ function Cursor (exclusive, searchKey, page, index) {
     // An insert location is ambiguous if we have an ambiguous insert location,
     // peek at the next leaf page to see if the record doesn't really belong to a
     // subsequent leaf page.
-    function abiguity () {
+    function ambiguity () {
       // The lock must held because the balancer can swoop in and prune the
       // ghost first records and thereby change the key. It could not delete
       // the page nor merge the page, but it can prune dead first records.
@@ -2598,7 +2598,7 @@ function Cursor (exclusive, searchKey, page, index) {
       }
 
       function compare (siblingKey) {
-        if (comparator(searchKey[0], siblingKey) < 0) insert();
+        if (comparator(key, siblingKey) < 0) insert();
         else callback(null, false);
       }
     }
