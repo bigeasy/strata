@@ -7,8 +7,6 @@
 , "contributors" : []
 , "devDependencies":
   { "proof": "0.0.15" }
-, "lib" : "lib"
-, "main" : "./lib/enclosed"
 , "scripts" : { "test": "proof t/*/*.t" }
 , "engines" : { "node": "> 0.6.0" }
 }

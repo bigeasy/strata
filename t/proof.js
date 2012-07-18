@@ -1,7 +1,7 @@
 var fs = require("fs")
   , path = require("path")
   , crypto = require("crypto")
-  , Strata = require("../lib/enclosed")
+  , Strata = require("..")
   ;
 
 function check (callback, forward) {
