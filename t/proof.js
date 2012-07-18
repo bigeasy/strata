@@ -67,7 +67,7 @@ function gather (async, strata) {
   }, function (cursor) {
     return true;
   }, function page (more, cursor) {
-    if (more) return 0;
+    if (more) return cursor.offset;
     cursor.unlock();
     async(null, records);
   }, function item (i, cursor, page) {
