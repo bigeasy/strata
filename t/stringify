@@ -1,5 +1,5 @@
-#!/usr/bin/env _coffee
-fixture = require "./fixture"
-[ directory ] = process.argv.slice(2)
-fixture.stringify directory, (error) -> throw error if error
+#!/usr/bin/env node
 
+require("./t/proof").stringify(process.argv[2], function (error, result) {
+  if (error) throw error;
+});
