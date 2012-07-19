@@ -1,45 +1,35 @@
-#!/usr/bin/env _coffee
-fs = require "fs"
-require("./proof") 4, ({ Strata, directory, fixture: { load, objectify, serialize } }, _) ->
-  serialize "#{__dirname}/fixtures/merge.before.json", directory, _
+#!/usr/bin/env node
 
-  strata = new Strata directory: directory, leafSize: 3, branchSize: 3
-  strata.open _
+require('./proof')(4, function (async, Strata, tmp, deepEqual) {
+  var strata = new Strata(tmp, { leafSize: 3, branchSize: 3 }), fs = require('fs');
+  async(function (serialize) { 
+    serialize(__dirname + '/fixtures/merge.before.json', tmp, async());
+  }, function () {
+    strata.open(async());
+  }, function () {
+    strata.mutator('a', async());
+  }, function (cursor) {
+    cursor.remove(cursor.index, async());
+  }, function (async, cursor, equal) {
+    equal(cursor.index, 0, 'unghostable');
+    cursor.unlock()
+  }, function (gather) {
+    gather(async, strata);
+  }, function (records) {
+    deepEqual(records, [ 'b', 'c', 'd' ], 'records');
+    strata.balance(async());
+  }, function (gather) {
+    gather(async, strata);
+  }, function (records, load) {
+    deepEqual(records, [ 'b', 'c', 'd' ], 'merged');
+    load(__dirname + '/fixtures/left-most-unghostable.after.json', async());
+  }, function (expected, objectify) {
+    objectify(tmp, async());
+  }, function (actual, expected, say) {
+    say(expected);
+    say(actual);
 
-  cursor = strata.mutator "a", _
-  cursor.delete cursor.index, _
-  cursor.unlock()
-
-  @equal cursor.index, 0, "unghostable"
-
-  records = []
-  cursor = strata.iterator "a", _
-  loop
-    for i in [cursor.offset...cursor.length]
-      records.push cursor.get i, _
-    break unless cursor.next(_)
-  cursor.unlock()
-
-  @deepEqual records, [ "b", "c", "d" ], "records"
-
-  strata.balance _
-
-  records = []
-  cursor = strata.iterator "a", _
-  @say cursor.offset
-  @say cursor._page.ghosts
-  loop
-    for i in [cursor.offset...cursor.length]
-      records.push cursor.get i, _
-    break unless cursor.next(_)
-  cursor.unlock()
-
-  @deepEqual records, [ "b", "c", "d" ], "merged"
-
-  expected = load "#{__dirname}/fixtures/left-most-unghostable.after.json", _
-  actual = objectify directory, _
-
-  @say expected
-  @say actual
-
-  @deepEqual actual, expected, "after"
+    deepEqual(actual, expected, 'after');
+    strata.close(async());
+  });
+});
