@@ -1,10 +1,15 @@
-#!/usr/bin/env _coffee
-fs = require "fs"
-require("./proof") 2, ({ Strata, directory }, _) ->
-  strata = new Strata directory: directory, leafSize: 3, branchSize: 3
-  strata.create(_)
-  strata.close(_)
-  strata = new Strata directory: directory, leafSize: 3, branchSize: 3
-  strata.open(_)
-  @equal strata._io.size, 0, "json size"
-  @equal strata._io.nextAddress, 2, "next address"
+#!/usr/bin/env node
+
+var fs = require("fs"), strata;
+require("./proof")(2, function (Strata, tmp, async) {
+  strata = new Strata(tmp, { leafSize: 3, branchSize: 3 });
+  strata.create(async());
+}, function (async) {
+  strata.close(async());
+}, function (Strata, async, tmp) {
+  strata = new Strata(tmp, { leafSize: 3, branchSize: 3 });
+  strata.open(async())
+}, function (equal) {
+  equal(strata.stats.size, 0, "json size");
+  equal(strata.stats.nextAddress, 2, "next address");
+});

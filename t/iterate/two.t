@@ -1,22 +1,26 @@
-#!/usr/bin/env _coffee
-fs = require "fs"
-require("./proof") 5, ({ Strata, directory, fixture: { serialize } }, _) ->
-  serialize "#{__dirname}/fixtures/two.json", directory, _
+#!/usr/bin/env node
 
-  strata = new Strata directory: directory, leafSize: 3, branchSize: 3
-  strata.open(_)
-
-  cursor = strata.iterator("a", _)
-  @equal cursor.index, 0, "found"
-  @equal cursor.offset, 0, "found"
-  @equal cursor.length, 2, "length"
-
-  records = []
-  records.push cursor.get(cursor.index, _)
-
-  @equal cursor.index, 0, "same index"
-  cursor.unlock()
-
-  records.push cursor.get(cursor.index + 1, _)
-
-  @deepEqual records, [ "a", "b" ], "records"
+require('./proof')(5, function (async, Strata, tmp, deepEqual) {
+  var strata = new Strata(tmp, { leafSize: 3, branchSize: 3 }), fs = require('fs'), records = [];
+  async(function (serialize) { 
+    serialize(__dirname + '/fixtures/two.json', tmp, async());
+  }, function () {
+    strata.open(async());
+  }, function () {
+    strata.iterator('a', async());
+  }, function (cursor, equal) {
+    equal(cursor.index, 0, 'found');
+    equal(cursor.offset, 0, 'found');
+    equal(cursor.length, 2, 'length');
+    cursor.get(cursor.index, async());
+  }, function (record, cursor, equal) {
+    records.push(record);
+    equal(cursor.index, 0, 'same index');
+    cursor.get(cursor.index + 1, async());
+  }, function (record, cursor) {
+    records.push(record);
+    deepEqual(records, [ 'a', 'b' ], 'records');
+    cursor.unlock();
+    strata.close(async());
+  });
+});

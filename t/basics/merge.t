@@ -1,41 +1,38 @@
-#!/usr/bin/env _coffee
-fs = require "fs"
-require("./proof") 3, ({ Strata, directory, fixture: { load, objectify, serialize } }, _) ->
-  serialize "#{__dirname}/fixtures/merge.before.json", directory, _
+#!/usr/bin/env node
 
-  strata = new Strata directory: directory, leafSize: 3, branchSize: 3
-  strata.open _
-
-  cursor = strata.mutator "b", _
-  cursor.delete cursor.index, _
-  cursor.unlock()
-
-  records = []
-  cursor = strata.iterator "a", _
-  loop
-    for i in [cursor.offset...cursor.length]
-      records.push cursor.get i, _
-    break unless cursor.next(_)
-  cursor.unlock()
-
-  @deepEqual records, [ "a", "c", "d" ], "records"
-
-  strata.balance _
-
-  expected = load "#{__dirname}/fixtures/merge.after.json", _
-  actual = objectify directory, _
-
-  @say expected
-  @say actual
-
-  @deepEqual actual, expected, "merge"
-
-  records = []
-  cursor = strata.iterator "a", _
-  loop
-    for i in [cursor.offset...cursor.length]
-      records.push cursor.get i, _
-    break unless cursor.next(_)
-  cursor.unlock()
-
-  @deepEqual records, [ "a", "c", "d" ], "merged"
+require("./proof")(3, function (Strata, tmp, load, objectify, serialize, deepEqual, async) {
+  var fs = require ('fs'), strata;
+  async(function (serialize) {
+    serialize(__dirname + "/fixtures/merge.before.json", tmp, async());
+  }, function () {
+    strata = new Strata(tmp, { leafSize: 3, branchSize: 3 });
+    strata.open(async());
+  }, function () {
+    strata.mutator("b", async());
+  }, function (cursor) {
+    async(function () {
+      cursor.remove(cursor.index, async());
+    }, function () {
+      cursor.unlock();
+    });
+  }, function (records, gather) {
+    gather(async, strata);
+  }, function (records) {
+    deepEqual(records, [ "a", "c", "d" ], "records");
+    strata.balance(async());
+  }, function () {
+    load(__dirname + '/fixtures/merge.after.json', async());
+  }, function (expected) {
+    objectify(tmp, async());
+  }, function (actual, expected, say) {
+    say(expected);
+    say(actual);
+  
+    deepEqual(actual, expected, "merge");
+  }, function (records, gather) {
+    gather(async, strata);
+  }, function (records) {
+    deepEqual(records, [ "a", "c", "d" ], "records");
+    strata.balance(async());
+  });
+});

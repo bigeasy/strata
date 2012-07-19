@@ -1,29 +1,32 @@
-#!/usr/bin/env _coffee
-fs = require "fs"
-require("./proof") 2, ({ Strata, directory, fixture: { load, objectify, serialize } }, _) ->
-  serialize "#{__dirname}/fixtures/split.before.json", directory, _
+#!/usr/bin/env node
 
-  strata = new Strata directory: directory, leafSize: 3, branchSize: 3
-  strata.open _
+require("./proof")(2, function (async, tmp) {
+  var fs = require("fs"), strata, records = [];
 
-  cursor = strata.mutator "b", _
-  cursor.insert "b", "b", ~ cursor.index, _
-  cursor.unlock()
+  async(function (serialize) {
+    serialize(__dirname + "/fixtures/split.before.json", tmp, async());
+  }, function (Strata) {
+    strata = new Strata(tmp, { leafSize: 3, branchSize: 3 });
+    strata.open(async());
+  }, function () {
+    strata.mutator("b", async());
+  }, function (cursor) {
+    cursor.insert("b", "b", ~ cursor.index, async());
+  }, function ($1, cursor, gather) {
+    cursor.unlock();
+    gather(async, strata);
+  }, function (records, deepEqual) {
+    deepEqual(records, [ "a", "b", "c", "d" ], "records");
+  }, function () {
+    strata.balance(async());
+  }, function (load) {
+    load(__dirname + "/fixtures/split.after.json", async());
+  }, function (expected, objectify) {
+    objectify(tmp, async());
+  }, function(actual, expected, say, deepEqual) {
+    say(expected);
+    say(actual);
 
-  records = []
-  cursor = strata.iterator "a", _
-  for i in [cursor.offset...cursor.length]
-    records.push cursor.get i, _
-  cursor.unlock()
-
-  @deepEqual records, [ "a", "b", "c", "d" ], "records"
-
-  strata.balance _
-
-  expected = load "#{__dirname}/fixtures/split.after.json", _
-  actual = objectify directory, _
-
-  @say expected
-  @say actual
-
-  @deepEqual actual, expected, "split"
+    deepEqual(actual, expected, "split");
+  });
+});

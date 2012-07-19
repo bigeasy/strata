@@ -1,47 +1,35 @@
-#!/usr/bin/env _coffee
-fs = require "fs"
-require("./proof") 4, ({ Strata, directory, fixture: { serialize, load, objectify } }, _) ->
-  serialize "#{__dirname}/fixtures/ambiguous.before.json", directory, _
+#!/usr/bin/env node
 
-  strata = new Strata directory: directory, leafSize: 3, branchSize: 3
-  strata.open(_)
-
-  records = []
-  cursor = strata.iterator "a", _
-  loop
-    for i in [cursor.offset...cursor.length]
-      records.push cursor.get i, _
-    break unless cursor.next(_)
-  cursor.unlock()
-
-  @deepEqual records, [ "a", "b", "d", "f", "g", "h", "i", "l", "m", "n" ], "records"
-
-  cursor = strata.mutator "g", _
-  cursor.delete cursor.index, _
-  cursor.unlock()
-
-  records = []
-  cursor = strata.iterator "a", _
-  loop
-    for i in [cursor.offset...cursor.length]
-      records.push cursor.get i, _
-    break unless cursor.next(_)
-  cursor.unlock()
-
-  @deepEqual records, [ "a", "b", "d", "f", "h", "i", "l", "m", "n" ], "records after delete"
-
-  cursor = strata.mutator "j", _
-  unambiguous = cursor.insert "j", "j", ~cursor.index, _
-  cursor.unlock()
-
-  @ok unambiguous, "unambiguous"
-
-  records = []
-  cursor = strata.iterator _
-  loop
-    for i in [cursor.offset...cursor.length]
-      records.push cursor.get i, _
-    break unless cursor.next(_)
-  cursor.unlock()
-
-  @deepEqual records, [ "a", "b", "d", "f", "h", "i", "j", "l", "m", "n" ], "records after insert"
+require('./proof')(4, function (async, Strata, tmp, deepEqual) {
+  var strata = new Strata(tmp, { leafSize: 3, branchSize: 3 }), fs = require('fs');
+  async(function (serialize) { 
+    serialize(__dirname + '/fixtures/ambiguous.before.json', tmp, async());
+  }, function () {
+    strata.open(async());
+  }, function (gather) {
+    gather(async, strata);
+  }, function (records) {
+    deepEqual(records, [ 'a', 'b', 'd', 'f', 'g', 'h', 'i', 'l', 'm', 'n' ], 'records');
+  }, function () {
+    strata.mutator('g', async());
+  }, function (cursor) {
+    cursor.remove(cursor.index, async());
+  }, function (async, gather, cursor) {
+    cursor.unlock()
+    gather(async, strata);
+  }, function (records) {
+    deepEqual(records, [ 'a', 'b', 'd', 'f', 'h', 'i', 'l', 'm', 'n' ], 'records after delete');
+    strata.mutator('j', async());
+  }, function (cursor) {
+    cursor.insert('j', 'j', ~cursor.index, async());
+  }, function (unambiguous, cursor, ok) {
+    ok(unambiguous, 'unambiguous');
+    cursor.unlock()
+  }, function (gather) {
+    gather(async, strata);
+  }, function (records) {
+    deepEqual(records, [ 'a', 'b', 'd', 'f', 'h', 'i', 'j', 'l', 'm', 'n' ], 'records after insert');
+  }, function() {
+    strata.close(async());
+  });
+});

@@ -1,28 +1,48 @@
-#!/usr/bin/env _coffee
-fs = require "fs"
-require("./proof") 3, ({ Strata, directory, fixture: { load, objectify } }, _) ->
-  strata = new Strata directory: directory, leafSize: 3, branchSize: 3
+#!/usr/bin/env node
 
-  strata.create _
+require("./proof")(3, function (async, tmp) {
+  var fs = require("fs"), strata;
 
-  cassette = strata.cassette("a")
-  cursor = strata.mutator "a", _
+  async(function (Strata) {
 
-  inserted = cursor.insert cassette.record, cassette.key, ~ cursor.index, _
+    strata = new Strata(tmp, { leafSize: 3, branchSize: 3 });
+    strata.create(async());
 
-  @ok inserted, "inserted"
-  cursor.unlock()
+  }, function () {
 
-  @equal strata._io.size, 32, "json size"
+    strata.mutator("a", async());
 
-  strata.close _
+  }, function (cursor) {
 
-  expected = load "#{__dirname}/fixtures/insert.json", _
-  actual = objectify directory, _
+    var cassette = strata.cassette("a");
+    cursor.insert(cassette.record, cassette.key, ~ cursor.index, async());
 
-  @say expected
-  @say actual
+  }, function (inserted, cursor, ok, equal) {
 
-  @deepEqual actual, expected, "insert"
+    ok(inserted, "inserted");
 
-  @say expected.segment00000001
+    cursor.unlock()
+
+    equal(strata.stats.size, 32, "json size");
+
+    strata.close(async());
+
+  }, function (load) {
+
+    load(__dirname + "/fixtures/insert.json", async());
+
+  }, function (expected, objectify) {
+
+    objectify(tmp, async());
+
+  }, function (actual, expected, say, deepEqual) {
+
+    say(expected);
+    say(actual);
+
+    deepEqual(actual, expected, "insert");
+
+    say(expected.segment00000001);
+
+  });
+});

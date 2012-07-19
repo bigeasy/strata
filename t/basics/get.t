@@ -1,25 +1,43 @@
-#!/usr/bin/env _coffee
-fs = require "fs"
-require("./proof") 6, ({ Strata, directory }, _) ->
-  fs.writeFile "#{directory}/segment00000000", "#{JSON.stringify([-1,[-1]])} -\n", "utf8", _
-  fs.writeFile "#{directory}/segment00000001", """
-    #{JSON.stringify([0,1,0,0,1,[]])} -
-    #{JSON.stringify([1,1,2,"a"])} -
+#!/usr/bin/env node
 
-  """, "utf8", _
+var fs = require("fs"), strata;
+require("./proof")(6, function (tmp, equal, async) {
+  async(function () {
 
-  strata = new Strata directory: directory, leafSize: 3, branchSize: 3
-  strata.open(_)
+    fs.writeFile(tmp + "/segment00000000", JSON.stringify([-1,[-1]]) + " -\n", "utf8", async());
 
-  @equal strata._io.size, 0, "json size before read"
+  }, function () {
 
-  cursor = strata.iterator "a", _
+    var body = JSON.stringify([0,1,0,0,1,[]]) + " -\n" +
+               JSON.stringify([1,1,2,"a"]) + " -\n";
+    fs.writeFile(tmp + "/segment00000001", body, "utf8", async());
 
-  @ok not cursor.exclusive, "shared"
-  @equal cursor.index, 0, "index"
-  @equal cursor.offset, 0, "offset"
+  }, function (Strata) {
 
-  @equal cursor.get(cursor.offset, _), "a", "get"
-  @equal strata._io.size, 32, "json size after read"
+    strata = new Strata(tmp, { leafSize: 3, branchSize: 3 });
+    strata.open(async());
 
-  cursor.unlock()
+  }, function (equal) {
+
+    equal(strata.stats.size, 0, "json size before read");
+
+    strata.iterator("a", async());
+
+  }, function (cursor, ok) {
+
+    ok(! cursor.exclusive, "shared");
+    equal(cursor.index, 0, "index");
+    equal(cursor.offset, 0, "offset");
+    
+
+    cursor.get(cursor.offset, async());
+
+  }, function (got, cursor) {
+
+    equal(got, "a", "get");
+    equal(strata.stats.size, 32, "json size after read");
+
+    cursor.unlock();
+
+  });
+});

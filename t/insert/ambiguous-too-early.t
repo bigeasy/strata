@@ -1,37 +1,36 @@
-#!/usr/bin/env _coffee
-fs = require "fs"
-require("./proof") 3, ({ Strata, directory, fixture: { serialize, load, objectify } }, _) ->
-  serialize "#{__dirname}/fixtures/ambiguous.before.json", directory, _
+#!/usr/bin/env node
 
-  strata = new Strata directory: directory, leafSize: 3, branchSize: 3
-  strata.open(_)
-
-  records = []
-  cursor = strata.iterator "a", _
-  loop
-    for i in [cursor.offset...cursor.length]
-      records.push cursor.get i, _
-    break unless cursor.next(_)
-  cursor.unlock()
-
-  @deepEqual records, [ "a", "b", "d", "f", "g", "h", "i", "l", "m", "n" ], "records"
-
-  unambiguous = []
-  cursor = strata.mutator "a", _
-  loop
-    unambiguous.unshift(cursor.insert "z", "z", ~cursor.indexOf("z", _), _)
-    break if unambiguous[0]
-    cursor.next _
-  cursor.unlock()
-
-  @deepEqual unambiguous, [ true, false, false, false ], "unambiguous"
-
-  records = []
-  cursor = strata.iterator _
-  loop
-    for i in [cursor.offset...cursor.length]
-      records.push cursor.get i, _
-    break unless cursor.next(_)
-  cursor.unlock()
-
-  @deepEqual records, [ "a", "b", "d", "f", "g", "h", "i", "l", "m", "n", "z" ], "records after insert"
+require('./proof')(3, function (async, Strata, tmp, deepEqual) {
+  var strata = new Strata(tmp, { leafSize: 3, branchSize: 3 }), fs = require('fs'), ambiguity = [];
+  async(function (serialize) { 
+    serialize(__dirname + '/fixtures/ambiguous.before.json', tmp, async());
+  }, function () {
+    strata.open(async());
+  }, function (gather) {
+    gather(async, strata);
+  }, function (records) {
+    deepEqual(records, [ 'a', 'b', 'd', 'f', 'g', 'h', 'i', 'l', 'm', 'n' ], 'records');
+  }, function () {
+    strata.mutator('a', async());
+  }, function (cursor) {
+    async(function page () {
+      cursor.indexOf('z', async());
+    }, function (index, cursor) {
+      cursor.insert('z', 'z', ~index, async());
+    }, function (unambiguous, cursor, page) {
+      ambiguity.unshift(unambiguous);
+      if (!ambiguity[0]) {
+        cursor.next(async(page));
+      } else {
+        deepEqual(ambiguity, [ true, false, false, false ], 'unambiguous');
+        cursor.unlock();
+      }
+    });
+  }, function (gather) {
+    gather(async, strata);
+  }, function (records) {
+    deepEqual(records, [ 'a', 'b', 'd', 'f', 'g', 'h', 'i', 'l', 'm', 'n', 'z' ], 'records after insert');
+  }, function() {
+    strata.close(async());
+  });
+});

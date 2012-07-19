@@ -1,43 +1,40 @@
-#!/usr/bin/env _coffee
-fs = require "fs"
-require("./proof") 3, ({ Strata, directory, fixture: { load, objectify, serialize } }, _) ->
-  serialize "#{__dirname}/fixtures/merge.before.json", directory, _
+#!/usr/bin/env node
 
-  strata = new Strata directory: directory, leafSize: 3, branchSize: 3
-  strata.open _
+require('./proof')(3, function (async, Strata, tmp, deepEqual) {
+  var strata = new Strata(tmp, { leafSize: 3, branchSize: 3 }), fs = require('fs');
+  async(function (serialize) { 
+    serialize(__dirname + '/fixtures/merge.before.json', tmp, async());
+  }, function () {
+    strata.open(async());
+  }, function () {
+    strata.mutator('b', async());
+  }, function (cursor) {
+    cursor.remove(cursor.index, async());
+  }, function (async, cursor) {
+    cursor.next(async());
+  }, function (async, cursor) {
+    cursor.indexOf('d', async());
+  }, function (index, cursor, gather) {
+    cursor.remove(index, async());
+    cursor.unlock();
+  }, function (gather) {
+    gather(async, strata);
+  }, function (records) {
+    deepEqual(records, [ 'a', 'c' ], 'records');
+  }, function () {
+    strata.balance(async());
+  }, function (load) {
+    load(__dirname + '/fixtures/leaf-less-than-max.after.json', async());
+  }, function (actual, objectify) {
+    objectify(tmp, async());
+  }, function (expected, actual, say, gather) {
+    say(expected);
+    say(actual);
 
-  cursor = strata.mutator "b", _
-  cursor.delete cursor.index, _
-  cursor.next _
-  cursor.delete cursor.indexOf("d", _), _
-  cursor.unlock()
-
-  records = []
-  cursor = strata.iterator "a", _
-  loop
-    for i in [cursor.offset...cursor.length]
-      records.push cursor.get i, _
-    break unless cursor.next(_)
-  cursor.unlock()
-
-  @deepEqual records, [ "a", "c" ], "records"
-
-  strata.balance _
-
-  expected = load "#{__dirname}/fixtures/leaf-less-than-max.after.json", _
-  actual = objectify directory, _
-
-  @say expected
-  @say actual
-
-  @deepEqual actual, expected, "merge"
-
-  records = []
-  cursor = strata.iterator "a", _
-  loop
-    for i in [cursor.offset...cursor.length]
-      records.push cursor.get i, _
-    break unless cursor.next(_)
-  cursor.unlock()
-
-  @deepEqual records, [ "a", "c" ], "merged"
+    deepEqual(actual, expected, 'merge');
+    gather(async, strata);
+  }, function (records) {
+    deepEqual(records, [ 'a', 'c' ], 'merged');
+    strata.close(async());
+  });
+});
