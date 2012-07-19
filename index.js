@@ -299,7 +299,6 @@ function Strata (directory, options) {
     , hash = options.checksum || "sha1"
     , checksum
     , crypto
-    , io = {}
     , constructors = {}
     ;
 
@@ -3150,7 +3149,7 @@ function Balancer () {
     , methods = {}
     ;
 
-  objectify.call(methods, splitLeaf, mergeLeaves);
+  objectify.call(methods, deleteGhost, splitLeaf, mergeLeaves);
 
   // Mark a page as having been altered, now requiring a test for balance. If
   // the `force` flag is set, the value is set to the leaf order, so that if the
@@ -3239,12 +3238,8 @@ function Balancer () {
 
     // We do not proceed if there is nothing to consider.
     var addresses = Object.keys(lengths);
-    if (addresses.length == 0) return;
-
-    // We put a new balancer in place of the current balancer. Any edits will be
-    // considered by the next balancer.
-    balancer = new Balancer();
-    balancing = true;
+    if (addresses.length == 0) callback(null);
+    else examine();
 
     // Prior to calculating a balance plan, we gather the sizes of each leaf
     // page into memory. We can then make a balance plan based on page sizes
@@ -3257,14 +3252,16 @@ function Balancer () {
     // at the next balance.
 
     // For each page that has changed we add it to a doubly linked list.
-    var i, I, address, page, node;
 
-    if (addresses.length) examine();
-    else throw new Error();
-
+    //
     function examine () {
+      // We put a new balancer in place of the current balancer. Any edits will
+      // be considered by the next balancer.
+      balancer = new Balancer();
+      balancing = true;
+
       // Convert the address back to an integer.
-      var address = +(addresses.shift()), length = lengths[address], right;
+      var address = +(addresses.shift()), length = lengths[address], right, node;
 
 
       // We create linked lists that contain the leaf pages we're considering in
@@ -3323,14 +3320,14 @@ function Balancer () {
         descent.descend(descent.key(node.key), descent.found(node.key), check(found));
 
         function found () {
-          descent.left(); // index--
+          descent.index--;
           descent.descend(descent.right, descent.leaf, check(leaf));
         }
 
         function leaf () {
           var left;
           if (left = ordered[descent.page.address]) attach(left);
-          else nodify(attach)(descent.page);
+          else nodify(attach)(null, descent.page);
         }
 
         function attach (left) {
@@ -3477,7 +3474,7 @@ function Balancer () {
       node = ghosts[address];
       operations.unshift({
         method: "deleteGhost",
-        key: node.key
+        parameters: [ node.key ]
       });
     }
 
@@ -3741,27 +3738,25 @@ function Balancer () {
 
   // &mdash;
   function drainRoot (callback) {
-    var pages, records, right;
+    var root, pages, records, right = 0, remainder, children = [], check = validator(callback);
+
     // Lock the root. No descent needed.
-    flow(function (callback) {
-      io.lock(0, true, callback());
-    }, check(callback, function (root_) {
+    lock(0, true, check(partition));
+
+    function partition ($root) {
+      root = $root;
       // It may have been some time since we've split, so we might have to split
       // into more than two pages.
-      pages = Math.ceil(root.length / io.options.branchSize);
+      pages = Math.ceil(root.length / options.branchSize);
       records = Math.floor(root.length / pages);
       remainder = root.length % pages;
 
-      children = [];
-      right = 0;
+      paginate();
+    }
 
-      root = root_;
-      pager();
-    }));
-
-    function pager () {
+    function paginate () {
       // Create a new branch page.
-      page = io.createBranch(io.nextAddress++, { right: right });
+      var page = createBranch(nextAddress++, { right: right });
 
       // Note the right address.
       right = page.address;
@@ -3771,82 +3766,105 @@ function Balancer () {
 
       // Determine the number of records to move from the root branch into the
       // new child branch page. Add an additonal record if we have a remainder.
-      length = remainder-- > 0 ? records + 1 : records;
-      offset = root.length - length;
+      var length = remainder-- > 0 ? records + 1 : records;
+      var offset = root.length - length;
 
       // Cut off a chunk of addresses.
-      cut = io.splice(root, offset, length);
+      var cut = splice(root, offset, length);
 
       // Uncache the keys from the root branch.
-      cut.forEach(function (address) { io.uncacheKey(root, address) });
+      cut.forEach(function (address) { uncacheKey(root, address) });
 
       // Add the keys to our new branch page.
-      io.splice(page, 0, 0, cut);
+      splice(page, 0, 0, cut);
 
-      if (--pages > 0) pager();
-      else store();
+      if (--pages) paginate();
+      else paginated();
     }
 
-    function store () {
+    function paginated () {
       // Get our children in the right order. We were pushing above.
       children.reverse()
 
       // Push the child branch page addresses onto our empty root.
-      io.splice(root, 0, 0, children.map(function (page) { return page.address }));
+      splice(root, 0, 0, children.map(function (page) { return page.address }));
 
-      flow(function (callback) {
-        // Write the child branch pages.
-        children.forEach(function (page) { io.writeBranch(page, ".replace", callback()) });
-      }, function (callback) {
-        // Rewrite our root.
-        io.writeBranch(root, ".pending", callback());
-      }, function (callback) {
-        // Commit the changes.
-        io.rename(root, ".pending", ".commit", callback());
-      }, function (callback) {
-        // Write the child branch pages.
-        children.forEach(function (page) { io.replace(page, ".replace", callback()) });
-      }, function (callback) {
-        // Commit complete.
-        io.replace(root, ".commit", callback());
-        // Add our new children to the cache.
-        children.forEach(function (page) { io.encache(page) });
-        // Release our lock on the root.
-        io.unlock(root);
-      }, check(callback, next));
+      // Write the child branch pages.
+      children.forEach(function (page) { writeBranch(page, ".replace", check(childWritten)) });
     }
 
-    function next () {
+    var childrenWritten = 0;
+
+    // Rewrite our root.
+    function childWritten () {
+      if (++childrenWritten == children.length) {
+        writeBranch(root, ".pending", check(rootWritten));
+      }
+    }
+      
+    // Commit the changes.
+    function rootWritten () {
+      rename(root, ".pending", ".commit", check(committing));
+    }
+      
+    // Write the child branch pages.
+    function committing () {
+      children.forEach(function (page) { replace(page, ".replace", check(childCommitted)) });
+    }
+
+    var childrenCommitted = 0;
+      
+    // Commit complete.
+    function childCommitted (callback) {
+      if (++childrenCommitted == children.length) {
+        replace(root, ".commit", check(rootCommitted));
+      }
+    }
+
+    // Add our new children to the cache.
+    function rootCommitted () {
+      children.forEach(function (page) { encache(page) });
+      // Release our lock on the root.
+      unlock(root);
       // Do we need to split the root again?
       if (root.length > options.branchSize) drainRoot(callback);
       else callback(null);
     }
   }
 
-  function deleteGhost (callback, key) {
-    var descents = [], sought = Descent.key(key), pivot, leaf;
+  function deleteGhost (key, callback) {
+    var descents = [], pivot, leaf, fd, check = validator(callback);
 
-    flow(function (callback) {
-      descents.push(pivot = new Descent(io));
-      pivot.descend(sought, Descent.found(key), callback());
-    }, function (callback) {
-      pivot.upgrade(callback());
-    }, function (callback) {
+    descents.push(pivot = new Descent());
+    pivot.descend(pivot.key(key), pivot.found(key), check(upgrade));
+
+    function upgrade () {
+      pivot.upgrade(check(descendLeaf));
+    }
+    
+    function descendLeaf () {
       descents.push(leaf = pivot.fork());
-      leaf.descend(sought, Descent.leaf, callback());
-    }, function (callback) {
-      io.splice(leaf.page, 0, 1);
+      leaf.descend(leaf.key(key), leaf.leaf, check(shift));
+    }
+    
+    function shift (callback) {
+      splice(leaf.page, 0, 1);
       leaf.page.ghosts = 0
 
-      fs.open(io.filename(leaf.page.address), "a", 0644, callback());
-    }, function (callback, fd_) {
-      io.writePositions(fd = fd_, leaf.page, callback());
-    }, function (callback, position_) {
-      fs.close(fd, callback());
-    }, check(callback, next));
+      fs.open(filename(leaf.page.address), 'a', 0644, check(opened));
+    }
+    
+    function opened ($fd) {
+      writePositions(fd = $fd, leaf.page, check(written));
+    }
+    
+    function written () {
+      fs.close(fd, check(closed));
+    }
 
-    function next () {
-      descents.forEach(function (descent) { io.unlock(descent.page) });
+    function closed () {
+      descents.forEach(function (descent) { unlock(descent.page) });
+      callback(null);
     }
   }
 
@@ -3943,7 +3961,8 @@ function Balancer () {
 
       index = leaves.right.page.ghosts;
 
-      append();
+      if (index < leaves.right.page.length) append();
+      else appended();
     }
 
     var position;

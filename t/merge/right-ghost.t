@@ -1,41 +1,33 @@
-#!/usr/bin/env _coffee
-fs = require "fs"
-require("./proof") 3, ({ Strata, directory, fixture: { load, objectify, serialize } }, _) ->
-  serialize "#{__dirname}/fixtures/merge.before.json", directory, _
+#!/usr/bin/env node
 
-  strata = new Strata directory: directory, leafSize: 3, branchSize: 3
-  strata.open _
+require('./proof')(3, function (async, Strata, tmp, deepEqual) {
+  var strata = new Strata(tmp, { leafSize: 3, branchSize: 3 }), fs = require('fs');
+  async(function (serialize) { 
+    serialize(__dirname + '/fixtures/merge.before.json', tmp, async());
+  }, function () {
+    strata.open(async());
+  }, function () {
+    strata.mutator('c', async());
+  }, function (cursor) {
+    cursor.remove(cursor.index, async());
+  }, function (async, gather, cursor) {
+    cursor.unlock();
+    gather(async, strata);
+  }, function (records) {
+    deepEqual(records, [ "a", "b", "d" ], "records");
+    strata.balance(async());
+  }, function (async, gather) {
+    gather(async, strata);
+  }, function (records, load) {
+    deepEqual(records, [ 'a', 'b', 'd' ], 'merged');
+    load(__dirname + '/fixtures/right-ghost.after.json', async());
+  }, function (actual, objectify) {
+    objectify(tmp, async());
+  }, function (expected, actual, say) {
+    say(expected);
+    say(actual);
 
-  cursor = strata.mutator "c", _
-  cursor.delete cursor.index, _
-  cursor.unlock()
-
-  records = []
-  cursor = strata.iterator "a", _
-  loop
-    for i in [cursor.offset...cursor.length]
-      records.push cursor.get i, _
-    break unless cursor.next(_)
-  cursor.unlock()
-
-  @deepEqual records, [ "a", "b", "d" ], "records"
-
-  strata.balance _
-
-  records = []
-  cursor = strata.iterator "a", _
-  loop
-    for i in [cursor.offset...cursor.length]
-      records.push cursor.get i, _
-    break unless cursor.next(_)
-  cursor.unlock()
-
-  @deepEqual records, [ "a", "b", "d" ], "merged"
-
-  expected = load "#{__dirname}/fixtures/right-ghost.after.json", _
-  actual = objectify directory, _
-
-  @say expected
-  @say actual
-
-  @deepEqual actual, expected, "after"
+    deepEqual(actual, expected, 'after');
+    strata.close(async());
+  });
+});

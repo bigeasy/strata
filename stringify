@@ -1,0 +1,5 @@
+#!/usr/bin/env node
+
+require("./t/proof").stringify(process.argv[2], function (error, result) {
+  if (error) throw error;
+});

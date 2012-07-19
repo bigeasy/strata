@@ -7,7 +7,7 @@ require('./proof')(3, function (async, Strata, tmp, deepEqual) {
   }, function () {
     strata.open(async());
   }, function () {
-    strata.mutator("a", async());
+    strata.mutator('a', async());
   }, function (cursor) {
     async(function () {
       cursor.indexOf('a', async());
@@ -32,11 +32,11 @@ require('./proof')(3, function (async, Strata, tmp, deepEqual) {
     say(expected);
     say(actual);
 
-    deepEqual(actual, expected, "merge");
+    deepEqual(actual, expected, 'merge');
   }, function (gather) {
     gather(async, strata);
   }, function (records) {
-    deepEqual(records, [ 'c', 'd' ], 'records');
+    deepEqual(records, [ 'c', 'd' ], 'merged');
   }, function() {
     strata.close(async());
   });

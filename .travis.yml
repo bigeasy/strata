@@ -2,6 +2,7 @@ language: node_js
 
 node_js:
   - 0.6
+  - 0.8
 
 branches:
   only:
@@ -13,6 +14,4 @@ branches:
 # build output.
 
 before_install:
-  - npm install coffee-script proof streamline
-  - git submodule init && git submodule update
-  - cake compile
+  - npm install
