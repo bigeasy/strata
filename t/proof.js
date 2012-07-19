@@ -169,3 +169,4 @@ module.exports = function (dirname) {
     });
   });
 };
+module.exports.stringify = stringify;
