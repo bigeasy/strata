@@ -1,0 +1,9 @@
+### Version 0.0.3
+
+ * Fix repository URL in `package.json`. #43.
+
+### Version 0.0.2
+
+Relased: *Thu Jul 19 07:14:21 UTC 2012*
+
+ * Begin maintaining meaningful change log.
