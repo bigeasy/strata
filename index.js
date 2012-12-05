@@ -2204,10 +2204,14 @@ function Descent (override) {
   descent.depth = function (d) { return function () { return d == depth } };
 
   // Stop before a we descend to a child with a certain address.
-  descent.address = function (a) { return function () { return a == addresss } };
+  function address (a) { return function (address) { return a == address } };
 
   // Upgrade a lock from shared to exclusive. Works only with branch pages. All
   // subsequent locks acquired by the descent are exclusive.
+  //
+  // TODO: Convince yourself that it is safe to upgrade a lock anywhere in the
+  // descent. I believe so because you're only doing to upgrade locks when you
+  // are rebalancing the tree.
   function upgrade (callback) {
     unlock(page);
 
@@ -2242,7 +2246,8 @@ function Descent (override) {
     downward();
 
     function downward () {
-      if (stop()) {
+      // **TODO**: Yup, this is bothersome. Choose a single name.
+      if (stop((page.addresses || page.positions)[index])) {
         unwind(callback, page, index);
       } else {
         depth++;
@@ -2268,7 +2273,7 @@ function Descent (override) {
 
   return objectify.call(this, descend, fork, exclude, upgrade
                             , key, left, right
-                            , found, penultimate, leaf
+                            , found, address, penultimate, leaf
                             , _page, _index, index_);
 }
 
@@ -3556,6 +3561,7 @@ function Balancer () {
     // will be removed.
     penultimate.descend(penultimate.key(key), penultimate.penultimate, check(upgrade));
 
+    // Upgrade to an exclusive lock.
     function upgrade () {
       penultimate.upgrade(check(fork));
     }
@@ -3564,6 +3570,199 @@ function Balancer () {
     function fork () {
       descents.push(leaf = penultimate.fork());
       leaf.descend(leaf.key(key), leaf.leaf, check(dirty));
+    }
+
+    // If it turns out that our leaf has drained to the point where it does not
+    // need to be split, we should then check to see if it can be merged.
+    function dirty () {
+      // **TODO**: We're not bothering with split when we've only grown a bit,
+      // right?
+      split = leaf.page;
+
+      if (split.length <= options.leafSize) cleanup();
+      // Otherwise we perform our split.
+      else partition();
+    }
+
+    function partition () {
+      // It may have been some time since we've split, so we might have to split
+      // into more than two pages.
+      pages = Math.ceil(split.length / options.leafSize);
+      records = Math.floor(split.length / pages);
+      remainder = split.length % pages;
+
+      right = split.right
+
+      // Never a remainder record on the first page.
+      offset = split.length
+
+      paginate();
+    }
+
+    function paginate () {
+      if (--pages) shuffle();
+      else paginated();
+    }
+
+    // Create a new page with some of the children of the split page.
+    function shuffle () {
+      // Create a new leaf page.
+      page = createLeaf(-(nextAddress++), { loaded: true });
+
+      // Link the leaf page to its siblings.
+      page.right = right;
+      right = page.address;
+
+      // Add the address to our parent penultimate branch.
+      splice(penultimate.page, penultimate.index + 1, 0, page.address);
+
+      // Determine the number of records to add to this page from the split
+      // leaf. Add an additional record if we have a remainder.
+      length = remainder-- > 0 ? records + 1 : records;
+      offset = split.length - length;
+      index = offset;
+
+      copy();
+    }
+
+    function copy () {
+      // Fetch the record and read it from cache or file.
+      var position = split.positions[index];
+
+      stash(split, position, check(uncache));
+
+      function uncache (object) {
+        uncacheRecord(split, position);
+        // Add it to our new page.
+        splice(page, page.length, 0, position);
+        cacheRecord(page, position, object.record, object.key);
+        index++;
+        if (index < offset + length) copy();
+        else copied();
+      }
+    }
+
+    // We've copied records from one leaf to another. Now we need to write out
+    // the new leaf.
+    function copied() {
+      // Remove the positions that have been merged.
+      splice(split, offset, length);
+
+      // Write the left most leaf page from which new pages were split.
+      rewriteLeaf(page, ".replace", check(replaced));
+
+      // Schedule the page for rewriting and encaching.
+      replacements.push(page);
+      uncached.push(page);
+    }
+
+    function replaced () {
+      paginate();
+    }
+
+    // Write the penultimate branch.
+    function paginated () {
+      // Link the leaf page to the last created new leaf page.
+      split.right = right;
+
+      // Write the left most leaf page from which new pages were split.
+      rewriteLeaf(split, ".replace", check(transact));
+      replacements.push(split);
+    }
+
+    // Write the penultimate branch.
+    function transact () {
+      writeBranch(penultimate.page, ".pending", check(commit));
+    }
+
+    // Now rename the last action, committing to our balance.
+    function commit () {
+      rename(penultimate.page, ".pending", ".commit", check(persist));
+    }
+
+    // Rename our files to put them in their place.
+    function persist () {
+      replacements.forEach(function (page) { replace(page, ".replace", check(complete)) });
+    }
+
+    function complete (callback) {
+      if (++completed == replacements.length) {
+        // Add our new pages to the cache.
+        uncached.forEach(function (page) { encache(page) } );
+
+        // This last replacement will complete the transaction.
+        replace(penultimate.page, ".commit", check(rebalance));
+      }
+    }
+
+    // Our left-most and right-most page might be able to merge with the left
+    // and right siblings of the page we've just split. We compel a merge
+    // detection in the next balance plan by setting the last known size. We do
+    // not use the current size, because it is not **known** to be balanced. We
+    // cannot employ the split shortcut that only checks for split if a page has
+    // grown from being known to be balanced with siblings. Sorry, English bad,
+    // but great example. Imagine a page that has been full, but has a sibling
+    // that has only one record. We add a record to the full page and split it
+    // so that it is half empty. We then add it to the balancer with its half
+    // full record count. We want to check for merge and see
+    //
+    // **TODO**: Swipe &mdash; This always balance until perfect balance is
+    // still imperfect.  We may still manage to create a b&#x2011;tree that has
+    // leaf pages that alternate from full pages to pages containing a single
+    // record, a degenerate case.
+
+    //
+    function rebalance () {
+      balancer.unbalanced(leaf, true);
+      balancer.unbalanced(page, true);
+
+      cleanup();
+    }
+
+    function cleanup() {
+      // Release the pages locked during descent. Seems premature because we're
+      // not done yet, but no other descent makes progress unless we invoke a
+      // callback.
+      descents.forEach(function (descent) { unlock(descent.page) });
+
+      // Although we've unlocked the penultimate branch page, we know that only
+      // the balancer edit a branch page, so we are safe to make a decision
+      // about whether to split the penultimate branch page while it is
+      // unlocked.
+      shouldSplitBranch(penultimate.page, key, callback);
+    }
+  }
+
+  // &mdash;
+  function splitBranch (address, key, callback) {
+    // Keep track of our descents so we can unlock the pages at exit.
+    var check = validator(callback)
+      , descents = []
+      , replacements = []
+      , uncached = []
+      , completed = 0
+      , penultimate, full, split, pages, page
+      , records, remainder, right, index, offset, length
+      ;
+
+    // We descend the tree directory directly to the leaf using the key stopping
+    // when we find the parent branch page of the branch page we want to split.
+    descents.push(parent = new Descent());
+
+    // Descend to the penultimate branch page, from which a leaf page child
+    // will be removed.
+    parent.descend(parent.key(key), parent.address(address), check(upgrade));
+
+    // Upgrade to an exclusive lock.
+    function upgrade () {
+      parent.upgrade(check(fork));
+    }
+
+    // Now descend to our leaf to split.
+    function fork () {
+      die("abandon all hope, ye who proceed past this line");
+      descents.push(full = parent.fork());
+      leaf.descend(full.key(key), full.leaf, check(dirty));
     }
 
     // If it turns out that our leaf has drained to the point where it does not
