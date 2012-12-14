@@ -154,8 +154,8 @@ function validator (callback) {
 }
 
 function check (callback, forward) {
-  if (!forward) throw Error();
-  if (!callback) throw Error();
+  if (!forward) throw Error("No forward function.");
+  if (!callback) throw Error("No callback function.");
   return function (error) {
     if (error) {
       callback(error);
@@ -2200,8 +2200,12 @@ function Descent (override) {
   // All subsequent locks acquired by the descent are exclusive.
   function exclude () { exclusive = true };
 
-  // Stop when we reach a certain depth in the tree.
-  descent.depth = function (d) { return function () { return d == depth } };
+  // Stop when we reach a certain depth in the tree relative to the current
+  // depth.
+  function descendant (descent) {
+    var current = depth;
+    return function () { return current + descent == depth };
+  }
 
   // Stop before a we descend to a child with a certain address.
   function address (a) { return function (address) { return a == address } };
@@ -2273,7 +2277,7 @@ function Descent (override) {
 
   return objectify.call(this, descend, fork, exclude, upgrade
                             , key, left, right
-                            , found, address, penultimate, leaf
+                            , found, address, penultimate, leaf, descendant
                             , _page, _index, index_);
 }
 
@@ -3738,11 +3742,9 @@ function Balancer () {
     // Keep track of our descents so we can unlock the pages at exit.
     var check = validator(callback)
       , descents = []
-      , replacements = []
-      , uncached = []
-      , completed = 0
-      , penultimate, full, split, pages, page
-      , records, remainder, right, index, offset, length
+      , children = []
+      , parent, full, split, pages
+      , records, remainder, right, offset
       ;
 
     // We descend the tree directory directly to the leaf using the key stopping
@@ -3760,27 +3762,21 @@ function Balancer () {
 
     // Now descend to our leaf to split.
     function fork () {
-      die("abandon all hope, ye who proceed past this line");
       descents.push(full = parent.fork());
-      leaf.descend(full.key(key), full.leaf, check(dirty));
+      full.descend(full.key(key), full.descendant(1), check(partition));
     }
 
-    // If it turns out that our leaf has drained to the point where it does not
-    // need to be split, we should then check to see if it can be merged.
-    function dirty () {
-      // **TODO**: We're not bothering with split when we've only grown a bit,
-      // right?
-      split = leaf.page;
+    // Unlike the leaf page, we do not have to reassure ourselves that the page
+    // needs to be split because the size of a branch page is only affected by
+    // the balancer thread.
 
-      if (split.length <= options.leafSize) cleanup();
-      // Otherwise we perform our split.
-      else partition();
-    }
-
+    // Split the branch.
     function partition () {
+      split = full.page;
+
       // It may have been some time since we've split, so we might have to split
       // into more than two pages.
-      pages = Math.ceil(split.length / options.leafSize);
+      pages = Math.ceil(split.length / options.branchSize);
       records = Math.floor(split.length / pages);
       remainder = split.length % pages;
 
@@ -3793,64 +3789,32 @@ function Balancer () {
     }
 
     function paginate () {
-      if (--pages) shuffle();
-      else paginated();
-    }
+      // Create a new branch page.
+      var page = createBranch(nextAddress++, { right: right });
 
-    // Create a new page with some of the children of the split page.
-    function shuffle () {
-      // Create a new leaf page.
-      page = createLeaf(-(nextAddress++), { loaded: true });
-
-      // Link the leaf page to its siblings.
-      page.right = right;
+      // Note the address of the page to the right.
       right = page.address;
 
-      // Add the address to our parent penultimate branch.
-      splice(penultimate.page, penultimate.index + 1, 0, page.address);
+      // Add the branch page to our list of new child branch pages.
+      children.push(page);
 
-      // Determine the number of records to add to this page from the split
-      // leaf. Add an additional record if we have a remainder.
-      length = remainder-- > 0 ? records + 1 : records;
-      offset = split.length - length;
-      index = offset;
+      // Determine the number of records to move from the root branch into the
+      // new child branch page. Add an additonal record if we have a remainder.
+      var length = remainder-- > 0 ? records + 1 : records;
+      var offset = split.length - length;
 
-      copy();
-    }
+      // Cut off a chunk of addresses.
+      var cut = splice(split, offset, length);
+      
+      // Uncache the keys from our splitting branch.
+      cut.forEach(function (address) { uncacheKey(split, address) });
 
-    function copy () {
-      // Fetch the record and read it from cache or file.
-      var position = split.positions[index];
+      // Add the keys to our new branch page.
+      splice(page, 0, 0, cut);
 
-      stash(split, position, check(uncache));
-
-      function uncache (object) {
-        uncacheRecord(split, position);
-        // Add it to our new page.
-        splice(page, page.length, 0, position);
-        cacheRecord(page, position, object.record, object.key);
-        index++;
-        if (index < offset + length) copy();
-        else copied();
-      }
-    }
-
-    // We've copied records from one leaf to another. Now we need to write out
-    // the new leaf.
-    function copied() {
-      // Remove the positions that have been merged.
-      splice(split, offset, length);
-
-      // Write the left most leaf page from which new pages were split.
-      rewriteLeaf(page, ".replace", check(replaced));
-
-      // Schedule the page for rewriting and encaching.
-      replacements.push(page);
-      uncached.push(page);
-    }
-
-    function replaced () {
-      paginate();
+      // Continue until there is one page left.
+      if (--pages > 1) paginate();
+      else paginated();
     }
 
     // Write the penultimate branch.
@@ -3858,71 +3822,63 @@ function Balancer () {
       // Link the leaf page to the last created new leaf page.
       split.right = right;
 
-      // Write the left most leaf page from which new pages were split.
-      rewriteLeaf(split, ".replace", check(transact));
-      replacements.push(split);
+      // Get our children in the right order. We were pushing above.
+      children.reverse()
+
+      // Insert the child branch page addresses onto our parent.
+      splice(parent.page, parent.index + 1, 0, children.map(function (page) { return page.address }));
+
+      // Add the split page to the list of children, order doesn't matter.
+      children.unshift(full.page);
+
+      // Write the child branch pages.
+      children.forEach(function (page) { writeBranch(page, ".replace", check(childWritten)) });
     }
 
-    // Write the penultimate branch.
-    function transact () {
-      writeBranch(penultimate.page, ".pending", check(commit));
+    var childrenWritten = 0;
+
+    // Rewrite our parent.
+    function childWritten () {
+      if (++childrenWritten == children.length) {
+        writeBranch(parent.page, ".pending", check(rootWritten));
+      }
+    }
+      
+    // Commit the changes.
+    function rootWritten () {
+      rename(parent.page, ".pending", ".commit", check(committing));
+    }
+      
+    // Write the child branch pages.
+    function committing () {
+      children.forEach(function (page) { replace(page, ".replace", check(childCommitted)) });
     }
 
-    // Now rename the last action, committing to our balance.
-    function commit () {
-      rename(penultimate.page, ".pending", ".commit", check(persist));
-    }
-
-    // Rename our files to put them in their place.
-    function persist () {
-      replacements.forEach(function (page) { replace(page, ".replace", check(complete)) });
-    }
-
-    function complete (callback) {
-      if (++completed == replacements.length) {
-        // Add our new pages to the cache.
-        uncached.forEach(function (page) { encache(page) } );
-
-        // This last replacement will complete the transaction.
-        replace(penultimate.page, ".commit", check(rebalance));
+    var childrenCommitted = 0;
+      
+    // Commit complete.
+    function childCommitted (callback) {
+      if (++childrenCommitted == children.length) {
+        replace(parent.page, ".commit", check(cleanup));
       }
     }
 
-    // Our left-most and right-most page might be able to merge with the left
-    // and right siblings of the page we've just split. We compel a merge
-    // detection in the next balance plan by setting the last known size. We do
-    // not use the current size, because it is not **known** to be balanced. We
-    // cannot employ the split shortcut that only checks for split if a page has
-    // grown from being known to be balanced with siblings. Sorry, English bad,
-    // but great example. Imagine a page that has been full, but has a sibling
-    // that has only one record. We add a record to the full page and split it
-    // so that it is half empty. We then add it to the balancer with its half
-    // full record count. We want to check for merge and see
-    //
-    // **TODO**: Swipe &mdash; This always balance until perfect balance is
-    // still imperfect.  We may still manage to create a b&#x2011;tree that has
-    // leaf pages that alternate from full pages to pages containing a single
-    // record, a degenerate case.
+    // **TODO**: Our left-most and right-most page might be able to merge with
+    // the left and right siblings of the page we've just split. We deal with
+    // this in split leaf, but not here in split branch as of yet.
 
-    //
-    function rebalance () {
-      balancer.unbalanced(leaf, true);
-      balancer.unbalanced(page, true);
 
-      cleanup();
-    }
-
+    // &mdash;
     function cleanup() {
       // Release the pages locked during descent. Seems premature because we're
       // not done yet, but no other descent makes progress unless we invoke a
       // callback.
       descents.forEach(function (descent) { unlock(descent.page) });
 
-      // Although we've unlocked the penultimate branch page, we know that only
-      // the balancer edit a branch page, so we are safe to make a decision
-      // about whether to split the penultimate branch page while it is
-      // unlocked.
-      shouldSplitBranch(penultimate.page, key, callback);
+      // Although we've unlocked the parent branch page, we know that only the
+      // balancer edit a branch page, so we are safe to make a decision about
+      // whether to split the penultimate branch page while it is unlocked.
+      shouldSplitBranch(parent.page, key, callback);
     }
   }
 
@@ -3977,6 +3933,7 @@ function Balancer () {
       // Add the keys to our new branch page.
       splice(page, 0, 0, cut);
 
+      // Continue until all the pages have been moved to new pages.
       if (--pages) paginate();
       else paginated();
     }
