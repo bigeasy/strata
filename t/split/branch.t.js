@@ -20,7 +20,7 @@ require('./proof')(3, function (async, Strata, tmp, deepEqual) {
     deepEqual(records, [ 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n' ], 'records');
     strata.balance(async());
   }, function (load) {
-    load(__dirname + '/fixtures/root-drain.after.json', async());
+    load(__dirname + '/fixtures/branch-split.after.json', async());
   }, function (expected, objectify) {
     objectify(tmp, async());
   }, function (actual, expected, say) {
@@ -36,7 +36,7 @@ require('./proof')(3, function (async, Strata, tmp, deepEqual) {
   }, function (gather) {
     gather(async, strata);
   }, function (records) {
-    deepEqual(records, [ 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j' ], 'records');
+    deepEqual(records, [ 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n' ], 'records');
     strata.close(async());
   });
 });
