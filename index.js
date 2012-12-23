@@ -4035,24 +4035,36 @@ function Balancer () {
 
 
     function upgrade () {
-      pivot.upgrade(check(fork));
+      pivot.upgrade(check(parentOfPageToMerge));
     }
     
     // Descend to the penultimate page, but first, take note of whether or not
     // the branch page that contains our key is also the penultimate page. We go
     // to the right-most descendant of the left child to find the left leaf page
     // of the merge. We follow the key to find the right leaf page of the merge.
-    function fork () {
+
+    // From the pivot, descend to the branch page that is the parent of the page
+    // for the given key.
+    function parentOfPageToMerge () {
       penultimate.isPivot = pivot.page.addresses[0] < 0;
 
-      penultimate.left = pivot.fork();
-      penultimate.left.index--;
-      penultimate.left.descend(penultimate.left.right, penultimate.left.penultimate, check(goRight));
+      penultimate.right = pivot.fork();
+      penultimate.right.descend(penultimate.right.key(key), penultimate.right.penultimate, check(parentOfLeftSibling));
     }
     
-    function goRight () {
-      penultimate.right = pivot.fork();
-      penultimate.right.descend(penultimate.right.key(key), penultimate.right.penultimate, check(atPenultimate));
+    // From the pivot, descent to the parent branch page of the left sibling of
+    // page for the given key.
+    //
+    // Note that while we must lock leaf pages from left to right, we can lock
+    // branch pages right to left because the balance descent is the only
+    // descent that will lock two sibling branch pages at the same time, search
+    // and mutate descents will only follow a single anscetoral path down the
+    // tree. Once a search or mutate descent reaches a leaf page, it then has
+    // the option to navigate from leaf page to leaf page from left to right.
+    function parentOfLeftSibling () {
+      penultimate.left = pivot.fork();
+      penultimate.left.index--;
+      penultimate.left.descend(penultimate.left.right, penultimate.left.penultimate, check(atPenultimate));
     }
     
     function atPenultimate (callback) {
