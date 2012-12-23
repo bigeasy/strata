@@ -1940,7 +1940,7 @@ function Strata (directory, options) {
   // branch child page in the case of a branch page. Because this method
   // operates on both branch pages and leaf pages, our binary search operates on
   // both branch pages and leaf pages.
-  function keychain (page, index, callback) {
+  function designate (page, index, callback) {
     var key;
     if (page.address < 0) {
       stash(page, page.positions[index], pluck(callback, function (entry) {
@@ -1993,7 +1993,7 @@ function Strata (directory, options) {
     function test () {
       if (low <= high) {
         mid = low + ((high - low) >>> 1);
-        keychain(page, mid, check(compare));
+        designate(page, mid, check(compare));
       } else {
         unwind(callback, ~low);
       }
@@ -2602,7 +2602,7 @@ function Cursor (exclusive, searchKey, page, index) {
       }
 
       function load ($) {
-        keychain(sibling = $, 0, check(compare));
+        designate(sibling = $, 0, check(compare));
       }
 
       function compare (siblingKey) {
@@ -3291,7 +3291,7 @@ function Balancer () {
 
       function nodify (next) {
         return check(function (page) {
-          keychain(page, 0, check(identified));
+          designate(page, 0, check(identified));
           function identified (key) {
             node = { page: page, length: page.length - page.ghosts, key: key };
             reference(page);
