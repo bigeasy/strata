@@ -1368,7 +1368,6 @@ function Strata (directory, options) {
     , length: 0
     , locks: [[]]
     , penultimate: true
-    , right: 0
     , size: 0
     };
     return extend(page, override || {});
@@ -1466,9 +1465,8 @@ function Strata (directory, options) {
 
   //
   function writeBranch (page, suffix, callback) {
-    var fn = filename(page.address, suffix), record, json, line, buffer;
-    record = [ page.right, page.addresses ];
-    json = JSON.stringify(record);
+    var fn = filename(page.address, suffix), json, line, buffer;
+    json = JSON.stringify(page.addresses);
     line = json + " " + checksum(json);
     buffer = new Buffer(line.length + 1);
     buffer.write(line);
@@ -1488,13 +1486,9 @@ function Strata (directory, options) {
       if (error) {
         callback(error);
       } else {
-        line = readLine(file);
-        var right = line[0], addresses = line[1];
         // Splice addresses into page.
-        splice(page, 0, 0, addresses)
-
-        // Extend the existing page with the properties read from file.
-        callback(null, extend(page, { right: right }));
+        splice(page, 0, 0, readLine(file))
+        callback(null, page);
       }
     });
   }
@@ -2096,43 +2090,50 @@ function Strata (directory, options) {
 // page because we don't want another descent to alter the parent page,
 // invaliding the direction of our descent.
 //
-// #### Lateral Traversal
+// #### Lateral Traversal of Leaf Pages
 //
-// Both branch pages and leaf pages are singly linked to their right sibling. If
-// you hold a lock on a page, you are allowed to obtain a lock on its right
-// sibling. This left right ordering allows us to traverse a level of the
-// b&#x2011;tree, which simplifies the implementation of record cursors and page
-// merges.
+// Leaf pages are singly linked to their right sibling. If you hold a lock on a
+// leaf page, you are allowed to obtain a lock on its right sibling. This left
+// right ordering allows us to traverse the leaf level of the b&#x2011;tree,
+// which simplifies the implementation of record cursors and page merges.
 //
-// When we move from a page to its right sibling, we hold the lock on the left
-// page until we've obtained the lock on the right sibling. The prevents another
-// descent from relinking linking our page and invalidating our traversal.
+// When we move from a leaf page to its right sibling, we hold the lock on the
+// left leaf page until we've obtained the lock on the right sibling. The
+// prevents another descent from relinking our page and invalidating our
+// traversal.
 //
 // #### Deadlock Prevention and Traversal Direction
 //
-// To prevent deadlock, we always move form a parent node to a child node, or
-// form a left sibling to a right sibling.
+// To prevent deadlock between search and mutate descents and balancing
+// descents, when descending the b&#x2011;tree for search or mutation we always
+// traverse a parent branch page to its child. When traversing leaf pages, we
+// always traverse from left to right. By traversing in a consistent order we
+// prevent the deadlock that would occur when another descent was attempting to
+// obtain locks on pages in the opposite order.
 //
-// **TK**: Chunky.
+// Because there is only ever one balance descent at a time, and because branch
+// pages are only ever locked exclusively by balance descents, we are allowed to
+// take more liberties when traversing branch pages for the purpose of
+// balancing. We can lock the right sibling of a branch page before locking the
+// branch page because we know that we're the only descent that would move
+// laterally along branch page levels of the b&#x2011;tree.
 //
-// Othewise we would deadlock when a descent that has an exclusive lock on a
-// parent attempted to obtain a lock on child, while another descent has either
-// sort of lock on the child attempted to obtain a lock on the parent. By only
-// obtaining locks top down, we avoid this deadlock condition because all of the
-// descents obtain locks in the same order.
+// Balance descents can also begin a shared or exclusive descent at any branch
+// page or leaf page in the b&#x2011;tree, so long as they do not already have a
+// branch locked. Because only a balance descents will change the shape of the
+// b&#x2011;tree, it can start anywhere in b&#x2011;tree. A search or mutation
+// descent cannot jump to any page in the b&#x2011;tree because it risks jumping
+// to a page that is the process of being split or merged.
 //
-// When traversing the tree laterally, we always travel from a page to the right
-// sibling of that page. Two descents traversing a level in both directions
-// would deadlock when they encountered each other, if one of the descents was
-// locking exclusively.
-//
-// To prevent a deadlock when a left right traversal coincides with the top down
-// traversal, we insist that when a parent obtains a lock on more than one
-// child, it locks the children in left to right order. That is, we must
-// remember the left right ordering regardless of whether we're navigating using
-// a page's link to it's right sibling, or whether we're referencing a branch
-// page's children pages.
+// As an extra special case, if a balance descent is only performing shared
+// locks in a descent that only includes branch pages, it can lock however many
+// branch pages it likes, in any order. In this case, there are no other
+// descents that would perform an exclusive lock on any branch page, so their is
+// no chance of deadlock. As an added bonus, for this special case, the shared
+// lock implementation is reentrant, so the balance descent can lock a branch
+// page in any order as many times as it likes.
 
+//
 function Descent (override) {
   // The constructor always felt like a dangerous place to be doing anything
   // meaningful in C++ or Java.
@@ -2376,7 +2377,7 @@ function Cursor (exclusive, searchKey, page, index) {
     , offset = index < 0 ? ~ index : index
     ;
 
-  // Get a the record at a given index from the current leaf page.
+  // Get a record at a given index from the current leaf page.
   function get (index, callback) {
     stash(page, page.positions[index], validator(callback)(unstashed));
     function unstashed (entry) { callback(null, entry.record) }
@@ -3461,7 +3462,7 @@ function Balancer () {
         // Schedule the merge. After we schedule the merge, we increase the size
         // of the head node and link the head node to the right sibling of the
         // right node. Note that a leaf page merged into its left sibling will
-        // be destoryed, so we don't have to tidy up its ghosts.
+        // be destroyed, so we don't have to tidy up its ghosts.
         if (node.right) {
           right = unlink(node);
           delete ghosts[right.page.address];
@@ -3744,7 +3745,7 @@ function Balancer () {
       , descents = []
       , children = []
       , parent, full, split, pages
-      , records, remainder, right, offset
+      , records, remainder, offset
       ;
 
     // We descend the tree directory directly to the leaf using the key stopping
@@ -3780,8 +3781,6 @@ function Balancer () {
       records = Math.floor(split.length / pages);
       remainder = split.length % pages;
 
-      right = split.right
-
       // Never a remainder record on the first page.
       offset = split.length
 
@@ -3790,16 +3789,13 @@ function Balancer () {
 
     function paginate () {
       // Create a new branch page.
-      var page = createBranch(nextAddress++, { right: right });
-
-      // Note the address of the page to the right.
-      right = page.address;
+      var page = createBranch(nextAddress++);
 
       // Add the branch page to our list of new child branch pages.
       children.push(page);
 
       // Determine the number of records to move from the root branch into the
-      // new child branch page. Add an additonal record if we have a remainder.
+      // new child branch page. Add an additional record if we have a remainder.
       var length = remainder-- > 0 ? records + 1 : records;
       var offset = split.length - length;
 
@@ -3819,9 +3815,6 @@ function Balancer () {
 
     // Write the penultimate branch.
     function paginated () {
-      // Link the leaf page to the last created new leaf page.
-      split.right = right;
-
       // Get our children in the right order. We were pushing above.
       children.reverse()
 
@@ -3893,7 +3886,7 @@ function Balancer () {
 
   // &mdash;
   function drainRoot (callback) {
-    var root, pages, records, right = 0, remainder, children = [], check = validator(callback);
+    var root, pages, records, remainder, children = [], check = validator(callback);
 
     // Lock the root. No descent needed.
     lock(0, true, check(partition));
@@ -3911,16 +3904,13 @@ function Balancer () {
 
     function paginate () {
       // Create a new branch page.
-      var page = createBranch(nextAddress++, { right: right });
-
-      // Note the right address.
-      right = page.address;
+      var page = createBranch(nextAddress++);
 
       // Add the branch page to our list of new child branch pages.
       children.push(page);
 
       // Determine the number of records to move from the root branch into the
-      // new child branch page. Add an additonal record if we have a remainder.
+      // new child branch page. Add an additional record if we have a remainder.
       var length = remainder-- > 0 ? records + 1 : records;
       var offset = root.length - length;
 
@@ -4058,7 +4048,7 @@ function Balancer () {
     // Note that while we must lock leaf pages from left to right, we can lock
     // branch pages right to left because the balance descent is the only
     // descent that will lock two sibling branch pages at the same time, search
-    // and mutate descents will only follow a single anscetoral path down the
+    // and mutate descents will only follow a single ancestral path down the
     // tree. Once a search or mutate descent reaches a leaf page, it then has
     // the option to navigate from leaf page to leaf page from left to right.
     function parentOfLeftSibling () {
