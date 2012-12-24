@@ -2245,6 +2245,13 @@ function Descent (override) {
   // Stop when we reach a leaf page.
   function leaf () { return page.address < 0 }
 
+  function unlocker_ ($unlocker) { unlocker = $unlocker }
+
+  function unlocker (parent) {
+    if (unlocking) unlock(parent);
+    unlocking = true;
+  }
+
   function descend (next, stop, callback) {
     var check = validator(callback), above = page;
 
@@ -2261,14 +2268,13 @@ function Descent (override) {
     }
 
     function locked (locked) {
-      if (unlocking) unlock(page);
+      unlocker(page, locked);
       page = locked;
       next(check(directed));
     }
 
     function directed ($1) {
       index = $1;
-      unlocking = true;
       if (page.address >= 0 && index < 0) {
         index = (~index) - 1;
       }
@@ -2279,7 +2285,7 @@ function Descent (override) {
   return objectify.call(this, descend, fork, exclude, upgrade
                             , key, left, right
                             , found, address, penultimate, leaf, descendant
-                            , _page, _index, index_);
+                            , _page, _index, index_, unlocker_);
 }
 
 
