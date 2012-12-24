@@ -4022,7 +4022,9 @@ function Balancer () {
 
   function mergeLeaves (key, unbalanced, callback) {
     // Create a list of descents whose pages we'll unlock before we leave.
-    var descents = [], penultimate = {}, leaves = {}, pivot, check = validator(callback);
+    var check = validator(callback),
+        descents = [], locked = [], singles = [], penultimate = {}, leaves = {},
+        ancestor, pivot, purge;
 
     // Descend the tree until we find the key of the leaf page we're going to
     // merge in a branch page.
@@ -4045,6 +4047,18 @@ function Balancer () {
       penultimate.isPivot = pivot.page.addresses[0] < 0;
 
       penultimate.right = pivot.fork();
+      penultimate.right.unlocker = function (parent, child) {
+        if (child.length == 1) {
+          if (singles.length == 0) singles.push(parent);
+          singles.push(child);
+        } else if (singles.length) {
+          if (singles[0].address == pivot.page.address) singles.shift();
+          singles.forEach(unlock);
+          singles.length = 0;
+        } else if (parent.address != pivot.page.address) {
+          unlock(parent); 
+        }
+      }
       penultimate.right.descend(penultimate.right.key(key), penultimate.right.penultimate, check(parentOfLeftSibling));
     }
     
@@ -4063,14 +4077,34 @@ function Balancer () {
       penultimate.left.descend(penultimate.left.right, penultimate.left.penultimate, check(atPenultimate));
     }
     
+    // between the page and the merge.
     function atPenultimate (callback) {
-      // If the leaf page key was found in the penultimate page, then we do not
-      // want to queue the penultimate pages for release, because they are the
-      // same as the branch key page, and the branch key page is already queued
-      // for release.
-      if (! penultimate.isPivot) {
+      // If we encountered singles, then we're going to delete all the branch
+      // pages that would be empty, then remove a child from an ancestor above
+      // the parent branch page of the page we're merging.
+      if (singles.length) {
+        ancestor = singles.shift();
+        locked.push(ancestor);
+      // If we encountered no singles, then we may still have gone down separate
+      // paths to reach the parent page. If so, the pivot branch page and the
+      // parent branch page are separate, so we can 
+      // 
+      // TODO: Unlock the pivot page here, for what good it will do anyone,
+      // since the key has been uncached, a full descent is necessary to
+      // designate the branch.
+      //
+      // TODO: Obviously, we also need to remove the keys of zero index child of
+      // the descent, otherwise it will be read again from a child branch page
+      // without visiting the child leaf page.
+      } else {
+        ancestor = penultimate.right.page;
+        if (penultimate.right.page.address != pivot.right.address) {
+          descents.push(penultimate.right);
+        }
+      }
+
+      if (penultimate.left.page.address != pivot.page.address) {
         descents.push(penultimate.left);
-        descents.push(penultimate.right);
       }
 
       descentLeft();
@@ -4103,10 +4137,12 @@ function Balancer () {
       if (left + right > options.leafSize) {
         // We cannot merge, so we queue one or both of pages for a merge test on the
         // next balancer.
-        if (unbalanced[leaves.left.page.address])
+        if (unbalanced[leaves.left.page.address]) {
           io.balancer.unbalanced(leaves.left.page, true)
-        if (unbalanced[leaves.right.page.address])
+        }
+        if (unbalanced[leaves.right.page.address]) {
           io.balancer.unbalanced(leaves.right.page, true)
+        }
         release();
       } else {
         merge();
@@ -4168,20 +4204,40 @@ function Balancer () {
       uncacheKey(pivot.page, pivot.page.addresses[pivot.index]);
       splice(penultimate.right.page, penultimate.right.index, 1);
 
-      writeBranch(penultimate.right.page, ".pending", check(penultimateRewritten));
+      purge = singles.slice(0);
+      writeBranch(penultimate.right.page, ".pending", check(purgeSingles));
+    }
+
+    function purgeSingles () {
+      if (purge.length) {
+        rename(purge.shift(), "", ".unlink", check(purgeSingles));
+      } else {
+        commit();
+      }
     }
       
-    function penultimateRewritten () {
+    function commit () {
       // **TODO**: If I succeed, how will I know to test the parents for balance?
       // **TODO**: Uh, can't the medic just note that this page needs to be
       // rebalanced? It can force a propagation of balance and merge checking of
       // the parent.
 
+      purge = singles.slice(0);
       // Renaming pending to commit will cause the merge to roll forward.
-      rename(penultimate.right.page, ".pending", ".commit", check(committed));
+      rename(ancestor, ".pending", ".commit", check(unlinkEmpties));
     }
     
-    function committed () {
+    // Unlink ancestor branch pages that are now empty as a result of the merge.
+    function unlinkEmpties () {
+      if (purge.length) {
+        unlink(purge.shift(), ".unlink", check(unlinkEmpties));
+      } else {
+        replaceLeft();
+      }
+    }
+
+    // Move the merged left leaf page into place.
+    function replaceLeft () {
       replace(leaves.left.page, ".replace", check(leftReplaced));
     }
     
@@ -4190,11 +4246,12 @@ function Balancer () {
     }
     
     function rightUnlinked () {
-      replace(penultimate.right.page, ".commit", check(release));
+      replace(ancestor, ".commit", check(release));
     }
 
     function release () {
       descents.forEach(function (descent) { unlock(descent.page) });
+      locked.forEach(unlock);
 
       callback(null);
     }
