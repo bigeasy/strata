@@ -2145,7 +2145,6 @@ function Descent (override) {
   var options = override || {},
       exclusive = options.exclusive || false,
       depth = 0,
-      first = true,
       index = options.index == null ? 0 : options.index,
       page = options.page || { addresses: [ 0 ] },
       indexes = options.indexes || {},
