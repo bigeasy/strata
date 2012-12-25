@@ -2143,6 +2143,7 @@ function Descent (override) {
       first = true,
       index = options.index == null ? 0 : options.index,
       page = options.page || { addresses: [ 0 ] },
+      indexes = options.indexes || {}
       descent = {};
 
   // #### Properties
@@ -2156,7 +2157,11 @@ function Descent (override) {
   // The index of the child branch page or leaf page can be assigned to adjust
   // the trajectory of the descent. We use this to descent to the left sibling
   // of a page we want to merge into its left sibling.
-  function index_ (i) { index = i }
+  function index_ (i) { indexes[page.address] = index = i }
+
+  // A map of the address of each page so far visited in the path to the index
+  // of the child determined by the navigation function.
+  function _indexes () { return indexes }
 
   // #### Forking
   //
@@ -2190,7 +2195,12 @@ function Descent (override) {
 
   //
   function fork () {
-    return new Descent({ page: page, exclusive: exclusive, index: index });
+    return new Descent({
+      page: page,
+      exclusive: exclusive,
+      index: index,
+      indexes: extend({}, indexes)
+    });
   }
 
   // #### Excluding
@@ -2308,11 +2318,13 @@ function Descent (override) {
       next(check(directed));
     }
 
-    function directed ($1) {
-      index = $1;
-      if (page.address >= 0 && index < 0) {
-        index = (~index) - 1;
+    function directed ($index) {
+      if (page.address >= 0 && $index < 0) {
+        index = (~$index) - 1;
+      } else {
+        index = $index;
       }
+      indexes[page.address] = index;
       downward();
     }
   }
@@ -2321,7 +2333,7 @@ function Descent (override) {
   return objectify.call(this, descend, fork, exclude, upgrade,
                               key, left, right,
                               found, address, penultimate, leaf, descendant,
-                              _page, _index, index_, unlocker_);
+                              _page, _index, index_, _indexes, unlocker_);
 }
 
 
