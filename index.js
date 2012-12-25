@@ -4072,7 +4072,7 @@ function Balancer () {
     // Create a list of descents whose pages we'll unlock before we leave.
     var check = validator(callback),
         descents = [], locked = [], singles = [], penultimate = {}, leaves = {},
-        ancestor, pivot, purge;
+        ancestor, pivot, empties;
 
     // Descent the tree stopping at the branch page that contains a key for the
     // leaf page that we are going to delete when we merge it into its left
@@ -4129,17 +4129,18 @@ function Balancer () {
     function parentOfLeftSibling () {
       penultimate.left = pivot.fork();
       penultimate.left.index--;
-      penultimate.left.descend(penultimate.left.right, penultimate.left.penultimate, check(atPenultimate));
+      penultimate.left.descend(penultimate.left.right, penultimate.left.penultimate, check(gatherLockedPages));
     }
     
-    // between the page and the merge.
-    function atPenultimate (callback) {
+    // Take note of which pages have been locked during our descent to find the
+    // parent branch pages of the two pages we want to merge.
+    function gatherLockedPages (callback) {
       // If we encountered singles, then we're going to delete all the branch
       // pages that would be empty, then remove a child from an ancestor above
       // the parent branch page of the page we're merging.
       if (singles.length) {
+        locked = singles.slice();
         ancestor = singles.shift();
-        locked.push(ancestor);
       // If we encountered no singles, then we may still have gone down separate
       // paths to reach the parent page. If so, the pivot branch page and the
       // parent branch page are separate, so we can 
@@ -4162,20 +4163,20 @@ function Balancer () {
         descents.push(penultimate.left);
       }
 
-      descentLeft();
+      descentToLeftLeaf();
     }
 
     // Descend to the leaves. Note that if we're on the penultimate page, the
     // next descent will follow the index we decremented above, the leaf page to
     // the left of the keyed page, instead of going to the right-most leaf page.
-    function descentLeft () {
+    function descentToLeftLeaf () {
       descents.push(leaves.left = penultimate.left.fork());
-      leaves.left.descend(leaves.left.left, leaves.left.leaf, check(descendRight));
+      leaves.left.descend(leaves.left.left, leaves.left.leaf, check(descentToRightLeaf));
     }
       
     // We use `left` in both cases, because we don't need an index into the leaf
     // page, only a lock on the leaf page.
-    function descendRight (callback) {
+    function descentToRightLeaf (callback) {
       descents.push(leaves.right = penultimate.right.fork());
       leaves.right.descend(leaves.right.left, leaves.right.leaf, check(applicable));
     }
@@ -4211,20 +4212,20 @@ function Balancer () {
 
       index = leaves.right.page.ghosts;
 
-      if (index < leaves.right.page.length) append();
-      else appended();
+      if (index < leaves.right.page.length) fetch();
+      else rewriteLeftLeaf();
     }
 
     var position;
 
     // Append all of the records of the right leaf page, excluding any ghosts.
-    function append () {
+    function fetch () {
       // Fetch the record and read it from cache or file.
       position = leaves.right.page.positions[index];
-      stash(leaves.right.page, position, check(stashed));
+      stash(leaves.right.page, position, check(copy));
     } 
 
-    function stashed (object) {
+    function copy (object) {
       uncacheRecord(leaves.right.page, position);
 
       // Add it to our new page. The negative positions are temproary. We'll
@@ -4232,79 +4233,78 @@ function Balancer () {
       splice(leaves.left.page, leaves.left.page.length, 0, -(position + 1));
       cacheRecord(leaves.left.page, -(position + 1), object.record, object.key);
 
-      if (++index < leaves.right.page.length) append();
-      else appended();
+      if (++index < leaves.right.page.length) fetch();
+      else rewriteLeftLeaf();
     }
 
-    function appended () {
+    function rewriteLeftLeaf () {
       // Remove the positions the outgoing page to update the JSON size of the
       // b&#x2011;tree.
       splice(leaves.right.page, 0, leaves.right.page.length);
 
       // Rewrite the left leaf page. Move the right leaf page aside for the
       // pending unlink.
-      rewriteLeaf(leaves.left.page, ".replace", check(leftRewritten));
+      rewriteLeaf(leaves.left.page, ".replace", check(renameRightLeaf));
     }
     
-    function leftRewritten () {
-      rename(leaves.right.page, "", ".unlink", check(rightRenamed));
+    function renameRightLeaf () {
+      rename(leaves.right.page, "", ".unlink", check(rewriteKeyedBranchPage));
     }
       
-    function rightRenamed () {
+    function rewriteKeyedBranchPage () {
       var index = penultimate.right.indexes[ancestor.address];
 
       uncacheKey(ancestor, ancestor.addresses[index]);
       splice(ancestor, index, 1);
 
-      purge = singles.slice(0);
-      writeBranch(penultimate.right.page, ".pending", check(purgeSingles));
+      empties = singles.slice();
+      writeBranch(penultimate.right.page, ".pending", check(rewriteEmpties));
     }
 
-    function purgeSingles () {
-      if (purge.length) {
-        rename(purge.shift(), "", ".unlink", check(purgeSingles));
+    function rewriteEmpties () {
+      if (empties.length) {
+        rename(empties.shift(), "", ".unlink", check(rewriteEmpties));
       } else {
-        commit();
+        beginCommit();
       }
     }
       
-    function commit () {
+    function beginCommit () {
       // **TODO**: If I succeed, how will I know to test the parents for balance?
       // **TODO**: Uh, can't the medic just note that this page needs to be
       // rebalanced? It can force a propagation of balance and merge checking of
       // the parent.
 
-      purge = singles.slice(0);
+      empties = singles.slice();
       // Renaming pending to commit will cause the merge to roll forward.
       rename(ancestor, ".pending", ".commit", check(unlinkEmpties));
     }
     
     // Unlink ancestor branch pages that are now empty as a result of the merge.
     function unlinkEmpties () {
-      if (purge.length) {
-        unlink(purge.shift(), ".unlink", check(unlinkEmpties));
+      if (empties.length) {
+        unlink(empties.shift(), ".unlink", check(unlinkEmpties));
       } else {
-        replaceLeft();
+        replaceLeftLeaf();
       }
     }
 
     // Move the merged left leaf page into place.
-    function replaceLeft () {
-      replace(leaves.left.page, ".replace", check(leftReplaced));
+    function replaceLeftLeaf () {
+      replace(leaves.left.page, ".replace", check(unlinkRightLeaf));
     }
     
-    function leftReplaced () {
-      unlink(leaves.right.page, ".unlink", check(rightUnlinked));
+    function unlinkRightLeaf () {
+      unlink(leaves.right.page, ".unlink", check(endCommit));
     }
     
-    function rightUnlinked () {
+    function endCommit () {
       replace(ancestor, ".commit", check(release));
     }
 
     function release () {
       descents.forEach(function (descent) { unlock(descent.page) });
       locked.forEach(unlock);
-
       callback(null);
     }
   }
