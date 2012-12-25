@@ -2137,22 +2137,29 @@ function Strata (directory, options) {
 function Descent (override) {
   // The constructor always felt like a dangerous place to be doing anything
   // meaningful in C++ or Java.
-  var options = override || {}
-    , exclusive = options.exclusive || false
-    , depth = 0
-    , unlocking = false
-    , first = true
-    , index = options.index == null ? 0 : options.index
-    , page = options.page || { addresses: [ 0 ] }
-    , descent = {}
-    ;
+  var options = override || {},
+      exclusive = options.exclusive || false,
+      depth = 0,
+      first = true,
+      index = options.index == null ? 0 : options.index,
+      page = options.page || { addresses: [ 0 ] },
+      descent = {};
 
+  // #### Properties
+  //
+  // The current branch page or leaf page of the descent.
   function _page () { return page }
 
+  // The index of the child branch page or leaf page in the descent.
   function _index () { return index }
 
+  // The index of the child branch page or leaf page can be assigned to adjust
+  // the trajectory of the descent. We use this to descent to the left sibling
+  // of a page we want to merge into its left sibling.
   function index_ (i) { index = i }
 
+  // #### Forking
+  //
   // We use `fork` to create a new descent using the position of the current
   // descent. The new descent will continue to descend the tree, but without
   // releasing the lock on the page held by the descent from which we forked.
@@ -2186,37 +2193,17 @@ function Descent (override) {
     return new Descent({ page: page, exclusive: exclusive, index: index });
   }
 
-  function found (key) {
-    return function () {
-      return page.addresses[0] != 0 && comparator(page.cache[page.addresses[index]],  key) == 0;
-    }
-  }
-
-  descent.discard = function (callback) { callback(null, 0) };
-
-  // Follow the right most path. **TODO**: How much confusion do I save if I
-  // replace addresses and positions with references?
-  function right (callback) { callback(null, (page.addresses || page.positions).length - 1) };
+  // #### Excluding
 
   // All subsequent locks acquired by the descent are exclusive.
   function exclude () { exclusive = true };
 
-  // Stop when we reach a certain depth in the tree relative to the current
-  // depth.
-  function descendant (descent) {
-    var current = depth;
-    return function () { return current + descent == depth };
-  }
-
-  // Stop before a we descend to a child with a certain address.
-  function address (a) { return function (address) { return a == address } };
-
-  // Upgrade a lock from shared to exclusive. Works only with branch pages. All
-  // subsequent locks acquired by the descent are exclusive.
+  // Upgrade a lock from shared to exclusive. This releases the lock on the
+  // current branch page and reacquires the lock as an exclusive. It only works
+  // only with branch pages, and it only works because the only descent that
+  // acquires an exclusive lock on a branch page is a balancing descent.
   //
-  // TODO: Convince yourself that it is safe to upgrade a lock anywhere in the
-  // descent. I believe so because you're only doing to upgrade locks when you
-  // are rebalancing the tree.
+  // All subsequent locks acquired by the descent are exclusive.
   function upgrade (callback) {
     unlock(page);
 
@@ -2228,16 +2215,40 @@ function Descent (override) {
     }
   }
 
+  // #### Navigating
+  //
+  // The `descend` function accepts a navigation function that determines the
+  // index of the child to follow down the tree.
+
+  // Follow the path for the given key.
   function key (key) {
     return function (callback) {
       return find(page, key, page.address < 0 ? page.ghosts : 1, callback);
     }
   }
 
+  // Always goes down the left most path.
   function left (callback) { callback(null, page.ghosts || 0) }
 
-  // TODO: Maybe for the sake of consistency, we make these accessors that
-  // generate the functions, because they are not applicable to Descent.
+  // Follow the right most path. **TODO**: How much confusion do I save if I
+  // replace addresses and positions with references?
+  function right (callback) { callback(null, (page.addresses || page.positions).length - 1) };
+
+  // #### Stopping
+  //
+  // The `descend` function accepts a stop function that determines when to
+  // terminate the descent.
+
+  // Stop when we've reached the branch page that contains a child whose key
+  // matches the given key.
+  function found (key) {
+    return function () {
+      return page.addresses[0] != 0 && comparator(page.cache[page.addresses[index]],  key) == 0;
+    }
+  }
+
+  // Stop before a we descend to a child with a certain address.
+  function address (a) { return function (address) { return a == address } };
 
   // Stop when we reach a penultimate branch page.
   function penultimate () { return page.addresses[0] < 0 }
@@ -2245,13 +2256,37 @@ function Descent (override) {
   // Stop when we reach a leaf page.
   function leaf () { return page.address < 0 }
 
-  function unlocker_ ($unlocker) { unlocker = $unlocker }
+  // Stop when we reach a certain depth in the tree relative to the current
+  // depth.
+  function descendant (descent) {
+    var current = depth;
+    return function () { return current + descent == depth };
+  }
+
+  // #### Unlocking
+  //
+  // Ordinarily, we unlock as we descent skipping the initial branch page. In
+  // the case of a descent from the root, the initial branch page is a dummy
+  // branch page containing the root. In the case of a forked descent, the
+  // forked descent does not own the branch page from which the descent forked.
+  var unlocking = false;
 
   function unlocker (parent) {
     if (unlocking) unlock(parent);
     unlocking = true;
   }
 
+  // However, there is the special case of a descent to delete a page as a
+  // result of a  merge where we're going to want to hold onto the locks to
+  // multiple pages on the path to the page we want to delete. The merge
+  // function provides it's down unlocker function.
+  function unlocker_ ($unlocker) { unlocker = $unlocker }
+
+  // #### Descending
+  //
+  // Descent the b&#x2011;tree from the current branch page using the given
+  // navigation function `next` to determine the page to take and the given stop
+  // function `stop` to determine when to stop the descent.
   function descend (next, stop, callback) {
     var check = validator(callback), above = page;
 
@@ -2282,10 +2317,11 @@ function Descent (override) {
     }
   }
 
-  return objectify.call(this, descend, fork, exclude, upgrade
-                            , key, left, right
-                            , found, address, penultimate, leaf, descendant
-                            , _page, _index, index_, unlocker_);
+  // Construct the `Descent` object and return it.
+  return objectify.call(this, descend, fork, exclude, upgrade,
+                              key, left, right,
+                              found, address, penultimate, leaf, descendant,
+                              _page, _index, index_, unlocker_);
 }
 
 
