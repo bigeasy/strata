@@ -2143,7 +2143,7 @@ function Descent (override) {
       first = true,
       index = options.index == null ? 0 : options.index,
       page = options.page || { addresses: [ 0 ] },
-      indexes = options.indexes || {}
+      indexes = options.indexes || {},
       descent = {};
 
   // #### Properties
@@ -4074,12 +4074,17 @@ function Balancer () {
         descents = [], locked = [], singles = [], penultimate = {}, leaves = {},
         ancestor, pivot, purge;
 
-    // Descend the tree until we find the key of the leaf page we're going to
-    // merge in a branch page.
+    // Descent the tree stopping at the branch page that contains a key for the
+    // leaf page that we are going to delete when we merge it into its left
+    // sibling. We're going to refer to this branch page as the pivot branch
+    // page in the rest of this function. We need to uncache the key from the
+    // pivot branch page, because it will no longer be correct once the leaf
+    // page is deleted.
     descents.push(pivot = new Descent());
     pivot.descend(pivot.key(key), pivot.found(key), check(upgrade))
 
-
+    // Upgrade the lock on the pivot branch page to an exclusive lock. From here
+    // on out, all descents will lock pages exclusively.
     function upgrade () {
       pivot.upgrade(check(parentOfPageToMerge));
     }
@@ -4088,12 +4093,14 @@ function Balancer () {
     // the branch page that contains our key is also the penultimate page. We go
     // to the right-most descendant of the left child to find the left leaf page
     // of the merge. We follow the key to find the right leaf page of the merge.
+    //
+    // TODO: Okay. You want to to fix up the Docco, but you're going to extract
+    // this bit into a generalized function, which is going to change the
+    // terminology significantly, so wait for it.
 
     // From the pivot, descend to the branch page that is the parent of the page
     // for the given key.
     function parentOfPageToMerge () {
-      penultimate.isPivot = pivot.page.addresses[0] < 0;
-
       penultimate.right = pivot.fork();
       penultimate.right.unlocker = function (parent, child) {
         if (child.length == 1) {
@@ -4173,13 +4180,8 @@ function Balancer () {
       leaves.right.descend(leaves.right.left, leaves.right.leaf, check(applicable));
     }
 
+    // Determine if we still have candidates for merge.
     function applicable () {
-      // Fix up the index. If the pivot is penultimate, then it is not actually
-      // the right-most. TODO: Necessary?
-      // if penultimate.isPivot
-        // leaves.left.index = leaves.right.index - 1
-
-      // Determine if we still have candidates for merge.
       var left = (leaves.left.page.length - leaves.left.page.ghosts);
       var right = (leaves.right.page.length - leaves.right.page.ghosts);
       if (left + right > options.leafSize) {
@@ -4249,8 +4251,10 @@ function Balancer () {
     }
       
     function rightRenamed () {
-      uncacheKey(pivot.page, pivot.page.addresses[pivot.index]);
-      splice(penultimate.right.page, penultimate.right.index, 1);
+      var index = penultimate.right.indexes[ancestor.address];
+
+      uncacheKey(ancestor, ancestor.addresses[index]);
+      splice(ancestor, index, 1);
 
       purge = singles.slice(0);
       writeBranch(penultimate.right.page, ".pending", check(purgeSingles));
