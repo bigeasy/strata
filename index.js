@@ -1448,6 +1448,11 @@ function Strata (directory, options) {
 
   // Remove a key from the branch page cache if one exists for the address.
   // Deduct the JSON string length of the key from the JSON size.
+  //
+  // Often times you return to have a look at this function to see why it wants
+  // an address and not an index. Before you go breaking things, have a look
+  // around. You'll find places where you've spliced the reference array and
+  // you're working with the removed addresses. In this case the index is lost.
   function uncacheKey (page, address) {
     if (page.cache[address]) {
       heft(page, -JSON.stringify(page.cache[address]).length);
@@ -2286,6 +2291,15 @@ function Descent (override) {
     unlocking = true;
   }
 
+  // #### Uncaching
+  //
+  // When we descend to remove a leaf page for a merge, to change the key value
+  // of a leaf page, we want to discard any cached references to the key value
+  // in the branch pages on the path to the leaf page. This property is turned
+  // off by default and it is not inherited by a fork.
+  var uncaching = false;
+  function uncaching_ ($uncaching) { uncaching = $uncaching }
+
   // However, there is the special case of a descent to delete a page as a
   // result of a  merge where we're going to want to hold onto the locks to
   // multiple pages on the path to the page we want to delete. The merge
@@ -2325,6 +2339,9 @@ function Descent (override) {
         index = $index;
       }
       indexes[page.address] = index;
+      if (uncaching && page.address >= 0) {
+        uncacheKey(page, page.addresses[index]);
+      }
       downward();
     }
   }
@@ -4042,13 +4059,25 @@ function Balancer () {
       pivot.upgrade(check(descendLeaf));
     }
     
+    // Uncache the pivot key and begin a descent that will clear cached keys all
+    // the way to the leaf page.
+    //
+    // We're okay calling `descend` after uncaching the pivot branch page key
+    // because we don't reference the branch page's keys when determining when
+    // to stop, that would be `found` instead of `leaf`. The `key` function will
+    // use branch page keys starting with the child of the pivot branch page.
     function descendLeaf () {
+      uncacheKey(pivot.page, pivot.page.addresses[pivot.index]);
+
       descents.push(leaf = pivot.fork());
+      leaf.uncaching = true;
+
       leaf.descend(leaf.key(key), leaf.leaf, check(shift));
     }
     
+    // Remove the ghosted record from the references array and the record cache.
     function shift (callback) {
-      splice(leaf.page, 0, 1);
+      uncacheRecord(leaf.page, splice(leaf.page, 0, 1).shift());
       leaf.page.ghosts = 0
 
       fs.open(filename(leaf.page.address), 'a', 0644, check(opened));
@@ -4101,7 +4130,25 @@ function Balancer () {
     // From the pivot, descend to the branch page that is the parent of the page
     // for the given key.
     function parentOfPageToMerge () {
+      // We're okay calling `descend` after uncaching the pivot branch page key
+      // because we don't reference the branch page's keys when determining when
+      // to stop, that would be using `found` as a stop function. Here we're
+      // going to use `address` or `penultimate` to stop the descent. The `key`
+      // function will use branch page keys starting with the child of the pivot
+      // branch page.
+      uncacheKey(pivot.page, pivot.page.addresses[pivot.index]);
+
+      // Create a forked descent that will descend to the parent branch page of
+      // the right page of the merge, uncaching the keys cached for the path
+      // we'll follow.
       penultimate.right = pivot.fork();
+      penultimate.right.uncaching = true;
+      
+      // We gather branch pages on the path to the right page of the merge with
+      // a single child whose descendants consist only of the leaf page or a
+      // branch page with a single child must be deleted. If we are gathering
+      // pages and encounter a branch page with more than one child, we release
+      // the pages we've gathered.
       penultimate.right.unlocker = function (parent, child) {
         if (child.length == 1) {
           if (singles.length == 0) singles.push(parent);
@@ -4114,6 +4161,8 @@ function Balancer () {
           unlock(parent); 
         }
       }
+
+      // Descent to the parent branch page of the right page of the merge.
       penultimate.right.descend(penultimate.right.key(key), penultimate.right.penultimate, check(parentOfLeftSibling));
     }
     
