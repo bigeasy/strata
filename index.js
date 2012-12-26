@@ -91,6 +91,25 @@
 // Terms specific to our implementation will be introduced as they are
 // encountered in the document.
 //
+// ## Documentation Style
+//
+// This documentation is written to be read through, with no expecation that
+// you, dear reader, will actually read it though. It is merely the style of the
+// documentation. When you jump to read the documentation for specific to
+// block of code, you're liable to read references to "the above", or be asked
+// to "see below." The referenced passage should not be too far away, but you'll
+// have go back or keep reading to find it.
+//
+// The documentation is not meant be a handy reference to the interface, but
+// instead an essay on logic behind the implementation. The alternative is to
+// repeat descriptions of difficult concepts every time they are visited by the
+// code. This is going to be painfully dull for the person who gives the code
+// the time and attention necessary for a proper understanding.
+//
+// **TODO**: Remove this paragraph once you get used to the notion that people
+// are probably going to mewl about not being able to understand the code, want
+// an API reference, etc.
+//
 // ## What is a b&#x2011;tree?
 //
 // This documentation assumes that you understand the theory behind the
@@ -2147,7 +2166,7 @@ function Descent (override) {
   // meaningful in C++ or Java.
   var options = override || {},
       exclusive = options.exclusive || false,
-      depth = options.depth || -1,
+      depth = options.depth == null ? -1 : options.depth,
       index = options.index == null ? 0 : options.index,
       page = options.page || { addresses: [ 0 ] },
       indexes = options.indexes || {},
@@ -4140,10 +4159,22 @@ function Balancer () {
     }
   }
 
-  function mergeLeaves (key, unbalanced, callback) {
+  // A generalized merge function with a specialization each for branch pages
+  // and leaf pages below. The function merge a page into its left sibling. A
+  // specialized implementation of the a merge inovkes this function providing
+  //
+  //  * a key that designates the page to merge,
+  //  * a stopper function that will generate a stop function that will stop the
+  //  descent at the page to merge,
+  //  * a merger function that will accept the two pages to merge as arguments,
+  //  merge them, and write out the left page, and
+  //  * a callback to invoke when the merge is completed.
+
+  //
+  function mergePages (key, stopper, merger, callback) {
     // Create a list of descents whose pages we'll unlock before we leave.
     var check = validator(callback),
-        descents = [], locked = [], singles = [], penultimate = {}, leaves = {},
+        descents = [], locked = [], singles = [], parents = {}, pages = {},
         ancestor, pivot, empties;
 
     // Descent the tree stopping at the branch page that contains a key for the
@@ -4161,15 +4192,6 @@ function Balancer () {
       pivot.upgrade(check(parentOfPageToMerge));
     }
     
-    // Descend to the penultimate page, but first, take note of whether or not
-    // the branch page that contains our key is also the penultimate page. We go
-    // to the right-most descendant of the left child to find the left leaf page
-    // of the merge. We follow the key to find the right leaf page of the merge.
-    //
-    // TODO: Okay. You want to to fix up the Docco, but you're going to extract
-    // this bit into a generalized function, which is going to change the
-    // terminology significantly, so wait for it.
-
     // From the pivot, descend to the branch page that is the parent of the page
     // for the given key.
     function parentOfPageToMerge () {
@@ -4184,15 +4206,15 @@ function Balancer () {
       // Create a forked descent that will descend to the parent branch page of
       // the right page of the merge, uncaching the keys cached for the path
       // we'll follow.
-      penultimate.right = pivot.fork();
-      penultimate.right.uncaching = true;
+      parents.right = pivot.fork();
+      parents.right.uncaching = true;
       
       // We gather branch pages on the path to the right page of the merge with
       // a single child whose descendants consist only of the leaf page or a
       // branch page with a single child must be deleted. If we are gathering
       // pages and encounter a branch page with more than one child, we release
       // the pages we've gathered.
-      penultimate.right.unlocker = function (parent, child) {
+      parents.right.unlocker = function (parent, child) {
         if (child.length == 1) {
           if (singles.length == 0) singles.push(parent);
           singles.push(child);
@@ -4206,7 +4228,7 @@ function Balancer () {
       }
 
       // Descent to the parent branch page of the right page of the merge.
-      penultimate.right.descend(penultimate.right.key(key), penultimate.right.penultimate, check(parentOfLeftSibling));
+      parents.right.descend(parents.right.key(key), stopper(parents.right), check(parentOfLeftSibling));
     }
     
     // From the pivot, descent to the parent branch page of the left sibling of
@@ -4219,9 +4241,9 @@ function Balancer () {
     // tree. Once a search or mutate descent reaches a leaf page, it then has
     // the option to navigate from leaf page to leaf page from left to right.
     function parentOfLeftSibling () {
-      penultimate.left = pivot.fork();
-      penultimate.left.index--;
-      penultimate.left.descend(penultimate.left.right, penultimate.left.penultimate, check(gatherLockedPages));
+      parents.left = pivot.fork();
+      parents.left.index--;
+      parents.left.descend(parents.left.right, parents.left.level(parents.right.depth), check(gatherLockedPages));
     }
     
     // Take note of which pages have been locked during our descent to find the
@@ -4245,112 +4267,62 @@ function Balancer () {
       // the descent, otherwise it will be read again from a child branch page
       // without visiting the child leaf page.
       } else {
-        ancestor = penultimate.right.page;
-        if (penultimate.right.page.address != pivot.right.address) {
-          descents.push(penultimate.right);
+        ancestor = parents.right.page;
+        if (parents.right.page.address != pivot.page.address) {
+          descents.push(parents.right);
         }
       }
 
-      if (penultimate.left.page.address != pivot.page.address) {
-        descents.push(penultimate.left);
+      if (parents.left.page.address != pivot.page.address) {
+        descents.push(parents.left);
       }
 
-      descentToLeftLeaf();
+      descendToLeftPageToMerge();
     }
 
-    // Descend to the leaves. Note that if we're on the penultimate page, the
-    // next descent will follow the index we decremented above, the leaf page to
-    // the left of the keyed page, instead of going to the right-most leaf page.
-    function descentToLeftLeaf () {
-      descents.push(leaves.left = penultimate.left.fork());
-      leaves.left.descend(leaves.left.left, leaves.left.leaf, check(descentToRightLeaf));
+    // Descend to the pages we want to merge. Note that if we're on the
+    // penultimate page, the next descent will follow the index we decremented
+    // above, the leaf page to the left of the keyed page, instead of going to
+    // the right-most leaf page.
+    function descendToLeftPageToMerge () {
+      descents.push(pages.left = parents.left.fork());
+      pages.left.descend(pages.left.left, pages.left.level(parents.left.depth + 1), check(descendToRightPageToMerge));
     }
       
-    // We use `left` in both cases, because we don't need an index into the leaf
-    // page, only a lock on the leaf page.
-    function descentToRightLeaf (callback) {
-      descents.push(leaves.right = penultimate.right.fork());
-      leaves.right.descend(leaves.right.left, leaves.right.leaf, check(applicable));
+    // We use `left` in both cases, because we don't need an index into the
+    // page to merge, only a lock on the leaf page.
+    function descendToRightPageToMerge (callback) {
+      descents.push(pages.right = parents.right.fork());
+      pages.right.descend(pages.right.left, pages.right.level(parents.right.depth + 1), check(merge));
     }
-
-    // Determine if we still have candidates for merge.
-    function applicable () {
-      var left = (leaves.left.page.length - leaves.left.page.ghosts);
-      var right = (leaves.right.page.length - leaves.right.page.ghosts);
-      if (left + right > options.leafSize) {
-        // We cannot merge, so we queue one or both of pages for a merge test on the
-        // next balancer.
-        if (unbalanced[leaves.left.page.address]) {
-          io.balancer.unbalanced(leaves.left.page, true)
-        }
-        if (unbalanced[leaves.right.page.address]) {
-          io.balancer.unbalanced(leaves.right.page, true)
-        }
-        release();
-      } else {
-        merge();
-      }
-    }
-
-    var index;
 
     function merge () {
+      merger(pages, check(merged));
+    }
+
+    function merged (dirty) {
+      if (dirty) uncachePivot();
+      else release();
+    }
+
+    function uncachePivot () {
       // Uncache the pivot key.
       uncacheKey(pivot.page, pivot.page.addresses[pivot.index]);
-
-      // The right leaf page of of the merged page is the right leaf page of the
-      // right page of the merge.
-      leaves.left.page.right = leaves.right.page.right;
-
-      index = leaves.right.page.ghosts;
-
-      if (index < leaves.right.page.length) fetch();
-      else rewriteLeftLeaf();
-    }
-
-    var position;
-
-    // Append all of the records of the right leaf page, excluding any ghosts.
-    function fetch () {
-      // Fetch the record and read it from cache or file.
-      position = leaves.right.page.positions[index];
-      stash(leaves.right.page, position, check(copy));
-    } 
-
-    function copy (object) {
-      uncacheRecord(leaves.right.page, position);
-
-      // Add it to our new page. The negative positions are temproary. We'll
-      // get real file positions when we rewrite.
-      splice(leaves.left.page, leaves.left.page.length, 0, -(position + 1));
-      cacheRecord(leaves.left.page, -(position + 1), object.record, object.key);
-
-      if (++index < leaves.right.page.length) fetch();
-      else rewriteLeftLeaf();
-    }
-
-    function rewriteLeftLeaf () {
-      // Remove the positions the outgoing page to update the JSON size of the
-      // b&#x2011;tree.
-      splice(leaves.right.page, 0, leaves.right.page.length);
-
-      // Rewrite the left leaf page. Move the right leaf page aside for the
-      // pending unlink.
-      rewriteLeaf(leaves.left.page, ".replace", check(renameRightLeaf));
+      renameRightPageToMerge();
     }
     
-    function renameRightLeaf () {
-      rename(leaves.right.page, "", ".unlink", check(rewriteKeyedBranchPage));
+    function renameRightPageToMerge () {
+      rename(pages.right.page, "", ".unlink", check(rewriteKeyedBranchPage));
     }
       
     function rewriteKeyedBranchPage () {
-      var index = penultimate.right.indexes[ancestor.address];
+      var index = parents.right.indexes[ancestor.address];
 
       uncacheKey(ancestor, ancestor.addresses[index]);
       splice(ancestor, index, 1);
 
       empties = singles.slice();
-      writeBranch(penultimate.right.page, ".pending", check(rewriteEmpties));
+      writeBranch(parents.right.page, ".pending", check(rewriteEmpties));
     }
 
     function rewriteEmpties () {
@@ -4377,17 +4349,17 @@ function Balancer () {
       if (empties.length) {
         unlink(empties.shift(), ".unlink", check(unlinkEmpties));
       } else {
-        replaceLeftLeaf();
+        replaceLeftPageToMerge();
       }
     }
 
     // Move the merged left leaf page into place.
-    function replaceLeftLeaf () {
-      replace(leaves.left.page, ".replace", check(unlinkRightLeaf));
+    function replaceLeftPageToMerge () {
+      replace(pages.left.page, ".replace", check(unlinkRightPageToMerge));
     }
     
-    function unlinkRightLeaf () {
-      unlink(leaves.right.page, ".unlink", check(endCommit));
+    function unlinkRightPageToMerge () {
+      unlink(pages.right.page, ".unlink", check(endCommit));
     }
     
     function endCommit () {
@@ -4399,6 +4371,106 @@ function Balancer () {
       locked.forEach(unlock);
       callback(null);
     }
+  }
+
+  // Merge the leaf page identified by the key into its left leaf page sibling.
+  //
+  // The key parameter designates the leaf page to merge into its left sibling.
+  // The unbalanced parameter is the set of leaf pages that were potentially
+  // unbalanced when the balance plan that invoked this merge was constructed.
+
+  //
+  function mergeLeaves (key, unbalanced, callback) {
+    // Our descent stops when we reach a branch page that has leaf pages as
+    // children. We call these penultimate pages.
+    function stopper (descent) { return descent.penultimate }
+
+    // By the time we lock the leaf pages exclusively, their sizes may have
+    // changed so that they are no longer candidates for merge. If that is case,
+    // we place the pages that were unbalanced before the merge into the set of
+    // unbalanced pages we inspect the next time we balance. The leaf page for
+    // the key cannot merge with it's left sibling, but perhaps it can merge
+    // with its right sibling.
+    function merger (leaves, callback) {
+      var check = validator(callback);
+
+      var left = (leaves.left.page.length - leaves.left.page.ghosts);
+      var right = (leaves.right.page.length - leaves.right.page.ghosts);
+
+      if (left + right > options.leafSize) {
+        // We cannot merge, so we queue one or both of pages for a merge test on the
+        // next balancer.
+        if (unbalanced[leaves.left.page.address]) {
+          io.balancer.unbalanced(leaves.left.page, true)
+        }
+        if (unbalanced[leaves.right.page.address]) {
+          io.balancer.unbalanced(leaves.right.page, true)
+        }
+        callback(null, false);
+      } else {
+        merge();
+      }
+
+      var index;
+
+      function merge () {
+        // The right leaf page of of the merged page is the right leaf page of the
+        // right page of the merge.
+        leaves.left.page.right = leaves.right.page.right;
+
+        index = leaves.right.page.ghosts;
+
+        if (index < leaves.right.page.length) fetch();
+        else rewriteLeftLeaf();
+      }
+
+      var position;
+
+      // Append all of the records of the right leaf page, excluding any ghosts.
+
+      // Fetch a page from the right leaf page. 
+      function fetch () {
+        // Fetch the record and read it from cache or file.
+        position = leaves.right.page.positions[index];
+        stash(leaves.right.page, position, check(copy));
+      } 
+
+      // Append a record fetched from the right leaf page to the left leaf page.
+      function copy (object) {
+        // Uncache the record from the right leaf page.
+        uncacheRecord(leaves.right.page, position);
+
+        // Add it to our new page. The negative positions are temporary. We'll
+        // get real file positions when we rewrite.
+        splice(leaves.left.page, leaves.left.page.length, 0, -(position + 1));
+        cacheRecord(leaves.left.page, -(position + 1), object.record, object.key);
+
+        if (++index < leaves.right.page.length) fetch();
+        else rewriteLeftLeaf();
+      }
+
+      // Initiate page rewriting by rewriting the left leaf. The remainder of
+      // the page rewriting is performed by the generalized merge function.
+      function rewriteLeftLeaf () {
+        // Remove the positions the outgoing page to update the JSON size of the
+        // b&#x2011;tree.
+        splice(leaves.right.page, 0, leaves.right.page.length);
+
+        // Rewrite the left leaf page. Move the right leaf page aside for the
+        // pending unlink.
+        rewriteLeaf(leaves.left.page, ".replace", check(resume));
+      }
+
+      // Continue with the generalized merge function. `true` indicates that we
+      // did indeed merge pages and the pages participating in the merge should
+      // be rewritten.
+      function resume () {
+        callback(null, true);
+      }
+    }
+
+    // Invoke the generalized merge function with our specializations.
+    mergePages(key, stopper, merger, callback);
   }
 
   return objectify.call(this, balance, unbalanced);
