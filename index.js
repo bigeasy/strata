@@ -2264,8 +2264,24 @@ function Descent (override) {
   // Always goes down the left most path.
   function left (callback) { callback(null, page.ghosts || 0) }
 
-  // Follow the right most path. **TODO**: How much confusion do I save if I
-  // replace addresses and positions with references?
+  // In the method you're about read, please don't let the `or` operator bother
+  // you, although it has in the past. When I set out to rename the addresses
+  // array of the branch page and the positions array of the leaf page so that
+  // they both the had a references array, the documentation became far more
+  // verbose as it set out to describe the meaning of the hopelessly generic
+  // term reference.
+  //
+  // It is bound to cause confusion to readers who see that both branch pages
+  // and leaf pages have a references array, but the contents of the array mean
+  // something different, yet some of the algorithms treat them as the same.
+  // Where this occurs, where you're able to use the same algorithm for both
+  // page addresses and record positions, it is actually easier to understand
+  // when you see the `or` operator.
+  //
+  // You'll see this use of the `or` operator to choose between addresses and
+  // positions in three places in the source.
+
+  // Follow the right most path.
   function right (callback) { callback(null, (page.addresses || page.positions).length - 1) };
 
   // #### Stopping
@@ -2335,12 +2351,12 @@ function Descent (override) {
     downward();
 
     function downward () {
-      // **TODO**: Yup, this is bothersome. Choose a single name.
       if (stop((page.addresses || page.positions)[index])) {
         unwind(callback, page, index);
       } else {
+        // We'll only ever go here if we're at a branch page.
         depth++;
-        if (index + 1 < (page.addresses || page.positions).length) {
+        if (index + 1 < page.addresses.length) {
           greater = fork();
         }
         if (index > 0) {
