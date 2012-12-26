@@ -2148,7 +2148,8 @@ function Descent (override) {
       index = options.index == null ? 0 : options.index,
       page = options.page || { addresses: [ 0 ] },
       indexes = options.indexes || {},
-      descent = {};
+      descent = {},
+      greater = options.greater, lesser = options.lesser;
 
   // #### Properties
   //
@@ -2170,6 +2171,18 @@ function Descent (override) {
   // The current depth of the descent into the b&#x2011;tree where `-1`
   // indicates no descent and `0` indicates the root.
   function _depth () { return depth }
+
+  // An instance of `Descent` that if followed to the right to the `depth` of
+  // this `Descent` will arrive at the left sibling of the current page of this
+  // `Descent`. If the current `page` has no left sibling, then the `lesser`
+  // property is undefined.
+  function _lesser () { return lesser }
+
+  // An instance of `Descent` that if followed to the left to the `depth` of
+  // this `Descent` will arrive at the right sibling of the current page of this
+  // `Descent`. If the current `page` has no right sibling, then the `greater`
+  // property is undefined.
+  function _greater () { return greater }
 
   // #### Forking
   //
@@ -2207,6 +2220,8 @@ function Descent (override) {
       page: page,
       exclusive: exclusive,
       depth: depth,
+      greater: greater,
+      lesser: lesser,
       index: index,
       indexes: extend({}, indexes)
     });
@@ -2325,6 +2340,12 @@ function Descent (override) {
         unwind(callback, page, index);
       } else {
         depth++;
+        if (index + 1 < (page.addresses || page.positions).length) {
+          greater = fork();
+        }
+        if (index > 0) {
+          lesser = fork();
+        }
         lock(page.addresses[index], exclusive, check(locked));
       }
     }
@@ -2353,7 +2374,7 @@ function Descent (override) {
   return objectify.call(this, descend, fork, exclude, upgrade,
                               key, left, right,
                               found, address, penultimate, leaf, level,
-                              _page, _depth, _index, index_, _indexes, unlocker_);
+                              _page, _depth, _index, index_, _indexes, _lesser, _greater, unlocker_);
 }
 
 
