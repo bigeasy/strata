@@ -1950,7 +1950,10 @@ function Strata (directory, options) {
         , iterIndex = index
         , stack = []
         ;
-      (function next () {
+
+      next();
+
+      function next () {
         var key;
         if (iter.address >= 0) {
           lock(iter.addresses[iterIndex], false, check(callback, function (locked) {
@@ -1965,7 +1968,7 @@ function Strata (directory, options) {
             callback(null, entry.key);
           }));
         }
-      })();
+      }
     } else {
       callback(null, key);
     }
