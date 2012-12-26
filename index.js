@@ -2144,7 +2144,7 @@ function Descent (override) {
   // meaningful in C++ or Java.
   var options = override || {},
       exclusive = options.exclusive || false,
-      depth = 0,
+      depth = options.depth || -1,
       index = options.index == null ? 0 : options.index,
       page = options.page || { addresses: [ 0 ] },
       indexes = options.indexes || {},
@@ -2166,6 +2166,10 @@ function Descent (override) {
   // A map of the address of each page so far visited in the path to the index
   // of the child determined by the navigation function.
   function _indexes () { return indexes }
+
+  // The current depth of the descent into the b&#x2011;tree where `-1`
+  // indicates no descent and `0` indicates the root.
+  function _depth () { return depth }
 
   // #### Forking
   //
@@ -2202,6 +2206,7 @@ function Descent (override) {
     return new Descent({
       page: page,
       exclusive: exclusive,
+      depth: depth,
       index: index,
       indexes: extend({}, indexes)
     });
@@ -2210,7 +2215,7 @@ function Descent (override) {
   // #### Excluding
 
   // All subsequent locks acquired by the descent are exclusive.
-  function exclude () { exclusive = true };
+  function exclude () { exclusive = true }
 
   // Upgrade a lock from shared to exclusive. This releases the lock on the
   // current branch page and reacquires the lock as an exclusive. It only works
@@ -2272,9 +2277,8 @@ function Descent (override) {
 
   // Stop when we reach a certain depth in the tree relative to the current
   // depth.
-  function descendant (descent) {
-    var current = depth;
-    return function () { return current + descent == depth };
+  function level (level) {
+    return function () { return level == depth }
   }
 
   // #### Unlocking
@@ -2348,8 +2352,8 @@ function Descent (override) {
   // Construct the `Descent` object and return it.
   return objectify.call(this, descend, fork, exclude, upgrade,
                               key, left, right,
-                              found, address, penultimate, leaf, descendant,
-                              _page, _index, index_, _indexes, unlocker_);
+                              found, address, penultimate, leaf, level,
+                              _page, _depth, _index, index_, _indexes, unlocker_);
 }
 
 
@@ -3834,7 +3838,7 @@ function Balancer () {
     // Now descend to our leaf to split.
     function fork () {
       descents.push(full = parent.fork());
-      full.descend(full.key(key), full.descendant(1), check(partition));
+      full.descend(full.key(key), full.level(full.depth + 1), check(partition));
     }
 
     // Unlike the leaf page, we do not have to reassure ourselves that the page
