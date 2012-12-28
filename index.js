@@ -4363,13 +4363,26 @@ function Balancer () {
     }
     
     function endCommit () {
-      replace(ancestor, ".commit", check(release));
+      replace(ancestor, ".commit", check(propagate));
     }
 
-    function release () {
+    // Release our locks and propagate the merge to parent branch pages.
+    function propagate () {
+      // Release locks.
       descents.forEach(function (descent) { unlock(descent.page) });
       locked.forEach(unlock);
-      callback(null);
+
+      // We released our lock on the ancestor, but even if it is freed by a
+      // cache purge, the properties we test here are still valid.
+      if (ancestor.address == 0) {
+        if (ancestor.length == 1 && ancestor.addresses[0] > 0) {
+          fillRoot(callback);
+        } else {
+          callback(null);
+        }
+      } else {
+        chooseBranchesToMerge(ancestor.address, callback);
+      }
     }
   }
 
