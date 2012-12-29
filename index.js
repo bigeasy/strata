@@ -154,8 +154,8 @@ function validator (callback) {
 }
 
 function check (callback, forward) {
-  if (!forward) throw Error();
-  if (!callback) throw Error();
+  if (!forward) throw Error("No forward function.");
+  if (!callback) throw Error("No callback function.");
   return function (error) {
     if (error) {
       callback(error);
@@ -2200,14 +2200,22 @@ function Descent (override) {
   // All subsequent locks acquired by the descent are exclusive.
   function exclude () { exclusive = true };
 
-  // Stop when we reach a certain depth in the tree.
-  descent.depth = function (d) { return function () { return d == depth } };
+  // Stop when we reach a certain depth in the tree relative to the current
+  // depth.
+  function descendant (descent) {
+    var current = depth;
+    return function () { return current + descent == depth };
+  }
 
   // Stop before a we descend to a child with a certain address.
-  descent.address = function (a) { return function () { return a == addresss } };
+  function address (a) { return function (address) { return a == address } };
 
   // Upgrade a lock from shared to exclusive. Works only with branch pages. All
   // subsequent locks acquired by the descent are exclusive.
+  //
+  // TODO: Convince yourself that it is safe to upgrade a lock anywhere in the
+  // descent. I believe so because you're only doing to upgrade locks when you
+  // are rebalancing the tree.
   function upgrade (callback) {
     unlock(page);
 
@@ -2242,7 +2250,8 @@ function Descent (override) {
     downward();
 
     function downward () {
-      if (stop()) {
+      // **TODO**: Yup, this is bothersome. Choose a single name.
+      if (stop((page.addresses || page.positions)[index])) {
         unwind(callback, page, index);
       } else {
         depth++;
@@ -2268,7 +2277,7 @@ function Descent (override) {
 
   return objectify.call(this, descend, fork, exclude, upgrade
                             , key, left, right
-                            , found, penultimate, leaf
+                            , found, address, penultimate, leaf, descendant
                             , _page, _index, index_);
 }
 
@@ -3556,6 +3565,7 @@ function Balancer () {
     // will be removed.
     penultimate.descend(penultimate.key(key), penultimate.penultimate, check(upgrade));
 
+    // Upgrade to an exclusive lock.
     function upgrade () {
       penultimate.upgrade(check(fork));
     }
@@ -3727,6 +3737,151 @@ function Balancer () {
     }
   }
 
+  // &mdash;
+  function splitBranch (address, key, callback) {
+    // Keep track of our descents so we can unlock the pages at exit.
+    var check = validator(callback)
+      , descents = []
+      , children = []
+      , parent, full, split, pages
+      , records, remainder, right, offset
+      ;
+
+    // We descend the tree directory directly to the leaf using the key stopping
+    // when we find the parent branch page of the branch page we want to split.
+    descents.push(parent = new Descent());
+
+    // Descend to the penultimate branch page, from which a leaf page child
+    // will be removed.
+    parent.descend(parent.key(key), parent.address(address), check(upgrade));
+
+    // Upgrade to an exclusive lock.
+    function upgrade () {
+      parent.upgrade(check(fork));
+    }
+
+    // Now descend to our leaf to split.
+    function fork () {
+      descents.push(full = parent.fork());
+      full.descend(full.key(key), full.descendant(1), check(partition));
+    }
+
+    // Unlike the leaf page, we do not have to reassure ourselves that the page
+    // needs to be split because the size of a branch page is only affected by
+    // the balancer thread.
+
+    // Split the branch.
+    function partition () {
+      split = full.page;
+
+      // It may have been some time since we've split, so we might have to split
+      // into more than two pages.
+      pages = Math.ceil(split.length / options.branchSize);
+      records = Math.floor(split.length / pages);
+      remainder = split.length % pages;
+
+      right = split.right
+
+      // Never a remainder record on the first page.
+      offset = split.length
+
+      paginate();
+    }
+
+    function paginate () {
+      // Create a new branch page.
+      var page = createBranch(nextAddress++, { right: right });
+
+      // Note the address of the page to the right.
+      right = page.address;
+
+      // Add the branch page to our list of new child branch pages.
+      children.push(page);
+
+      // Determine the number of records to move from the root branch into the
+      // new child branch page. Add an additonal record if we have a remainder.
+      var length = remainder-- > 0 ? records + 1 : records;
+      var offset = split.length - length;
+
+      // Cut off a chunk of addresses.
+      var cut = splice(split, offset, length);
+      
+      // Uncache the keys from our splitting branch.
+      cut.forEach(function (address) { uncacheKey(split, address) });
+
+      // Add the keys to our new branch page.
+      splice(page, 0, 0, cut);
+
+      // Continue until there is one page left.
+      if (--pages > 1) paginate();
+      else paginated();
+    }
+
+    // Write the penultimate branch.
+    function paginated () {
+      // Link the leaf page to the last created new leaf page.
+      split.right = right;
+
+      // Get our children in the right order. We were pushing above.
+      children.reverse()
+
+      // Insert the child branch page addresses onto our parent.
+      splice(parent.page, parent.index + 1, 0, children.map(function (page) { return page.address }));
+
+      // Add the split page to the list of children, order doesn't matter.
+      children.unshift(full.page);
+
+      // Write the child branch pages.
+      children.forEach(function (page) { writeBranch(page, ".replace", check(childWritten)) });
+    }
+
+    var childrenWritten = 0;
+
+    // Rewrite our parent.
+    function childWritten () {
+      if (++childrenWritten == children.length) {
+        writeBranch(parent.page, ".pending", check(rootWritten));
+      }
+    }
+      
+    // Commit the changes.
+    function rootWritten () {
+      rename(parent.page, ".pending", ".commit", check(committing));
+    }
+      
+    // Write the child branch pages.
+    function committing () {
+      children.forEach(function (page) { replace(page, ".replace", check(childCommitted)) });
+    }
+
+    var childrenCommitted = 0;
+      
+    // Commit complete.
+    function childCommitted (callback) {
+      if (++childrenCommitted == children.length) {
+        replace(parent.page, ".commit", check(cleanup));
+      }
+    }
+
+    // **TODO**: Our left-most and right-most page might be able to merge with
+    // the left and right siblings of the page we've just split. We deal with
+    // this in split leaf, but not here in split branch as of yet.
+
+
+    // &mdash;
+    function cleanup() {
+      // Release the pages locked during descent. Seems premature because we're
+      // not done yet, but no other descent makes progress unless we invoke a
+      // callback.
+      descents.forEach(function (descent) { unlock(descent.page) });
+
+      // Although we've unlocked the parent branch page, we know that only the
+      // balancer edit a branch page, so we are safe to make a decision about
+      // whether to split the penultimate branch page while it is unlocked.
+      shouldSplitBranch(parent.page, key, callback);
+    }
+  }
+
   // ### Drain Root
   //
   // When the root branch page is full we don't split it so much as we drain it.
@@ -3778,6 +3933,7 @@ function Balancer () {
       // Add the keys to our new branch page.
       splice(page, 0, 0, cut);
 
+      // Continue until all the pages have been moved to new pages.
       if (--pages) paginate();
       else paginated();
     }

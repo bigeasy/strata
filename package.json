@@ -7,7 +7,7 @@
 , "contributors" : []
 , "devDependencies":
   { "proof": "0.0.15" }
-, "scripts" : { "test": "proof t/*/*.t" }
+, "scripts" : { "test": "proof t/*/*.t.js" }
 , "engines" : { "node": "> 0.6.0" }
 , "homepage": "https://github.com/bigeasy/strata"
 , "licenses": [
@@ -16,6 +16,6 @@
   }]
 , "repository":
   { "type": "git"
-  , "url": "http://github.com/bigeasy/strta.git"
+  , "url": "http://github.com/bigeasy/strata.git"
   }
 }
