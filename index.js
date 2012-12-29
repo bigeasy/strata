@@ -2380,18 +2380,20 @@ function Descent (override) {
         unwind(callback, page, index);
       } else {
         // We'll only ever go here if we're at a branch page.
-        depth++;
         if (index + 1 < page.addresses.length) {
           greater = fork();
+          greater.index++;
         }
         if (index > 0) {
           lesser = fork();
+          lesser.index--;
         }
         lock(page.addresses[index], exclusive, check(locked));
       }
     }
 
     function locked (locked) {
+      depth++;
       unlocker(page, locked);
       page = locked;
       next(check(directed));
@@ -4397,8 +4399,10 @@ function Balancer () {
 
   //
   function mergeLeaves (key, unbalanced, callback) {
-    // Our descent stops when we reach a branch page that has leaf pages as
-    // children. We call these penultimate pages.
+    // The generalized merge function needs to stop at the parent of the leaf
+    // page we with to merge into its left leaf page sibling. We tell it to stop
+    // it reaches a branch page that has leaf pages as children. We call these
+    // penultimate pages.
     function stopper (descent) { return descent.penultimate }
 
     // By the time we lock the leaf pages exclusively, their sizes may have
@@ -4480,6 +4484,130 @@ function Balancer () {
       // Continue with the generalized merge function. `true` indicates that we
       // did indeed merge pages and the pages participating in the merge should
       // be rewritten.
+      function resume () {
+        callback(null, true);
+      }
+    }
+
+    // Invoke the generalized merge function with our specializations.
+    mergePages(key, stopper, merger, callback);
+  }
+
+  // Determine if the branch page at the given address can be merged with either
+  // of its siblings. If possible we procede to merge the chosen branche pages,
+  // otherwise procede to the next balance operation.
+
+  //
+  function chooseBranchesToMerge (address, callback) {
+    var check = validator(callback),
+        descents = [],
+        choice, lesser, greater, center;
+
+    // Get the key that designates the branch page with the given address.
+    // Please don't go back and try to find a way to pass the key into this
+    // function. The key we used to arrive at this page during the previous
+    // merge has been removed from the b&#x2011;tree.
+    lock(address, false, check(getKey));
+
+    function getKey (page) {
+      designate(page, 0, check(unlockPage));
+
+      function unlockPage (key) {
+        unlock(page);
+        findPage(key);
+      }
+    }
+
+    // Now that we have the key we descend to the branch page we want to test
+    // for a potential merge. When we descend, the `Descent` class will track
+    // the path to the branch page that is to the left in its `lesser` property
+    // and the branch page to the right in its `greater` property.
+    function findPage (key) {
+      descents.push(center = new Descent());
+      center.descend(center.key(key), center.address(address), check(findLeftPage))
+    }
+
+    // The branch page we're testing may not have a left sibling. If it does the
+    // `lesser` property is a `Descent` class that when followed to the right
+    // to the depth of the branch page we're testing, will arrive at the left
+    // sibling branch page. 
+    function findLeftPage () {
+      if (lesser = center.lesser) {
+        descents.push(lesser);
+        lesser.descend(lesser.right, lesser.level(center.depth), check(findRightPage));
+      } else {
+        findRightPage();
+      }
+    }
+
+    // The branch page we're testing may not have a right sibling. If it does
+    // the `greater` property is a `Descent` class that when followed to the
+    // left to the depth of the branch page we're testing, will arrive at the
+    // right sibling branch page. 
+    function findRightPage () {
+      if (greater = center.greater) {
+        descents.push(greater);
+        greater.descend(greater.left, greater.level(center.depth), check(choose));
+      } else {
+        choose();
+      }
+    }
+
+    // See if the branch page we're testing can merge with either its left
+    // branch page sibling or its right branch page sibling. We always merge a
+    // page into its left sibling, so if we're able to merge, we obtain the key
+    // of the right page of the two pages we want to merge to pass it onto the
+    // `mergeBranches` function along with the address of the right page of the
+    // two pages we want to merge.
+    var choice;
+    function choose () {
+      if (lesser && lesser.page.length + center.page.length <= options.branchSize) {
+        choice = center;
+      } else if (greater && greater.page.length + center.page.length <= options.branchSize) {
+        choice = greater;
+      }
+      if (choice) {
+        designate(choice.page, 0, check(propagate));
+      } else {
+        release();
+      }
+    }
+
+    function propagate (key) {
+      release();
+      mergeBranches(key, choice.page.address, callback);
+    }
+
+    function release () {
+      descents.forEach(function (descent) { unlock(descent.page) });
+    }
+  }
+
+  // Merge the branch page identified by the address found along the path
+  // defined by the given key into its left branch page sibling.
+
+  // 
+  function mergeBranches (key, address, callback) {
+    // The generalized merge branch needs to stop at the parent of the branch
+    // page we wish to merge into its left branch page sibling.
+    function stopper (descent) {
+      return descent.child(address);
+    }
+
+    function merger (pages, callback) {
+      // Merging branch pages by slicing out all the addresses in the right page
+      // and adding them to the left page. Uncache the keys we've removed.
+      var cut = splice(pages.right.page, 0, pages.right.page.length);
+      cut.forEach(function (address) { uncacheKey(pages.right.page, address) });
+      splice(pages.left.page, pages.left.page.length, 0, cut);
+
+      // Write out the left branch page. The generalized merge function will
+      // handle the rest of the page rewriting.
+      writeBranch(pages.left.page, ".replace", check(callback, resume));
+
+      // We invoke the callback with a `true` value indicating that we did
+      // indeed merge some pages, so rewriting and propagation should be
+      // performed.
       function resume () {
         callback(null, true);
       }
