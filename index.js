@@ -91,6 +91,25 @@
 // Terms specific to our implementation will be introduced as they are
 // encountered in the document.
 //
+// ## Documentation Style
+//
+// This documentation is written to be read through, with no expecation that
+// you, dear reader, will actually read it though. It is merely the style of the
+// documentation. When you jump to read the documentation for specific to
+// block of code, you're liable to read references to "the above", or be asked
+// to "see below." The referenced passage should not be too far away, but you'll
+// have go back or keep reading to find it.
+//
+// The documentation is not meant be a handy reference to the interface, but
+// instead an essay on logic behind the implementation. The alternative is to
+// repeat descriptions of difficult concepts every time they are visited by the
+// code. This is going to be painfully dull for the person who gives the code
+// the time and attention necessary for a proper understanding.
+//
+// **TODO**: Remove this paragraph once you get used to the notion that people
+// are probably going to mewl about not being able to understand the code, want
+// an API reference, etc.
+//
 // ## What is a b&#x2011;tree?
 //
 // This documentation assumes that you understand the theory behind the
@@ -1368,7 +1387,6 @@ function Strata (directory, options) {
     , length: 0
     , locks: [[]]
     , penultimate: true
-    , right: 0
     , size: 0
     };
     return extend(page, override || {});
@@ -1449,6 +1467,11 @@ function Strata (directory, options) {
 
   // Remove a key from the branch page cache if one exists for the address.
   // Deduct the JSON string length of the key from the JSON size.
+  //
+  // Often times you return to have a look at this function to see why it wants
+  // an address and not an index. Before you go breaking things, have a look
+  // around. You'll find places where you've spliced the reference array and
+  // you're working with the removed addresses. In this case the index is lost.
   function uncacheKey (page, address) {
     if (page.cache[address]) {
       heft(page, -JSON.stringify(page.cache[address]).length);
@@ -1466,9 +1489,8 @@ function Strata (directory, options) {
 
   //
   function writeBranch (page, suffix, callback) {
-    var fn = filename(page.address, suffix), record, json, line, buffer;
-    record = [ page.right, page.addresses ];
-    json = JSON.stringify(record);
+    var fn = filename(page.address, suffix), json, line, buffer;
+    json = JSON.stringify(page.addresses);
     line = json + " " + checksum(json);
     buffer = new Buffer(line.length + 1);
     buffer.write(line);
@@ -1488,13 +1510,9 @@ function Strata (directory, options) {
       if (error) {
         callback(error);
       } else {
-        line = readLine(file);
-        var right = line[0], addresses = line[1];
         // Splice addresses into page.
-        splice(page, 0, 0, addresses)
-
-        // Extend the existing page with the properties read from file.
-        callback(null, extend(page, { right: right }));
+        splice(page, 0, 0, readLine(file))
+        callback(null, page);
       }
     });
   }
@@ -1940,7 +1958,7 @@ function Strata (directory, options) {
   // branch child page in the case of a branch page. Because this method
   // operates on both branch pages and leaf pages, our binary search operates on
   // both branch pages and leaf pages.
-  function keychain (page, index, callback) {
+  function designate (page, index, callback) {
     var key;
     if (page.address < 0) {
       stash(page, page.positions[index], pluck(callback, function (entry) {
@@ -1951,7 +1969,10 @@ function Strata (directory, options) {
         , iterIndex = index
         , stack = []
         ;
-      (function next () {
+
+      next();
+
+      function next () {
         var key;
         if (iter.address >= 0) {
           lock(iter.addresses[iterIndex], false, check(callback, function (locked) {
@@ -1966,7 +1987,7 @@ function Strata (directory, options) {
             callback(null, entry.key);
           }));
         }
-      })();
+      }
     } else {
       callback(null, key);
     }
@@ -1993,7 +2014,7 @@ function Strata (directory, options) {
     function test () {
       if (low <= high) {
         mid = low + ((high - low) >>> 1);
-        keychain(page, mid, check(compare));
+        designate(page, mid, check(compare));
       } else {
         unwind(callback, ~low);
       }
@@ -2096,62 +2117,97 @@ function Strata (directory, options) {
 // page because we don't want another descent to alter the parent page,
 // invaliding the direction of our descent.
 //
-// #### Lateral Traversal
+// #### Lateral Traversal of Leaf Pages
 //
-// Both branch pages and leaf pages are singly linked to their right sibling. If
-// you hold a lock on a page, you are allowed to obtain a lock on its right
-// sibling. This left right ordering allows us to traverse a level of the
-// b&#x2011;tree, which simplifies the implementation of record cursors and page
-// merges.
+// Leaf pages are singly linked to their right sibling. If you hold a lock on a
+// leaf page, you are allowed to obtain a lock on its right sibling. This left
+// right ordering allows us to traverse the leaf level of the b&#x2011;tree,
+// which simplifies the implementation of record cursors and page merges.
 //
-// When we move from a page to its right sibling, we hold the lock on the left
-// page until we've obtained the lock on the right sibling. The prevents another
-// descent from relinking linking our page and invalidating our traversal.
+// When we move from a leaf page to its right sibling, we hold the lock on the
+// left leaf page until we've obtained the lock on the right sibling. The
+// prevents another descent from relinking our page and invalidating our
+// traversal.
 //
 // #### Deadlock Prevention and Traversal Direction
 //
-// To prevent deadlock, we always move form a parent node to a child node, or
-// form a left sibling to a right sibling.
+// To prevent deadlock between search and mutate descents and balancing
+// descents, when descending the b&#x2011;tree for search or mutation we always
+// traverse a parent branch page to its child. When traversing leaf pages, we
+// always traverse from left to right. By traversing in a consistent order we
+// prevent the deadlock that would occur when another descent was attempting to
+// obtain locks on pages in the opposite order.
 //
-// **TK**: Chunky.
+// Because there is only ever one balance descent at a time, and because branch
+// pages are only ever locked exclusively by balance descents, we are allowed to
+// take more liberties when traversing branch pages for the purpose of
+// balancing. We can lock the right sibling of a branch page before locking the
+// branch page because we know that we're the only descent that would move
+// laterally along branch page levels of the b&#x2011;tree.
 //
-// Othewise we would deadlock when a descent that has an exclusive lock on a
-// parent attempted to obtain a lock on child, while another descent has either
-// sort of lock on the child attempted to obtain a lock on the parent. By only
-// obtaining locks top down, we avoid this deadlock condition because all of the
-// descents obtain locks in the same order.
+// Balance descents can also begin a shared or exclusive descent at any branch
+// page or leaf page in the b&#x2011;tree, so long as they do not already have a
+// branch locked. Because only a balance descents will change the shape of the
+// b&#x2011;tree, it can start anywhere in b&#x2011;tree. A search or mutation
+// descent cannot jump to any page in the b&#x2011;tree because it risks jumping
+// to a page that is the process of being split or merged.
 //
-// When traversing the tree laterally, we always travel from a page to the right
-// sibling of that page. Two descents traversing a level in both directions
-// would deadlock when they encountered each other, if one of the descents was
-// locking exclusively.
-//
-// To prevent a deadlock when a left right traversal coincides with the top down
-// traversal, we insist that when a parent obtains a lock on more than one
-// child, it locks the children in left to right order. That is, we must
-// remember the left right ordering regardless of whether we're navigating using
-// a page's link to it's right sibling, or whether we're referencing a branch
-// page's children pages.
+// As an extra special case, if a balance descent is only performing shared
+// locks in a descent that only includes branch pages, it can lock however many
+// branch pages it likes, in any order. In this case, there are no other
+// descents that would perform an exclusive lock on any branch page, so their is
+// no chance of deadlock. As an added bonus, for this special case, the shared
+// lock implementation is reentrant, so the balance descent can lock a branch
+// page in any order as many times as it likes.
 
+//
 function Descent (override) {
   // The constructor always felt like a dangerous place to be doing anything
   // meaningful in C++ or Java.
-  var options = override || {}
-    , exclusive = options.exclusive || false
-    , depth = 0
-    , unlocking = false
-    , first = true
-    , index = options.index == null ? 0 : options.index
-    , page = options.page || { addresses: [ 0 ] }
-    , descent = {}
-    ;
+  var options = override || {},
+      exclusive = options.exclusive || false,
+      depth = options.depth == null ? -1 : options.depth,
+      index = options.index == null ? 0 : options.index,
+      page = options.page || { addresses: [ 0 ] },
+      indexes = options.indexes || {},
+      descent = {},
+      greater = options.greater, lesser = options.lesser;
 
+  // #### Properties
+  //
+  // The current branch page or leaf page of the descent.
   function _page () { return page }
 
+  // The index of the child branch page or leaf page in the descent.
   function _index () { return index }
 
-  function index_ (i) { index = i }
+  // The index of the child branch page or leaf page can be assigned to adjust
+  // the trajectory of the descent. We use this to descent to the left sibling
+  // of a page we want to merge into its left sibling.
+  function index_ (i) { indexes[page.address] = index = i }
 
+  // A map of the address of each page so far visited in the path to the index
+  // of the child determined by the navigation function.
+  function _indexes () { return indexes }
+
+  // The current depth of the descent into the b&#x2011;tree where `-1`
+  // indicates no descent and `0` indicates the root.
+  function _depth () { return depth }
+
+  // An instance of `Descent` that if followed to the right to the `depth` of
+  // this `Descent` will arrive at the left sibling of the current page of this
+  // `Descent`. If the current `page` has no left sibling, then the `lesser`
+  // property is undefined.
+  function _lesser () { return lesser }
+
+  // An instance of `Descent` that if followed to the left to the `depth` of
+  // this `Descent` will arrive at the right sibling of the current page of this
+  // `Descent`. If the current `page` has no right sibling, then the `greater`
+  // property is undefined.
+  function _greater () { return greater }
+
+  // #### Forking
+  //
   // We use `fork` to create a new descent using the position of the current
   // descent. The new descent will continue to descend the tree, but without
   // releasing the lock on the page held by the descent from which we forked.
@@ -2182,40 +2238,28 @@ function Descent (override) {
 
   //
   function fork () {
-    return new Descent({ page: page, exclusive: exclusive, index: index });
+    return new Descent({
+      page: page,
+      exclusive: exclusive,
+      depth: depth,
+      greater: greater,
+      lesser: lesser,
+      index: index,
+      indexes: extend({}, indexes)
+    });
   }
 
-  function found (key) {
-    return function () {
-      return page.addresses[0] != 0 && comparator(page.cache[page.addresses[index]],  key) == 0;
-    }
-  }
-
-  descent.discard = function (callback) { callback(null, 0) };
-
-  // Follow the right most path. **TODO**: How much confusion do I save if I
-  // replace addresses and positions with references?
-  function right (callback) { callback(null, (page.addresses || page.positions).length - 1) };
+  // #### Excluding
 
   // All subsequent locks acquired by the descent are exclusive.
-  function exclude () { exclusive = true };
+  function exclude () { exclusive = true }
 
-  // Stop when we reach a certain depth in the tree relative to the current
-  // depth.
-  function descendant (descent) {
-    var current = depth;
-    return function () { return current + descent == depth };
-  }
-
-  // Stop before a we descend to a child with a certain address.
-  function address (a) { return function (address) { return a == address } };
-
-  // Upgrade a lock from shared to exclusive. Works only with branch pages. All
-  // subsequent locks acquired by the descent are exclusive.
+  // Upgrade a lock from shared to exclusive. This releases the lock on the
+  // current branch page and reacquires the lock as an exclusive. It only works
+  // only with branch pages, and it only works because the only descent that
+  // acquires an exclusive lock on a branch page is a balancing descent.
   //
-  // TODO: Convince yourself that it is safe to upgrade a lock anywhere in the
-  // descent. I believe so because you're only doing to upgrade locks when you
-  // are rebalancing the tree.
+  // All subsequent locks acquired by the descent are exclusive.
   function upgrade (callback) {
     unlock(page);
 
@@ -2227,16 +2271,59 @@ function Descent (override) {
     }
   }
 
+  // #### Navigating
+  //
+  // The `descend` function accepts a navigation function that determines the
+  // index of the child to follow down the tree.
+
+  // Follow the path for the given key.
   function key (key) {
     return function (callback) {
       return find(page, key, page.address < 0 ? page.ghosts : 1, callback);
     }
   }
 
+  // Always goes down the left most path.
   function left (callback) { callback(null, page.ghosts || 0) }
 
-  // TODO: Maybe for the sake of consistency, we make these accessors that
-  // generate the functions, because they are not applicable to Descent.
+  // In the method you're about read, please don't let the `or` operator bother
+  // you, although it has in the past. When I set out to rename the addresses
+  // array of the branch page and the positions array of the leaf page so that
+  // they both the had a references array, the documentation became far more
+  // verbose as it set out to describe the meaning of the hopelessly generic
+  // term reference.
+  //
+  // It is bound to cause confusion to readers who see that both branch pages
+  // and leaf pages have a references array, but the contents of the array mean
+  // something different, yet some of the algorithms treat them as the same.
+  // Where this occurs, where you're able to use the same algorithm for both
+  // page addresses and record positions, it is actually easier to understand
+  // when you see the `or` operator.
+  //
+  // You'll see this use of the `or` operator to choose between addresses and
+  // positions in three places in the source.
+
+  // Follow the right most path.
+  function right (callback) { callback(null, (page.addresses || page.positions).length - 1) };
+
+  // #### Stopping
+  //
+  // The `descend` function accepts a stop function that determines when to
+  // terminate the descent.
+
+  // Stop when we've reached the branch page that contains a child whose key
+  // matches the given key.
+  function found (key) {
+    return function () {
+      return page.addresses[0] != 0 && comparator(page.cache[page.addresses[index]],  key) == 0;
+    }
+  }
+
+  // Stop before a we descend to a child with a certain address.
+  function child (address) { return function () { return page.addresses[index] == address } };
+
+  // Stop when we reach a specific page identified by its address.
+  function address (address) { return function () { return page.address == address } };
 
   // Stop when we reach a penultimate branch page.
   function penultimate () { return page.addresses[0] < 0 }
@@ -2244,41 +2331,93 @@ function Descent (override) {
   // Stop when we reach a leaf page.
   function leaf () { return page.address < 0 }
 
+  // Stop when we reach a certain depth in the tree relative to the current
+  // depth.
+  function level (level) {
+    return function () { return level == depth }
+  }
+
+  // #### Unlocking
+  //
+  // Ordinarily, we unlock as we descent skipping the initial branch page. In
+  // the case of a descent from the root, the initial branch page is a dummy
+  // branch page containing the root. In the case of a forked descent, the
+  // forked descent does not own the branch page from which the descent forked.
+  var unlocking = false;
+
+  function unlocker (parent) {
+    if (unlocking) unlock(parent);
+    unlocking = true;
+  }
+
+  // #### Uncaching
+  //
+  // When we descend to remove a leaf page for a merge, to change the key value
+  // of a leaf page, we want to discard any cached references to the key value
+  // in the branch pages on the path to the leaf page. This property is turned
+  // off by default and it is not inherited by a fork.
+  var uncaching = false;
+  function uncaching_ ($uncaching) { uncaching = $uncaching }
+
+  // However, there is the special case of a descent to delete a page as a
+  // result of a  merge where we're going to want to hold onto the locks to
+  // multiple pages on the path to the page we want to delete. The merge
+  // function provides it's down unlocker function.
+  function unlocker_ ($unlocker) { unlocker = $unlocker }
+
+  // #### Descending
+  //
+  // Descent the b&#x2011;tree from the current branch page using the given
+  // navigation function `next` to determine the page to take and the given stop
+  // function `stop` to determine when to stop the descent.
   function descend (next, stop, callback) {
     var check = validator(callback), above = page;
 
     downward();
 
     function downward () {
-      // **TODO**: Yup, this is bothersome. Choose a single name.
-      if (stop((page.addresses || page.positions)[index])) {
+      if (stop()) {
         unwind(callback, page, index);
       } else {
-        depth++;
+        // We'll only ever go here if we're at a branch page.
+        if (index + 1 < page.addresses.length) {
+          greater = fork();
+          greater.index++;
+        }
+        if (index > 0) {
+          lesser = fork();
+          lesser.index--;
+        }
         lock(page.addresses[index], exclusive, check(locked));
       }
     }
 
     function locked (locked) {
-      if (unlocking) unlock(page);
+      depth++;
+      unlocker(page, locked);
       page = locked;
       next(check(directed));
     }
 
-    function directed ($1) {
-      index = $1;
-      unlocking = true;
-      if (page.address >= 0 && index < 0) {
-        index = (~index) - 1;
+    function directed ($index) {
+      if (page.address >= 0 && $index < 0) {
+        index = (~$index) - 1;
+      } else {
+        index = $index;
+      }
+      indexes[page.address] = index;
+      if (uncaching && page.address >= 0) {
+        uncacheKey(page, page.addresses[index]);
       }
       downward();
     }
   }
 
-  return objectify.call(this, descend, fork, exclude, upgrade
-                            , key, left, right
-                            , found, address, penultimate, leaf, descendant
-                            , _page, _index, index_);
+  // Construct the `Descent` object and return it.
+  return objectify.call(this, descend, fork, exclude, upgrade,
+                              key, left, right,
+                              found, address, child, penultimate, leaf, level,
+                              _page, _depth, _index, index_, _indexes, _lesser, _greater, unlocker_);
 }
 
 
@@ -2376,7 +2515,7 @@ function Cursor (exclusive, searchKey, page, index) {
     , offset = index < 0 ? ~ index : index
     ;
 
-  // Get a the record at a given index from the current leaf page.
+  // Get a record at a given index from the current leaf page.
   function get (index, callback) {
     stash(page, page.positions[index], validator(callback)(unstashed));
     function unstashed (entry) { callback(null, entry.record) }
@@ -2602,7 +2741,7 @@ function Cursor (exclusive, searchKey, page, index) {
       }
 
       function load ($) {
-        keychain(sibling = $, 0, check(compare));
+        designate(sibling = $, 0, check(compare));
       }
 
       function compare (siblingKey) {
@@ -3291,7 +3430,7 @@ function Balancer () {
 
       function nodify (next) {
         return check(function (page) {
-          keychain(page, 0, check(identified));
+          designate(page, 0, check(identified));
           function identified (key) {
             node = { page: page, length: page.length - page.ghosts, key: key };
             reference(page);
@@ -3461,7 +3600,7 @@ function Balancer () {
         // Schedule the merge. After we schedule the merge, we increase the size
         // of the head node and link the head node to the right sibling of the
         // right node. Note that a leaf page merged into its left sibling will
-        // be destoryed, so we don't have to tidy up its ghosts.
+        // be destroyed, so we don't have to tidy up its ghosts.
         if (node.right) {
           right = unlink(node);
           delete ghosts[right.page.address];
@@ -3744,7 +3883,7 @@ function Balancer () {
       , descents = []
       , children = []
       , parent, full, split, pages
-      , records, remainder, right, offset
+      , records, remainder, offset
       ;
 
     // We descend the tree directory directly to the leaf using the key stopping
@@ -3753,7 +3892,7 @@ function Balancer () {
 
     // Descend to the penultimate branch page, from which a leaf page child
     // will be removed.
-    parent.descend(parent.key(key), parent.address(address), check(upgrade));
+    parent.descend(parent.key(key), parent.child(address), check(upgrade));
 
     // Upgrade to an exclusive lock.
     function upgrade () {
@@ -3763,7 +3902,7 @@ function Balancer () {
     // Now descend to our leaf to split.
     function fork () {
       descents.push(full = parent.fork());
-      full.descend(full.key(key), full.descendant(1), check(partition));
+      full.descend(full.key(key), full.level(full.depth + 1), check(partition));
     }
 
     // Unlike the leaf page, we do not have to reassure ourselves that the page
@@ -3780,8 +3919,6 @@ function Balancer () {
       records = Math.floor(split.length / pages);
       remainder = split.length % pages;
 
-      right = split.right
-
       // Never a remainder record on the first page.
       offset = split.length
 
@@ -3790,16 +3927,13 @@ function Balancer () {
 
     function paginate () {
       // Create a new branch page.
-      var page = createBranch(nextAddress++, { right: right });
-
-      // Note the address of the page to the right.
-      right = page.address;
+      var page = createBranch(nextAddress++);
 
       // Add the branch page to our list of new child branch pages.
       children.push(page);
 
       // Determine the number of records to move from the root branch into the
-      // new child branch page. Add an additonal record if we have a remainder.
+      // new child branch page. Add an additional record if we have a remainder.
       var length = remainder-- > 0 ? records + 1 : records;
       var offset = split.length - length;
 
@@ -3819,9 +3953,6 @@ function Balancer () {
 
     // Write the penultimate branch.
     function paginated () {
-      // Link the leaf page to the last created new leaf page.
-      split.right = right;
-
       // Get our children in the right order. We were pushing above.
       children.reverse()
 
@@ -3862,6 +3993,16 @@ function Balancer () {
         replace(parent.page, ".commit", check(cleanup));
       }
     }
+      
+    // Commit the changes.
+    function rootWritten () {
+      rename(parent.page, ".pending", ".commit", check(committing));
+    }
+      
+    // Write the child branch pages.
+    function committing () {
+      children.forEach(function (page) { replace(page, ".replace", check(childCommitted)) });
+    }
 
     // **TODO**: Our left-most and right-most page might be able to merge with
     // the left and right siblings of the page we've just split. We deal with
@@ -3893,7 +4034,7 @@ function Balancer () {
 
   // &mdash;
   function drainRoot (callback) {
-    var root, pages, records, right = 0, remainder, children = [], check = validator(callback);
+    var root, pages, records, remainder, children = [], check = validator(callback);
 
     // Lock the root. No descent needed.
     lock(0, true, check(partition));
@@ -3911,16 +4052,13 @@ function Balancer () {
 
     function paginate () {
       // Create a new branch page.
-      var page = createBranch(nextAddress++, { right: right });
-
-      // Note the right address.
-      right = page.address;
+      var page = createBranch(nextAddress++);
 
       // Add the branch page to our list of new child branch pages.
       children.push(page);
 
       // Determine the number of records to move from the root branch into the
-      // new child branch page. Add an additonal record if we have a remainder.
+      // new child branch page. Add an additional record if we have a remainder.
       var length = remainder-- > 0 ? records + 1 : records;
       var offset = root.length - length;
 
@@ -3998,13 +4136,25 @@ function Balancer () {
       pivot.upgrade(check(descendLeaf));
     }
     
+    // Uncache the pivot key and begin a descent that will clear cached keys all
+    // the way to the leaf page.
+    //
+    // We're okay calling `descend` after uncaching the pivot branch page key
+    // because we don't reference the branch page's keys when determining when
+    // to stop, that would be `found` instead of `leaf`. The `key` function will
+    // use branch page keys starting with the child of the pivot branch page.
     function descendLeaf () {
+      uncacheKey(pivot.page, pivot.page.addresses[pivot.index]);
+
       descents.push(leaf = pivot.fork());
+      leaf.uncaching = true;
+
       leaf.descend(leaf.key(key), leaf.leaf, check(shift));
     }
     
+    // Remove the ghosted record from the references array and the record cache.
     function shift (callback) {
-      splice(leaf.page, 0, 1);
+      uncacheRecord(leaf.page, splice(leaf.page, 0, 1).shift());
       leaf.page.ghosts = 0
 
       fs.open(filename(leaf.page.address), 'a', 0644, check(opened));
@@ -4024,172 +4174,457 @@ function Balancer () {
     }
   }
 
-  function mergeLeaves (key, unbalanced, callback) {
-    // Create a list of descents whose pages we'll unlock before we leave.
-    var descents = [], penultimate = {}, leaves = {}, pivot, check = validator(callback);
+  // A generalized merge function with a specialization each for branch pages
+  // and leaf pages below. The function merge a page into its left sibling. A
+  // specialized implementation of the a merge inovkes this function providing
+  //
+  //  * a key that designates the page to merge,
+  //  * a stopper function that will generate a stop function that will stop the
+  //  descent at the page to merge,
+  //  * a merger function that will accept the two pages to merge as arguments,
+  //  merge them, and write out the left page, and
+  //  * a callback to invoke when the merge is completed.
 
-    // Descend the tree until we find the key of the leaf page we're going to
-    // merge in a branch page.
+  //
+  function mergePages (key, stopper, merger, callback) {
+    // Create a list of descents whose pages we'll unlock before we leave.
+    var check = validator(callback),
+        descents = [], locked = [], singles = [], parents = {}, pages = {},
+        ancestor, pivot, empties;
+
+    // Descent the tree stopping at the branch page that contains a key for the
+    // leaf page that we are going to delete when we merge it into its left
+    // sibling. We're going to refer to this branch page as the pivot branch
+    // page in the rest of this function. We need to uncache the key from the
+    // pivot branch page, because it will no longer be correct once the leaf
+    // page is deleted.
     descents.push(pivot = new Descent());
     pivot.descend(pivot.key(key), pivot.found(key), check(upgrade))
 
-
+    // Upgrade the lock on the pivot branch page to an exclusive lock. From here
+    // on out, all descents will lock pages exclusively.
     function upgrade () {
-      pivot.upgrade(check(fork));
+      pivot.upgrade(check(parentOfPageToMerge));
     }
     
-    // Descend to the penultimate page, but first, take note of whether or not
-    // the branch page that contains our key is also the penultimate page. We go
-    // to the right-most descendant of the left child to find the left leaf page
-    // of the merge. We follow the key to find the right leaf page of the merge.
-    function fork () {
-      penultimate.isPivot = pivot.page.addresses[0] < 0;
+    // From the pivot, descend to the branch page that is the parent of the page
+    // for the given key.
+    function parentOfPageToMerge () {
+      // We're okay calling `descend` after uncaching the pivot branch page key
+      // because we don't reference the branch page's keys when determining when
+      // to stop, that would be using `found` as a stop function. Here we're
+      // going to use `address` or `penultimate` to stop the descent. The `key`
+      // function will use branch page keys starting with the child of the pivot
+      // branch page.
+      uncacheKey(pivot.page, pivot.page.addresses[pivot.index]);
 
-      penultimate.left = pivot.fork();
-      penultimate.left.index--;
-      penultimate.left.descend(penultimate.left.right, penultimate.left.penultimate, check(goRight));
-    }
-    
-    function goRight () {
-      penultimate.right = pivot.fork();
-      penultimate.right.descend(penultimate.right.key(key), penultimate.right.penultimate, check(atPenultimate));
-    }
-    
-    function atPenultimate (callback) {
-      // If the leaf page key was found in the penultimate page, then we do not
-      // want to queue the penultimate pages for release, because they are the
-      // same as the branch key page, and the branch key page is already queued
-      // for release.
-      if (! penultimate.isPivot) {
-        descents.push(penultimate.left);
-        descents.push(penultimate.right);
+      // Create a forked descent that will descend to the parent branch page of
+      // the right page of the merge, uncaching the keys cached for the path
+      // we'll follow.
+      parents.right = pivot.fork();
+      parents.right.uncaching = true;
+      
+      // We gather branch pages on the path to the right page of the merge with
+      // a single child whose descendants consist only of the leaf page or a
+      // branch page with a single child must be deleted. If we are gathering
+      // pages and encounter a branch page with more than one child, we release
+      // the pages we've gathered.
+      parents.right.unlocker = function (parent, child) {
+        if (child.length == 1) {
+          if (singles.length == 0) singles.push(parent);
+          singles.push(child);
+        } else if (singles.length) {
+          if (singles[0].address == pivot.page.address) singles.shift();
+          singles.forEach(unlock);
+          singles.length = 0;
+        } else if (parent.address != pivot.page.address) {
+          unlock(parent); 
+        }
       }
 
-      descentLeft();
+      // Descent to the parent branch page of the right page of the merge.
+      parents.right.descend(parents.right.key(key), stopper(parents.right), check(parentOfLeftSibling));
+    }
+    
+    // From the pivot, descent to the parent branch page of the left sibling of
+    // page for the given key.
+    //
+    // Note that while we must lock leaf pages from left to right, we can lock
+    // branch pages right to left because the balance descent is the only
+    // descent that will lock two sibling branch pages at the same time, search
+    // and mutate descents will only follow a single ancestral path down the
+    // tree. Once a search or mutate descent reaches a leaf page, it then has
+    // the option to navigate from leaf page to leaf page from left to right.
+    function parentOfLeftSibling () {
+      parents.left = pivot.fork();
+      parents.left.index--;
+      parents.left.descend(parents.left.right, parents.left.level(parents.right.depth), check(gatherLockedPages));
+    }
+    
+    // Take note of which pages have been locked during our descent to find the
+    // parent branch pages of the two pages we want to merge.
+    function gatherLockedPages (callback) {
+      // If we encountered singles, then we're going to delete all the branch
+      // pages that would be empty, then remove a child from an ancestor above
+      // the parent branch page of the page we're merging.
+      if (singles.length) {
+        locked = singles.slice();
+        ancestor = singles.shift();
+      // If we encountered no singles, then we may still have gone down separate
+      // paths to reach the parent page. If so, the pivot branch page and the
+      // parent branch page are separate, so we can 
+      // 
+      // TODO: Unlock the pivot page here, for what good it will do anyone,
+      // since the key has been uncached, a full descent is necessary to
+      // designate the branch.
+      //
+      // TODO: Obviously, we also need to remove the keys of zero index child of
+      // the descent, otherwise it will be read again from a child branch page
+      // without visiting the child leaf page.
+      } else {
+        ancestor = parents.right.page;
+        if (parents.right.page.address != pivot.page.address) {
+          descents.push(parents.right);
+        }
+      }
+
+      if (parents.left.page.address != pivot.page.address) {
+        descents.push(parents.left);
+      }
+
+      descendToLeftPageToMerge();
     }
 
-    // Descend to the leaves. Note that if we're on the penultimate page, the
-    // next descent will follow the index we decremented above, the leaf page to
-    // the left of the keyed page, instead of going to the right-most leaf page.
-    function descentLeft () {
-      descents.push(leaves.left = penultimate.left.fork());
-      leaves.left.descend(leaves.left.left, leaves.left.leaf, check(descendRight));
+    // Descend to the pages we want to merge. Note that if we're on the
+    // penultimate page, the next descent will follow the index we decremented
+    // above, the leaf page to the left of the keyed page, instead of going to
+    // the right-most leaf page.
+    function descendToLeftPageToMerge () {
+      descents.push(pages.left = parents.left.fork());
+      pages.left.descend(pages.left.left, pages.left.level(parents.left.depth + 1), check(descendToRightPageToMerge));
     }
       
-    // We use `left` in both cases, because we don't need an index into the leaf
-    // page, only a lock on the leaf page.
-    function descendRight (callback) {
-      descents.push(leaves.right = penultimate.right.fork());
-      leaves.right.descend(leaves.right.left, leaves.right.leaf, check(applicable));
+    // We use `left` in both cases, because we don't need an index into the
+    // page to merge, only a lock on the leaf page.
+    function descendToRightPageToMerge (callback) {
+      descents.push(pages.right = parents.right.fork());
+      pages.right.descend(pages.right.left, pages.right.level(parents.right.depth + 1), check(merge));
     }
-
-    function applicable () {
-      // Fix up the index. If the pivot is penultimate, then it is not actually
-      // the right-most. TODO: Necessary?
-      // if penultimate.isPivot
-        // leaves.left.index = leaves.right.index - 1
-
-      // Determine if we still have candidates for merge.
-      var left = (leaves.left.page.length - leaves.left.page.ghosts);
-      var right = (leaves.right.page.length - leaves.right.page.ghosts);
-      if (left + right > options.leafSize) {
-        // We cannot merge, so we queue one or both of pages for a merge test on the
-        // next balancer.
-        if (unbalanced[leaves.left.page.address])
-          io.balancer.unbalanced(leaves.left.page, true)
-        if (unbalanced[leaves.right.page.address])
-          io.balancer.unbalanced(leaves.right.page, true)
-        release();
-      } else {
-        merge();
-      }
-    }
-
-    var index;
 
     function merge () {
+      merger(pages, check(merged));
+    }
+
+    function merged (dirty) {
+      if (dirty) uncachePivot();
+      else release();
+    }
+
+    function uncachePivot () {
       // Uncache the pivot key.
       uncacheKey(pivot.page, pivot.page.addresses[pivot.index]);
-
-      // The right leaf page of of the merged page is the right leaf page of the
-      // right page of the merge.
-      leaves.left.page.right = leaves.right.page.right;
-
-      index = leaves.right.page.ghosts;
-
-      if (index < leaves.right.page.length) append();
-      else appended();
-    }
-
-    var position;
-
-    // Append all of the records of the right leaf page, excluding any ghosts.
-    function append () {
-      // Fetch the record and read it from cache or file.
-      position = leaves.right.page.positions[index];
-      stash(leaves.right.page, position, check(stashed));
-    } 
-
-    function stashed (object) {
-      uncacheRecord(leaves.right.page, position);
-
-      // Add it to our new page. The negative positions are temproary. We'll
-      // get real file positions when we rewrite.
-      splice(leaves.left.page, leaves.left.page.length, 0, -(position + 1));
-      cacheRecord(leaves.left.page, -(position + 1), object.record, object.key);
-
-      if (++index < leaves.right.page.length) append();
-      else appended();
-    }
-
-    function appended () {
-      // Remove the positions the outgoing page to update the JSON size of the
-      // b&#x2011;tree.
-      splice(leaves.right.page, 0, leaves.right.page.length);
-
-      // Rewrite the left leaf page. Move the right leaf page aside for the
-      // pending unlink.
-      rewriteLeaf(leaves.left.page, ".replace", check(leftRewritten));
+      renameRightPageToMerge();
     }
     
-    function leftRewritten () {
-      rename(leaves.right.page, "", ".unlink", check(rightRenamed));
+    function renameRightPageToMerge () {
+      rename(pages.right.page, "", ".unlink", check(rewriteKeyedBranchPage));
     }
       
-    function rightRenamed () {
-      uncacheKey(pivot.page, pivot.page.addresses[pivot.index]);
-      splice(penultimate.right.page, penultimate.right.index, 1);
+    function rewriteKeyedBranchPage () {
+      var index = parents.right.indexes[ancestor.address];
 
-      writeBranch(penultimate.right.page, ".pending", check(penultimateRewritten));
+      uncacheKey(ancestor, ancestor.addresses[index]);
+      splice(ancestor, index, 1);
+
+      empties = singles.slice();
+      writeBranch(parents.right.page, ".pending", check(rewriteEmpties));
+    }
+
+    function rewriteEmpties () {
+      if (empties.length) {
+        rename(empties.shift(), "", ".unlink", check(rewriteEmpties));
+      } else {
+        beginCommit();
+      }
     }
       
-    function penultimateRewritten () {
+    function beginCommit () {
       // **TODO**: If I succeed, how will I know to test the parents for balance?
       // **TODO**: Uh, can't the medic just note that this page needs to be
       // rebalanced? It can force a propagation of balance and merge checking of
       // the parent.
 
+      empties = singles.slice();
       // Renaming pending to commit will cause the merge to roll forward.
-      rename(penultimate.right.page, ".pending", ".commit", check(committed));
+      rename(ancestor, ".pending", ".commit", check(unlinkEmpties));
     }
     
-    function committed () {
-      replace(leaves.left.page, ".replace", check(leftReplaced));
+    // Unlink ancestor branch pages that are now empty as a result of the merge.
+    function unlinkEmpties () {
+      if (empties.length) {
+        unlink(empties.shift(), ".unlink", check(unlinkEmpties));
+      } else {
+        replaceLeftPageToMerge();
+      }
+    }
+
+    // Move the merged left leaf page into place.
+    function replaceLeftPageToMerge () {
+      replace(pages.left.page, ".replace", check(unlinkRightPageToMerge));
     }
     
-    function leftReplaced () {
-      unlink(leaves.right.page, ".unlink", check(rightUnlinked));
+    function unlinkRightPageToMerge () {
+      unlink(pages.right.page, ".unlink", check(endCommit));
     }
     
-    function rightUnlinked () {
-      replace(penultimate.right.page, ".commit", check(release));
+    function endCommit () {
+      replace(ancestor, ".commit", check(propagate));
+    }
+
+    // Release our locks and propagate the merge to parent branch pages.
+    function propagate () {
+      // Release locks.
+      descents.forEach(function (descent) { unlock(descent.page) });
+      locked.forEach(unlock);
+
+      // We released our lock on the ancestor, but even if it is freed by a
+      // cache purge, the properties we test here are still valid.
+      if (ancestor.address == 0) {
+        if (ancestor.length == 1 && ancestor.addresses[0] > 0) {
+          fillRoot(callback);
+        } else {
+          callback(null);
+        }
+      } else {
+        chooseBranchesToMerge(ancestor.address, callback);
+      }
+    }
+  }
+
+  // Merge the leaf page identified by the key into its left leaf page sibling.
+  //
+  // The key parameter designates the leaf page to merge into its left sibling.
+  // The unbalanced parameter is the set of leaf pages that were potentially
+  // unbalanced when the balance plan that invoked this merge was constructed.
+
+  //
+  function mergeLeaves (key, unbalanced, callback) {
+    // The generalized merge function needs to stop at the parent of the leaf
+    // page we with to merge into its left leaf page sibling. We tell it to stop
+    // it reaches a branch page that has leaf pages as children. We call these
+    // penultimate pages.
+    function stopper (descent) { return descent.penultimate }
+
+    // By the time we lock the leaf pages exclusively, their sizes may have
+    // changed so that they are no longer candidates for merge. If that is case,
+    // we place the pages that were unbalanced before the merge into the set of
+    // unbalanced pages we inspect the next time we balance. The leaf page for
+    // the key cannot merge with it's left sibling, but perhaps it can merge
+    // with its right sibling.
+    function merger (leaves, callback) {
+      var check = validator(callback);
+
+      var left = (leaves.left.page.length - leaves.left.page.ghosts);
+      var right = (leaves.right.page.length - leaves.right.page.ghosts);
+
+      if (left + right > options.leafSize) {
+        // We cannot merge, so we queue one or both of pages for a merge test on the
+        // next balancer.
+        if (unbalanced[leaves.left.page.address]) {
+          io.balancer.unbalanced(leaves.left.page, true)
+        }
+        if (unbalanced[leaves.right.page.address]) {
+          io.balancer.unbalanced(leaves.right.page, true)
+        }
+        callback(null, false);
+      } else {
+        merge();
+      }
+
+      var index;
+
+      function merge () {
+        // The right leaf page of of the merged page is the right leaf page of the
+        // right page of the merge.
+        leaves.left.page.right = leaves.right.page.right;
+
+        index = leaves.right.page.ghosts;
+
+        if (index < leaves.right.page.length) fetch();
+        else rewriteLeftLeaf();
+      }
+
+      var position;
+
+      // Append all of the records of the right leaf page, excluding any ghosts.
+
+      // Fetch a page from the right leaf page. 
+      function fetch () {
+        // Fetch the record and read it from cache or file.
+        position = leaves.right.page.positions[index];
+        stash(leaves.right.page, position, check(copy));
+      } 
+
+      // Append a record fetched from the right leaf page to the left leaf page.
+      function copy (object) {
+        // Uncache the record from the right leaf page.
+        uncacheRecord(leaves.right.page, position);
+
+        // Add it to our new page. The negative positions are temporary. We'll
+        // get real file positions when we rewrite.
+        splice(leaves.left.page, leaves.left.page.length, 0, -(position + 1));
+        cacheRecord(leaves.left.page, -(position + 1), object.record, object.key);
+
+        if (++index < leaves.right.page.length) fetch();
+        else rewriteLeftLeaf();
+      }
+
+      // Initiate page rewriting by rewriting the left leaf. The remainder of
+      // the page rewriting is performed by the generalized merge function.
+      function rewriteLeftLeaf () {
+        // Remove the positions the outgoing page to update the JSON size of the
+        // b&#x2011;tree.
+        splice(leaves.right.page, 0, leaves.right.page.length);
+
+        // Rewrite the left leaf page. Move the right leaf page aside for the
+        // pending unlink.
+        rewriteLeaf(leaves.left.page, ".replace", check(resume));
+      }
+
+      // Continue with the generalized merge function. `true` indicates that we
+      // did indeed merge pages and the pages participating in the merge should
+      // be rewritten.
+      function resume () {
+        callback(null, true);
+      }
+    }
+
+    // Invoke the generalized merge function with our specializations.
+    mergePages(key, stopper, merger, callback);
+  }
+
+  // Determine if the branch page at the given address can be merged with either
+  // of its siblings. If possible we procede to merge the chosen branche pages,
+  // otherwise procede to the next balance operation.
+
+  //
+  function chooseBranchesToMerge (address, callback) {
+    var check = validator(callback),
+        descents = [],
+        choice, lesser, greater, center;
+
+    // Get the key that designates the branch page with the given address.
+    // Please don't go back and try to find a way to pass the key into this
+    // function. The key we used to arrive at this page during the previous
+    // merge has been removed from the b&#x2011;tree.
+    lock(address, false, check(getKey));
+
+    function getKey (page) {
+      designate(page, 0, check(unlockPage));
+
+      function unlockPage (key) {
+        unlock(page);
+        findPage(key);
+      }
+    }
+
+    // Now that we have the key we descend to the branch page we want to test
+    // for a potential merge. When we descend, the `Descent` class will track
+    // the path to the branch page that is to the left in its `lesser` property
+    // and the branch page to the right in its `greater` property.
+    function findPage (key) {
+      descents.push(center = new Descent());
+      center.descend(center.key(key), center.address(address), check(findLeftPage))
+    }
+
+    // The branch page we're testing may not have a left sibling. If it does the
+    // `lesser` property is a `Descent` class that when followed to the right
+    // to the depth of the branch page we're testing, will arrive at the left
+    // sibling branch page. 
+    function findLeftPage () {
+      if (lesser = center.lesser) {
+        descents.push(lesser);
+        lesser.descend(lesser.right, lesser.level(center.depth), check(findRightPage));
+      } else {
+        findRightPage();
+      }
+    }
+
+    // The branch page we're testing may not have a right sibling. If it does
+    // the `greater` property is a `Descent` class that when followed to the
+    // left to the depth of the branch page we're testing, will arrive at the
+    // right sibling branch page. 
+    function findRightPage () {
+      if (greater = center.greater) {
+        descents.push(greater);
+        greater.descend(greater.left, greater.level(center.depth), check(choose));
+      } else {
+        choose();
+      }
+    }
+
+    // See if the branch page we're testing can merge with either its left
+    // branch page sibling or its right branch page sibling. We always merge a
+    // page into its left sibling, so if we're able to merge, we obtain the key
+    // of the right page of the two pages we want to merge to pass it onto the
+    // `mergeBranches` function along with the address of the right page of the
+    // two pages we want to merge.
+    var choice;
+    function choose () {
+      if (lesser && lesser.page.length + center.page.length <= options.branchSize) {
+        choice = center;
+      } else if (greater && greater.page.length + center.page.length <= options.branchSize) {
+        choice = greater;
+      }
+      if (choice) {
+        designate(choice.page, 0, check(propagate));
+      } else {
+        release();
+      }
+    }
+
+    function propagate (key) {
+      release();
+      mergeBranches(key, choice.page.address, callback);
     }
 
     function release () {
       descents.forEach(function (descent) { unlock(descent.page) });
-
-      callback(null);
     }
+  }
+
+  // Merge the branch page identified by the address found along the path
+  // defined by the given key into its left branch page sibling.
+
+  // 
+  function mergeBranches (key, address, callback) {
+    // The generalized merge branch needs to stop at the parent of the branch
+    // page we wish to merge into its left branch page sibling.
+    function stopper (descent) {
+      return descent.child(address);
+    }
+
+    function merger (pages, callback) {
+      // Merging branch pages by slicing out all the addresses in the right page
+      // and adding them to the left page. Uncache the keys we've removed.
+      var cut = splice(pages.right.page, 0, pages.right.page.length);
+      cut.forEach(function (address) { uncacheKey(pages.right.page, address) });
+      splice(pages.left.page, pages.left.page.length, 0, cut);
+
+      // Write out the left branch page. The generalized merge function will
+      // handle the rest of the page rewriting.
+      writeBranch(pages.left.page, ".replace", check(callback, resume));
+
+      // We invoke the callback with a `true` value indicating that we did
+      // indeed merge some pages, so rewriting and propagation should be
+      // performed.
+      function resume () {
+        callback(null, true);
+      }
+    }
+
+    // Invoke the generalized merge function with our specializations.
+    mergePages(key, stopper, merger, callback);
   }
 
   return objectify.call(this, balance, unbalanced);
