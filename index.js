@@ -2320,7 +2320,10 @@ function Descent (override) {
   }
 
   // Stop before a we descend to a child with a certain address.
-  function address (a) { return function (address) { return a == address } };
+  function child (address) { return function () { return page.addresses[index] == address } };
+
+  // Stop when we reach a specific page identified by its address.
+  function address (address) { return function () { return page.address == address } };
 
   // Stop when we reach a penultimate branch page.
   function penultimate () { return page.addresses[0] < 0 }
@@ -2373,7 +2376,7 @@ function Descent (override) {
     downward();
 
     function downward () {
-      if (stop((page.addresses || page.positions)[index])) {
+      if (stop()) {
         unwind(callback, page, index);
       } else {
         // We'll only ever go here if we're at a branch page.
@@ -2411,7 +2414,7 @@ function Descent (override) {
   // Construct the `Descent` object and return it.
   return objectify.call(this, descend, fork, exclude, upgrade,
                               key, left, right,
-                              found, address, penultimate, leaf, level,
+                              found, address, child, penultimate, leaf, level,
                               _page, _depth, _index, index_, _indexes, _lesser, _greater, unlocker_);
 }
 
@@ -3887,7 +3890,7 @@ function Balancer () {
 
     // Descend to the penultimate branch page, from which a leaf page child
     // will be removed.
-    parent.descend(parent.key(key), parent.address(address), check(upgrade));
+    parent.descend(parent.key(key), parent.child(address), check(upgrade));
 
     // Upgrade to an exclusive lock.
     function upgrade () {
