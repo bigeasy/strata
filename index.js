@@ -3386,28 +3386,31 @@ function Balancer () {
 
     // We do not proceed if there is nothing to consider.
     var addresses = Object.keys(lengths);
-    if (addresses.length == 0) callback(null);
-    else examine();
+    if (addresses.length == 0) {
+      callback(null);
+    // Otherwise we put a new balancer in place of the current balancer. Any
+    // edits will be considered by the next balancer.
+    } else {
+      balancer = new Balancer();
+      balancing = true;
+      gather();
+    }
 
     // Prior to calculating a balance plan, we gather the sizes of each leaf
     // page into memory. We can then make a balance plan based on page sizes
-    // that will not change while we are considering them in our plan. However,
-    // page size may change between gathering and planning, and page size may
-    // change between planning and executing the plan. Staggering gathering,
-    // planning and executing the balance gives us the ability to detect the
-    // changes in page size. When we detect that we can't make an informed
-    // decision on a page, we pass it onto the next balancer for consideration
-    // at the next balance.
+    // that will not change while we are considering them in our plan.
+    //
+    // However, page size may change between gathering and planning, and page
+    // size may change between planning and executing the plan. Staggering
+    // gathering, planning and executing the balance gives us the ability to
+    // detect the changes in page size. When we detect that we can't make an
+    // informed decision on a page, we pass it onto the next balancer for
+    // consideration at the next balance.
 
     // For each page that has changed we add it to a doubly linked list.
 
     //
-    function examine () {
-      // We put a new balancer in place of the current balancer. Any edits will
-      // be considered by the next balancer.
-      balancer = new Balancer();
-      balancing = true;
-
+    function gather () {
       // Convert the address back to an integer.
       var address = +(addresses.shift()), length = lengths[address], right, node;
 
@@ -3428,6 +3431,11 @@ function Balancer () {
       if (node = ordered[address]) linkCachedSibling(node);
       else lock(address, false, nodify(linkCachedSibling));
 
+      // Build a callback function that will add a leaf page to our collection
+      // of gathered pages, then invoke the `next` function passing the balance
+      // list node. The leaf page must be locked. The function will mark the
+      // page as being a participant in a balance, then unlock it. Linking to
+      // sibling nodes is not performed here.
       function nodify (next) {
         return check(function (page) {
           designate(page, 0, check(identified));
@@ -3465,17 +3473,23 @@ function Balancer () {
 
       function leftSibling (node) {
         var descent = new Descent();
-        descent.descend(descent.key(node.key), descent.found(node.key), check(found));
+        descent.descend(descent.key(node.key), descent.found(node.key), check(goToLeaf));
 
-        function found () {
+        function goToLeaf () {
           descent.index--;
-          descent.descend(descent.right, descent.leaf, check(leaf));
+          descent.descend(descent.right, descent.leaf, check(checkLists));
         }
 
-        function leaf () {
+        // **FIXME**: Does the cache hit path release the lock on the descent? I
+        // dont' believe so.
+        function checkLists () {
           var left;
-          if (left = ordered[descent.page.address]) attach(left);
-          else nodify(attach)(null, descent.page);
+          if (left = ordered[descent.page.address]) {
+            unlock(descent.page);
+            attach(left);
+          } else {
+            nodify(attach)(null, descent.page);
+          }
         }
 
         function attach (left) {
@@ -3492,20 +3506,26 @@ function Balancer () {
         if (!node.right && node.page.right)  {
           if (right = ordered[node.page.right]) attach(right);
           else lock(node.page.right, false, nodify(attach));
-        } else if (addresses.length) {
-          examine();
         } else {
-          plan(callback);
+          next();
         }
 
         function attach (right) {
           node.right = right
           right.left = node
+
+          next();
+        }
+      }
+
+      function next () {
+        if (addresses.length) {
+          gather();
+        } else {
           plan(callback);
         }
       }
     }
-
   }
 
   // The remainder of the calculations will not be interrupted by evented I/O.
