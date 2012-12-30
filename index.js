@@ -4590,6 +4590,7 @@ function Balancer () {
         designate(choice.page, 0, check(propagate));
       } else {
         release();
+        callback(null);
       }
     }
 
