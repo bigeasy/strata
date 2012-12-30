@@ -4638,6 +4638,61 @@ function Balancer () {
     mergePages(key, stopper, merger, callback);
   }
 
+  // When the root branch page has only a single child, and that child is a
+  // branch page, we copy the children of the root are replaced by the children
+  // of root branch page's single branch page child. The fill root operation is
+  // the operation that decreases the height of the b&#x2011;tree.
+
+  //
+  function fillRoot (callback) {
+    var check = validator(callback), descents = [], root, child;
+
+    // Start by locking the root exclusively.
+    descents.push(root = new Descent());
+    root.exclude();
+    root.descend(root.left, root.level(0), check(getChild));
+
+    // Lock the child branch page of the root branch page exclusively.
+    function getChild () {
+      descents.push(child = root.fork());
+      child.descend(child.left, child.level(1), check(fill));
+    }
+
+    // Copy the contents of the child branch page of the root branch page into
+    // the root branch page, then rewrite the root branch page.
+    function fill () {
+      var cut;
+      cut = splice(root.page, 0, root.page.length);
+      cut.forEach(function (address) { uncacheKey(root.page, address) });
+      cut = splice(child.page, 0, child.page.length);
+      cut.forEach(function (address) { uncacheKey(child.page, address) });
+      splice(root.page, root.page.length, 0, cut);
+
+      writeBranch(root.page, ".pending", check(rewriteChild));
+    }
+
+    // Rewrite the child branch page as an unlink operation.
+    function rewriteChild () {
+      rename(child.page, "", ".unlink", check(beginCommit));
+    }
+
+    // Begin the commit by renaming the root file with a `.commit` suffix.
+    function beginCommit () {
+      rename(root.page, ".pending", ".commit", check(unlinkChild));
+    }
+
+    // Unlink the child.
+    function unlinkChild () {
+      unlink(child.page, ".unlink", check(endCommit));
+    }
+
+    // End the commit by moving the new root into place.
+    function endCommit () {
+      descents.forEach(function (descent) { unlock(descent.page) });
+      replace(root.page, ".commit", callback);
+    }
+  }
+
   return objectify.call(this, balance, unbalanced);
 }
 
