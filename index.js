@@ -2315,7 +2315,7 @@ function Descent (override) {
   // matches the given key.
   function found (key) {
     return function () {
-      return page.addresses[0] != 0 && comparator(page.cache[page.addresses[index]],  key) == 0;
+      return page.addresses[0] != 0 && index != 0 && comparator(page.cache[page.addresses[index]],  key) == 0;
     }
   }
 
