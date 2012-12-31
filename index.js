@@ -2315,7 +2315,7 @@ function Descent (override) {
   // matches the given key.
   function found (key) {
     return function () {
-      return page.addresses[0] != 0 && comparator(page.cache[page.addresses[index]],  key) == 0;
+      return page.addresses[0] != 0 && index != 0 && comparator(page.cache[page.addresses[index]],  key) == 0;
     }
   }
 
@@ -3386,28 +3386,31 @@ function Balancer () {
 
     // We do not proceed if there is nothing to consider.
     var addresses = Object.keys(lengths);
-    if (addresses.length == 0) callback(null);
-    else examine();
+    if (addresses.length == 0) {
+      callback(null);
+    // Otherwise we put a new balancer in place of the current balancer. Any
+    // edits will be considered by the next balancer.
+    } else {
+      balancer = new Balancer();
+      balancing = true;
+      gather();
+    }
 
     // Prior to calculating a balance plan, we gather the sizes of each leaf
     // page into memory. We can then make a balance plan based on page sizes
-    // that will not change while we are considering them in our plan. However,
-    // page size may change between gathering and planning, and page size may
-    // change between planning and executing the plan. Staggering gathering,
-    // planning and executing the balance gives us the ability to detect the
-    // changes in page size. When we detect that we can't make an informed
-    // decision on a page, we pass it onto the next balancer for consideration
-    // at the next balance.
+    // that will not change while we are considering them in our plan.
+    //
+    // However, page size may change between gathering and planning, and page
+    // size may change between planning and executing the plan. Staggering
+    // gathering, planning and executing the balance gives us the ability to
+    // detect the changes in page size. When we detect that we can't make an
+    // informed decision on a page, we pass it onto the next balancer for
+    // consideration at the next balance.
 
     // For each page that has changed we add it to a doubly linked list.
 
     //
-    function examine () {
-      // We put a new balancer in place of the current balancer. Any edits will
-      // be considered by the next balancer.
-      balancer = new Balancer();
-      balancing = true;
-
+    function gather () {
       // Convert the address back to an integer.
       var address = +(addresses.shift()), length = lengths[address], right, node;
 
@@ -3428,6 +3431,11 @@ function Balancer () {
       if (node = ordered[address]) linkCachedSibling(node);
       else lock(address, false, nodify(linkCachedSibling));
 
+      // Build a callback function that will add a leaf page to our collection
+      // of gathered pages, then invoke the `next` function passing the balance
+      // list node. The leaf page must be locked. The function will mark the
+      // page as being a participant in a balance, then unlock it. Linking to
+      // sibling nodes is not performed here.
       function nodify (next) {
         return check(function (page) {
           designate(page, 0, check(identified));
@@ -3465,17 +3473,23 @@ function Balancer () {
 
       function leftSibling (node) {
         var descent = new Descent();
-        descent.descend(descent.key(node.key), descent.found(node.key), check(found));
+        descent.descend(descent.key(node.key), descent.found(node.key), check(goToLeaf));
 
-        function found () {
+        function goToLeaf () {
           descent.index--;
-          descent.descend(descent.right, descent.leaf, check(leaf));
+          descent.descend(descent.right, descent.leaf, check(checkLists));
         }
 
-        function leaf () {
+        // **FIXME**: Does the cache hit path release the lock on the descent? I
+        // dont' believe so.
+        function checkLists () {
           var left;
-          if (left = ordered[descent.page.address]) attach(left);
-          else nodify(attach)(null, descent.page);
+          if (left = ordered[descent.page.address]) {
+            unlock(descent.page);
+            attach(left);
+          } else {
+            nodify(attach)(null, descent.page);
+          }
         }
 
         function attach (left) {
@@ -3492,20 +3506,26 @@ function Balancer () {
         if (!node.right && node.page.right)  {
           if (right = ordered[node.page.right]) attach(right);
           else lock(node.page.right, false, nodify(attach));
-        } else if (addresses.length) {
-          examine();
         } else {
-          plan(callback);
+          next();
         }
 
         function attach (right) {
           node.right = right
           right.left = node
+
+          next();
+        }
+      }
+
+      function next () {
+        if (addresses.length) {
+          gather();
+        } else {
           plan(callback);
         }
       }
     }
-
   }
 
   // The remainder of the calculations will not be interrupted by evented I/O.
@@ -4570,6 +4590,7 @@ function Balancer () {
         designate(choice.page, 0, check(propagate));
       } else {
         release();
+        callback(null);
       }
     }
 
@@ -4615,6 +4636,61 @@ function Balancer () {
 
     // Invoke the generalized merge function with our specializations.
     mergePages(key, stopper, merger, callback);
+  }
+
+  // When the root branch page has only a single child, and that child is a
+  // branch page, we copy the children of the root are replaced by the children
+  // of root branch page's single branch page child. The fill root operation is
+  // the operation that decreases the height of the b&#x2011;tree.
+
+  //
+  function fillRoot (callback) {
+    var check = validator(callback), descents = [], root, child;
+
+    // Start by locking the root exclusively.
+    descents.push(root = new Descent());
+    root.exclude();
+    root.descend(root.left, root.level(0), check(getChild));
+
+    // Lock the child branch page of the root branch page exclusively.
+    function getChild () {
+      descents.push(child = root.fork());
+      child.descend(child.left, child.level(1), check(fill));
+    }
+
+    // Copy the contents of the child branch page of the root branch page into
+    // the root branch page, then rewrite the root branch page.
+    function fill () {
+      var cut;
+      cut = splice(root.page, 0, root.page.length);
+      cut.forEach(function (address) { uncacheKey(root.page, address) });
+      cut = splice(child.page, 0, child.page.length);
+      cut.forEach(function (address) { uncacheKey(child.page, address) });
+      splice(root.page, root.page.length, 0, cut);
+
+      writeBranch(root.page, ".pending", check(rewriteChild));
+    }
+
+    // Rewrite the child branch page as an unlink operation.
+    function rewriteChild () {
+      rename(child.page, "", ".unlink", check(beginCommit));
+    }
+
+    // Begin the commit by renaming the root file with a `.commit` suffix.
+    function beginCommit () {
+      rename(root.page, ".pending", ".commit", check(unlinkChild));
+    }
+
+    // Unlink the child.
+    function unlinkChild () {
+      unlink(child.page, ".unlink", check(endCommit));
+    }
+
+    // End the commit by moving the new root into place.
+    function endCommit () {
+      descents.forEach(function (descent) { unlock(descent.page) });
+      replace(root.page, ".commit", callback);
+    }
   }
 
   return objectify.call(this, balance, unbalanced);
