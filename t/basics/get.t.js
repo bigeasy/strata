@@ -4,7 +4,7 @@ var fs = require("fs"), strata;
 require("./proof")(6, function (tmp, equal, async) {
   async(function () {
 
-    fs.writeFile(tmp + "/segment00000000", JSON.stringify([-1,[-1]]) + " -\n", "utf8", async());
+    fs.writeFile(tmp + "/segment00000000", JSON.stringify([-1]) + " -\n", "utf8", async());
 
   }, function () {
 
