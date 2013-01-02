@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 var fs = require('fs');
-require('./proof')(2, function (Strata, async, tmp,  load, objectify, _) {
+require('./proof')(3, function (Strata, async, tmp,  load, objectify, _) {
   var strata = new Strata(tmp, { leafSize: 3, branchSize: 3 });
   async(function (serialize) {
     serialize(__dirname + '/fixtures/split.before.json', tmp, async());
@@ -21,5 +21,10 @@ require('./proof')(2, function (Strata, async, tmp,  load, objectify, _) {
     gather(async, strata);
   }, function (records, deepEqual) {
     deepEqual(records, [ "a", "d" ], "records");
+
+    strata.purge(0);
+    deepEqual(strata.size, 0, "purged");
+
+    strata.close(async());
   });
 });

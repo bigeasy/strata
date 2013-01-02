@@ -10,6 +10,6 @@ require("./proof")(2, function (Strata, tmp, async) {
   strata = new Strata(tmp, { leafSize: 3, branchSize: 3 });
   strata.open(async())
 }, function (equal) {
-  equal(strata.stats.size, 0, "json size");
-  equal(strata.stats.nextAddress, 2, "next address");
+  equal(strata.size, 0, "json size");
+  equal(strata.nextAddress, 2, "next address");
 });

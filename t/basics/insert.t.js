@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require("./proof")(3, function (async, tmp) {
+require("./proof")(4, function (async, tmp) {
   var fs = require("fs"), strata;
 
   async(function (Strata) {
@@ -23,7 +23,7 @@ require("./proof")(3, function (async, tmp) {
 
     cursor.unlock()
 
-    equal(strata.stats.size, 32, "json size");
+    equal(strata.size, 32, "json size");
 
     strata.close(async());
 
@@ -44,5 +44,9 @@ require("./proof")(3, function (async, tmp) {
 
     say(expected.segment00000001);
 
+    strata.purge(0);
+    deepEqual(strata.size, 0, "purged");
+
+    strata.close(async());
   });
 });
