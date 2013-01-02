@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require("./proof")(2, function (async, tmp) {
+require("./proof")(3, function (async, tmp) {
   var fs = require("fs"), strata, records = [];
 
   async(function (serialize) {
@@ -28,5 +28,10 @@ require("./proof")(2, function (async, tmp) {
     say(actual);
 
     deepEqual(actual, expected, "split");
+
+    strata.purge(0);
+    deepEqual(strata.size, 0, "purged");
+
+    strata.close(async());
   });
 });

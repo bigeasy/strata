@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 var fs = require("fs"), strata;
-require("./proof")(6, function (tmp, equal, async) {
+require("./proof")(7, function (tmp, equal, async) {
   async(function () {
 
     fs.writeFile(tmp + "/segment00000000", JSON.stringify([-1]) + " -\n", "utf8", async());
@@ -19,7 +19,7 @@ require("./proof")(6, function (tmp, equal, async) {
 
   }, function (equal) {
 
-    equal(strata.stats.size, 0, "json size before read");
+    equal(strata.size, 0, "json size before read");
 
     strata.iterator("a", async());
 
@@ -35,9 +35,13 @@ require("./proof")(6, function (tmp, equal, async) {
   }, function (got, cursor) {
 
     equal(got, "a", "get");
-    equal(strata.stats.size, 32, "json size after read");
+    equal(strata.size, 32, "json size after read");
 
     cursor.unlock();
 
+    strata.purge(0);
+    equal(strata.size, 0, "page");
+
+    strata.close(async());
   });
 });
