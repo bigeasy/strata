@@ -330,7 +330,9 @@ function Strata (directory, options) {
     checksum = function (m) { return crypto.createHash(hash).update(m).digest("hex") }
   }
 
-  function _stats () { return { size: size, nextAddress: nextAddress } }
+  function _size () { return size }
+
+  function _nextAddress () { return nextAddress }
 
   mru.next = mru.previous = mru;
 
@@ -4754,7 +4756,32 @@ function Balancer () {
 
   function balance (callback) { balancer.balance(callback) }
 
-  return objectify.call(this, cassette, create, open, iterator, mutator, balance, close, _stats);
+  // Attempt to purge the cache until the JSON size of the cache is less than or
+  // equal to the given size. Pages that are locked for navigation or balancing
+  // cannot be purged.
+  function purge (downTo) {
+    downTo = Math.max(downTo, 0);
+    var page, iterator = mru;
+    while (size > downTo && iterator.previous !== mru) {
+      page = iterator.previous;
+      if (page.locks.length == 1 && page.locks[0].length == 0) {
+        if (page.balancers) {
+          page.load = [];
+          page.size = 0;
+          page.cache = {};
+          (page.addresses || page.positions).length = 0;
+        } else {
+          delete cache[page.address];
+          _unlink(page);
+        }
+        size -= page.size;
+      } else {
+        iterator = page;
+      }
+    }
+  }
+
+  return objectify.call(this, cassette, create, open, iterator, mutator, balance, purge, close, _size, _nextAddress);
 }
 
 module.exports = Strata;
