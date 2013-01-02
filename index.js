@@ -330,7 +330,9 @@ function Strata (directory, options) {
     checksum = function (m) { return crypto.createHash(hash).update(m).digest("hex") }
   }
 
-  function _stats () { return { size: size, nextAddress: nextAddress } }
+  function _size () { return size }
+
+  function _nextAddress () { return nextAddress }
 
   mru.next = mru.previous = mru;
 
@@ -4754,7 +4756,37 @@ function Balancer () {
 
   function balance (callback) { balancer.balance(callback) }
 
-  return objectify.call(this, cassette, create, open, iterator, mutator, balance, close, _stats);
+  // Attempt to purge the cache until the JSON size of the cache is less than or
+  // equal to the given size.
+  function purge (downTo) {
+    // Iterate until we've reached the desired JSON size or else we've visited
+    // every entry in the cache.
+    downTo = Math.max(downTo, 0);
+    var page, iterator = mru;
+    while (size > downTo && iterator.previous !== mru) {
+      page = iterator.previous;
+      // Pages that are locked cannot be purged.
+      if (page.locks.length == 1 && page.locks[0].length == 0) {
+        // Deduct the size of the page from the size of the b&#x2011;tree.
+        size -= page.size;
+        // Pages held by the balancers are reset to an unloaded state.
+        if (page.balancers) {
+          page.load = [];
+          page.size = 0;
+          page.cache = {};
+          (page.addresses || page.positions).length = 0;
+        // If a page is not held by the balancer its entry is purged from cache.
+        } else {
+          delete cache[page.address];
+          _unlink(page);
+        }
+      } else {
+        iterator = page;
+      }
+    }
+  }
+
+  return objectify.call(this, cassette, create, open, iterator, mutator, balance, purge, close, _size, _nextAddress);
 }
 
 module.exports = Strata;
