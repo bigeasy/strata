@@ -1,6 +1,1 @@
-lib-cov
-.DS_Store
-.AppleDouble
 node_modules
-*.swp
-docs
