@@ -3560,7 +3560,7 @@ function Strata (directory, options) {
       }
 
       // Break the link to next right node and return it.
-      function unlink (node) {
+      function terminate (node) {
         var right;
         if (node) {
           if (right = node.right) {
@@ -3571,12 +3571,19 @@ function Strata (directory, options) {
         return right;
       }
 
-      // Link a node
+      // Link a node to the right of a node. 
       function link (node, right) {
         if (right) {
           right.left = node
           node.right = right
         }
+      }
+
+      // Unlink a node.
+      function unlink (node) {
+        terminate(node.left);
+        terminate(node);
+        return node;
       }
 
       // Break the lists on the nodes that we plucked because we expected that
@@ -3595,7 +3602,6 @@ function Strata (directory, options) {
           // Schedule the split.
           operations.push({  method: "splitLeaf", parameters: [ node.key ] });
           // Unlink this split node, so that we don't consider it when merging.
-          unlink(node.left);
           unlink(node);
         // Lost a race condition. When we fetched pages, this page didn't need
         // to be tested for merge, so we didn't grab its siblings, but it does
@@ -3628,7 +3634,7 @@ function Strata (directory, options) {
           var node = ordered[address];
           while (node.right) {
             if (node.length + node.right.length > options.leafSize) {
-              node = unlink(node);
+              node = terminate(node);
               ordered[node.address] = node;
             } else {
               node = node.right;
@@ -3645,14 +3651,14 @@ function Strata (directory, options) {
           // of the right node. Note that a leaf page merged into its left
           // sibling will be destroyed, so we don't have to tidy up its ghosts.
           if (node.right) {
-            right = unlink(node);
+            right = terminate(node);
             delete ghosts[right.page.address];
             operations.push({
               method: "mergeLeaves",
               parameters: [ right.key, lengths ]
             });
             node.length += right.length;
-            link(node, unlink(right));
+            link(node, terminate(right));
           // Remove any lists containing only one node.
           } else {
             delete ordered[address];
