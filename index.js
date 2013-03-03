@@ -3554,10 +3554,10 @@ function Strata (directory, options) {
       var address, node, difference, addresses;
 
       // Calculate the actual length of the page less ghosts.
-      Object.keys(ordered).forEach(function (address) {
+      for (address in ordered) {
         node = ordered[address];
         node.length = node.page.length - node.page.ghosts;
-      });
+      }
 
       // Break the link to next right node and return it.
       function unlink (node) {
@@ -3609,9 +3609,9 @@ function Strata (directory, options) {
 
       // Now remove any node from our ordered collection that is not the left
       // most, so that we have a collection of heads of linked pages.
-      Object.keys(ordered).forEach(function (address) {
+      for (address in ordered) {
         if (ordered[address].left) delete ordered[address];
-      });
+      }
 
       // We schedule merges, removing the nodes we merge and the nodes we can't
       // merge until the list of nodes to consider is empty.
@@ -3621,7 +3621,7 @@ function Strata (directory, options) {
         if (addresses.length == 0) break;
 
         // Break the links between pages that cannot merge.
-        addresses.forEach(function (address) {
+        for (address in ordered) {
           var node = ordered[address];
           while (node.right) {
             if (node.length + node.right.length > options.leafSize) {
@@ -3631,11 +3631,12 @@ function Strata (directory, options) {
               node = node.right;
             }
           }
-        });
+        }
 
         // Merge the node to the right of each head node into the head node.
-        addresses.forEach(function (address) {
-          var node = ordered[address], right;
+        var right;
+        for (address in ordered) {
+          node = ordered[address];
           // Schedule the merge. After we schedule the merge, we increase the
           // size of the head node and link the head node to the right sibling
           // of the right node. Note that a leaf page merged into its left
@@ -3653,7 +3654,7 @@ function Strata (directory, options) {
           } else {
             delete ordered[address];
           }
-        });
+        }
       }
 
       // Rewrite position arrays to remove ghosts.
