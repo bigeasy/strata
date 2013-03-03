@@ -4163,6 +4163,33 @@ function Strata (directory, options) {
       }
     }
 
+    function exorcise (page, callback) {
+      var fd, check = validator(callback);
+
+      if (page.ghosts) shift()
+      else callback(null, false);
+
+      // Remove the ghosted record from the references array and the record cache.
+      function shift () {
+        uncacheRecord(page, splice(page, 0, 1).shift());
+        page.ghosts = 0
+
+        fs.open(filename(page.address), 'a', 0644, check(opened));
+      }
+
+      function opened (fd) {
+        writePositions(fd, page, check(written));
+
+        function written () {
+          fs.close(fd, check(closed));
+        }
+
+        function closed () {
+          callback(null, true);
+        }
+      }
+    }
+
     function deleteGhost (key, callback) {
       var descents = [], pivot, leaf, fd, check = validator(callback);
 
@@ -4191,22 +4218,11 @@ function Strata (directory, options) {
       }
       
       // Remove the ghosted record from the references array and the record cache.
-      function shift (callback) {
-        uncacheRecord(leaf.page, splice(leaf.page, 0, 1).shift());
-        leaf.page.ghosts = 0
-
-        fs.open(filename(leaf.page.address), 'a', 0644, check(opened));
-      }
-      
-      function opened ($fd) {
-        writePositions(fd = $fd, leaf.page, check(written));
-      }
-      
-      function written () {
-        fs.close(fd, check(closed));
+      function shift () {
+        exorcise(leaf.page, check(release));  
       }
 
-      function closed () {
+      function release () {
         descents.forEach(function (descent) { unlock(descent.page) });
         callback(null);
       }
