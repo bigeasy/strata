@@ -50,6 +50,8 @@ require('./proof')(3, function (async, Strata, tmp, deepEqual) {
   }, function (records) {
     deepEqual(records, [ 'a', 'b', 'c', 'd',  'f', 'j', 'k', 'l' ], 'records');
     strata.balance(async());
+  }, function () {
+    strata.balance(async());
   }, function (load) {
     load(__dirname + '/fixtures/root-fill.after.json', async());
   }, function (expected, objectify) {

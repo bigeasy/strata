@@ -3624,45 +3624,33 @@ function Strata (directory, options) {
       // Now we break the links between pages that cannot merge, pair up the
       // pages that can merge. We only merge two leaf pages at a time, even when
       // we could combine more than two to file a leaf page. **FIXME**: Not so.
-      for (;;) {
-        // We're done where there are no more nodes to consider.
-        addresses = Object.keys(ordered);
-        if (addresses.length == 0) break;
-
-        // Break the links between pages that cannot merge.
-        for (address in ordered) {
-          var node = ordered[address];
-          while (node.right) {
-            if (node.length + node.right.length > options.leafSize) {
-              node = terminate(node);
-              ordered[node.address] = node;
-            } else {
-              node = node.right;
+      for (address in ordered) {
+        var node = ordered[address];
+        while (node && node.right) {
+          if (node.length + node.right.length > options.leafSize) {
+            node = terminate(node);
+            ordered[node.page.address] = node;
+          } else {
+            if (node = terminate(node.right)) {
+              ordered[node.page.address] = node;
             }
           }
         }
+      }
 
-        // Merge the node to the right of each head node into the head node.
-        var right;
-        for (address in ordered) {
-          node = ordered[address];
-          // Schedule the merge. After we schedule the merge, we increase the
-          // size of the head node and link the head node to the right sibling
-          // of the right node. Note that a leaf page merged into its left
-          // sibling will be destroyed, so we don't have to tidy up its ghosts.
-          if (node.right) {
-            right = terminate(node);
-            delete ghosts[right.page.address];
-            operations.push({
-              method: "mergeLeaves",
-              parameters: [ right.key, lengths ]
-            });
-            node.length += right.length;
-            link(node, terminate(right));
-          // Remove any lists containing only one node.
-          } else {
-            delete ordered[address];
-          }
+      // Merge the node to the right of each head node into the head node.
+      for (address in ordered) {
+        node = ordered[address];
+        // Schedule the merge. Note that a leaf page merged into its left
+        // sibling will be destroyed, so we don't have to tidy up its ghosts.
+        if (node.right) {
+          if (node.right.right) throw Error();
+          operations.push({
+            method: "mergeLeaves",
+            parameters: [ node.right.key, lengths, !!ghosts[node.page.address] ]
+          });
+          delete ghosts[node.page.address];
+          delete ghosts[node.right.page.address];
         }
       }
 
@@ -3691,6 +3679,7 @@ function Strata (directory, options) {
             referenced[address].balancers--
           }
 
+          balancing = false;
           callback(null);
         }
       }
@@ -4246,7 +4235,7 @@ function Strata (directory, options) {
     //  * a callback to invoke when the merge is completed.
 
     //
-    function mergePages (key, stopper, merger, callback) {
+    function mergePages (key, stopper, merger, ghostly, callback) {
       // Create a list of descents whose pages we'll unlock before we leave.
       var check = validator(callback),
           descents = [], locked = [], singles = [], parents = {}, pages = {},
@@ -4319,7 +4308,13 @@ function Strata (directory, options) {
       function parentOfLeftSibling () {
         parents.left = pivot.fork();
         parents.left.index--;
-        parents.left.descend(parents.left.right, parents.left.level(parents.right.depth), check(gatherLockedPages));
+        if (ghostly) {
+          uncacheKey(parents.left.page, parents.left.page.addresses[parents.left.index]);
+          parents.left.uncaching = true;
+        }
+        parents.left.descend(parents.left.right,
+                             parents.left.level(parents.right.depth),
+                             check(gatherLockedPages));
       }
       
       // Take note of which pages have been locked during our descent to find
@@ -4398,7 +4393,7 @@ function Strata (directory, options) {
         splice(ancestor, index, 1);
 
         empties = singles.slice();
-        writeBranch(parents.right.page, ".pending", check(rewriteEmpties));
+        writeBranch(ancestor, ".pending", check(rewriteEmpties));
       }
 
       function rewriteEmpties () {
@@ -4446,6 +4441,9 @@ function Strata (directory, options) {
 
       // Release our locks and propagate the merge to parent branch pages.
       function propagate () {
+        // See if we can fit any more into the left page at the next balance.
+        balancer.unbalanced(pages.left.page, true);
+
         // Release locks.
         descents.forEach(function (descent) { unlock(descent.page) });
         locked.forEach(unlock);
@@ -4473,7 +4471,7 @@ function Strata (directory, options) {
     // constructed.
 
     //
-    function mergeLeaves (key, unbalanced, callback) {
+    function mergeLeaves (key, unbalanced, ghostly, callback) {
       // The generalized merge function needs to stop at the parent of the leaf
       // page we with to merge into its left leaf page sibling. We tell it to
       // stop it reaches a branch page that has leaf pages as children. We call
@@ -4503,10 +4501,15 @@ function Strata (directory, options) {
           }
           callback(null, false);
         } else {
-          merge();
+          deleteGhost();
         }
 
         var index;
+
+        function deleteGhost () {
+          if (ghostly) exorcise(leaves.left.page, check(merge));
+          else merge();
+        }
 
         function merge () {
           // The right leaf page of of the merged page is the right leaf page of
@@ -4567,7 +4570,7 @@ function Strata (directory, options) {
       }
 
       // Invoke the generalized merge function with our specializations.
-      mergePages(key, stopper, merger, callback);
+      mergePages(key, stopper, merger, ghostly, callback);
     }
 
     // Determine if the branch page at the given address can be merged with
@@ -4693,7 +4696,7 @@ function Strata (directory, options) {
       }
 
       // Invoke the generalized merge function with our specializations.
-      mergePages(key, stopper, merger, callback);
+      mergePages(key, stopper, merger, false, callback);
     }
 
     // When the root branch page has only a single child, and that child is a
