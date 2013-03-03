@@ -3607,14 +3607,17 @@ function Strata (directory, options) {
         }
       }
 
-      // Now remove any node from our ordered collection that is not the left
-      // most, so that we have a collection of heads of linked pages.
+      // Ordered now becomes a map of the heads of lists of leaf pages that are
+      // candidates for merge. If a page in the ordered map has a left sibling
+      // it is removed from the ordered map because it is linked to the ordered
+      // map though it's left sibling.
       for (address in ordered) {
         if (ordered[address].left) delete ordered[address];
       }
 
-      // We schedule merges, removing the nodes we merge and the nodes we can't
-      // merge until the list of nodes to consider is empty.
+      // Now we break the links between pages that cannot merge, pair up the
+      // pages that can merge. We only merge two leaf pages at a time, even when
+      // we could combine more than two to file a leaf page. **FIXME**: Not so.
       for (;;) {
         // We're done where there are no more nodes to consider.
         addresses = Object.keys(ordered);
