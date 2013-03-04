@@ -955,7 +955,7 @@ function Strata (directory, options) {
     // if the balancer is using it, but its data is freed. We reset to zero and
     // expect that the read will restore it to the value we're about to erase.
     page.length = 0;
-    
+
     // We don't cache file descriptors after the leaf page file read. We will
     // close the file descriptors before the function returns.
     fs.open(filename(page.address), "r+", check(opened));
@@ -3592,7 +3592,7 @@ function Strata (directory, options) {
         return right;
       }
 
-      // Link a node to the right of a node. 
+      // Link a node to the right of a node.
       function link (node, right) {
         if (right) {
           right.left = node
@@ -4001,7 +4001,7 @@ function Strata (directory, options) {
 
         // Cut off a chunk of addresses.
         var cut = splice(split, offset, length);
-        
+
         // Uncache the keys from our splitting branch.
         cut.forEach(function (address) { uncacheKey(split, address) });
 
@@ -4036,19 +4036,19 @@ function Strata (directory, options) {
           writeBranch(parent.page, ".pending", check(rootWritten));
         }
       }
-        
+
       // Commit the changes.
       function rootWritten () {
         rename(parent.page, ".pending", ".commit", check(committing));
       }
-        
+
       // Write the child branch pages.
       function committing () {
         children.forEach(function (page) { replace(page, ".replace", check(childCommitted)) });
       }
 
       var childrenCommitted = 0;
-        
+
       // Commit complete.
       function childCommitted (callback) {
         if (++childrenCommitted == children.length) {
@@ -4148,19 +4148,19 @@ function Strata (directory, options) {
           writeBranch(root, ".pending", check(rootWritten));
         }
       }
-        
+
       // Commit the changes.
       function rootWritten () {
         rename(root, ".pending", ".commit", check(committing));
       }
-        
+
       // Write the child branch pages.
       function committing () {
         children.forEach(function (page) { replace(page, ".replace", check(childCommitted)) });
       }
 
       var childrenCommitted = 0;
-        
+
       // Commit complete.
       function childCommitted (callback) {
         if (++childrenCommitted == children.length) {
@@ -4215,7 +4215,7 @@ function Strata (directory, options) {
       function upgrade () {
         pivot.upgrade(check(descendLeaf));
       }
-      
+
       // Uncache the pivot key and begin a descent that will clear cached keys all
       // the way to the leaf page.
       //
@@ -4232,10 +4232,10 @@ function Strata (directory, options) {
 
         leaf.descend(leaf.key(key), leaf.leaf, check(shift));
       }
-      
+
       // Remove the ghosted record from the references array and the record cache.
       function shift () {
-        exorcise(leaf.page, check(release));  
+        exorcise(leaf.page, check(release));
       }
 
       function release () {
@@ -4276,7 +4276,7 @@ function Strata (directory, options) {
       function upgrade () {
         pivot.upgrade(check(parentOfPageToMerge));
       }
-      
+
       // From the pivot, descend to the branch page that is the parent of the
       // page for the given key.
       function parentOfPageToMerge () {
@@ -4293,7 +4293,7 @@ function Strata (directory, options) {
         // path we'll follow.
         parents.right = pivot.fork();
         parents.right.uncaching = true;
-        
+
         // We gather branch pages on the path to the right page of the merge
         // with a single child whose descendants consist only of the leaf page
         // or a branch page with a single child must be deleted. If we are
@@ -4308,14 +4308,14 @@ function Strata (directory, options) {
             singles.forEach(unlock);
             singles.length = 0;
           } else if (parent.address != pivot.page.address) {
-            unlock(parent); 
+            unlock(parent);
           }
         }
 
         // Descent to the parent branch page of the right page of the merge.
         parents.right.descend(parents.right.key(key), stopper(parents.right), check(parentOfLeftSibling));
       }
-      
+
       // From the pivot, descent to the parent branch page of the left sibling
       // of page for the given key.
       //
@@ -4337,7 +4337,7 @@ function Strata (directory, options) {
                              parents.left.level(parents.right.depth),
                              check(gatherLockedPages));
       }
-      
+
       // Take note of which pages have been locked during our descent to find
       // the parent branch pages of the two pages we want to merge.
       function gatherLockedPages (callback) {
@@ -4349,8 +4349,8 @@ function Strata (directory, options) {
           ancestor = singles.shift();
         // If we encountered no singles, then we may still have gone down
         // separate paths to reach the parent page. If so, the pivot branch page
-        // and the parent branch page are separate, so we can 
-        // 
+        // and the parent branch page are separate, so we can
+        //
         // TODO: Unlock the pivot page here, for what good it will do anyone,
         // since the key has been uncached, a full descent is necessary to
         // designate the branch.
@@ -4380,7 +4380,7 @@ function Strata (directory, options) {
         descents.push(pages.left = parents.left.fork());
         pages.left.descend(pages.left.left, pages.left.level(parents.left.depth + 1), check(descendToRightPageToMerge));
       }
-        
+
       // We use `left` in both cases, because we don't need an index into the
       // page to merge, only a lock on the leaf page.
       function descendToRightPageToMerge (callback) {
@@ -4402,11 +4402,11 @@ function Strata (directory, options) {
         uncacheKey(pivot.page, pivot.page.addresses[pivot.index]);
         renameRightPageToMerge();
       }
-      
+
       function renameRightPageToMerge () {
         rename(pages.right.page, "", ".unlink", check(rewriteKeyedBranchPage));
       }
-        
+
       function rewriteKeyedBranchPage () {
         var index = parents.right.indexes[ancestor.address];
 
@@ -4424,7 +4424,7 @@ function Strata (directory, options) {
           beginCommit();
         }
       }
-        
+
       function beginCommit () {
         // **TODO**: If I succeed, how will I know to test the parents for
         // balance?
@@ -4436,7 +4436,7 @@ function Strata (directory, options) {
         // Renaming pending to commit will cause the merge to roll forward.
         rename(ancestor, ".pending", ".commit", check(unlinkEmpties));
       }
-      
+
       // Unlink ancestor branch pages that are now empty as a result of the
       // merge.
       function unlinkEmpties () {
@@ -4451,11 +4451,11 @@ function Strata (directory, options) {
       function replaceLeftPageToMerge () {
         replace(pages.left.page, ".replace", check(unlinkRightPageToMerge));
       }
-      
+
       function unlinkRightPageToMerge () {
         unlink(pages.right.page, ".unlink", check(endCommit));
       }
-      
+
       function endCommit () {
         replace(ancestor, ".commit", check(propagate));
       }
@@ -4548,12 +4548,12 @@ function Strata (directory, options) {
         // Append all of the records of the right leaf page, excluding any
         // ghosts.
 
-        // Fetch a page from the right leaf page. 
+        // Fetch a page from the right leaf page.
         function fetch () {
           // Fetch the record and read it from cache or file.
           position = leaves.right.page.positions[index];
           stash(leaves.right.page, position, check(copy));
-        } 
+        }
 
         // Append a record fetched from the right leaf page to the left leaf
         // page.
@@ -4631,7 +4631,7 @@ function Strata (directory, options) {
       // The branch page we're testing may not have a left sibling. If it does
       // the `lesser` property is a `Descent` class that when followed to the
       // right to the depth of the branch page we're testing, will arrive at the
-      // left sibling branch page. 
+      // left sibling branch page.
       function findLeftPage () {
         if (lesser = center.lesser) {
           descents.push(lesser);
@@ -4644,7 +4644,7 @@ function Strata (directory, options) {
       // The branch page we're testing may not have a right sibling. If it does
       // the `greater` property is a `Descent` class that when followed to the
       // left to the depth of the branch page we're testing, will arrive at the
-      // right sibling branch page. 
+      // right sibling branch page.
       function findRightPage () {
         if (greater = center.greater) {
           descents.push(greater);
@@ -4688,7 +4688,7 @@ function Strata (directory, options) {
     // Merge the branch page identified by the address found along the path
     // defined by the given key into its left branch page sibling.
 
-    // 
+    //
     function mergeBranches (key, address, callback) {
       // The generalized merge branch needs to stop at the parent of the branch
       // page we wish to merge into its left branch page sibling.
