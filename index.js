@@ -319,6 +319,7 @@ function Strata (directory, options) {
     , checksum
     , crypto
     , constructors = {}
+    , tracer = options.tracer || function () { arguments[1]() }
     ;
 
   switch (hash) {
@@ -335,6 +336,13 @@ function Strata (directory, options) {
   function _nextAddress () { return nextAddress }
 
   mru.next = mru.previous = mru;
+
+  function report (object) {
+    object.size = size;
+    object.nextAddress = nextAddress;
+    object.cache = Object.keys(cache);
+    return object;
+  }
 
   // #### Verifying Checksums
 
@@ -941,6 +949,13 @@ function Strata (directory, options) {
       , check = validator(callback);
       ;
 
+    // Reset the page length. The page object keeps a cached copy of the
+    // positions array length so that meta data is not dependent on the actual
+    // data, the actual data can be released. On purge a page entry is retained
+    // if the balancer is using it, but its data is freed. We reset to zero and
+    // expect that the read will restore it to the value we're about to erase.
+    page.length = 0;
+    
     // We don't cache file descriptors after the leaf page file read. We will
     // close the file descriptors before the function returns.
     fs.open(filename(page.address), "r+", check(opened));
@@ -3315,6 +3330,12 @@ function Strata (directory, options) {
 
     objectify.call(methods, deleteGhost, splitLeaf, mergeLeaves);
 
+    function balancerReport (object) {
+      object.referenced = Object.keys(referenced);
+      object.lengths = extend({}, lengths);
+      return report(object);
+    }
+
     // Mark a page as having been altered, now requiring a test for balance. If
     // the `force` flag is set, the value is set to the leaf order, so that if
     // the record count of the page is less than the order of the leaf page, it
@@ -3464,7 +3485,7 @@ function Strata (directory, options) {
               ordered[page.address] = node
               if (node.page.ghosts)
                 ghosts[node.page.address] = node
-              next(node);
+              tracer({ type: "reference", report: balancerReport }, check(function () { next(node) }));
             }
           });
         }
@@ -4835,6 +4856,7 @@ function Strata (directory, options) {
           page.size = 0;
           page.cache = {};
           (page.addresses || page.positions).length = 0;
+          iterator = page;
         // If a page is not held by the balancer its entry is purged from cache.
         } else {
           delete cache[page.address];
