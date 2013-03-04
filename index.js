@@ -945,7 +945,6 @@ function Strata (directory, options) {
       , start
       , read
       , fd
-      , page
       , check = validator(callback);
       ;
 
