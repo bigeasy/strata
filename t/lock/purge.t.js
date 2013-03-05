@@ -1,22 +1,17 @@
 #!/usr/bin/env node
 
 require("./proof")(4, function (async, ok, equal, Strata, tmp, deepEqual, say, die) {
-  var strata, cadence = require("cadence"), purge, count = 0;
-
-  purge = cadence(function (report) {
-    ok(report({}).cache.length > 2, "unpurged");
-    strata.purge(0);
-    equal(0, report({}).cache.length, "purged");
-  });
+  var strata, purge, count = 0;
 
   function tracer (trace, callback) {
     switch (trace.type) {
     case "reference":
       if (++count == 2) {
-        purge(trace.report, callback);
-      } else {
-        callback();
+        ok(trace.report({}).cache.length > 2, "unpurged");
+        strata.purge(0);
+        equal(0, trace.report({}).cache.length, "purged");
       }
+      callback();
       break;
     default:
       say(trace.type);
