@@ -6,7 +6,7 @@ require("./proof")(4, function (async, ok, equal, Strata, tmp, deepEqual, say, d
   purge = cadence(function (report) {
     ok(report({}).cache.length > 2, "unpurged");
     strata.purge(0);
-    equal(2, report({}).cache.length, "purged");
+    equal(0, report({}).cache.length, "purged");
   });
 
   function tracer (trace, callback) {

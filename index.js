@@ -612,7 +612,6 @@ function Strata (directory, options) {
   function createLeaf (address, override) {
     var page =
     { address: address
-    , balancers: 0
     , cache: {}
     , entries: 0
     , locks: [[]]
@@ -1390,7 +1389,6 @@ function Strata (directory, options) {
     var page =
     { address: address
     , addresses: []
-    , balancers: 0
     , cache: {}
     , locks: [[]]
     , penultimate: true
@@ -1998,7 +1996,8 @@ function Strata (directory, options) {
 
   function unwind (callback) {
     var vargs = [ null ].concat(__slice.call(arguments, 1));
-    process.nextTick(function () { callback.apply(null, vargs) });
+    callback.apply(null, vargs);
+//    process.nextTick(function () { callback.apply(null, vargs) });
   }
 
   // Binary search implemented, as always, by having a peek at [Algorithms in
@@ -3337,13 +3336,6 @@ function Strata (directory, options) {
       }
     }
 
-    function reference (page) {
-      if (! referenced[page.address]) {
-        referenced[page.address] = page;
-        page.balancers++;
-      }
-    }
-
     // **TODO**: You will have to launch this in a worker thread, otherwise
     // there is no good way for you to handle the error, or rather, you're going
     // to have to have some form of error callback, which is a pattern I'd like
@@ -3466,12 +3458,14 @@ function Strata (directory, options) {
             if (page.address > 0) throw new Error();
             designate(page, 0, check(identified));
             function identified (key) {
-              node = { page: page, length: page.positions.length - page.ghosts, key: key };
-              reference(page);
+              node = { key: key,
+                       address: page.address,
+                       rightAddress: page.right,
+                       length: page.positions.length - page.ghosts };
               unlock(page);
-              ordered[page.address] = node
-              if (node.page.ghosts)
-                ghosts[node.page.address] = node
+              ordered[node.address] = node
+              if (page.ghosts)
+                ghosts[node.address] = node
               tracer({ type: "reference", report: balancerReport }, check(function () { next(node) }));
             }
           });
@@ -3483,7 +3477,7 @@ function Strata (directory, options) {
         function linkCachedSibling (node) {
           var right;
 
-          if (! node.right && (right = ordered[node.page.right])) {
+          if (! node.rightAddress && (right = ordered[node.rightAddress])) {
             node.right = right
             right.left = node
           }
@@ -3494,7 +3488,7 @@ function Strata (directory, options) {
         // If the page has shrunk in size, we gather the size of the left
         // sibling page and the right sibling page. The right sibling page
         function checkMerge(node) {
-          if (node.length - length < 0 && node.page.address != -1 && ! node.left) leftSibling(node);
+          if (node.length - length < 0 && node.address != -1 && ! node.left) leftSibling(node);
           else rightSibling(node);
         }
 
@@ -3530,9 +3524,9 @@ function Strata (directory, options) {
         function rightSibling (node) {
           var right;
 
-          if (!node.right && node.page.right)  {
-            if (right = ordered[node.page.right]) attach(right);
-            else lock(node.page.right, false, nodify(attach));
+          if (!node.right && node.rightAddress)  {
+            if (right = ordered[node.rightAddress]) attach(right);
+            else lock(node.rightAddress, false, nodify(attach));
           } else {
             next();
           }
@@ -3564,7 +3558,6 @@ function Strata (directory, options) {
       // Calculate the actual length of the page less ghosts.
       for (address in ordered) {
         node = ordered[address];
-        node.length = node.page.positions.length - node.page.ghosts;
       }
 
       // Break the link to next right node and return it.
@@ -3616,8 +3609,8 @@ function Strata (directory, options) {
         // now. We ask the next balancer to consider it as we found it.
         } else if (
           difference < 0
-          && ! ((node.page.address == -1 || node.left) && (node.page.right == 0 || node.right))) {
-          io.balancer.lengths[node.page.address] = length;
+          && ! ((node.address == -1 || node.left) && (node.rightAddress == 0 || node.right))) {
+          io.balancer.lengths[node.address] = length;
         }
       }
 
@@ -3637,10 +3630,10 @@ function Strata (directory, options) {
         while (node && node.right) {
           if (node.length + node.right.length > options.leafSize) {
             node = terminate(node);
-            ordered[node.page.address] = node;
+            ordered[node.address] = node;
           } else {
             if (node = terminate(node.right)) {
-              ordered[node.page.address] = node;
+              ordered[node.address] = node;
             }
           }
         }
@@ -3655,10 +3648,10 @@ function Strata (directory, options) {
           if (node.right.right) throw Error();
           operations.push({
             method: "mergeLeaves",
-            parameters: [ node.right.key, lengths, !!ghosts[node.page.address] ]
+            parameters: [ node.right.key, lengths, !!ghosts[node.address] ]
           });
-          delete ghosts[node.page.address];
-          delete ghosts[node.right.page.address];
+          delete ghosts[node.address];
+          delete ghosts[node.right.address];
         }
       }
 
@@ -3682,11 +3675,7 @@ function Strata (directory, options) {
           // Maybe use bind instead.
           methods[operation.method].apply(this, operation.parameters.concat(check(shift)));
         } else {
-          // Decrement the reference lengths. **TODO**: Why a length and not a boolean?
-          for (address in referenced) {
-            referenced[address].balancers--
-          }
-
+          // Allow a subsequent balance.
           balancing = false;
           callback(null);
         }
@@ -4837,18 +4826,9 @@ function Strata (directory, options) {
       if (page.locks.length == 1 && page.locks[0].length == 0) {
         // Deduct the size of the page from the size of the b&#x2011;tree.
         size -= page.size;
-        // Pages held by the balancers are reset to an unloaded state.
-        if (page.balancers) {
-          page.load = [];
-          page.size = 0;
-          page.cache = {};
-          (page.addresses || page.positions).length = 0;
-          iterator = page;
-        // If a page is not held by the balancer its entry is purged from cache.
-        } else {
-          delete cache[page.address];
-          _unlink(page);
-        }
+        // Purge entry from cache.
+        delete cache[page.address];
+        _unlink(page);
       } else {
         iterator = page;
       }
