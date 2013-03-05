@@ -1,28 +1,28 @@
 #!/usr/bin/env node
 
-require("./proof")(3, function (async, tmp) {
+require("./proof")(3, function (step, tmp) {
   var fs = require("fs"), strata, records = [];
 
-  async(function (serialize) {
-    serialize(__dirname + "/fixtures/split.before.json", tmp, async());
+  step(function (serialize) {
+    serialize(__dirname + "/fixtures/split.before.json", tmp, step());
   }, function (Strata) {
     strata = new Strata(tmp, { leafSize: 3, branchSize: 3 });
-    strata.open(async());
+    strata.open(step());
   }, function () {
-    strata.mutator("b", async());
+    strata.mutator("b", step());
   }, function (cursor) {
-    cursor.insert("b", "b", ~ cursor.index, async());
+    cursor.insert("b", "b", ~ cursor.index, step());
   }, function ($1, cursor, gather) {
     cursor.unlock();
-    gather(async, strata);
+    gather(step, strata);
   }, function (records, deepEqual) {
     deepEqual(records, [ "a", "b", "c", "d" ], "records");
   }, function () {
-    strata.balance(async());
+    strata.balance(step());
   }, function (load) {
-    load(__dirname + "/fixtures/split.after.json", async());
+    load(__dirname + "/fixtures/split.after.json", step());
   }, function (expected, objectify) {
-    objectify(tmp, async());
+    objectify(tmp, step());
   }, function(actual, expected, say, deepEqual) {
     say(expected);
     say(actual);
@@ -32,6 +32,6 @@ require("./proof")(3, function (async, tmp) {
     strata.purge(0);
     deepEqual(strata.size, 0, "purged");
 
-    strata.close(async());
+    strata.close(step());
   });
 });

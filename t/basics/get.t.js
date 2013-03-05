@@ -1,27 +1,27 @@
 #!/usr/bin/env node
 
 var fs = require("fs"), strata;
-require("./proof")(7, function (tmp, equal, async) {
-  async(function () {
+require("./proof")(7, function (tmp, equal, step) {
+  step(function () {
 
-    fs.writeFile(tmp + "/segment00000000", JSON.stringify([-1]) + " -\n", "utf8", async());
+    fs.writeFile(tmp + "/segment00000000", JSON.stringify([-1]) + " -\n", "utf8", step());
 
   }, function () {
 
     var body = JSON.stringify([0,1,0,0,1,[]]) + " -\n" +
                JSON.stringify([1,1,2,"a"]) + " -\n";
-    fs.writeFile(tmp + "/segment00000001", body, "utf8", async());
+    fs.writeFile(tmp + "/segment00000001", body, "utf8", step());
 
   }, function (Strata) {
 
     strata = new Strata(tmp, { leafSize: 3, branchSize: 3 });
-    strata.open(async());
+    strata.open(step());
 
   }, function (equal) {
 
     equal(strata.size, 0, "json size before read");
 
-    strata.iterator("a", async());
+    strata.iterator("a", step());
 
   }, function (cursor, ok) {
 
@@ -30,7 +30,7 @@ require("./proof")(7, function (tmp, equal, async) {
     equal(cursor.offset, 0, "offset");
     
 
-    cursor.get(cursor.offset, async());
+    cursor.get(cursor.offset, step());
 
   }, function (got, cursor) {
 
@@ -42,6 +42,6 @@ require("./proof")(7, function (tmp, equal, async) {
     strata.purge(0);
     equal(strata.size, 0, "page");
 
-    strata.close(async());
+    strata.close(step());
   });
 });

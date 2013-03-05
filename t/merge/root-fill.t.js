@@ -1,71 +1,71 @@
 #!/usr/bin/env node
 
-require('./proof')(3, function (async, Strata, tmp, deepEqual) {
+require('./proof')(3, function (step, Strata, tmp, deepEqual) {
   var strata = new Strata(tmp, { leafSize: 3, branchSize: 3 }), fs = require('fs');
-  async(function (serialize) { 
-    serialize(__dirname + '/fixtures/branch.before.json', tmp, async());
+  step(function (serialize) { 
+    serialize(__dirname + '/fixtures/branch.before.json', tmp, step());
   }, function () {
-    strata.open(async());
+    strata.open(step());
   }, function () {
-    strata.mutator('h', async());
+    strata.mutator('h', step());
   }, function (cursor) {
-    async(function () {
-      cursor.indexOf('h', async());
+    step(function () {
+      cursor.indexOf('h', step());
     }, function (index) {
-      cursor.remove(index, async());
+      cursor.remove(index, step());
     }, function () {
-      cursor.indexOf('i', async());
+      cursor.indexOf('i', step());
     }, function (index) {
-      cursor.remove(index, async());
+      cursor.remove(index, step());
       cursor.unlock();
     });
   }, function () {
-    strata.mutator('e', async());
+    strata.mutator('e', step());
   }, function (cursor) {
-    async(function () {
-      cursor.indexOf('e', async());
+    step(function () {
+      cursor.indexOf('e', step());
     }, function (index) {
-      cursor.remove(index, async());
+      cursor.remove(index, step());
     }, function () {
-      cursor.indexOf('g', async());
+      cursor.indexOf('g', step());
     }, function (index) {
-      cursor.remove(index, async());
+      cursor.remove(index, step());
       cursor.unlock();
     });
   }, function () {
-    strata.mutator('m', async());
+    strata.mutator('m', step());
   }, function (cursor) {
-    async(function () {
-      cursor.indexOf('m', async());
+    step(function () {
+      cursor.indexOf('m', step());
     }, function (index) {
-      cursor.remove(index, async());
+      cursor.remove(index, step());
     }, function () {
-      cursor.indexOf('n', async());
+      cursor.indexOf('n', step());
     }, function (index) {
-      cursor.remove(index, async());
+      cursor.remove(index, step());
       cursor.unlock();
     });
   }, function (gather) {
-    gather(async, strata);
+    gather(step, strata);
   }, function (records) {
     deepEqual(records, [ 'a', 'b', 'c', 'd',  'f', 'j', 'k', 'l' ], 'records');
-    strata.balance(async());
+    strata.balance(step());
   }, function () {
-    strata.balance(async());
+    strata.balance(step());
   }, function (load) {
-    load(__dirname + '/fixtures/root-fill.after.json', async());
+    load(__dirname + '/fixtures/root-fill.after.json', step());
   }, function (expected, objectify) {
-    objectify(tmp, async());
+    objectify(tmp, step());
   }, function (actual, expected, say) {
 //    say(expected);
 //    say(actual);
 
     deepEqual(actual, expected, 'merge');
   }, function (gather) {
-    gather(async, strata);
+    gather(step, strata);
   }, function (records) {
     deepEqual(records, [ 'a', 'b', 'c', 'd', 'f', 'j', 'k', 'l' ], 'merged');
   }, function() {
-    strata.close(async());
+    strata.close(step());
   });
 });

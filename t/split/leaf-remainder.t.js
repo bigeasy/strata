@@ -1,37 +1,37 @@
 #!/usr/bin/env node
 
-require('./proof')(3, function (async, Strata, tmp, deepEqual) {
+require('./proof')(3, function (step, Strata, tmp, deepEqual) {
   var strata = new Strata(tmp, { leafSize: 3, branchSize: 3 }), fs = require('fs');
-  async(function (serialize) { 
-    serialize(__dirname + '/fixtures/leaf-remainder.before.json', tmp, async());
+  step(function (serialize) { 
+    serialize(__dirname + '/fixtures/leaf-remainder.before.json', tmp, step());
   }, function () {
-    strata.open(async());
+    strata.open(step());
   }, function () {
-    strata.mutator('b', async());
+    strata.mutator('b', step());
   }, function (cursor) {
-    async(function () {
-      cursor.insert('b', 'b', ~ cursor.index, async());
+    step(function () {
+      cursor.insert('b', 'b', ~ cursor.index, step());
     }, function () {
       cursor.unlock()
     });
   }, function (gather) {
-    gather(async, strata);
+    gather(step, strata);
   }, function (records) {
     deepEqual(records, [ 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h' ], 'records');
-    strata.balance(async());
+    strata.balance(step());
   }, function (gather) {
-    gather(async, strata);
+    gather(step, strata);
   }, function (records, load) {
     deepEqual(records, [ 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h' ], 'records after balance');
-    load(__dirname + '/fixtures/leaf-remainder.after.json', async());
+    load(__dirname + '/fixtures/leaf-remainder.after.json', step());
   }, function (expected, objectify) {
-    objectify(tmp, async());
+    objectify(tmp, step());
   }, function (actual, expected, say) {
     say(expected);
     say(actual);
 
     deepEqual(actual, expected, 'split');
   }, function() {
-    strata.close(async());
+    strata.close(step());
   });
 });

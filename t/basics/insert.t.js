@@ -1,21 +1,21 @@
 #!/usr/bin/env node
 
-require("./proof")(4, function (async, tmp) {
+require("./proof")(4, function (step, tmp) {
   var fs = require("fs"), strata;
 
-  async(function (Strata) {
+  step(function (Strata) {
 
     strata = new Strata(tmp, { leafSize: 3, branchSize: 3 });
-    strata.create(async());
+    strata.create(step());
 
   }, function () {
 
-    strata.mutator("a", async());
+    strata.mutator("a", step());
 
   }, function (cursor) {
 
     var cassette = strata.cassette("a");
-    cursor.insert(cassette.record, cassette.key, ~ cursor.index, async());
+    cursor.insert(cassette.record, cassette.key, ~ cursor.index, step());
 
   }, function (inserted, cursor, ok, equal) {
 
@@ -25,15 +25,15 @@ require("./proof")(4, function (async, tmp) {
 
     equal(strata.size, 32, "json size");
 
-    strata.close(async());
+    strata.close(step());
 
   }, function (load) {
 
-    load(__dirname + "/fixtures/insert.json", async());
+    load(__dirname + "/fixtures/insert.json", step());
 
   }, function (expected, objectify) {
 
-    objectify(tmp, async());
+    objectify(tmp, step());
 
   }, function (actual, expected, say, deepEqual) {
 
@@ -47,6 +47,6 @@ require("./proof")(4, function (async, tmp) {
     strata.purge(0);
     deepEqual(strata.size, 0, "purged");
 
-    strata.close(async());
+    strata.close(step());
   });
 });

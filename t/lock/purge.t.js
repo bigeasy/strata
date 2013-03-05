@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require("./proof")(4, function (async, ok, equal, Strata, tmp, deepEqual, say, die) {
+require("./proof")(4, function (step, ok, equal, Strata, tmp, deepEqual, say, die) {
   var strata, purge, count = 0;
 
   function tracer (trace, callback) {
@@ -19,85 +19,85 @@ require("./proof")(4, function (async, ok, equal, Strata, tmp, deepEqual, say, d
     }
   }
 
-  async(function (serialize) {
+  step(function (serialize) {
 
-    serialize(__dirname + '/fixtures/tree.before.json', tmp, async());
+    serialize(__dirname + '/fixtures/tree.before.json', tmp, step());
 
   }, function () {
 
     strata = new Strata(tmp, { leafSize: 3, branchSize: 3, tracer: tracer });
-    strata.open(async());
+    strata.open(step());
 
   }, function () {
 
-    strata.mutator('h', async());
+    strata.mutator('h', step());
 
   }, function (cursor) {
 
-    async(function () {
+    step(function () {
 
-      cursor.indexOf('h', async());
+      cursor.indexOf('h', step());
 
     }, function (index) {
 
-      cursor.remove(index, async());
+      cursor.remove(index, step());
 
     }, function () {
 
-      cursor.indexOf('i', async());
+      cursor.indexOf('i', step());
 
     }, function (index) {
 
-      cursor.remove(index, async());
+      cursor.remove(index, step());
       cursor.unlock();
 
     });
   }, function () {
 
-    strata.mutator('e', async());
+    strata.mutator('e', step());
 
   }, function (cursor) {
 
-    async(function () {
+    step(function () {
 
-      cursor.indexOf('e', async());
+      cursor.indexOf('e', step());
 
     }, function (index) {
 
-      cursor.remove(index, async());
+      cursor.remove(index, step());
 
     }, function () {
 
-      cursor.indexOf('g', async());
+      cursor.indexOf('g', step());
 
     }, function (index) {
 
-      cursor.remove(index, async());
+      cursor.remove(index, step());
       cursor.unlock();
 
     });
   }, function (gather) {
 
-    gather(async, strata);
+    gather(step, strata);
 
   }, function (records) {
 
     deepEqual(records, [ 'a', 'b', 'c', 'd',  'f', 'j', 'k', 'l', 'm', 'n' ], 'records');
-    strata.balance(async());
+    strata.balance(step());
 
   }, function (load) {
 
-    load(__dirname + '/fixtures/tree.after.json', async());
+    load(__dirname + '/fixtures/tree.after.json', step());
 
   }, function (expected, objectify) {
 
-    objectify(tmp, async());
+    objectify(tmp, step());
 
   }, function (actual, expected, say) {
 
     deepEqual(actual, expected, 'merge');
 
-    strata.close(async());
+    strata.close(step());
 
   });
 });
