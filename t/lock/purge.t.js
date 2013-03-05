@@ -7,9 +7,9 @@ require("./proof")(4, function (async, ok, equal, Strata, tmp, deepEqual, say, d
     switch (trace.type) {
     case "reference":
       if (++count == 2) {
-        ok(trace.report({}).cache.length > 2, "unpurged");
+        ok(trace.report().cache.length > 2, "unpurged");
         strata.purge(0);
-        equal(0, trace.report({}).cache.length, "purged");
+        equal(0, trace.report().cache.length, "purged");
       }
       callback();
       break;

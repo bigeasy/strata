@@ -337,11 +337,12 @@ function Strata (directory, options) {
 
   mru.next = mru.previous = mru;
 
-  function report (object) {
-    object.size = size;
-    object.nextAddress = nextAddress;
-    object.cache = Object.keys(cache);
-    return object;
+  function report () {
+    return {
+      size: size,
+      nextAddress: nextAddress,
+      cache: Object.keys(cache)
+    }
   }
 
   // #### Verifying Checksums
@@ -3315,10 +3316,11 @@ function Strata (directory, options) {
 
     objectify.call(methods, deleteGhost, splitLeaf, mergeLeaves);
 
-    function balancerReport (object) {
-      object.referenced = Object.keys(referenced);
-      object.lengths = extend({}, lengths);
-      return report(object);
+    function balancerReport () {
+      return extend(report(), {
+        referenced: Object.keys(referenced),
+        lengths: extend({}, lengths)
+      });
     }
 
     // Mark a page as having been altered, now requiring a test for balance. If
