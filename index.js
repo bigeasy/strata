@@ -337,11 +337,12 @@ function Strata (directory, options) {
 
   mru.next = mru.previous = mru;
 
-  function report (object) {
-    object.size = size;
-    object.nextAddress = nextAddress;
-    object.cache = Object.keys(cache);
-    return object;
+  function report () {
+    return {
+      size: size,
+      nextAddress: nextAddress,
+      cache: Object.keys(cache)
+    }
   }
 
   // #### Verifying Checksums
@@ -612,10 +613,8 @@ function Strata (directory, options) {
   function createLeaf (address, override) {
     var page =
     { address: address
-    , balancers: 0
     , cache: {}
     , entries: 0
-    , length: 0
     , locks: [[]]
     , ghosts: 0
     , positions: []
@@ -827,7 +826,7 @@ function Strata (directory, options) {
 
   // Write an insert object.
   function writeInsert (fd, page, index, record, callback) {
-    var entry = [ index + 1, page.length - page.ghosts + 1, ++page.entries, record ];
+    var entry = [ index + 1, page.positions.length - page.ghosts + 1, ++page.entries, record ];
     writeJSON(fd, page, entry, callback);
   }
 
@@ -861,7 +860,7 @@ function Strata (directory, options) {
 
   // Write a delete object.
   function writeDelete (fd, page, index, callback) {
-    var entry = [ -(index + 1), page.length - page.ghosts - 1, ++page.entries ];
+    var entry = [ -(index + 1), page.positions.length - page.ghosts - 1, ++page.entries ];
     writeJSON(fd, page, entry, callback);
   }
 
@@ -945,16 +944,8 @@ function Strata (directory, options) {
       , start
       , read
       , fd
-      , page
       , check = validator(callback);
       ;
-
-    // Reset the page length. The page object keeps a cached copy of the
-    // positions array length so that meta data is not dependent on the actual
-    // data, the actual data can be released. On purge a page entry is retained
-    // if the balancer is using it, but its data is freed. We reset to zero and
-    // expect that the read will restore it to the value we're about to erase.
-    page.length = 0;
 
     // We don't cache file descriptors after the leaf page file read. We will
     // close the file descriptors before the function returns.
@@ -1173,7 +1164,7 @@ function Strata (directory, options) {
       page.entries = 0;
 
       // Capture the positions, while truncating the page position array.
-      positions = splice(page, 0, page.length);
+      positions = splice(page, 0, page.positions.length);
 
       // Write an empty positions array to act as a header.
       writePositions(fd, page, check(iterate))
@@ -1200,7 +1191,7 @@ function Strata (directory, options) {
 
       // Append the position to the page and stash the position and object.
       function written (position) {
-        splice(page, page.length, 0, position);
+        splice(page, page.positions.length, 0, position);
         cache[position] = object;
         iterate();
       }
@@ -1399,9 +1390,7 @@ function Strata (directory, options) {
     var page =
     { address: address
     , addresses: []
-    , balancers: 0
     , cache: {}
-    , length: 0
     , locks: [[]]
     , penultimate: true
     , size: 0
@@ -1445,8 +1434,6 @@ function Strata (directory, options) {
                                 : "," + removals.join(",");
 
       heft(page, -json.length);
-
-      page.length -= length;
     } else {
       removals = [];
     }
@@ -1462,8 +1449,6 @@ function Strata (directory, options) {
                                   : "," + insert.join(",");
 
         heft(page, json.length);
-
-        page.length += insert.length
 
         values.splice.apply(values, [ offset, 0 ].concat(insert));
       }
@@ -2012,7 +1997,8 @@ function Strata (directory, options) {
 
   function unwind (callback) {
     var vargs = [ null ].concat(__slice.call(arguments, 1));
-    process.nextTick(function () { callback.apply(null, vargs) });
+    callback.apply(null, vargs);
+//    process.nextTick(function () { callback.apply(null, vargs) });
   }
 
   // Binary search implemented, as always, by having a peek at [Algorithms in
@@ -2024,7 +2010,7 @@ function Strata (directory, options) {
   //
   // Index is bitwise compliment of the insert location if not found.
   function find (page, key, low, callback) {
-    var mid, high = page.length - 1, check = validator(callback);
+    var mid, high = (page.addresses || page.positions).length - 1, check = validator(callback);
 
     test();
 
@@ -2728,7 +2714,7 @@ function Strata (directory, options) {
 
       // An insert location is ambiguous if it would append the record to the
       // current leaf page.
-      unambiguous = index < page.length;
+      unambiguous = index < page.positions.length;
 
       // If we are at the first leaf page and the key is the search key that got
       // us here, then this is, without a doubt, the correct leaf page for the
@@ -2834,7 +2820,7 @@ function Strata (directory, options) {
         } else {
           uncacheRecord(page, page.positions[index]);
           splice(page, index, 1);
-          length = page.length
+// **FIXME**:          length = page.length
         }
         fs.close(fd, check(closed));
       }
@@ -3330,10 +3316,11 @@ function Strata (directory, options) {
 
     objectify.call(methods, deleteGhost, splitLeaf, mergeLeaves);
 
-    function balancerReport (object) {
-      object.referenced = Object.keys(referenced);
-      object.lengths = extend({}, lengths);
-      return report(object);
+    function balancerReport () {
+      return extend(report(), {
+        referenced: Object.keys(referenced),
+        lengths: extend({}, lengths)
+      });
     }
 
     // Mark a page as having been altered, now requiring a test for balance. If
@@ -3343,17 +3330,11 @@ function Strata (directory, options) {
     // it will be split. Of course, if it the order of the page, it can not be
     // merged, nor should it be split.
     function unbalanced (page, force) {
+      if (page.address > 0) throw new Error();
       if (force) {
         lengths[page.address] = options.leafSize;
       } else if (lengths[page.address] == null) {
-        lengths[page.address] = page.length - page.ghosts;
-      }
-    }
-
-    function reference (page) {
-      if (! referenced[page.address]) {
-        referenced[page.address] = page;
-        page.balancers++;
+        lengths[page.address] = page.positions.length - page.ghosts;
       }
     }
 
@@ -3453,7 +3434,6 @@ function Strata (directory, options) {
         // Convert the address back to an integer.
         var address = +(addresses.shift()), length = lengths[address], right, node;
 
-
         // We create linked lists that contain the leaf pages we're considering
         // in our balance plan. This is apart from the most-recently used list
         // that the pages themselves form.
@@ -3477,14 +3457,17 @@ function Strata (directory, options) {
         // Linking to sibling nodes is not performed here.
         function nodify (next) {
           return check(function (page) {
+            if (page.address > 0) throw new Error();
             designate(page, 0, check(identified));
             function identified (key) {
-              node = { page: page, length: page.length - page.ghosts, key: key };
-              reference(page);
+              node = { key: key,
+                       address: page.address,
+                       rightAddress: page.right,
+                       length: page.positions.length - page.ghosts };
               unlock(page);
-              ordered[page.address] = node
-              if (node.page.ghosts)
-                ghosts[node.page.address] = node
+              ordered[node.address] = node
+              if (page.ghosts)
+                ghosts[node.address] = node
               tracer({ type: "reference", report: balancerReport }, check(function () { next(node) }));
             }
           });
@@ -3496,7 +3479,7 @@ function Strata (directory, options) {
         function linkCachedSibling (node) {
           var right;
 
-          if (! node.right && (right = ordered[node.page.right])) {
+          if (! node.rightAddress && (right = ordered[node.rightAddress])) {
             node.right = right
             right.left = node
           }
@@ -3507,7 +3490,7 @@ function Strata (directory, options) {
         // If the page has shrunk in size, we gather the size of the left
         // sibling page and the right sibling page. The right sibling page
         function checkMerge(node) {
-          if (node.length - length < 0 && node.page.address != -1 && ! node.left) leftSibling(node);
+          if (node.length - length < 0 && node.address != -1 && ! node.left) leftSibling(node);
           else rightSibling(node);
         }
 
@@ -3543,9 +3526,9 @@ function Strata (directory, options) {
         function rightSibling (node) {
           var right;
 
-          if (!node.right && node.page.right)  {
-            if (right = ordered[node.page.right]) attach(right);
-            else lock(node.page.right, false, nodify(attach));
+          if (!node.right && node.rightAddress)  {
+            if (right = ordered[node.rightAddress]) attach(right);
+            else lock(node.rightAddress, false, nodify(attach));
           } else {
             next();
           }
@@ -3577,7 +3560,6 @@ function Strata (directory, options) {
       // Calculate the actual length of the page less ghosts.
       for (address in ordered) {
         node = ordered[address];
-        node.length = node.page.length - node.page.ghosts;
       }
 
       // Break the link to next right node and return it.
@@ -3629,8 +3611,8 @@ function Strata (directory, options) {
         // now. We ask the next balancer to consider it as we found it.
         } else if (
           difference < 0
-          && ! ((node.page.address == -1 || node.left) && (node.page.right == 0 || node.right))) {
-          io.balancer.lengths[node.page.address] = length;
+          && ! ((node.address == -1 || node.left) && (node.rightAddress == 0 || node.right))) {
+          io.balancer.lengths[node.address] = length;
         }
       }
 
@@ -3650,10 +3632,10 @@ function Strata (directory, options) {
         while (node && node.right) {
           if (node.length + node.right.length > options.leafSize) {
             node = terminate(node);
-            ordered[node.page.address] = node;
+            ordered[node.address] = node;
           } else {
             if (node = terminate(node.right)) {
-              ordered[node.page.address] = node;
+              ordered[node.address] = node;
             }
           }
         }
@@ -3668,10 +3650,10 @@ function Strata (directory, options) {
           if (node.right.right) throw Error();
           operations.push({
             method: "mergeLeaves",
-            parameters: [ node.right.key, lengths, !!ghosts[node.page.address] ]
+            parameters: [ node.right.key, lengths, !!ghosts[node.address] ]
           });
-          delete ghosts[node.page.address];
-          delete ghosts[node.right.page.address];
+          delete ghosts[node.address];
+          delete ghosts[node.right.address];
         }
       }
 
@@ -3695,11 +3677,7 @@ function Strata (directory, options) {
           // Maybe use bind instead.
           methods[operation.method].apply(this, operation.parameters.concat(check(shift)));
         } else {
-          // Decrement the reference lengths. **TODO**: Why a length and not a boolean?
-          for (address in referenced) {
-            referenced[address].balancers--
-          }
-
+          // Allow a subsequent balance.
           balancing = false;
           callback(null);
         }
@@ -3720,7 +3698,7 @@ function Strata (directory, options) {
     // &mdash;
     function shouldSplitBranch (branch, key, callback) {
       // Are we larger than a branch page ought to be?
-      if (branch.length > options.branchSize) {
+      if (branch.addresses.length > options.branchSize) {
         // Either drain the root, or split the branch.
         if (branch.address == 0) {
           drainRoot(callback);
@@ -3789,14 +3767,14 @@ function Strata (directory, options) {
       function partition () {
         // It may have been some time since we've split, so we might have to
         // split into more than two pages.
-        pages = Math.ceil(split.length / options.leafSize);
-        records = Math.floor(split.length / pages);
-        remainder = split.length % pages;
+        pages = Math.ceil(split.positions.length / options.leafSize);
+        records = Math.floor(split.positions.length / pages);
+        remainder = split.positions.length % pages;
 
         right = split.right
 
         // Never a remainder record on the first page.
-        offset = split.length
+        offset = split.positions.length
 
         paginate();
       }
@@ -3821,7 +3799,7 @@ function Strata (directory, options) {
         // Determine the number of records to add to this page from the split
         // leaf. Add an additional record if we have a remainder.
         length = remainder-- > 0 ? records + 1 : records;
-        offset = split.length - length;
+        offset = split.positions.length - length;
         index = offset;
 
         copy();
@@ -3836,7 +3814,7 @@ function Strata (directory, options) {
         function uncache (object) {
           uncacheRecord(split, position);
           // Add it to our new page.
-          splice(page, page.length, 0, position);
+          splice(page, page.positions.length, 0, position);
           cacheRecord(page, position, object.record, object.key);
           index++;
           if (index < offset + length) copy();
@@ -3976,12 +3954,12 @@ function Strata (directory, options) {
 
         // It may have been some time since we've split, so we might have to
         // split into more than two pages.
-        pages = Math.ceil(split.length / options.branchSize);
-        records = Math.floor(split.length / pages);
-        remainder = split.length % pages;
+        pages = Math.ceil(split.addresses.length / options.branchSize);
+        records = Math.floor(split.addresses.length / pages);
+        remainder = split.addresses.length % pages;
 
         // Never a remainder record on the first page.
-        offset = split.length
+        offset = split.addresses.length
 
         paginate();
       }
@@ -3997,7 +3975,7 @@ function Strata (directory, options) {
         // new child branch page. Add an additional record if we have a
         // remainder.
         var length = remainder-- > 0 ? records + 1 : records;
-        var offset = split.length - length;
+        var offset = split.addresses.length - length;
 
         // Cut off a chunk of addresses.
         var cut = splice(split, offset, length);
@@ -4095,9 +4073,9 @@ function Strata (directory, options) {
         root = $root;
         // It may have been some time since we've split, so we might have to
         // split into more than two pages.
-        pages = Math.ceil(root.length / options.branchSize);
-        records = Math.floor(root.length / pages);
-        remainder = root.length % pages;
+        pages = Math.ceil(root.addresses.length / options.branchSize);
+        records = Math.floor(root.addresses.length / pages);
+        remainder = root.addresses.length % pages;
 
         paginate();
       }
@@ -4113,7 +4091,7 @@ function Strata (directory, options) {
         // new child branch page. Add an additional record if we have a
         // remainder.
         var length = remainder-- > 0 ? records + 1 : records;
-        var offset = root.length - length;
+        var offset = root.addresses.length - length;
 
         // Cut off a chunk of addresses.
         var cut = splice(root, offset, length);
@@ -4174,7 +4152,7 @@ function Strata (directory, options) {
         // Release our lock on the root.
         unlock(root);
         // Do we need to split the root again?
-        if (root.length > options.branchSize) drainRoot(callback);
+        if (root.addresses.length > options.branchSize) drainRoot(callback);
         else callback(null);
       }
     }
@@ -4300,7 +4278,7 @@ function Strata (directory, options) {
         // gathering pages and encounter a branch page with more than one child,
         // we release the pages we've gathered.
         parents.right.unlocker = function (parent, child) {
-          if (child.length == 1) {
+          if (child.addresses.length == 1) {
             if (singles.length == 0) singles.push(parent);
             singles.push(child);
           } else if (singles.length) {
@@ -4462,9 +4440,6 @@ function Strata (directory, options) {
 
       // Release our locks and propagate the merge to parent branch pages.
       function propagate () {
-        // See if we can fit any more into the left page at the next balance.
-        balancer.unbalanced(pages.left.page, true);
-
         // Release locks.
         descents.forEach(function (descent) { unlock(descent.page) });
         locked.forEach(unlock);
@@ -4472,7 +4447,7 @@ function Strata (directory, options) {
         // We released our lock on the ancestor, but even if it is freed by a
         // cache purge, the properties we test here are still valid.
         if (ancestor.address == 0) {
-          if (ancestor.length == 1 && ancestor.addresses[0] > 0) {
+          if (ancestor.addresses.length == 1 && ancestor.addresses[0] > 0) {
             fillRoot(callback);
           } else {
             callback(null);
@@ -4508,8 +4483,11 @@ function Strata (directory, options) {
       function merger (leaves, callback) {
         var check = validator(callback);
 
-        var left = (leaves.left.page.length - leaves.left.page.ghosts);
-        var right = (leaves.right.page.length - leaves.right.page.ghosts);
+        var left = (leaves.left.page.positions.length - leaves.left.page.ghosts);
+        var right = (leaves.right.page.positions.length - leaves.right.page.ghosts);
+
+        // See if we can fit any more into the left page at the next balance.
+        balancer.unbalanced(leaves.left.page, true);
 
         if (left + right > options.leafSize) {
           // We cannot merge, so we queue one or both of pages for a merge test
@@ -4539,7 +4517,7 @@ function Strata (directory, options) {
 
           index = leaves.right.page.ghosts;
 
-          if (index < leaves.right.page.length) fetch();
+          if (index < leaves.right.page.positions.length) fetch();
           else rewriteLeftLeaf();
         }
 
@@ -4563,10 +4541,10 @@ function Strata (directory, options) {
 
           // Add it to our new page. The negative positions are temporary. We'll
           // get real file positions when we rewrite.
-          splice(leaves.left.page, leaves.left.page.length, 0, -(position + 1));
+          splice(leaves.left.page, leaves.left.page.positions.length, 0, -(position + 1));
           cacheRecord(leaves.left.page, -(position + 1), object.record, object.key);
 
-          if (++index < leaves.right.page.length) fetch();
+          if (++index < leaves.right.page.positions.length) fetch();
           else rewriteLeftLeaf();
         }
 
@@ -4575,7 +4553,7 @@ function Strata (directory, options) {
         function rewriteLeftLeaf () {
           // Remove the positions the outgoing page to update the JSON size of
           // the b&#x2011;tree.
-          splice(leaves.right.page, 0, leaves.right.page.length);
+          splice(leaves.right.page, 0, leaves.right.page.positions.length);
 
           // Rewrite the left leaf page. Move the right leaf page aside for the
           // pending unlink.
@@ -4662,9 +4640,9 @@ function Strata (directory, options) {
       // of the two pages we want to merge.
       var choice;
       function choose () {
-        if (lesser && lesser.page.length + center.page.length <= options.branchSize) {
+        if (lesser && lesser.page.addresses.length + center.page.addresses.length <= options.branchSize) {
           choice = center;
-        } else if (greater && greater.page.length + center.page.length <= options.branchSize) {
+        } else if (greater && greater.page.addresses.length + center.page.addresses.length <= options.branchSize) {
           choice = greater;
         }
         if (choice) {
@@ -4700,9 +4678,9 @@ function Strata (directory, options) {
         // Merging branch pages by slicing out all the addresses in the right
         // page and adding them to the left page. Uncache the keys we've
         // removed.
-        var cut = splice(pages.right.page, 0, pages.right.page.length);
+        var cut = splice(pages.right.page, 0, pages.right.page.addresses.length);
         cut.forEach(function (address) { uncacheKey(pages.right.page, address) });
-        splice(pages.left.page, pages.left.page.length, 0, cut);
+        splice(pages.left.page, pages.left.page.addresses.length, 0, cut);
 
         // Write out the left branch page. The generalized merge function will
         // handle the rest of the page rewriting.
@@ -4745,11 +4723,11 @@ function Strata (directory, options) {
       // the root branch page, then rewrite the root branch page.
       function fill () {
         var cut;
-        cut = splice(root.page, 0, root.page.length);
+        cut = splice(root.page, 0, root.page.addresses.length);
         cut.forEach(function (address) { uncacheKey(root.page, address) });
-        cut = splice(child.page, 0, child.page.length);
+        cut = splice(child.page, 0, child.page.addresses.length);
         cut.forEach(function (address) { uncacheKey(child.page, address) });
-        splice(root.page, root.page.length, 0, cut);
+        splice(root.page, root.page.addresses.length, 0, cut);
 
         writeBranch(root.page, ".pending", check(rewriteChild));
       }
@@ -4850,18 +4828,9 @@ function Strata (directory, options) {
       if (page.locks.length == 1 && page.locks[0].length == 0) {
         // Deduct the size of the page from the size of the b&#x2011;tree.
         size -= page.size;
-        // Pages held by the balancers are reset to an unloaded state.
-        if (page.balancers) {
-          page.load = [];
-          page.size = 0;
-          page.cache = {};
-          (page.addresses || page.positions).length = 0;
-          iterator = page;
-        // If a page is not held by the balancer its entry is purged from cache.
-        } else {
-          delete cache[page.address];
-          _unlink(page);
-        }
+        // Purge entry from cache.
+        delete cache[page.address];
+        _unlink(page);
       } else {
         iterator = page;
       }
