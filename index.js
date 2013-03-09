@@ -146,9 +146,6 @@
 // from the split of a non-root branch, because the root branch does not have
 // siblings.
 
-// Required Node.js libraries.
-var fs = require("fs");
-
 // Copy values from one hash into another.
 function extend(to, from) {
   for (var key in from) to[key] = from[key];
@@ -308,6 +305,7 @@ function objectify () {
 function Strata (directory, options) {
   var extractor = options.extractor || extract
     , comparator = options.comparator || compare
+    , fs = options.fs || require('fs')
     , cache = {}
     , mru = { address: null }
     , nextAddress = 0
