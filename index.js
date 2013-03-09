@@ -2164,16 +2164,18 @@ function Strata (directory, options) {
 
   //
   function Descent (override) {
+    // Initialize override.
+    override = override || {};
+
     // The constructor always felt like a dangerous place to be doing anything
     // meaningful in C++ or Java.
-    var options = override || {},
-        exclusive = options.exclusive || false,
-        depth = options.depth == null ? -1 : options.depth,
-        index = options.index == null ? 0 : options.index,
-        page = options.page || { addresses: [ 0 ] },
-        indexes = options.indexes || {},
+    var exclusive = override.exclusive || false,
+        depth = override.depth == null ? -1 : override.depth,
+        index = override.index == null ? 0 : override.index,
+        page = override.page || { addresses: [ 0 ] },
+        indexes = override.indexes || {},
         descent = {},
-        greater = options.greater, lesser = options.lesser;
+        greater = override.greater, lesser = override.lesser;
 
     // #### Properties
     //
