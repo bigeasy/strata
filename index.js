@@ -152,9 +152,6 @@ function extend(to, from) {
   return to;
 }
 
-// Allow a missing file.
-function ENOENT (e) { return e.code == "ENOENT" }
-
 // Used for debugging. If you don't see them called in the code, it means the
 // code is absolutely bug free.
 var __slice = [].slice;
