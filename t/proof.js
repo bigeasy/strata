@@ -59,26 +59,26 @@ function load (segments, callback) {
   function parse (json) { callback(null, JSON.parse(json)) }
 }
 
-function gather (async, strata) {
+function gather (step, strata) {
   var records = [];
-  async(function () {
+  step(function () {
     records = []
-    strata.iterator("a", async());
+    strata.iterator("a", step());
   }, function (cursor) {
     return true;
   }, function page (more, cursor) {
     if (more) return cursor.offset;
     cursor.unlock();
-    async(null, records);
+    step(null, records);
   }, function item (i, cursor, page) {
     if (i < cursor.length) {
-      cursor.get(i, async()); 
+      cursor.get(i, step()); 
     } else {
-      cursor.next(async(page));
+      cursor.next(step(page));
     }
   }, function (record, i, item) {
     records.push(record);
-    async(item)(null, i + 1);
+    step(item)(null, i + 1);
   });
 }
 
@@ -152,11 +152,11 @@ function deltree (directory, callback) {
 
 module.exports = function (dirname) {
   var tmp = dirname + "/tmp";
-  return require("proof")(function cleanup (async) {
-    deltree(tmp, async());
-  }, function (async) {
-    async(function () {
-      fs.mkdir(tmp, 0755, async());
+  return require("proof")(function cleanup (step) {
+    deltree(tmp, step());
+  }, function (step) {
+    step(function () {
+      fs.mkdir(tmp, 0755, step());
     }, function () {
       return { Strata: Strata
              , tmp: tmp
