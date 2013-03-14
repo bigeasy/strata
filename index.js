@@ -404,7 +404,7 @@ function Strata (directory, options) {
     fs.stat(replacement, validator(callback)(stat));
 
     function stat (stat) {
-      ok(stat.isFile(), 'is a file');
+      ok(stat.isFile(), 'is not a file');
       fs.unlink(permanent, unlinked);
     }
 
