@@ -303,6 +303,7 @@ function Strata (directory, options) {
   var extractor = options.extractor || extract
     , comparator = options.comparator || compare
     , fs = options.fs || require('fs')
+    , ok = options.ok || require('assert').ok
     , cache = {}
     , mru = { address: null }
     , nextAddress = 0
@@ -401,7 +402,7 @@ function Strata (directory, options) {
     fs.stat(replacement, validator(callback)(stat));
 
     function stat (stat) {
-      if (! stat.isFile()) throw new Error("not a file");
+      ok(stat.isFile(), 'is a file');
       fs.unlink(permanent, unlinked);
     }
 
