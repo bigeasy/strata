@@ -163,25 +163,6 @@ function die () {
 
 function say () { return console.log.apply(console, __slice.call(arguments, 0)) }
 */
-function validator (callback) {
-  return function (forward) { return check(callback, forward) }
-}
-
-function check (callback, forward) {
-  if (!forward) throw Error("No forward function.");
-  if (!callback) throw Error("No callback function.");
-  return function (error) {
-    if (error) {
-      callback(error);
-    } else {
-      try {
-        forward.apply(null, __slice.call(arguments, 1));
-      } catch (error) {
-        callback(error);
-      }
-    }
-  }
-}
 
 // ## Collation
 //
@@ -326,6 +307,26 @@ function Strata (directory, options) {
   default:
     crypto = require("crypto");
     checksum = function (m) { return crypto.createHash(hash).update(m).digest("hex") }
+  }
+
+  function validator (callback) {
+    return function (forward) { return check(callback, forward) }
+  }
+
+  function check (callback, forward) {
+    ok(forward, 'no forward function');
+    ok(callback,'no callback function');
+    return function (error) {
+      if (error) {
+        callback(error);
+      } else {
+        try {
+          forward.apply(null, __slice.call(arguments, 1));
+        } catch (error) {
+          callback(error);
+        }
+      }
+    }
   }
 
   function _size () { return size }
