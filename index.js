@@ -155,13 +155,14 @@ function extend(to, from) {
 // Used for debugging. If you don't see them called in the code, it means the
 // code is absolutely bug free.
 var __slice = [].slice;
+/*
 function die () {
   console.log.apply(console, __slice.call(arguments, 0));
   return process.exit(1);
 };
 
 function say () { return console.log.apply(console, __slice.call(arguments, 0)) }
-
+*/
 function validator (callback) {
   return function (forward) { return check(callback, forward) }
 }
