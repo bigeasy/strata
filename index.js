@@ -285,7 +285,7 @@ function Strata (directory, options) {
   var extractor = options.extractor || extract
     , comparator = options.comparator || compare
     , fs = options.fs || require('fs')
-    , ok = options.ok || require('assert').ok
+    , ok = function (condition, message) { if (!condition) throw new Error(message) }
     , cache = {}
     , mru = { address: null }
     , nextAddress = 0
