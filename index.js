@@ -4803,20 +4803,6 @@ function Strata (directory, options) {
     cursor(splat, true, splat.pop());
   }
 
-  // Create a cassette to insert into b&#x2011;tree.
-  function cassette (object) {
-    return { record: object, key: extractor(object) };
-  }
-
-  // Create an array of cassettes, sorted by the record key, from the array of
-  // records.
-  function cassettes () {
-    var objects = __slice.apply(arguments, 0);
-    var sorted = objects.map(function (object) { cassette(object) });
-    sorted.sort(function (a, b) { return comparator(a.key, b.key) });
-    return sorted;
-  }
-
   function balance (callback) { balancer.balance(callback) }
 
   // Attempt to purge the cache until the JSON size of the cache is less than or
@@ -4841,7 +4827,7 @@ function Strata (directory, options) {
     }
   }
 
-  return objectify.call(this, cassette, create, open,
+  return objectify.call(this, create, open,
                               iterator, mutator, balance, purge, close,
                               _size, _nextAddress);
 }
