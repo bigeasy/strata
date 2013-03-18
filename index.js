@@ -297,7 +297,7 @@ function Strata (directory, options) {
     , checksum
     , crypto
     , constructors = {}
-    , tracer = options.tracer || function () { arguments[1]() }
+    , tracer = options.tracer || function () { arguments[2]() }
     ;
 
   switch (hash) {
@@ -310,10 +310,10 @@ function Strata (directory, options) {
   }
 
   function validator (callback) {
-    return function (forward) { return check(callback, forward) }
+    return function (forward, type, report) { return check(callback, forward, type, report) }
   }
 
-  function check (callback, forward) {
+  function check (callback, forward, type, report) {
     ok(forward, 'no forward function');
     ok(callback,'no callback function');
     return function (error) {
@@ -321,7 +321,11 @@ function Strata (directory, options) {
         callback(error);
       } else {
         try {
-          forward.apply(null, __slice.call(arguments, 1));
+          if (type && report) {
+            tracer(type, report, check(callback, forward));
+          } else {
+            forward.apply(null, __slice.call(arguments, 1));
+          }
         } catch (error) {
           callback(error);
         }
@@ -3468,7 +3472,7 @@ function Strata (directory, options) {
               ordered[node.address] = node
               if (page.ghosts)
                 ghosts[node.address] = node
-              tracer({ type: "reference", report: balancerReport }, check(function () { next(node) }));
+              check(function () { next(node) }, "reference", balancerReport)(null);
             }
           });
         }
@@ -3852,7 +3856,7 @@ function Strata (directory, options) {
 
       // Write the penultimate branch.
       function transact () {
-        writeBranch(penultimate.page, ".pending", check(commit));
+        writeBranch(penultimate.page, ".pending", check(commit, "splitLeafCommit", report));
       }
 
       // Now rename the last action, committing to our balance.

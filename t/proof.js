@@ -59,6 +59,19 @@ function load (segments, callback) {
   function parse (json) { callback(null, JSON.parse(json)) }
 }
 
+function insert (step, strata, values) {
+  step(function () {
+    values.sort();
+    strata.mutator(values[0], step());
+  }, function (cursor) {
+    step(function () {
+      cursor.insert(values[0], values[0], ~ cursor.index, step());
+    }, function () {
+      cursor.unlock();
+    });
+  });
+}
+
 function gather (step, strata) {
   var records = [];
   step(function () {
@@ -162,6 +175,7 @@ module.exports = function (dirname) {
              , tmp: tmp
              , load: load
              , stringify: stringify
+             , insert: insert
              , serialize: serialize
              , gather: gather
              , objectify: objectify
