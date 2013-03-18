@@ -1509,16 +1509,11 @@ function Strata (directory, options) {
   //
   function readBranch (page, callback) {
     // Read addresses from JSON branch file.
-    fs.readFile(filename(page.address), "utf8", function (error, file) {
-      var line;
-      if (error) {
-        callback(error);
-      } else {
-        // Splice addresses into page.
-        splice(page, 0, 0, readLine(file))
-        callback(null, page);
-      }
-    });
+    fs.readFile(filename(page.address), "utf8", check(callback, function (file) {
+      // Splice addresses into page.
+      splice(page, 0, 0, readLine(file))
+      callback(null, page);
+    }));
   }
 
   // ### B-Tree Initialization
