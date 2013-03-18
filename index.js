@@ -363,12 +363,8 @@ function Strata (directory, options) {
   //
   function readLine (line) {
     var match = /^\s?(.*)\s((?:-|[\da-f]+))\s?$/i.exec(line);
-    if (! match) {
-      throw new Error("corrupt line: cannot split line: " + line);
-    }
-    if (match[2] != "-" && checksum(match[1]) != match[2]) {
-      throw new Error("corrupt line: invalid checksum");
-    }
+    ok(match, "corrupt line: cannot split line: " + line);
+    ok(match[2] == "-" || checksum(match[1]) == match[2], "corrupt line: invalid checksum");
     return JSON.parse(match[1])
   }
 
