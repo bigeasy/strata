@@ -14,8 +14,7 @@ require("./proof")(4, function (step, tmp) {
 
   }, function (cursor) {
 
-    var cassette = strata.cassette("a");
-    cursor.insert(cassette.record, cassette.key, ~ cursor.index, step());
+    cursor.insert("a", "a", ~ cursor.index, step());
 
   }, function (inserted, cursor, ok, equal) {
 
