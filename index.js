@@ -1818,9 +1818,7 @@ function Strata (directory, options) {
         size += JSON.stringify(object).length
       }
     }
-    if (size != page.size) {
-      throw new Error("sizes are wrong");
-    }
+    ok(size == page.size, "sizes are wrong");
   }
 
   // ### Load
