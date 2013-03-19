@@ -1541,9 +1541,7 @@ function Strata (directory, options) {
     }
 
     function extant (stat) {
-      if (! stat.isDirectory()) {
-        throw new Error("database " + directory + " is not a directory.");
-      }
+      ok(stat.isDirectory(), "database " + directory + " is not a directory.");
       fs.readdir(directory, check(empty));
     }
 
