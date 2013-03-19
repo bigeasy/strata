@@ -1012,9 +1012,7 @@ function Strata (directory, options) {
       splices.reverse()
       splices.forEach(function ($) {
         var index = $[0], position = $[1], entry = $[2];
-        if (entry != ++page.entries) {
-          throw new Error("leaf corrupt: incorrect entry position");
-        }
+        ok(entry == ++page.entries, "leaf corrupt: incorrect entry position");
         if (index > 0) {
           splice(page, index - 1, 0, position);
         } else if (~index == 0 && page.address != -1) {
