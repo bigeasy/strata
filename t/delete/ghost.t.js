@@ -1,30 +1,32 @@
 #!/usr/bin/env node
 
-require('./proof')(5, function (step, Strata, tmp, deepEqual) {
+require('./proof')(5, function (step, Strata,
+  tmp, deepEqual, serialize, gather, load, objectify, say, equal) {
   var strata = new Strata(tmp, { leafSize: 3, branchSize: 3 }), fs = require('fs');
-  step(function (serialize) { 
+  step(function () { 
     serialize(__dirname + '/fixtures/delete.json', tmp, step());
   }, function () {
     strata.open(step());
-  }, function (gather) {
+  }, function () {
     gather(step, strata);
   }, function (records) {
     deepEqual(records, [ 'a', 'b', 'c', 'd' ], 'records');
   }, function () {
     strata.mutator('c', step());
   }, function (cursor) {
-    cursor.indexOf('c', step());
-  }, function (i, cursor) {
-    cursor.remove(i, step());
-  }, function (step, cursor, gather) {
-    cursor.unlock()
-    gather(step, strata);
-  }, function (records, load) {
+    step(function() {
+      cursor.indexOf('c', step());
+    }, function (i) {
+      cursor.remove(i, step());
+    }, function () {
+      cursor.unlock()
+      gather(step, strata);
+    });
+  }, function (records) {
     deepEqual(records, [ 'a', 'b', 'd' ], 'deleted');
-    load(__dirname + '/fixtures/ghost.after.json', step());
-  }, function (expected, objectify) {
     objectify(tmp, step());
-  }, function (actual, expected, say) {
+    load(__dirname + '/fixtures/ghost.after.json', step());
+  }, function (actual, expected) {
     say(expected);
     say(actual);
 
@@ -37,11 +39,13 @@ require('./proof')(5, function (step, Strata, tmp, deepEqual) {
   }, function () {
     strata.iterator('a', step());
   }, function (cursor) {
-    cursor.next(step())
-  }, function (next, cursor, equal) {
-    equal(cursor.offset, 1, 'ghosted');
-    cursor.unlock();
-  }, function (gather) {
+    step(function () {
+      cursor.next(step())
+    }, function (next) {
+      equal(cursor.offset, 1, 'ghosted');
+      cursor.unlock();
+    });
+  }, function () {
     gather(step, strata);
   }, function (records) {
     deepEqual(records, [ 'a', 'b', 'd' ], 'reopened');

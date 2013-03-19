@@ -1,31 +1,33 @@
 #!/usr/bin/env node
 
-require('./proof')(4, function (step, Strata, tmp, deepEqual) {
+require('./proof')(4, function (step, Strata,
+    tmp, equal, deepEqual, serialize, gather, load, objectify, say) {
   var strata = new Strata(tmp, { leafSize: 3, branchSize: 3 }), fs = require('fs');
-  step(function (serialize) { 
+  step(function () { 
     serialize(__dirname + '/fixtures/merge.before.json', tmp, step());
   }, function () {
     strata.open(step());
   }, function () {
     strata.mutator('a', step());
   }, function (cursor) {
-    cursor.remove(cursor.index, step());
-  }, function (step, cursor, equal) {
-    equal(cursor.index, 0, 'unghostable');
-    cursor.unlock()
-  }, function (gather) {
+    step(function () {
+      cursor.remove(cursor.index, step());
+    }, function () {
+      equal(cursor.index, 0, 'unghostable');
+      cursor.unlock()
+    });
+  }, function () {
     gather(step, strata);
   }, function (records) {
     deepEqual(records, [ 'b', 'c', 'd' ], 'records');
     strata.balance(step());
-  }, function (gather) {
+  }, function () {
     gather(step, strata);
-  }, function (records, load) {
+  }, function (records) {
     deepEqual(records, [ 'b', 'c', 'd' ], 'merged');
-    load(__dirname + '/fixtures/left-most-unghostable.after.json', step());
-  }, function (expected, objectify) {
     objectify(tmp, step());
-  }, function (actual, expected, say) {
+    load(__dirname + '/fixtures/left-most-unghostable.after.json', step());
+  }, function (actual, expected) {
     say(expected);
     say(actual);
 

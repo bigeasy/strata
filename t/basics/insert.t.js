@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-require("./proof")(4, function (step, tmp) {
+require("./proof")(4, function (step, tmp, Strata, ok, equal, load, objectify, say, deepEqual) {
   var fs = require("fs"), strata;
 
-  step(function (Strata) {
+  step(function () {
 
     strata = new Strata(tmp, { leafSize: 3, branchSize: 3 });
     strata.create(step());
@@ -14,27 +14,28 @@ require("./proof")(4, function (step, tmp) {
 
   }, function (cursor) {
 
-    cursor.insert("a", "a", ~ cursor.index, step());
+    step(function () {
 
-  }, function (inserted, cursor, ok, equal) {
+      cursor.insert("a", "a", ~ cursor.index, step());
 
-    ok(inserted, "inserted");
+    }, function (inserted) {
 
-    cursor.unlock()
+      ok(inserted, "inserted");
 
-    equal(strata.size, 32, "json size");
+      cursor.unlock()
 
-    strata.close(step());
+      equal(strata.size, 32, "json size");
 
-  }, function (load) {
+      strata.close(step());
 
-    load(__dirname + "/fixtures/insert.json", step());
+    });
 
-  }, function (expected, objectify) {
+  }, function () {
 
     objectify(tmp, step());
+    load(__dirname + "/fixtures/insert.json", step());
 
-  }, function (actual, expected, say, deepEqual) {
+  }, function (actual, expected) {
 
     say(expected);
     say(actual);

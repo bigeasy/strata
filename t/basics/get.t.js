@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 var fs = require("fs"), strata;
-require("./proof")(7, function (tmp, equal, step) {
+require("./proof")(7, function (tmp, equal, step, Strata, ok) {
   step(function () {
 
     fs.writeFile(tmp + "/segment00000000", JSON.stringify([-1]) + " -\n", "utf8", step());
@@ -12,36 +12,39 @@ require("./proof")(7, function (tmp, equal, step) {
                JSON.stringify([1,1,2,"a"]) + " -\n";
     fs.writeFile(tmp + "/segment00000001", body, "utf8", step());
 
-  }, function (Strata) {
+  }, function () {
 
     strata = new Strata(tmp, { leafSize: 3, branchSize: 3 });
     strata.open(step());
 
-  }, function (equal) {
+  }, function () {
 
     equal(strata.size, 0, "json size before read");
 
     strata.iterator("a", step());
 
-  }, function (cursor, ok) {
+  }, function (cursor) {
 
-    ok(! cursor.exclusive, "shared");
-    equal(cursor.index, 0, "index");
-    equal(cursor.offset, 0, "offset");
-    
+    step(function () {
 
-    cursor.get(cursor.offset, step());
+      ok(! cursor.exclusive, "shared");
+      equal(cursor.index, 0, "index");
+      equal(cursor.offset, 0, "offset");
+      
 
-  }, function (got, cursor) {
+      cursor.get(cursor.offset, step());
 
-    equal(got, "a", "get");
-    equal(strata.size, 32, "json size after read");
+    }, function (got) {
 
-    cursor.unlock();
+      equal(got, "a", "get");
+      equal(strata.size, 32, "json size after read");
 
-    strata.purge(0);
-    equal(strata.size, 0, "page");
+      cursor.unlock();
 
-    strata.close(step());
+      strata.purge(0);
+      equal(strata.size, 0, "page");
+
+      strata.close(step());
+    });
   });
 });

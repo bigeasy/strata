@@ -1,25 +1,28 @@
 #!/usr/bin/env node
 var fs = require('fs');
-require('./proof')(3, function (Strata, step, tmp,  load, objectify, _) {
+require('./proof')(3, function (Strata, step, tmp,  load, objectify, serialize, gather, deepEqual) {
   var strata = new Strata(tmp, { leafSize: 3, branchSize: 3 });
-  step(function (serialize) {
+  step(function () {
     serialize(__dirname + '/fixtures/split.before.json', tmp, step());
   }, function () {
     strata.open(step());
-  }, function (step, gather) {
+  }, function () {
     gather(step, strata);
-  }, function (records, deepEqual) {
+  }, function (records) {
     deepEqual(records, [ "a", "c", "d" ], "records");
   }, function () {
     strata.mutator("a", step());
   }, function (cursor) {
-    cursor.indexOf("c", step())
-  }, function (i, cursor) {
-    cursor.remove(i, step());
-  }, function (step, gather, cursor) {
-    cursor.unlock()
+    step(function () {
+      cursor.indexOf("c", step())
+    }, function (i) {
+      cursor.remove(i, step());
+    }, function () {
+      cursor.unlock()
+    });
+  }, function () {
     gather(step, strata);
-  }, function (records, deepEqual) {
+  }, function (records) {
     deepEqual(records, [ "a", "d" ], "records");
 
     strata.purge(0);

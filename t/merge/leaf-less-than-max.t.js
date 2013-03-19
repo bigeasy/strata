@@ -1,33 +1,34 @@
 #!/usr/bin/env node
 
-require('./proof')(3, function (step, Strata, tmp, deepEqual) {
+require('./proof')(3, function (step, Strata, tmp, deepEqual, serialize, gather, load, objectify, say) {
   var strata = new Strata(tmp, { leafSize: 3, branchSize: 3 }), fs = require('fs');
-  step(function (serialize) { 
+  step(function () {
     serialize(__dirname + '/fixtures/merge.before.json', tmp, step());
   }, function () {
     strata.open(step());
   }, function () {
     strata.mutator('b', step());
   }, function (cursor) {
-    cursor.remove(cursor.index, step());
-  }, function (step, cursor) {
-    cursor.next(step());
-  }, function (step, cursor) {
-    cursor.indexOf('d', step());
-  }, function (index, cursor, gather) {
-    cursor.remove(index, step());
-    cursor.unlock();
-  }, function (gather) {
+    step(function () {
+      cursor.remove(cursor.index, step());
+    }, function () {
+      cursor.next(step());
+    }, function () {
+      cursor.indexOf('d', step());
+    }, function (index) {
+      cursor.remove(index, step());
+      cursor.unlock();
+    });
+  }, function () {
     gather(step, strata);
   }, function (records) {
     deepEqual(records, [ 'a', 'c' ], 'records');
   }, function () {
     strata.balance(step());
-  }, function (load) {
-    load(__dirname + '/fixtures/leaf-less-than-max.after.json', step());
-  }, function (actual, objectify) {
+  }, function () {
     objectify(tmp, step());
-  }, function (expected, actual, say, gather) {
+    load(__dirname + '/fixtures/leaf-less-than-max.after.json', step());
+  }, function (expected, actual) {
     say(expected);
     say(actual);
 

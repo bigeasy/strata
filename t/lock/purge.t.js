@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
-require("./proof")(4, function (step, ok, equal, Strata, tmp, deepEqual, say, die) {
+require("./proof")(4, function (step, ok, equal, Strata, tmp, deepEqual,
+  say, serialize, gather, load, objectify) {
   var strata, purge, count = 0;
 
   function tracer (type, report, callback) {
@@ -19,7 +20,7 @@ require("./proof")(4, function (step, ok, equal, Strata, tmp, deepEqual, say, di
     }
   }
 
-  step(function (serialize) {
+  step(function () {
 
     serialize(__dirname + '/fixtures/tree.before.json', tmp, step());
 
@@ -76,7 +77,7 @@ require("./proof")(4, function (step, ok, equal, Strata, tmp, deepEqual, say, di
       cursor.unlock();
 
     });
-  }, function (gather) {
+  }, function () {
 
     gather(step, strata);
 
@@ -85,15 +86,12 @@ require("./proof")(4, function (step, ok, equal, Strata, tmp, deepEqual, say, di
     deepEqual(records, [ 'a', 'b', 'c', 'd',  'f', 'j', 'k', 'l', 'm', 'n' ], 'records');
     strata.balance(step());
 
-  }, function (load) {
-
-    load(__dirname + '/fixtures/tree.after.json', step());
-
-  }, function (expected, objectify) {
+  }, function () {
 
     objectify(tmp, step());
+    load(__dirname + '/fixtures/tree.after.json', step());
 
-  }, function (actual, expected, say) {
+  }, function (actual, expected) {
 
     deepEqual(actual, expected, 'merge');
 

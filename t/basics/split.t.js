@@ -1,29 +1,33 @@
 #!/usr/bin/env node
 
-require("./proof")(3, function (step, tmp) {
+require("./proof")(3, function (step, tmp, serialize, deepEqual, load, objectify, say, Strata, gather) {
   var fs = require("fs"), strata, records = [];
 
-  step(function (serialize) {
+  step(function () {
     serialize(__dirname + "/fixtures/split.before.json", tmp, step());
-  }, function (Strata) {
+  }, function () {
     strata = new Strata(tmp, { leafSize: 3, branchSize: 3 });
     strata.open(step());
   }, function () {
     strata.mutator("b", step());
   }, function (cursor) {
-    cursor.insert("b", "b", ~ cursor.index, step());
-  }, function ($1, cursor, gather) {
-    cursor.unlock();
-    gather(step, strata);
-  }, function (records, deepEqual) {
+    step(function () {
+      cursor.insert("b", "b", ~ cursor.index, step());
+    }, function () {
+      cursor.unlock();
+      gather(step, strata);
+    });
+  }, function (records) {
     deepEqual(records, [ "a", "b", "c", "d" ], "records");
   }, function () {
     strata.balance(step());
-  }, function (load) {
-    load(__dirname + "/fixtures/split.after.json", step());
-  }, function (expected, objectify) {
+  }, function () {
+
     objectify(tmp, step());
-  }, function(actual, expected, say, deepEqual) {
+    load(__dirname + "/fixtures/split.after.json", step());
+
+  }, function(actual, expected) {
+
     say(expected);
     say(actual);
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 var fs = require("fs"), strata;
-require("./proof")(5, function (Strata, equal, deepEqual, say, tmp, step) {
+require("./proof")(5, function (Strata, equal, deepEqual, say, tmp, step, ok, load, objectify) {
   step(function () {
 
     strata = new Strata(tmp, { leafSize: 3, branchSize: 3 });
@@ -12,14 +12,11 @@ require("./proof")(5, function (Strata, equal, deepEqual, say, tmp, step) {
     equal(strata.size, 4, "json size");
     strata.close(step());
     
-  }, function (ok, load) {
+  }, function () {
 
     ok(1, "created");
-    load(__dirname + "/fixtures/create.after.json", step());
-
-  }, function (expected, objectify) {
-
     objectify(tmp, step());
+    load(__dirname + "/fixtures/create.after.json", step());
 
   }, function (actual, expected) {
 
@@ -35,7 +32,7 @@ require("./proof")(5, function (Strata, equal, deepEqual, say, tmp, step) {
 
     strata.iterator("a", step());
 
-  }, function (cursor, equal) {
+  }, function (cursor) {
 
     equal(cursor.length - cursor.offset, 0, "empty");
 

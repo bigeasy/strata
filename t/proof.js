@@ -73,25 +73,28 @@ function insert (step, strata, values) {
 }
 
 function gather (step, strata) {
-  var records = [];
+  var records = [], page, item;
   step(function () {
     records = []
     strata.iterator("a", step());
   }, function (cursor) {
-    return true;
-  }, function page (more, cursor) {
-    if (more) return cursor.offset;
-    cursor.unlock();
-    step(null, records);
-  }, function item (i, cursor, page) {
-    if (i < cursor.length) {
-      cursor.get(i, step()); 
-    } else {
-      cursor.next(step(page));
-    }
-  }, function (record, i, item) {
-    records.push(record);
-    step(item)(null, i + 1);
+    step(function () {
+      return true;
+    }, page = function (more) {
+      if (more) return cursor.offset;
+      cursor.unlock();
+      step(null, records);
+    }, item = function (i) {
+      if (i < cursor.length) {
+        cursor.get(i, step()); 
+        step()(null, i);
+      } else {
+        cursor.next(step(page));
+      }
+    }, function (record, i) {
+      records.push(record);
+      step(item)(null, i + 1);
+    });
   });
 }
 
@@ -165,7 +168,7 @@ function deltree (directory, callback) {
 
 module.exports = function (dirname) {
   var tmp = dirname + "/tmp";
-  return require("proof")(function cleanup (step) {
+  return require("proof")(function (step) {
     deltree(tmp, step());
   }, function (step) {
     step(function () {

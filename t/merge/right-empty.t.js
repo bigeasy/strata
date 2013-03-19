@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
-require('./proof')(3, function (step, Strata, tmp, deepEqual) {
+require('./proof')(3, function (step, Strata, tmp, deepEqual, serialize, gather, load, objectify, say) {
   var strata = new Strata(tmp, { leafSize: 3, branchSize: 3 }), fs = require('fs');
-  step(function (serialize) { 
+  step(function () { 
     serialize(__dirname + '/fixtures/merge.before.json', tmp, step());
   }, function () {
     strata.open(step());
@@ -19,22 +19,21 @@ require('./proof')(3, function (step, Strata, tmp, deepEqual) {
       cursor.remove(index, step());
       cursor.unlock();
     });
-  }, function (gather) {
+  }, function () {
     gather(step, strata);
   }, function (records) {
     deepEqual(records, [ 'a', 'b' ], 'records');
 
     strata.balance(step());
-  }, function (load) {
-    load(__dirname + '/fixtures/right-empty.after.json', step());
-  }, function (expected, objectify) {
+  }, function () {
     objectify(tmp, step());
-  }, function (actual, expected, say) {
+    load(__dirname + '/fixtures/right-empty.after.json', step());
+  }, function (actual, expected) {
     say(expected);
     say(actual);
 
     deepEqual(actual, expected, 'merge');
-  }, function (gather) {
+  }, function () {
     gather(step, strata);
   }, function (records) {
     deepEqual(records, [ 'a', 'b' ], 'merged');

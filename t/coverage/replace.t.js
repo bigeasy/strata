@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require("./proof")(1, function (step, Strata, deepEqual, tmp, insert, load, objectify, equal) {
+require("./proof")(1, function (step, Strata, deepEqual, tmp, insert, load, objectify, equal, serialize) {
 
   function forward (name) { return function () { return fs[name].apply(fs, arguments) } }
 
@@ -16,14 +16,14 @@ require("./proof")(1, function (step, Strata, deepEqual, tmp, insert, load, obje
   }
   var strata = new Strata(tmp, { fs: proxy, leafSize: 3 });
 
-  step(function (serialize) {
+  step(function () {
     serialize(__dirname + "/../basics/fixtures/split.before.json", tmp, step());
   }, function () {
     strata.open(step());
   }, function () {
     insert(step, strata, [ "b" ]);
   }, function () {
-    strata.balance(step());
+    strata.balance(step(Error));
   }, function (error) {
     equal(error.code, "EACCES", "unlink error");
   });
