@@ -1018,7 +1018,7 @@ function Strata (directory, options) {
         if (index > 0) {
           splice(page, index - 1, 0, position);
         } else if (~index == 0 && page.address != -1) {
-          if (page.ghosts) throw new Error("double ghosts");
+          ok(!page.ghosts, "double ghosts");
           page.ghosts++
         } else {
           splice(page, -(index + 1), 1);
