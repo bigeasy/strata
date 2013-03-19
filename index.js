@@ -973,9 +973,7 @@ function Strata (directory, options) {
     function iterate (read) {
       var eos, entry, index, position;
       end -= read
-      if (buffer[--read] != 0x0A) {
-        throw new Error("corrupt leaves: no newline at end of file");
-      }
+      ok(buffer[--read] == 0x0A, "corrupt leaves: no newline at end of file");
       eos = read;
       while (read != 0) {
         read = read - 1
