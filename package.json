@@ -5,8 +5,8 @@
 , "keywords" : ["btree", "database", "json", "b-tree"]
 , "author" : "Alan Gutierrez <alan@prettyrobots.com>"
 , "contributors" : []
-, "devDependencies": { "proof": "0.0.26" }
-, "scripts" : { "test": "proof t/*/*.t.js" }
+, "devDependencies": { "proof": "0.0.27" }
+, "scripts" : { "test": "proof test t/*/*.t.js" }
 , "engines" : { "node": "> 0.8.0" }
 , "homepage": "https://github.com/bigeasy/strata"
 , "licenses": [
