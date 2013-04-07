@@ -4,6 +4,10 @@ var fs = require("fs"), strata;
 require("./proof")(5, function (Strata, equal, deepEqual, say, tmp, step, ok, load, objectify) {
   step(function () {
 
+    fs.writeFile(tmp + '/.ignore', '', 'utf8', step());
+
+  }, function () {
+
     strata = new Strata(tmp, { leafSize: 3, branchSize: 3 });
     strata.create(step());
 
