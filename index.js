@@ -298,6 +298,7 @@ function Strata (directory, options) {
     , crypto
     , constructors = {}
     , tracer = options.tracer || function () { arguments[2]() }
+    , readRecordStartLength = options.readRecordStartLength || 1024
     ;
 
   switch (hash) {
@@ -1079,7 +1080,7 @@ function Strata (directory, options) {
 
   //
   function readRecord (page, position, callback) {
-    var buffer, record, fd, check = validator(callback), length = 1024;
+    var record, length = readRecordStartLength, check = validator(callback);
 
     if (page.position) positioned();
     else fs.stat(filename(page.address), check(stat));
@@ -1093,29 +1094,24 @@ function Strata (directory, options) {
       fs.open(filename(page.address), "r", check(input));
     }
 
-    function input ($) {
-      buffer = new Buffer(length);
-      fs.read(fd = $, buffer, 0, buffer.length, position, check(read));
-    }
+    function input (fd) {
+      read();
 
-    function read (read) {
-      var entry;
-      if (entry = readJSON(buffer, read)) {
-        record = entry.pop();
-        close();
-      } else if (length > page.position - position) {
-        callback(new Error("cannot find end of record."));
-      } else if (length > page.position - position) {
-        length += length >>> 1
-        input(fd);
-      } else {
-        // TODO
-        callback(new Error("unknown error"));
+      function read () {
+        fs.read(fd, new Buffer(length), 0, length, position, check(json));
       }
-    }
 
-    function close () {
-      fs.close(fd, check(closed));
+      function json (bytes, buffer) {
+        var entry;
+        if (entry = readJSON(buffer, bytes)) {
+          record = entry.pop();
+          fs.close(fd, check(closed));
+        } else {
+          ok(length <= page.position - position, "cannot find end of record.");
+          length = length << 1
+          read();
+        }
+      }
     }
 
     function closed() {
