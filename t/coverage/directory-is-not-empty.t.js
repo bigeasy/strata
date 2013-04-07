@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 
-require("./proof")(1, function (step, Strata, equal, ok, tmp) {
+require("./proof")(1, function (step, Strata, ok) {
   
   var strata = new Strata(__dirname, {});
 
   step(function () {
     strata.create(step(Error));
   }, function (error) {
-    equal(error.message, 'database /home/alan/git/ecma/strata/t/coverage is not empty.', 'directory not empty');
+    ok(/database .* is not empty\./.test(error.message), 'directory not empty');
   });
 });
