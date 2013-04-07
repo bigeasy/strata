@@ -1764,15 +1764,12 @@ function Strata (directory, options) {
 
     locks = page.locks
     if (exclusive) {
-      if (! locks.length % 2) {
-        callback(new Error("already locked"));
-      } else {
-        locks.push([ callback ]);
-        locks.push([]);
-        if (locks[0].length == 0) {
-          locks.shift()
-          load(page, callback);
-        }
+      ok(locks.length % 2, "already locked exclusive");
+      locks.push([ callback ]);
+      locks.push([]);
+      if (locks[0].length == 0) {
+        locks.shift()
+        load(page, callback);
       }
     } else {
       locks[locks.length - 1].push(callback);
