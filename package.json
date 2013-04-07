@@ -6,7 +6,7 @@
 , "author" : "Alan Gutierrez <alan@prettyrobots.com>"
 , "contributors" : []
 , "devDependencies": { "proof": "0.0.27" }
-, "scripts" : { "test": "proof test t/*/*.t.js" }
+, "scripts" : { "test": "proof platform win32 && proof test */*/*.t.js || t/test" }
 , "engines" : { "node": "> 0.8.0" }
 , "homepage": "https://github.com/bigeasy/strata"
 , "licenses": [
