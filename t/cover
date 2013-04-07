@@ -9,7 +9,7 @@ for file in $(find t -name \*.t.js); do
   count=$(expr $count + 1)
 done
 
-node_modules/.bin/istanbul report --root coverage --dir coverage
+node_modules/.bin/istanbul report --root coverage --dir coverage > /dev/null
 
 sed -i -e s,'^SF:'`pwd`/,SF:, coverage/lcov.info
 
