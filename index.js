@@ -1904,20 +1904,13 @@ function Strata (directory, options) {
   //
   var _unlock = unlock;
 
-  function pluck (callback, ok) {
-    return function (error, result) {
-      if (error) callback(error);
-      else callback(null, ok(result));
-    }
-  }
-
   // Read a record cache entry from the cache. Load the record and cache it of
   // it is not already cached.
   function stash (page, position, callback) {
     var stash;
     if (!(stash = page.cache[position])) {
-      readRecord(page, position, pluck(callback, function (record) {
-        return cacheRecord(page, position, record);
+      readRecord(page, position, check(callback, function (record) {
+        callback(null, cacheRecord(page, position, record));
       }));
     } else {
       callback(null, stash);
@@ -1939,8 +1932,8 @@ function Strata (directory, options) {
   function designate (page, index, callback) {
     var key;
     if (page.address < 0) {
-      stash(page, page.positions[index], pluck(callback, function (entry) {
-        return entry.key;
+      stash(page, page.positions[index], check(callback, function (entry) {
+        callback(null, entry.key);
       }));
     } else if (!(key = page.cache[page.addresses[index]])) {
       var iter = page
