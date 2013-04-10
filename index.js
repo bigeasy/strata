@@ -4131,16 +4131,13 @@ function Strata (directory, options) {
     function exorcise (page, callback) {
       var fd, check = validator(callback);
 
-      if (page.ghosts) shift()
-      else callback(null, false);
+      ok(page.ghosts, "no ghosts");
 
       // Remove the ghosted record from the references array and the record cache.
-      function shift () {
-        uncacheRecord(page, splice(page, 0, 1).shift());
-        page.ghosts = 0
+      uncacheRecord(page, splice(page, 0, 1).shift());
+      page.ghosts = 0
 
-        fs.open(filename(page.address), 'a', 0644, check(opened));
-      }
+      fs.open(filename(page.address), 'a', 0644, check(opened));
 
       function opened (fd) {
         writePositions(fd, page, check(written));
