@@ -1797,9 +1797,8 @@ function Strata (directory, options) {
       }
       for (position in page.cache) {
         object = page.cache[position];
-        if (object.size != JSON.stringify({ record: object.record, key: object.key }).length) {
-          throw new Error("sizes are wrong");
-        }
+        ok(object.size == JSON.stringify({ record: object.record, key: object.key }).length,
+          "sizes are wrong");
         size += object.size
       }
     } else {
