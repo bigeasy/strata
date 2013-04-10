@@ -81,3 +81,10 @@ Maybe rename `deleteGhost` to `shiftGhost`.
 
 Why does the length need to be stored in the page. Can't the balancer grab the
 length into it's nodes? Yes. It is opportunistic. Probably much simpiler.
+
+## Shifting Ghosts
+
+What is so important about deleting ghosts? It seems like a silly tidy when
+we've yet to implement vacuum. I suppose it makes vacuum easier because vacuum
+will always faithfully rewrite the page, ghosts and all, so it can move across
+the leaves without descending.
