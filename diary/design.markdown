@@ -88,3 +88,11 @@ What is so important about deleting ghosts? It seems like a silly tidy when
 we've yet to implement vacuum. I suppose it makes vacuum easier because vacuum
 will always faithfully rewrite the page, ghosts and all, so it can move across
 the leaves without descending.
+
+## Inbox
+
+ * `nextTick` behavior ought to make coverage happen quickly, especially a
+ combination of `nextTick` behavior and purge.
+ * Splitting out the read write lock would create an additional primitive for
+ database design.
+ * Creating a r-tree would be yet another primitive for database design.
