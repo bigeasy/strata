@@ -1893,7 +1893,7 @@ function Strata (directory, options) {
       // Each callback is scheduled using next tick. If any callback waits on
       // I/O, then another one will resume. Concurrency.
       locks[0].forEach(function (callback) {
-        process.nextTick(function () { callback(error, page) });
+        process.nextTick(function () { callback(null, page) });
       });
     }
   }
