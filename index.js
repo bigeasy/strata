@@ -3545,14 +3545,6 @@ function Strata (directory, options) {
         return right;
       }
 
-      // Link a node to the right of a node.
-      function link (node, right) {
-        if (right) {
-          right.left = node
-          node.right = right
-        }
-      }
-
       // Unlink a node.
       function unlink (node) {
         terminate(node.left);
