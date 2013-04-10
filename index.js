@@ -3282,7 +3282,7 @@ function Strata (directory, options) {
       , operations = []
       , referenced = {}
       , ordered = {}
-      , ghosts = []
+      , ghosts = {}
       , methods = {}
       ;
 
