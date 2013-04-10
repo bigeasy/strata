@@ -2393,7 +2393,8 @@ function Strata (directory, options) {
     return objectify.call(this, descend, fork, exclude, upgrade,
                                 key, left, right,
                                 found, address, child, penultimate, leaf, level,
-                                _page, _depth, _index, index_, _indexes, _lesser, _greater, unlocker_);
+                                _page, _depth, _index, index_, _indexes, _lesser, _greater,
+                                uncaching_, unlocker_);
   }
 
 
