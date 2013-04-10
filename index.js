@@ -3427,7 +3427,7 @@ function Strata (directory, options) {
         // Linking to sibling nodes is not performed here.
         function nodify (next) {
           return check(function (page) {
-            if (page.address > 0) throw new Error();
+            ok(page.address < 0, "leaf page expected");
             designate(page, 0, check(identified));
             function identified (key) {
               node = { key: key,
@@ -3617,7 +3617,7 @@ function Strata (directory, options) {
         // Schedule the merge. Note that a leaf page merged into its left
         // sibling will be destroyed, so we don't have to tidy up its ghosts.
         if (node.right) {
-          if (node.right.right) throw Error();
+          ok(!node.right.right, "merge pair still linked to sibling");
           operations.push({
             method: "mergeLeaves",
             parameters: [ node.right.key, lengths, !!ghosts[node.address] ]
