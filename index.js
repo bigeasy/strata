@@ -3301,7 +3301,6 @@ function Strata (directory, options) {
     // it will be split. Of course, if it the order of the page, it can not be
     // merged, nor should it be split.
     function unbalanced (page, force) {
-      if (page.address > 0) throw new Error();
       if (force) {
         lengths[page.address] = options.leafSize;
       } else if (lengths[page.address] == null) {
