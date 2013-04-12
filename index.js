@@ -298,7 +298,6 @@ function Strata (directory, options) {
     , crypto
     , constructors = {}
     , tracer = options.tracer || function () { arguments[2]() }
-    , readRecordStartLength = options.readRecordStartLength || 1024
     ;
 
   switch (hash) {
@@ -1080,7 +1079,9 @@ function Strata (directory, options) {
 
   //
   function readRecord (page, position, callback) {
-    var record, length = readRecordStartLength, check = validator(callback);
+    var length = options.readRecordStartLength || 1024,
+        check = validator(callback),
+        record;
 
     if (page.position) positioned();
     else fs.stat(filename(page.address), check(stat));
