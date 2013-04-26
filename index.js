@@ -3451,7 +3451,7 @@ function Strata (directory, options) {
         function linkCachedSibling (node) {
           var right;
 
-          if (! node.rightAddress && (right = ordered[node.rightAddress])) {
+          if (node.rightAddress && (right = ordered[node.rightAddress])) {
             node.right = right
             right.left = node
           }
