@@ -3373,9 +3373,8 @@ function Strata (directory, options) {
       var check = validator(callback), address;
 
       // We only ever run one balance at a time. If there is a balance in
-      // progress, we do not proceed. We do note that a subsequent balance has
-      // been requested, so that we can continue to balance.
-      if (balancing) return;
+      // progress, we do not proceed.
+      if (balancing) return callback(null);
 
       // We do not proceed if there is nothing to consider.
       var addresses = Object.keys(lengths);
