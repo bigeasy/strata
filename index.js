@@ -2716,7 +2716,7 @@ function Strata (directory, options) {
 
         //
         if (sibling) {
-          identify(sibling);
+          load(sibling);
         } else {
           lock(page.right, exclusive, check(load));
         }

@@ -10,7 +10,7 @@ require('./proof')(4, function (step, Strata,
   }, function () {
     gather(step, strata);
   }, function (records) {
-    deepEqual(records, [ 'a', 'b', 'd', 'f', 'g', 'h', 'i', 'l', 'm', 'n' ], 'records');
+    deepEqual(records, [ 'a', 'd', 'f', 'g', 'h', 'i', 'l', 'm', 'n' ], 'records');
   }, function () {
     strata.mutator('g', step());
   }, function (cursor) {
@@ -21,7 +21,7 @@ require('./proof')(4, function (step, Strata,
       gather(step, strata);
     });
   }, function (records) {
-    deepEqual(records, [ 'a', 'b', 'd', 'f', 'h', 'i', 'l', 'm', 'n' ], 'records after delete');
+    deepEqual(records, [ 'a', 'd', 'f', 'h', 'i', 'l', 'm', 'n' ], 'records after delete');
     strata.mutator('j', step());
   }, function (cursor) {
     step(function () {
@@ -33,7 +33,7 @@ require('./proof')(4, function (step, Strata,
       gather(step, strata);
     });
   }, function (records) {
-    deepEqual(records, [ 'a', 'b', 'd', 'f', 'h', 'i', 'j', 'l', 'm', 'n' ], 'records after insert');
+    deepEqual(records, [ 'a', 'd', 'f', 'h', 'i', 'j', 'l', 'm', 'n' ], 'records after insert');
   }, function() {
     strata.close(step());
   });

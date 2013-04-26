@@ -9,7 +9,7 @@ require('./proof')(3, function (step, Strata, tmp, deepEqual, serialize, gather,
   }, function () {
     gather(step, strata);
   }, function (records) {
-    deepEqual(records, [ 'a', 'b', 'd', 'f', 'g', 'h', 'i', 'l', 'm', 'n' ], 'records');
+    deepEqual(records, [ 'a', 'd', 'f', 'g', 'h', 'i', 'l', 'm', 'n' ], 'records');
   }, function () {
     strata.mutator('a', step());
   }, function (cursor) {
@@ -30,7 +30,7 @@ require('./proof')(3, function (step, Strata, tmp, deepEqual, serialize, gather,
   }, function () {
     gather(step, strata);
   }, function (records) {
-    deepEqual(records, [ 'a', 'b', 'd', 'f', 'g', 'h', 'i', 'l', 'm', 'n', 'z' ], 'records after insert');
+    deepEqual(records, [ 'a', 'd', 'f', 'g', 'h', 'i', 'l', 'm', 'n', 'z' ], 'records after insert');
   }, function() {
     strata.close(step());
   });
