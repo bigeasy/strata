@@ -936,7 +936,7 @@ function Strata (directory, options) {
       // object.
       , cache     = {}
       , line      = ""
-      , buffer    = new Buffer(1024)
+      , buffer    = new Buffer(options.readLeafStartLength || 1024)
       , end
       , eol
       , start
