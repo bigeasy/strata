@@ -2680,9 +2680,10 @@ function Strata (directory, options) {
     function insert (record, key, index, callback) {
       var check = validator(callback), unambiguous;
 
-      // On every leaf page except the first leaf page, the least record is the
-      // key, and inserted records are always greater than the key. We assert
-      // this here. Do not catch this exception, debug your code.
+      // On every leaf page except the first leaf page of the descent (not of
+      // the entire tree), the least record is the key, and inserted records are
+      // always greater than the key. We assert this here. Do not catch this
+      // exception, debug your code.
       ok(index != 0 || page.address == -1, "lesser key");
 
       // An insert location is ambiguous if it would append the record to the
