@@ -3419,8 +3419,8 @@ function Strata (directory, options) {
         //
         // We are always allowed to get a lock on a single page, so long as
         // we're holding no other locks.
-        if (node = ordered[address]) linkCachedSibling(node);
-        else lock(address, false, nodify(linkCachedSibling));
+        if (node = ordered[address]) checkMerge(node);
+        else lock(address, false, nodify(checkMerge));
 
         // Build a callback function that will add a leaf page to our collection
         // of gathered pages, then invoke the `next` function passing the
@@ -3443,20 +3443,6 @@ function Strata (directory, options) {
               check(function () { next(node) }, "reference", balancerReport)(null);
             }
           });
-        }
-
-        // Save us the trouble of possibly going left for a future count, if we
-        // have an opportunity to make that link from the right free of a
-        // descent.
-        function linkCachedSibling (node) {
-          var right;
-
-          if (node.rightAddress && (right = ordered[node.rightAddress])) {
-            node.right = right
-            right.left = node
-          }
-
-          checkMerge(node);
         }
 
         // If the page has shrunk in size, we gather the size of the left
@@ -3490,11 +3476,15 @@ function Strata (directory, options) {
           function attach (left) {
             left.right = node
             node.left = left
+          if (node.rightAddress && ordered[node.rightAddress])  {
+            console.log(node.rightAddress);
+          }
 
             rightSibling(node);
           }
         }
 
+        // Link the right sibling to examine for a possible merge.
         function rightSibling (node) {
           var right;
 
