@@ -3462,7 +3462,7 @@ function Strata (directory, options) {
           }
 
           // **FIXME**: Does the cache hit path release the lock on the descent?
-          // I dont' believe so.
+          // I don't believe so.
           function checkLists () {
             var left;
             if (left = ordered[descent.page.address]) {
