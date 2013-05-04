@@ -3446,10 +3446,20 @@ function Strata (directory, options) {
         }
 
         // If the page has shrunk in size, we gather the size of the left
-        // sibling page and the right sibling page. The right sibling page
+        // sibling page and the right sibling page to check to see if the
+        // page can be merged with its siblings.
+        //
+        // If it has not shrunk in size, we assume that the page will not merge
+        // with its siblings because if it could have merged with its siblings,
+        // it would have been merged by a previous balance. We will check the
+        // page for a split, but not a merge.
         function checkMerge(node) {
-          if (node.length - length < 0 && node.address != -1 && ! node.left) leftSibling(node);
-          else rightSibling(node);
+          if (node.length - length < 0) {
+            if (node.address != -1 && ! node.left) leftSibling(node);
+            else rightSibling(node);
+          } else {
+            next();
+          }
         }
 
         function leftSibling (node) {
