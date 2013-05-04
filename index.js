@@ -3486,9 +3486,6 @@ function Strata (directory, options) {
           function attach (left) {
             left.right = node
             node.left = left
-          if (node.rightAddress && ordered[node.rightAddress])  {
-            console.log(node.rightAddress);
-          }
 
             rightSibling(node);
           }
