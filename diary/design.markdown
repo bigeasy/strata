@@ -96,3 +96,4 @@ the leaves without descending.
  * Splitting out the read write lock would create an additional primitive for
  database design.
  * Creating a r-tree would be yet another primitive for database design.
+ * Naming functions build by validator `check` is confusing.
