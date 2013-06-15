@@ -314,8 +314,8 @@ function Strata (directory, options) {
   }
 
   function check (callback, forward, type, report) {
-    ok(forward, 'no forward function');
-    ok(callback,'no callback function');
+    ok(typeof forward == "function", 'no forward function');
+    ok(typeof callback == "function",'no callback function');
     return function (error) {
       if (error) {
         callback(error);
@@ -3514,7 +3514,7 @@ function Strata (directory, options) {
           if (addresses.length) {
             gather();
           } else {
-            plan(callback);
+            check(function () { plan(callback) }, "plan", balancerReport)(null);
           }
         }
       }
@@ -3713,9 +3713,13 @@ function Strata (directory, options) {
         // right?
         split = leaf.page;
 
-        if (split.length <= options.leafSize) cleanup();
-        // Otherwise we perform our split.
-        else partition();
+        if (split.positions.length - split.ghosts <= options.leafSize) {
+          balancer.unbalanced(split, true);
+          cleanup();
+        } else {
+          // Otherwise we perform our split.
+          partition();
+        }
       }
 
       function partition () {
