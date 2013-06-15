@@ -15,7 +15,6 @@ require("./proof")(4, function (step, ok, equal, Strata, tmp, deepEqual,
       callback();
       break;
     default:
-      say(trace.type);
       callback();
     }
   }
