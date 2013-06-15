@@ -310,10 +310,10 @@ function Strata (directory, options) {
   }
 
   function validator (callback) {
-    return function (forward, type, report) { return check(callback, forward, type, report) }
+    return function (forward, type, report) { return validate(callback, forward, type, report) }
   }
 
-  function check (callback, forward, type, report) {
+  function validate (callback, forward, type, report) {
     ok(typeof forward == "function", 'no forward function');
     ok(typeof callback == "function",'no callback function');
     return function (error) {
@@ -322,7 +322,7 @@ function Strata (directory, options) {
       } else {
         try {
           if (type && report) {
-            tracer(type, report, check(callback, forward));
+            tracer(type, report, validate(callback, forward));
           } else {
             forward.apply(null, __slice.call(arguments, 1));
           }
@@ -1498,7 +1498,7 @@ function Strata (directory, options) {
   //
   function readBranch (page, callback) {
     // Read addresses from JSON branch file.
-    fs.readFile(filename(page.address), "utf8", check(callback, function (file) {
+    fs.readFile(filename(page.address), "utf8", validate(callback, function (file) {
       // Splice addresses into page.
       splice(page, 0, 0, readLine(file))
       callback(null, page);
@@ -1910,7 +1910,7 @@ function Strata (directory, options) {
   function stash (page, position, callback) {
     var stash;
     if (!(stash = page.cache[position])) {
-      readRecord(page, position, check(callback, function (record) {
+      readRecord(page, position, validate(callback, function (record) {
         callback(null, cacheRecord(page, position, record));
       }));
     } else {
@@ -1933,7 +1933,7 @@ function Strata (directory, options) {
   function designate (page, index, callback) {
     var key;
     if (page.address < 0) {
-      stash(page, page.positions[index], check(callback, function (entry) {
+      stash(page, page.positions[index], validate(callback, function (entry) {
         callback(null, entry.key);
       }));
     } else if (!(key = page.cache[page.addresses[index]])) {
@@ -1947,13 +1947,13 @@ function Strata (directory, options) {
       function next () {
         var key;
         if (iter.address >= 0) {
-          lock(iter.addresses[iterIndex], false, check(callback, function (locked) {
+          lock(iter.addresses[iterIndex], false, validate(callback, function (locked) {
             iterIndex = 0;
             stack.push(iter = locked);
             next();
           }));
         } else {
-          stash(iter, iter.positions[iterIndex], check(callback, function (entry) {
+          stash(iter, iter.positions[iterIndex], validate(callback, function (entry) {
             stack.forEach(function (page) { unlock(page) });
             cacheKey(page, page.addresses[index], entry.key);
             callback(null, entry.key);
@@ -2239,7 +2239,7 @@ function Strata (directory, options) {
     function upgrade (callback) {
       unlock(page);
 
-      lock(page.address, exclusive = true, check(callback, locked));
+      lock(page.address, exclusive = true, validate(callback, locked));
 
       function locked (locked) {
         page = locked;
@@ -2516,7 +2516,7 @@ function Strata (directory, options) {
           locked(next);
         // Otherwise fetch the next page.
         } else {
-          lock(page.right, exclusive, check(callback, locked));
+          lock(page.right, exclusive, validate(callback, locked));
         }
       } else {
         callback(null, false);
@@ -4639,7 +4639,7 @@ function Strata (directory, options) {
 
         // Write out the left branch page. The generalized merge function will
         // handle the rest of the page rewriting.
-        writeBranch(pages.left.page, ".replace", check(callback, resume));
+        writeBranch(pages.left.page, ".replace", validate(callback, resume));
 
         // We invoke the callback with a `true` value indicating that we did
         // indeed merge some pages, so rewriting and propagation should be
