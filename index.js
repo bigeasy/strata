@@ -3567,13 +3567,6 @@ function Strata (directory, options) {
           operations.push({  method: "splitLeaf", parameters: [ node.key ] });
           // Unlink this split node, so that we don't consider it when merging.
           unlink(node);
-        // Lost a race condition. When we fetched pages, this page didn't need
-        // to be tested for merge, so we didn't grab its siblings, but it does
-        // now. We ask the next balancer to consider it as we found it.
-        } else if (
-          difference < 0
-          && ! ((node.address == -1 || node.left) && (node.rightAddress == 0 || node.right))) {
-          io.balancer.lengths[node.address] = length;
         }
       }
 
