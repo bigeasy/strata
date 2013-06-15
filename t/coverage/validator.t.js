@@ -2,7 +2,7 @@
 
 require("./proof")(2, function (Strata, equal, ok, tmp) {
 
-  strata = new Strata(__filename, {}) ;
+  var strata = new Strata(__filename, {}) ;
 
   strata.create(function (error) {
     ok(/is not a directory.$/.test(error.message), 'thrown');
