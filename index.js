@@ -1765,7 +1765,6 @@ function Strata (directory, options) {
 
     locks = page.locks
     if (exclusive) {
-      ok(locks.length % 2, "already locked exclusive");
       locks.push([ callback ]);
       locks.push([]);
       if (locks[0].length == 0) {
@@ -1886,10 +1885,11 @@ function Strata (directory, options) {
     // Note that it is not possible for this method to be called on an page that
     // has not already been loaded.
     checkJSONSize(page);
-    var locks = page.locks
-      , locked = locks[0];
-    locked.shift()
-    if (locked.length == 0 && locks.length != 1) {
+    var locks = page.locks;
+    locks[0].shift()
+    // Stop when we find a lock queue that has outstanding descents, or when we
+    // reach the final queue of shared locks.
+    while (locks[0].length == 0 && locks.length != 1) {
       locks.shift()
       // Each callback is scheduled using next tick. If any callback waits on
       // I/O, then another one will resume. Concurrency.
