@@ -1,5 +1,13 @@
 # Strata Design Diary
 
+ * It is worth nothing that we split a page into however many pages, we don't
+   recursively split, we could have, it would have been much easier, but we
+   didn't, so here we are. However, we don't merge however many pages at once,
+   mercifully, and I don't believe we're going to merge however many pages at
+   once any time soon.
+ * Need to be able to say that you can do big table with strata, so that means
+   that you set `leafSize` to a finite size and `branchSize` to size that is
+   never going to be reached; `Number.MAX_VALUE`.
  * Should `merger` accept a `left` and `right` argument?
  * Why is `designate` not defined in terms of itself?
  * Should `uncacheKey` or `uncacheRecord` be called automatically by `splice`?
