@@ -3,7 +3,7 @@
 require('./proof')(3, function (step, Strata, tmp, deepEqual, serialize, gather, load, objectify) {
   var strata = new Strata(tmp, { leafSize: 3, branchSize: 3 }), fs = require('fs');
   step(function () { 
-    serialize(__dirname + '/fixtures/branch-split.before.json', tmp, step());
+    serialize(__dirname + '/fixtures/branch.before.json', tmp, step());
   }, function () {
     strata.open(step());
   }, function () {
@@ -21,7 +21,7 @@ require('./proof')(3, function (step, Strata, tmp, deepEqual, serialize, gather,
     strata.balance(step());
   }, function () {
     objectify(tmp, step());
-    load(__dirname + '/fixtures/branch-split.after.json', step());
+    load(__dirname + '/fixtures/branch.after.json', step());
   }, function (actual, expected) {
     deepEqual(actual, expected, 'split');
 
