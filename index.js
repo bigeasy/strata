@@ -967,15 +967,11 @@ function Strata (directory, options) {
     // go to the disk to get something that we already have in memory, but it is
     // simpiler to adjust the offsets and reread that half a line.
     function input () {
-      if (end) {
-        start = end - buffer.length;
-        if (start < 0) start = 0;
-        offset = 0;
-        slice = buffer.slice(0, end - start);
-        load(0);
-      } else {
-        replay();
-      }
+      start = end - buffer.length;
+      if (start < 0) start = 0;
+      offset = 0;
+      slice = buffer.slice(0, end - start);
+      load(0);
     }
 
     function load (read) {
