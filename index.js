@@ -3866,7 +3866,7 @@ function Strata (directory, options) {
 
       //
       function rebalance () {
-        balancer.unbalanced(leaf, true);
+        balancer.unbalanced(leaf.page, true);
         balancer.unbalanced(page, true);
 
         cleanup();
