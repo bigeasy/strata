@@ -937,9 +937,12 @@ function Strata (directory, options) {
       , cache     = {}
       , line      = ""
       , buffer    = new Buffer(options.readLeafStartLength || 1024)
+      , slice     = buffer.slice(0, 0)
       , end
       , eol
       , start
+      , length
+      , offset = 0
       , read
       , fd
       , check = validator(callback);
@@ -954,32 +957,44 @@ function Strata (directory, options) {
     }
 
     function stat (stat) {
-      end = stat.size, eol = stat.size
+      start = stat.size, end = stat.size, eol = stat.size
       input();
     }
 
-    //
+    // As we read backwards through the leaf page file, we're going to have
+    // buffers that begin with half a line. My instinct is to save that half a
+    // line by copying it to the end of the buffer, because it seems wasteful to
+    // go to the disk to get something that we already have in memory, but it is
+    // simpiler to adjust the offsets and reread that half a line.
     function input () {
       if (end) {
-        end = eol;
         start = end - buffer.length;
         if (start < 0) start = 0;
-        fs.read(fd, buffer, 0, buffer.length, start, check(iterate));
+        offset = 0;
+        slice = buffer.slice(0, end - start);
+        load(0);
       } else {
         replay();
       }
     }
 
-    function iterate (read) {
-      var eos, entry, index, position;
-      end -= read
-      ok(buffer[--read] == 0x0A, "corrupt leaves: no newline at end of file");
-      eos = read;
-      while (read != 0) {
-        read = read - 1
-        if (buffer[read] == 0x0A || start == 0 && read == 0) {
-          entry = readLine(buffer.toString("utf8", read, eos));
-          eos   = read;
+    function load (read) {
+      if (read < slice.length - offset) {
+        offset += read;
+        fs.read(fd, slice, offset, slice.length - offset, start + offset, check(load));
+      } else {
+        iterate();
+      }
+    }
+
+    function iterate () {
+      var i = end - start, j = i, entry, index, position;
+      ok(buffer[--i] == 0x0A, "corrupt leaves: no newline at end of file");
+      while (i != 0) {
+        i = i - 1
+        if (buffer[i] == 0x0A || i == 0 && start == 0) {
+          entry = readLine(buffer.toString("utf8", i, j));
+          j = i + 1;
           index = entry.shift();
           if (index == 0) {
             entry.shift(); // leaf page file format version
@@ -987,10 +1002,10 @@ function Strata (directory, options) {
             page.ghosts = entry.shift();
             page.entries = entry.shift();
             positions = entry.shift();
-            end = 0;
-            break;
+            replay();
+            return;
           } else {
-            position = start + read + 1;
+            position = start + i + 1;
             if (index > 0) {
               cache[position] = entry.pop();
             }
@@ -998,7 +1013,7 @@ function Strata (directory, options) {
           }
         }
       }
-      eol = start + eos
+      end = start + j;
       input();
     }
 
