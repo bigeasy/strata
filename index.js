@@ -1778,6 +1778,9 @@ function Strata (directory, options) {
     // queue. Subsequent read lock callbacks are appended to the array in the
     // last element. This gives exclusive lock callbacks priority.
 
+    // If there were no locks outstanding, then it could be the case that page
+    // has not been loaded. Note that, if there were locks outstanding, then the
+    // page is already loaded, so we do not have to invoke load now or later.
     locks = page.locks
     if (exclusive) {
       locks.push([ callback ]);
