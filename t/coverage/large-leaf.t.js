@@ -17,7 +17,7 @@ require('./proof')(2, function (step, Strata, tmp, deepEqual, serialize, gather,
   }, function () {
     gather(step, strata);
   }, function (records) {
-    deepEqual(records, 'abcdefghijklmnopqrstuvwxyz'.split(''), 'records');
+    deepEqual(records, '_abcdefghijklmnopqrstuvwxyz'.split(''), 'records');
     strata.balance(step());
   }, function () {
     objectify(tmp, step());

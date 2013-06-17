@@ -76,7 +76,7 @@ function gather (step, strata) {
   var records = [], page, item;
   step(function () {
     records = []
-    strata.iterator("a", step());
+    strata.iterator(step());
   }, function (cursor) {
     step(function () {
       return true;

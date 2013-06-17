@@ -4744,7 +4744,7 @@ function Strata (directory, options) {
 
     // In theory, we can support null keys, since we can test to see if we've
     // been provided a key value by the arity of invocation.
-    sought = key.length ? descent.key(key[0]) : descend.left;
+    sought = key.length ? descent.key(key[0]) : descent.left;
 
     descent.descend(sought, descent.penultimate, check(penultimate));
 
