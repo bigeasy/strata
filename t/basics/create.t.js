@@ -15,7 +15,7 @@ require("./proof")(5, function (Strata, equal, deepEqual, say, tmp, step, ok, lo
 
     equal(strata.size, 4, "json size");
     strata.close(step());
-    
+
   }, function () {
 
     ok(1, "created");

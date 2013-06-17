@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 require("./proof")(1, function (step, Strata, equal, ok, tmp) {
-  
   var fs = require('fs'), path = require('path');
   var strata = new Strata(tmp, { checksum: "none" }) ;
 

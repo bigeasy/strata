@@ -26,7 +26,7 @@ require("./proof")(3, function (Strata, tmp, load, objectify, serialize, deepEqu
     }, function (actual, expected) {
       say(expected);
       say(actual);
-    
+
       deepEqual(actual, expected, "merge");
     }, function () {
       gather(step, strata);

@@ -30,7 +30,6 @@ require("./proof")(7, function (tmp, equal, step, Strata, ok) {
       ok(! cursor.exclusive, "shared");
       equal(cursor.index, 0, "index");
       equal(cursor.offset, 0, "offset");
-      
 
       cursor.get(cursor.offset, step());
 

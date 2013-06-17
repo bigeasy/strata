@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-/* 
- 
+/*
+
   ___ usage: en_US ___
   stratify [options]
 
@@ -10,7 +10,7 @@
   -d, --directory         [name]  Name of directory to store database.
 
   ___ usage ___
- 
+
  */
 
 var Strata = require('./index'), processing = false, queue = [ { type: 'create' } ];

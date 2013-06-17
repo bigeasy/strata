@@ -2,7 +2,7 @@
 
 require('./proof')(2, function (step, Strata, tmp, deepEqual, serialize, gather, load, objectify) {
   var strata = new Strata(tmp, { leafSize: 3, branchSize: 3 }), fs = require('fs');
-  step(function () { 
+  step(function () {
     serialize(__dirname + '/fixtures/large-leaf.before.json', tmp, step());
   }, function () {
     strata.open(step());

@@ -1552,7 +1552,7 @@ function Strata (directory, options) {
     }
 
     function empty (files) {
-      ok(!files.filter(function (f) { return ! /^\./.test(f) }).length, 
+      ok(!files.filter(function (f) { return ! /^\./.test(f) }).length,
          "database " + directory + " is not empty.");
 
       // Create a root branch with a single empty leaf.

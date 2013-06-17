@@ -30,7 +30,7 @@ function objectify (directory, callback) {
 
     function lines (lines) {
       lines = lines.split(/\n/);
-      lines.pop(); 
+      lines.pop();
       lines.forEach(function (json) {
         json = json.replace(/[\da-f]+$/, "");
         segments[file].push(JSON.parse(json));
@@ -86,7 +86,7 @@ function gather (step, strata) {
       step(null, records);
     }, item = function (i) {
       if (i < cursor.length) {
-        cursor.get(i, step()); 
+        cursor.get(i, step());
         step()(null, i);
       } else {
         cursor.next(step(page));
@@ -140,7 +140,7 @@ function deltree (directory, callback) {
 
   function list ($1) {
     (files = $1).forEach(function (file) {
-      stat(path.resolve(directory, file)); 
+      stat(path.resolve(directory, file));
     });
     deleted();
   }

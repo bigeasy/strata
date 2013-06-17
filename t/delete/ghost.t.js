@@ -3,7 +3,7 @@
 require('./proof')(5, function (step, Strata,
   tmp, deepEqual, serialize, gather, load, objectify, say, equal) {
   var strata = new Strata(tmp, { leafSize: 3, branchSize: 3 }), fs = require('fs');
-  step(function () { 
+  step(function () {
     serialize(__dirname + '/fixtures/delete.json', tmp, step());
   }, function () {
     strata.open(step());
