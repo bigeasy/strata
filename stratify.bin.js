@@ -40,6 +40,10 @@ require('arguable').parse(__filename, process.argv.slice(2), function (options) 
     });
   });
 
+  actions.balance = function (action, callback) {
+    strata.balance(callback);
+  }
+
   actions.stringify = cadence(function (step) {
     console.log('stringify');
   });
@@ -74,6 +78,9 @@ require('arguable').parse(__filename, process.argv.slice(2), function (options) 
           break;
         case '>':
           queue.push({ type: 'stringify' });
+          break;
+        case '~':
+          queue.push({ type: 'balance' });
           break;
         }
       });
