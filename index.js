@@ -4770,6 +4770,74 @@ function Strata (directory, options) {
 
   function balance (callback) { balancer.balance(callback) }
 
+  // Create an in memory mirror of a small b&#x2011tree for display. This is
+  // only intended for use against small trees for the sake of illustration.
+  function vivify (callback) {
+    var check = validator(callback), root;
+
+    lock(0, false, check(begin));
+
+    function record (address) {
+      return { address: address };
+    }
+
+    function begin (page) {
+      expand(root = page.addresses.map(record), 0, check(function () {
+        unlock(page); 
+        callback(null, root);
+      }));
+    }
+
+    function expand (pages, index, callback) {
+      if (index < pages.length) {
+        var address = pages[index].address;
+        lock(address, false, check(address < 0 ? leaf : branch));
+      } else {
+        callback(null, pages);
+      } 
+
+      function branch (page) {
+        pages[index].children = page.addresses.map(record);
+        if (index) designate(page, index, check(designated));
+        else keyed();
+
+        function designated (key) {
+          pages[index].key = key;
+          keyed();
+        }
+
+        function keyed () {
+          expand(pages[index].children, 0, check(expanded));
+        }
+
+        function expanded () {
+          unlock(page);
+          expand(pages, index + 1, callback);
+        }
+      }
+
+      function leaf (page) {
+        pages[index].children = [];
+
+        get(page.ghosts);
+
+        function get (recordIndex) {
+          if (recordIndex < page.positions.length) {
+            stash(page, page.positions[recordIndex], check(push));
+          } else {
+            unlock(page);
+            expand(pages, index + 1, callback);
+          }
+
+          function push (entry) {
+            pages[index].children.push(entry.record);
+            get(recordIndex + 1);
+          }
+        }
+      }
+    }
+  }
+
   // Attempt to purge the cache until the JSON size of the cache is less than or
   // equal to the given size.
   function purge (downTo) {
@@ -4793,7 +4861,9 @@ function Strata (directory, options) {
   }
 
   return objectify.call(this, create, open,
-                              iterator, mutator, balance, purge, close,
+                              iterator, mutator,
+                              balance, purge, vivify,
+                              close,
                               _size, _nextAddress);
 }
 
