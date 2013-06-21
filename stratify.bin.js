@@ -44,6 +44,33 @@ require('arguable').parse(__filename, process.argv.slice(2), function (options) 
     strata.balance(callback);
   }
 
+  function print (tree, address, index, depth) {
+    tree.forEach(function (child, index) {
+      var padding = new Array(depth + 1).join('   ');
+      if (child.address < 0) {
+        console.log(padding + (index ? child.children[0] : '<'));
+        child.children.forEach(function (value) {
+          process.stdout.write('   ' + padding + value +  '\n');
+        });
+      } else {
+        if (!('key' in child)) {
+          process.stdout.write(padding + '<\n');
+        } else {
+          process.stdout.write(padding + child.key + '\n');
+        }
+        print(child.children, child.address, 0, depth + 1);
+      }
+    });
+  }
+
+  actions.vivify = cadence(function (step, action) {
+    step(function () {
+      strata.vivify(step());
+    }, function (tree) {
+      print(tree, 0, 0, 0);
+    });
+  });
+
   actions.stringify = cadence(function (step) {
     console.log('stringify');
   });
@@ -81,6 +108,9 @@ require('arguable').parse(__filename, process.argv.slice(2), function (options) 
           break;
         case '~':
           queue.push({ type: 'balance' });
+          break;
+        case '!':
+          queue.push({ type: 'vivify' });
           break;
         }
       });
