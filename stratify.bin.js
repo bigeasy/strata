@@ -69,11 +69,10 @@ require('arguable').parse(__filename, process.argv.slice(2), function (options) 
     tree.forEach(function (child, index) {
       var padding = new Array(depth + 1).join('   ');
       if (child.address < 0) {
-        console.log(padding + (index ? child.children[0] : '<'));
-          process.stdout.write('   ' + padding + child.children.join(', ') +  '\n');
-      /*  child.children.forEach(function (value) {
-          process.stdout.write('   ' + padding + value +  '\n');
-        });*/
+        var key = index ? child.children[0] : '<';
+        while (key.length != 2) key = key + ' ';
+        process.stdout.write(padding + key + ' -> ');
+        process.stdout.write(child.children.join(', ') +  '\n');
       } else {
         if (!('key' in child)) {
           process.stdout.write(padding + '<\n');
