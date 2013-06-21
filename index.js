@@ -4823,7 +4823,7 @@ function Strata (directory, options) {
 
     function begin (page) {
       expand(root = page.addresses.map(record), 0, check(function () {
-        unlock(page); 
+        unlock(page);
         callback(null, root);
       }));
     }
@@ -4834,7 +4834,7 @@ function Strata (directory, options) {
         lock(address, false, check(address < 0 ? leaf : branch));
       } else {
         callback(null, pages);
-      } 
+      }
 
       function branch (page) {
         pages[index].children = page.addresses.map(record);
