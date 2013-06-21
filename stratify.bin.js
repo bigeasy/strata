@@ -15,7 +15,7 @@
 
 var Strata = require('./index'), processing = false, queue = [ { type: 'create' } ];
 
-var cadence = require('cadence');
+var cadence = require('cadence'), ok = require('assert');
 
 
 require('arguable').parse(__filename, process.argv.slice(2), function (options) {
@@ -27,13 +27,34 @@ require('arguable').parse(__filename, process.argv.slice(2), function (options) 
     strata.create(callback);
   }
 
+  var alphabet = 'abcdefghiklmnopqrstuvwxyz'.split('');
+
+  function inc (string) {
+    var parts = string.split('').reverse(), i = 0;
+    for (;;) {
+      var letter = i < parts.length ? alphabet.indexOf(parts[i]) + 1 : 0;
+      if (letter == alphabet.length) letter = 0;
+      parts[i] = alphabet[letter];
+      if (letter || ++i == parts.length) break;
+    }
+    if (!letter) {
+      parts.push('a');
+    }
+    return parts.reverse().join('');
+  }
+
   actions.add = cadence(function (step, action) {
     step(function () {
-      strata.mutator(action.value, step());
+      strata.mutator(action.values[0], step());
     }, function (cursor) {
-      step(function () {
-        // If index is positive; problem.
-        cursor.insert(action.value, action.value, ~ cursor.index, step());
+      var next;
+      step(next = function () {
+        cursor.indexOf(action.values[0], step());
+      }, function (index) {
+        ok(index < 0);
+        cursor.insert(action.values[0], action.values[0], ~ index, step());
+        action.values.shift();
+        if (action.values.length) step.jump(next);
       }, function () {
         cursor.unlock();
       });
@@ -49,9 +70,10 @@ require('arguable').parse(__filename, process.argv.slice(2), function (options) 
       var padding = new Array(depth + 1).join('   ');
       if (child.address < 0) {
         console.log(padding + (index ? child.children[0] : '<'));
-        child.children.forEach(function (value) {
+          process.stdout.write('   ' + padding + child.children.join(', ') +  '\n');
+      /*  child.children.forEach(function (value) {
           process.stdout.write('   ' + padding + value +  '\n');
-        });
+        });*/
       } else {
         if (!('key' in child)) {
           process.stdout.write(padding + '<\n');
@@ -101,7 +123,14 @@ require('arguable').parse(__filename, process.argv.slice(2), function (options) 
       lines.forEach(function (line) {
         switch (line[0]) {
         case '+':
-          queue.push({ type: 'add', value: line.substring(1) });
+          var $ = /^\+([a-z]+)(?:-([a-z]+))?\s*$/.exec(line), values = [];
+          values.push($[1]);
+          $[2] = $[2] || $[1];
+          while ($[1] != $[2]) {
+            $[1] = inc($[1]);
+            values.push($[1]);
+          }
+          queue.push({ type: 'add', values: values });
           break;
         case '>':
           queue.push({ type: 'stringify' });
