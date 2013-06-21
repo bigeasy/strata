@@ -89,11 +89,13 @@ function gather (step, strata) {
         cursor.get(i, step());
         step()(null, i);
       } else {
-        cursor.next(step(page));
+        step.jump(page);
+        cursor.next(step());
       }
     }, function (record, i) {
       records.push(record);
-      step(item)(null, i + 1);
+      step.jump(item);
+      step()(null, i + 1);
     });
   });
 }

@@ -21,7 +21,8 @@ require('./proof')(3, function (step, Strata, tmp, deepEqual, serialize, gather,
     }, function (unambiguous) {
       ambiguity.unshift(unambiguous);
       if (!ambiguity[0]) {
-        cursor.next(step(page));
+        step.jump(page);
+        cursor.next(step());
       } else {
         deepEqual(ambiguity, [ true, false, false, false ], 'unambiguous');
         cursor.unlock();
