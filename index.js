@@ -4129,15 +4129,49 @@ function Strata (directory, options) {
       }
     }
 
+    // ### Delete Ghosts
+    //
+    // Remove a ghost record from the positions array of a  leaf page. This
+    // method does not remove the ghost record itself from the leaf page, that
+    // only happens when we merge this page into its left sibling. (Or we
+    // rewrite it as part of a vacuum, but that's not implemented yet.)
+    //
+    // At the time of writing, I've forgotten if there is any breakage that
+    // occurs when you leave ghosts in place, beyond the fact that you are now
+    // balancing your tree based on data that it does not contain. Primarily I
+    // want to get rid of ghosts just because. I believe that if I were to take
+    // the time to think about it, I'd find a nicely illustrative example of a
+    // tree that would be taller than it needs to be because we're using keys
+    // that do not exist in the data set, and are never going to be added back.
+    //
+    // At one point in this project, this would have prompted me to pause and
+    // reflect, to step away from the computer, to take a walk, to try to
+    // understand why I made this decision, so that I could write for you a
+    // justification for the decision. This is not unreasonable, but I don't
+    // know that I always did this for the right reasons.
+    //
+    // At this point in my life, I know that any significant software system is
+    // impossible to hold in one's head. In the past, I might be able to read
+    // through source code and create a picture of how it worked in my mind,
+    // which would lead me to mistakenly believe that I was able to understand
+    // that software in its entirety. There was a time, though, when the thought
+    // of introducing a bug in a system would be something that would be a
+    // source of embarrassment, evidence that I was not a real coder. As much as
+    // I thought education was beneath me, I still felt that compulsion of the
+    // autodidactic to prove his knowledge.
+
+    //
     function exorcise (page, callback) {
       var fd, check = validator(callback);
 
+      // Shouldn't call unless necessary.
       ok(page.ghosts, "no ghosts");
 
       // Remove the ghosted record from the references array and the record cache.
       uncacheRecord(page, splice(page, 0, 1).shift());
       page.ghosts = 0
 
+      // Open the leaf page file and write out the shifted positions array.
       fs.open(filename(page.address), 'a', 0644, check(opened));
 
       function opened (fd) {
@@ -4153,9 +4187,14 @@ function Strata (directory, options) {
       }
     }
 
+    // We delete ghosts as part of a balance; we replace the key in branch with
+    // the first non-ghosted record, then we rewrite the positions array.
+
+    //
     function deleteGhost (key, callback) {
       var descents = [], pivot, leaf, fd, check = validator(callback);
 
+      // Descend to the ghost key and lock exclusively.
       descents.push(pivot = new Descent());
       pivot.descend(pivot.key(key), pivot.found(key), check(upgrade));
 
@@ -4185,6 +4224,7 @@ function Strata (directory, options) {
         exorcise(leaf.page, check(release));
       }
 
+      // Release all locks.
       function release () {
         descents.forEach(function (descent) { unlock(descent.page) });
         callback(null);
