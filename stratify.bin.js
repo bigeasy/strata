@@ -61,6 +61,22 @@ require('arguable').parse(__filename, process.argv.slice(2), function (options) 
     });
   });
 
+  actions.remove = cadence(function (step, action) {
+    var mutate, next;
+    step(function () {
+      if (action.values.length) strata.mutator(action.values[0], step());
+      else step(null);
+    }, function (cursor) {
+      action.values.shift();
+      if (cursor.index < 0) step.jump(next);
+      else step(function () {
+        cursor.remove(cursor.index, step());
+      }, function () {
+        cursor.unlock();
+      });
+    });
+  });
+
   actions.balance = function (action, callback) {
     strata.balance(callback);
   }
@@ -121,15 +137,16 @@ require('arguable').parse(__filename, process.argv.slice(2), function (options) 
       buffer = lines.pop();
       lines.forEach(function (line) {
         switch (line[0]) {
+        case '-':
         case '+':
-          var $ = /^\+([a-z]+)(?:-([a-z]+))?\s*$/.exec(line), values = [];
+          var $ = /^[+-]([a-z]+)(?:-([a-z]+))?\s*$/.exec(line), values = [];
           values.push($[1]);
           $[2] = $[2] || $[1];
           while ($[1] != $[2]) {
             $[1] = inc($[1]);
             values.push($[1]);
           }
-          queue.push({ type: 'add', values: values });
+          queue.push({ type: line[0] == '+' ? 'add' : 'remove', values: values });
           break;
         case '>':
           queue.push({ type: 'stringify' });
