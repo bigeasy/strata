@@ -3740,7 +3740,6 @@ function Strata (directory, options) {
         split = leaf.page;
 
         if (split.positions.length - split.ghosts <= options.leafSize) {
-          console.log('never mind');
           balancer.unbalanced(split, true);
           cleanup();
         } else {
