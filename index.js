@@ -4822,13 +4822,13 @@ function Strata (directory, options) {
     }
 
     function begin (page) {
-      expand(root = page.addresses.map(record), 0, check(function () {
+      expand(page, root = page.addresses.map(record), 0, check(function () {
         unlock(page);
         callback(null, root);
       }));
     }
 
-    function expand (pages, index, callback) {
+    function expand (parent, pages, index, callback) {
       if (index < pages.length) {
         var address = pages[index].address;
         lock(address, false, check(address < 0 ? leaf : branch));
@@ -4838,7 +4838,7 @@ function Strata (directory, options) {
 
       function branch (page) {
         pages[index].children = page.addresses.map(record);
-        if (index) designate(page, index, check(designated));
+        if (index) designate(parent, index, check(designated));
         else keyed();
 
         function designated (key) {
@@ -4847,12 +4847,12 @@ function Strata (directory, options) {
         }
 
         function keyed () {
-          expand(pages[index].children, 0, check(expanded));
+          expand(page, pages[index].children, 0, check(expanded));
         }
 
         function expanded () {
           unlock(page);
-          expand(pages, index + 1, callback);
+          expand(parent, pages, index + 1, callback);
         }
       }
 
@@ -4867,7 +4867,7 @@ function Strata (directory, options) {
             stash(page, page.positions[recordIndex], check(push));
           } else {
             unlock(page);
-            expand(pages, index + 1, callback);
+            expand(parent, pages, index + 1, callback);
           }
 
           function push (entry) {

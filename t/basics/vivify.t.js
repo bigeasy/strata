@@ -21,12 +21,12 @@ require("./proof")(1, function (Strata, tmp, serialize, deepEqual, step, gather,
            [ { address: -7, children: [ 'i', 'j', 'k' ], ghosts: 0 },
              { address: -6, children: [ 'l', 'm', 'n' ], ghosts: 0 },
              { address: -5, children: [ 'o', 'p', 'q' ], ghosts: 0 } ],
-          key: 'l' },
+          key: 'i' },
         { address: 10,
           children:
            [ { address: -4, children: [ 'r', 's', 't' ], ghosts: 0 },
              { address: -3, children: [ 'u', 'v', 'w' ], ghosts: 0 },
              { address: -2, children: [ 'x', 'y', 'z' ], ghosts: 0 } ],
-          key: 'x' } ], 'vivify');
+          key: 'r' } ], 'vivify');
   });
 });
