@@ -15,8 +15,9 @@
 
 var Strata = require('./index'), processing = false, queue = [ { type: 'create' } ];
 
-var cadence = require('cadence'), ok = require('assert');
+var cadence = require('cadence'), ok = require('assert'), fs = require('fs');
 
+var stringify = require('./t/proof').stringify;
 
 require('arguable').parse(__filename, process.argv.slice(2), function (options) {
   var strata = new Strata(options.params.directory, { branchSize: 3, leafSize: 3 });
@@ -108,8 +109,13 @@ require('arguable').parse(__filename, process.argv.slice(2), function (options) 
     });
   });
 
-  actions.stringify = cadence(function (step) {
-    console.log('stringify');
+  actions.stringify = cadence(function (step, action) {
+    step(function () {
+      stringify(options.params.directory, step());
+    }, function (result) {
+      console.log(action, result);
+      fs.writeFile(action.file, result, 'utf8', step());
+    });
   });
 
   function consume (callback) {
@@ -149,7 +155,7 @@ require('arguable').parse(__filename, process.argv.slice(2), function (options) 
           queue.push({ type: line[0] == '+' ? 'add' : 'remove', values: values });
           break;
         case '>':
-          queue.push({ type: 'stringify' });
+          queue.push({ type: 'stringify', file: line.substring(1) });
           break;
         case '~':
           queue.push({ type: 'balance' });

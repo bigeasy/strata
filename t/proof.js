@@ -48,8 +48,7 @@ function stringify (directory, callback) {
   objectify(directory, check(callback, segments));
 
   function segments (segments) {
-    console.log(JSON.stringify(segments, null, 2));
-    callback();
+    callback(null, JSON.stringify(segments, null, 2));
   }
 }
 
