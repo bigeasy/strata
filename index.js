@@ -3578,7 +3578,9 @@ function Strata (directory, options) {
         // its list, because we know it cannot merge with its neighbors.
         if (difference > 0 && node.length > options.leafSize) {
           // Schedule the split.
-          operations.push({  method: "splitLeaf", parameters: [ node.key ] });
+          operations.push({  method: "splitLeaf", parameters: [ node.key, ghosts[node.address] ] });
+          // If there's a ghost, delete it from within `splitLeaf`.
+          delete ghosts[node.address];
           // Unlink this split node, so that we don't consider it when merging.
           unlink(node);
         }
@@ -3691,7 +3693,7 @@ function Strata (directory, options) {
     // **TK**: Docco.
 
     //
-    function splitLeaf (key, callback) {
+    function splitLeaf (key, ghosts, callback) {
       // Keep track of our descents so we can unlock the pages at exit.
       var check = validator(callback)
         , descents = []
@@ -3702,12 +3704,22 @@ function Strata (directory, options) {
         , records, remainder, right, index, offset, length
         ;
 
-      // We descend the tree directory directly to the leaf using the key.
-      descents.push(penultimate = new Descent());
+      if (ghosts) deleteGhost(key, check(exorcised));
+      else penultimate();
 
-      // Descend to the penultimate branch page, from which a leaf page child
-      // will be removed.
-      penultimate.descend(penultimate.key(key), penultimate.penultimate, check(upgrade));
+      function exorcised (rekey) {
+        key = rekey;
+        penultimate();
+      }
+
+      function penultimate () {
+        // We descend the tree directory directly to the leaf using the key.
+        descents.push(penultimate = new Descent());
+
+        // Descend to the penultimate branch page, from which a leaf page child
+        // will be removed.
+        penultimate.descend(penultimate.key(key), penultimate.penultimate, check(upgrade));
+      }
 
       // Upgrade to an exclusive lock.
       function upgrade () {
@@ -3728,6 +3740,7 @@ function Strata (directory, options) {
         split = leaf.page;
 
         if (split.positions.length - split.ghosts <= options.leafSize) {
+          console.log('never mind');
           balancer.unbalanced(split, true);
           cleanup();
         } else {
@@ -4226,8 +4239,9 @@ function Strata (directory, options) {
 
       // Release all locks.
       function release () {
+        var key = leaf.page.positions[0];
         descents.forEach(function (descent) { unlock(descent.page) });
-        callback(null);
+        callback(null, key);
       }
     }
 
