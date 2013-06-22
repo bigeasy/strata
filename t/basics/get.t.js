@@ -1,16 +1,10 @@
 #!/usr/bin/env node
 
 var fs = require("fs"), strata;
-require("./proof")(7, function (tmp, equal, step, Strata, ok) {
+require("./proof")(7, function (serialize, tmp, equal, step, Strata, ok) {
   step(function () {
 
-    fs.writeFile(tmp + "/segment00000000", JSON.stringify([-1]) + " -\n", "utf8", step());
-
-  }, function () {
-
-    var body = JSON.stringify([0,1,0,0,1,[]]) + " -\n" +
-               JSON.stringify([1,1,2,"a"]) + " -\n";
-    fs.writeFile(tmp + "/segment00000001", body, "utf8", step());
+    serialize(__dirname + "/fixtures/get.json", tmp, step());
 
   }, function () {
 
