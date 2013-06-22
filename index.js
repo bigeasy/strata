@@ -4529,7 +4529,7 @@ function Strata (directory, options) {
         var index;
 
         function deleteGhost () {
-          if (ghostly) exorcise(leaves.left.page, check(merge));
+          if (ghostly && left + right) exorcise(leaves.left.page, check(merge));
           else merge();
         }
 
