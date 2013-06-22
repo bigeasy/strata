@@ -63,13 +63,13 @@ require('arguable').parse(__filename, process.argv.slice(2), function (options) 
 
   actions.remove = cadence(function (step, action) {
     var mutate, next;
-    step(function () {
+    step(next = function () {
       if (action.values.length) strata.mutator(action.values[0], step());
       else step(null);
     }, function (cursor) {
       action.values.shift();
-      if (cursor.index < 0) step.jump(next);
-      else step(function () {
+      step.jump(next);
+      if (cursor.index >= 0) step(function () {
         cursor.remove(cursor.index, step());
       }, function () {
         cursor.unlock();

@@ -4858,8 +4858,9 @@ function Strata (directory, options) {
 
       function leaf (page) {
         pages[index].children = [];
+        pages[index].ghosts = page.ghosts;
 
-        get(page.ghosts);
+        get(0);
 
         function get (recordIndex) {
           if (recordIndex < page.positions.length) {

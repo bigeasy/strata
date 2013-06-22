@@ -13,20 +13,20 @@ require("./proof")(1, function (Strata, tmp, serialize, deepEqual, step, gather,
     deepEqual(result,
       [ { address: 12,
           children:
-           [ { address: -1, children: [ 'a', 'b' ] },
-             { address: -9, children: [ 'c', 'd', 'e' ] },
-             { address: -8, children: [ 'f', 'g', 'h' ] } ] },
+           [ { address: -1, children: [ 'a', 'b' ], ghosts: 0 },
+             { address: -9, children: [ 'c', 'd', 'e' ], ghosts: 0 },
+             { address: -8, children: [ 'f', 'g', 'h' ], ghosts: 0 } ] },
         { address: 11,
           children:
-           [ { address: -7, children: [ 'i', 'j', 'k' ] },
-             { address: -6, children: [ 'l', 'm', 'n' ] },
-             { address: -5, children: [ 'o', 'p', 'q' ] } ],
+           [ { address: -7, children: [ 'i', 'j', 'k' ], ghosts: 0 },
+             { address: -6, children: [ 'l', 'm', 'n' ], ghosts: 0 },
+             { address: -5, children: [ 'o', 'p', 'q' ], ghosts: 0 } ],
           key: 'l' },
         { address: 10,
           children:
-           [ { address: -4, children: [ 'r', 's', 't' ] },
-             { address: -3, children: [ 'u', 'v', 'w' ] },
-             { address: -2, children: [ 'x', 'y', 'z' ] } ],
+           [ { address: -4, children: [ 'r', 's', 't' ], ghosts: 0 },
+             { address: -3, children: [ 'u', 'v', 'w' ], ghosts: 0 },
+             { address: -2, children: [ 'x', 'y', 'z' ], ghosts: 0 } ],
           key: 'x' } ], 'vivify');
   });
 });
