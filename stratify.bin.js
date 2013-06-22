@@ -113,7 +113,6 @@ require('arguable').parse(__filename, process.argv.slice(2), function (options) 
     step(function () {
       stringify(options.params.directory, step());
     }, function (result) {
-      console.log(action, result);
       fs.writeFile(action.file, result, 'utf8', step());
     });
   });
