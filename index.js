@@ -3630,7 +3630,7 @@ function Strata (directory, options) {
       // Rewrite position arrays to remove ghosts.
       for (address in ghosts) {
         node = ghosts[address];
-        operations.unshift({
+        if (node.length) operations.unshift({
           method: "deleteGhost",
           parameters: [ node.key ]
         });
