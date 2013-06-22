@@ -88,7 +88,7 @@ require('arguable').parse(__filename, process.argv.slice(2), function (options) 
         var key = index ? child.children[0] : '<';
         while (key.length != 2) key = key + ' ';
         process.stdout.write(padding + key + ' -> ');
-        process.stdout.write(child.children.join(', ') +  '\n');
+        process.stdout.write(child.children.slice(child.ghosts).join(', ') +  '\n');
       } else {
         if (!('key' in child)) {
           process.stdout.write(padding + '<\n');
