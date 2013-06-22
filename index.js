@@ -4394,7 +4394,7 @@ function Strata (directory, options) {
 
       function merged (dirty) {
         if (dirty) uncachePivot();
-        else release();
+        else release(callback)();
       }
 
       function uncachePivot () {
@@ -4457,15 +4457,20 @@ function Strata (directory, options) {
       }
 
       function endCommit () {
-        replace(ancestor, ".commit", check(propagate));
+        replace(ancestor, ".commit", check(release(propagate)));
+      }
+
+      function release (next) {
+        return function () {
+          // Release locks.
+          descents.forEach(function (descent) { unlock(descent.page) });
+          locked.forEach(unlock);
+          next();
+        }
       }
 
       // Release our locks and propagate the merge to parent branch pages.
       function propagate () {
-        // Release locks.
-        descents.forEach(function (descent) { unlock(descent.page) });
-        locked.forEach(unlock);
-
         // We released our lock on the ancestor, but even if it is freed by a
         // cache purge, the properties we test here are still valid.
         if (ancestor.address == 0) {
@@ -4515,10 +4520,10 @@ function Strata (directory, options) {
           // We cannot merge, so we queue one or both of pages for a merge test
           // on the next balancer.
           if (unbalanced[leaves.left.page.address]) {
-            io.balancer.unbalanced(leaves.left.page, true)
+            balancer.unbalanced(leaves.left.page, true)
           }
           if (unbalanced[leaves.right.page.address]) {
-            io.balancer.unbalanced(leaves.right.page, true)
+            balancer.unbalanced(leaves.right.page, true)
           }
           callback(null, false);
         } else {
