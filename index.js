@@ -939,7 +939,7 @@ function Strata (directory, options) {
       , buffer    = new Buffer(options.readLeafStartLength || 1024)
       , slice     = buffer.slice(0, 0)
       , end
-      , eol
+      , was = -1
       , start
       , length
       , offset = 0
@@ -957,7 +957,7 @@ function Strata (directory, options) {
     }
 
     function stat (stat) {
-      start = stat.size, end = stat.size, eol = stat.size
+      start = stat.size, end = stat.size;
       input();
     }
 
@@ -967,10 +967,12 @@ function Strata (directory, options) {
     // go to the disk to get something that we already have in memory, but it is
     // simpiler to adjust the offsets and reread that half a line.
     function input () {
+      if (end == was) buffer = new Buffer(buffer.length * 2);
       start = end - buffer.length;
       if (start < 0) start = 0;
       offset = 0;
       slice = buffer.slice(0, end - start);
+      was = end;
       load(0);
     }
 
