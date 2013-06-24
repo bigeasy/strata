@@ -152,17 +152,8 @@ function extend(to, from) {
   return to;
 }
 
-// Used for debugging. If you don't see them called in the code, it means the
-// code is absolutely bug free.
+// Used to manipulate `argument` arrays.
 var __slice = [].slice;
-/*
-function die () {
-  console.log.apply(console, __slice.call(arguments, 0));
-  process.exit(1);
-};
-
-function say () { console.log.apply(console, __slice.call(arguments, 0)) }
-*/
 
 // ## Collation
 //
