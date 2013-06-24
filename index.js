@@ -195,14 +195,14 @@ function extract (a) { return a }
 // I began this project long ago, in 2010, as a first Node.js project, and as a
 // first Node.js project, I experimented with the closure style of object
 // construction. All of a `Strata` is a closure over the implementation. No
-// prototypes. Instead, I build objects on the fly using `objectify`.
+// prototypes. Instead, I build objects on the fly using `classify`.
 //
-// This `objectify` function builds an object from a list of functions,
-// assigning the functions as member functions, or else defining them as
-// property getters or setters. If the function name starts with a `_`, then the
-// name without the underscore is used as a property getter. If the function
-// name ends with a `_`, then the property name is used as a property setter.
-function objectify () {
+// This `classify` function builds an object from a list of functions, assigning
+// the functions as member functions, or else defining them as property getters
+// or setters. If the function name starts with a `_`, then the name without the
+// underscore is used as a property getter. If the function name ends with a
+// `_`, then the property name is used as a property setter.
+function classify () {
   var i, I, name;
   for (i = 0, I = arguments.length; i < I; i++) {
     name = arguments[i].name;
@@ -2408,11 +2408,11 @@ function Strata (directory, options) {
     }
 
     // Construct the `Descent` object and return it.
-    return objectify.call(this, descend, fork, exclude, upgrade,
-                                key, left, right,
-                                found, address, child, penultimate, leaf, level,
-                                _page, _depth, _index, index_, _indexes, _lesser, _greater,
-                                uncaching_, unlocker_);
+    return classify.call(this, descend, fork, exclude, upgrade,
+                               key, left, right,
+                               found, address, child, penultimate, leaf, level,
+                               _page, _depth, _index, index_, _indexes, _lesser, _greater,
+                               uncaching_, unlocker_);
   }
 
 
@@ -2574,7 +2574,7 @@ function Strata (directory, options) {
 
     function _length () { return length }
 
-    objectify.call(this, unlock, indexOf, get, next, _index, _offset, _length);
+    classify.call(this, unlock, indexOf, get, next, _index, _offset, _length);
 
     if (!exclusive) return this;
 
@@ -2821,7 +2821,7 @@ function Strata (directory, options) {
       }
     }
 
-    return objectify.call(this, insert, remove);
+    return classify.call(this, insert, remove);
   }
 
   // #### Insertion and Deletion Versus Balance
@@ -3305,7 +3305,7 @@ function Strata (directory, options) {
       , methods = {}
       ;
 
-    objectify.call(methods, deleteGhost, splitLeaf, mergeLeaves);
+    classify.call(methods, deleteGhost, splitLeaf, mergeLeaves);
 
     function balancerReport () {
       return extend(report(), {
@@ -4784,7 +4784,7 @@ function Strata (directory, options) {
       }
     }
 
-    return objectify.call(this, balance, unbalanced);
+    return classify.call(this, balance, unbalanced);
   }
 
   // The `key` is the splat array passed to `Strata.iterator` or
@@ -4922,7 +4922,7 @@ function Strata (directory, options) {
     }
   }
 
-  return objectify.call(this, create, open,
+  return classify.call(this, create, open,
                               iterator, mutator,
                               balance, purge, vivify,
                               close,
