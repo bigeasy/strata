@@ -33,7 +33,7 @@ Strata is a database **primitive**, it is not supposed to be used a as a general
 purpose database by it's lonesome, but an interface to a b#x2011;tree and it's
 concepts that you can use to create different types database strategies.
 
-## Brace Yourself
+### Brace Yourself
 
 The interface to Strata is *not* an API, it is a programmer's interface to
 b#x2011;tree concepts. It is easy to use, if you know how a b#x2011;tree works,
@@ -53,7 +53,7 @@ I'd do I was to do it all again.
 I'm going to cut this whinging in the final `README.md`. It's here to vent my
 defensiveness and remind of who my audience is.
 
-## A Note on Examples
+### A Note on Examples
 
 All of the examples below assume the following function.
 
@@ -77,11 +77,19 @@ function valiator (callback) {
 
 TK: More about how that works. It's all over Strata.
 
+## Installing
+
+Install from NPM.
+
+```console
+npm install b-tree
+```
+
 ## Creating a B-Tree
 
-You must create the b#x2011tree  object first, specifying the size of the inner branch
-pages as a count of child pages, and the size of the leaf pages as a count of
-stored records.
+You must create the b#x2011;tree  object first, specifying the size of the inner
+branch pages as a count of child pages, and the size of the leaf pages as a
+count of stored records.
 
 ```javascript
 function openOrCreate (directory, callback) {
@@ -107,6 +115,32 @@ openOrCreate('/home/alan/strata', function (error, strata) {
 ```
 
 Properties to the constructor...
+
+### `new Strata(location[, options])`.
+
+Constructs a new b-tree that stores its files in the directory provided by
+`location`. It does not open or close the b#x2011;tree.
+
+#### `options`
+
+`new Strata()` takes an optional options object as its second argument; the
+following properties are accepted:
+
+ * `leafSize`: The maximum size in records of a leaf page before it is it split.
+ * `branchSize`: The maximum size in child pages of a branch page before it is
+   split.
+ * `checksum`: A cryptographic algorithm to use as a hash, or a checksum
+   function to validate each line in a leaf page, and the contents of a branch
+   page.
+
+### `strata.open(callback)`
+
+Opens the b-tree.
+
+### `strata.open(callback)`
+
+Creates a new, empty b-tree. It will raise an exception if there is *anything*
+in the location directory.
 
 ## Primitive Operations
 
