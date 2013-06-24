@@ -4,42 +4,46 @@
 
 An Evented I/O B-tree for Node.js.
 
-# Purpose
+The docs below are a work in progress; for now, [read the
+Docco](http://bigeasy.github.io/strata/).
+
+Read the [Docco](http://bigeasy.github.io/strata/)! Read the
+[Docco](http://bigeasy.github.io/strata/)! Read the
+[Docco](http://bigeasy.github.io/strata/)!
+
+## Purpose
 
 Strata is part of a collection of database primitives that you can use to design
 your own distributed databases for your Node.js applications.
 
-Strata is a **concurrent**, **b-tree** **primitive**, in **pure-JavaScript** for
-Node.js.
+Strata is a **concurrent**, **b#x2011;tree** **primitive**, in
+**pure-JavaScript** for Node.js.
 
-A **b-tree** is a data structure used by databases to store records organized in
-large pages on disk.
+A **b#x2011;tree** is a data structure used by databases to store records
+organized in large pages on disk.
 
 By **concurrent** I mean that multiple queries can make progress on a descent of
-the b-tree. Multple reads can all navigate the b-tree simultaneously, of course.
-Multple reads can also make progress in the presence of a write, so long as they
-are not reading a page that is being written. This is the equivalence to
-"threading" in other database engines, but evented for Node.js.
+the b#x2011;tree. Multple reads can all navigate the b#x2011;tree
+simultaneously, of course. Multple reads can also make progress in the presence
+of a write, so long as they are not reading a page that is being written. This
+is the equivalence to "threading" in other database engines, but evented for
+Node.js.
 
 Strata is a database **primitive**, it is not supposed to be used a as a general
-purpose database by it's lonesome, but an interface to a b-tree and it's
+purpose database by it's lonesome, but an interface to a b#x2011;tree and it's
 concepts that you can use to create different types database strategies.
 
 ## Brace Yourself
 
-I'm going to write really happy docs, but you know how you imagine the trolls in
-your head kind of complaining about stuff, and stuff. Well, here's what I expect
-people will say when they find strata and it's not for them.
-
 The interface to Strata is *not* an API, it is a programmer's interface to
-b-tree concepts. It is easy to use, if you know how a b-tree works, but please
-don't complain about encapsulation; it is not a database engine, it is a b-tree
-structure and the *details are supposed to be exposed*.
+b#x2011;tree concepts. It is easy to use, if you know how a b#x2011;tree works,
+but please don't complain about encapsulation; it is not a database engine, it
+is a b#x2011;tree structure and the *details are supposed to be exposed*.
 
-The Strata b-tree interface describes a b-tree as a collection of actors, not a
-collection of objects. A b-tree isn't all about "pages." It's about descending,
-navigating, appending, and balancing a tree. When you read the code, you're
-going to find people who do tings.
+The Strata b#x2011;tree interface describes a b#x2011;tree as a collection of
+actors, not a collection of objects. A b#x2011;tree isn't all about "pages."
+It's about descending, navigating, appending, and balancing a tree. When you
+read the code, you're going to find these people-named classes who do things.
 
 Finally, Strata is an ancient project of mine, that began before anyone really
 know how a Node.js library is supposed to look. I used closure based objects,
@@ -75,7 +79,7 @@ TK: More about how that works. It's all over Strata.
 
 ## Creating a B-Tree
 
-You must create the b-tree object first, specifying the size of the inner branch
+You must create the b#x2011tree  object first, specifying the size of the inner branch
 pages as a count of child pages, and the size of the leaf pages as a count of
 stored records.
 
@@ -98,7 +102,7 @@ function openOrCreate (directory, callback) {
 openOrCreate('/home/alan/strata', function (error, strata) {
   if (error) throw error;
   
-  // Do something with an open b-tree...
+  // Do something with an open b#x2011;tree...
 });
 ```
 
