@@ -192,6 +192,16 @@ function compare (a, b) { return a < b ? -1 : a > b ? 1 : 0 }
 // Default extractor returns the value as whole for use as a key.
 function extract (a) { return a }
 
+// I began this project long ago, in 2010, as a first Node.js project, and as a
+// first Node.js project, I experimented with the closure style of object
+// construction. All of a `Strata` is a closure over the implementation. No
+// prototypes. Instead, I build objects on the fly using `objectify`.
+//
+// This `objectify` function builds an object from a list of functions,
+// assigning the functions as member functions, or else defining them as
+// property getters or setters. If the function name starts with a `_`, then the
+// name without the underscore is used as a property getter. If the function
+// name ends with a `_`, then the property name is used as a property setter.
 function objectify () {
   var i, I, name;
   for (i = 0, I = arguments.length; i < I; i++) {
