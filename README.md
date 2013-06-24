@@ -58,7 +58,7 @@ defensiveness and remind of who my audience is.
 All of the examples below assume the following function.
 
 ```javascript
-function valiator (callback) {
+function validator (callback) {
   return function (forward) {
     return function (error) {
       if (error) {
