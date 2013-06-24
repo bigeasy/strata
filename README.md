@@ -16,10 +16,10 @@ Read the [Docco](http://bigeasy.github.io/strata/)! Read the
 Strata is part of a collection of database primitives that you can use to design
 your own distributed databases for your Node.js applications.
 
-Strata is a **concurrent**, **b#8209;tree** **primitive**, in
+Strata is a **concurrent**, **b&#8209;tree** **primitive**, in
 **pure-JavaScript** for Node.js.
 
-A **b#8209;tree** is a data structure used by databases to store records
+A **b&#x2011;tree** is a data structure used by databases to store records
 organized in large pages on disk.
 
 By **concurrent** I mean that multiple queries can make progress on a descent of
