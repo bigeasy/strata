@@ -1,6 +1,6 @@
 <a href="http://www.flickr.com/photos/rickz/2207171252/" title="&quot;The Wave&quot; by rickz, on Flickr"><img src="http://farm3.staticflickr.com/2363/2207171252_6ebe988904_z.jpg?zz=1" width="850" height="567" alt="&quot;The Wave&quot;"></a>
 
-# Strata [![Build Status](https://secure.travis-ci.org/bigeasy/strata.png?branch=master)](http://travis-ci.org/bigeasy/strata) [![Coverage Status](https://coveralls.io/repos/bigeasy/strata/badge.png?branch=master)](https://coveralls.io/r/bigeasy/strata) [![NPM version](https://badge.fury.io/js/b-tree.png)](http://badge.fury.io/js/b-tree)
+# Strata [![Build Status](https://secure.travis-ci.org/bigeasy/strata.png?branch=master)](http://travis-ci.org/bigeasy/strata) [![Coverage Status](https://coveralls.io/repos/bigeasy/strata/badge.png?branch=master)](https://coveralls.io/r/bigeasy/strata) [![NPM version](https://badge.fury.io/js/b-tree.png)](http://badge.fury.io/js/b-tree) [![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/bigeasy/strata/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
 
 An Evented I/O B-tree for Node.js.
 
