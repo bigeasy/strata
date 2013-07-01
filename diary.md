@@ -97,6 +97,24 @@ we've yet to implement vacuum. I suppose it makes vacuum easier because vacuum
 will always faithfully rewrite the page, ghosts and all, so it can move across
 the leaves without descending.
 
+## Binary Leaves
+
+A leaf format is this:
+
+ * A terminatator, currently '\n'.
+ * A checksum, currently SHA1, but always a fixed length.
+ * Stuff inbetween the checksum and terminator.
+
+We could easily make the terminator `0xdeadbeaf` or similar, and the checksum
+could be a binary integer, and the body could be JSON.
+
+There might be an optional length. If it is missing, then we're going to assume
+that the terminator is unique, or else we're going to scan and keep scanning
+until we find a buffer that satisfies the checksum. We put the length before the
+terminator we can read backwards easily as we are doing now.
+
+This is fantasitic. Do it.
+
 ## Inbox
 
  * `nextTick` behavior ought to make coverage happen quickly, especially a
