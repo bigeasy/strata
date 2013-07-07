@@ -123,3 +123,7 @@ This is fantasitic. Do it.
  database design.
  * Creating a r-tree would be yet another primitive for database design.
  * Naming functions build by validator `check` is confusing.
+
+## Changes for Next Release
+
+ * Fix aspect ratio of `README.md` image. #108.
