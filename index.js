@@ -1919,6 +1919,10 @@ function Strata (options) {
 
   // We're going to shadow `unlock` in the `Cursor` class, so keep a copy of
   // `Strata` version.
+  //
+  // **Note**: Wow! I just had a heck of a time debugging an update to `Cursor`
+  // that called `unlock(rightLeafPage)`. Set me back trying to figure out why
+  // it wasn't unlocking the page you passed it.
 
   //
   var _unlock = unlock;
@@ -2507,7 +2511,7 @@ function Strata (options) {
   //
   function Cursor (exclusive, searchKey, page, index) {
     // Iterators are initialized with the results of a descent.
-    var sibling = null
+    var rightLeafKey = null
       , length = page.positions.length
       , offset = index < 0 ? ~ index : index
       ;
@@ -2523,19 +2527,13 @@ function Strata (options) {
     // the current leaf page is the last leaf page in the b&#x2011;tree.
     function next (callback) {
       var next;
+
+      // Clear out peek at the next page.
+      rightLeafKey = null;
+
       // If we are not the last leaf page, advance and return true.
       if (page.right) {
-        // If we are iterating for insert and delete, we may already have taken
-        // a peek at the next page.
-        var next;
-        if (sibling) {
-          next = sibling
-          sibling = null
-          locked(next);
-        // Otherwise fetch the next page.
-        } else {
-          lock(page.right, exclusive, validate(callback, locked));
-        }
+        lock(page.right, exclusive, validate(callback, locked));
       } else {
         callback(null, false);
       }
@@ -2566,7 +2564,6 @@ function Strata (options) {
     // Unlock all leaf pages held by the iterator.
     function unlock () {
       _unlock(page);
-      if (sibling) _unlock(sibling);
     }
 
     function _index () { return index }
@@ -2755,23 +2752,42 @@ function Strata (options) {
       // location, peek at the next leaf page to see if the record doesn't
       // really belong to a subsequent leaf page.
       function ambiguity () {
-        // The lock must held because the balancer can swoop in and prune the
-        // ghost first records and thereby change the key. It could not delete
-        // the page nor merge the page, but it can prune dead first records.
+        // We used to believe that the lock must held because the balancer can
+        // swoop in and prune the ghost first records and thereby change the
+        // key. It could not delete the page nor merge the page, but it can
+        // prune dead first records.
+        //
+        // Now we realize that this doesn't mean that the lock must be held. The
+        // only thing that a prune of the ghost first record will do is cause
+        // the key to *increase* in value. Thus, even if it changes, our test to
+        // determine if a record belongs in this leaf page will only ever err on
+        // the side of caution. It will not falsely say that the record belongs
+        // on the current page, but it may falsely say that the record does not
+        // belong on the current page. Definately yes, probably no.
+        //
+        // In the case of a no, it might really be a yes, but it doesn't mater.
+        // Just descend the tree again with the maybe no key. Descending the
+        // tree with a key is always the safe bet.
 
         //
-        if (sibling) {
-          load(sibling);
+        if (rightLeafKey) {
+          compare();
         } else {
-          lock(page.right, exclusive, check(load));
+          lock(page.right, false, check(load));
         }
 
-        function load ($) {
-          designate(sibling = $, 0, check(compare));
+        function load (rightLeafPage) {
+          designate(rightLeafPage, 0, check(designated));
+
+          function designated (key) {
+            rightLeafKey = key;
+            _unlock(rightLeafPage);
+            compare();
+          }
         }
 
-        function compare (siblingKey) {
-          if (comparator(key, siblingKey) < 0) insert();
+        function compare () {
+          if (comparator(key, rightLeafKey) < 0) insert();
           else callback(null, false);
         }
       }

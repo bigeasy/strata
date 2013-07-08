@@ -124,8 +124,19 @@ This is fantasitic. Do it.
  * Creating a r-tree would be yet another primitive for database design.
  * Naming functions build by validator `check` is confusing.
 
+## Delayed Writes
+
+For block writes, with a nice interface, wouldn't it be nice to have `unlock`
+take a callback, which would be a way to say, write before unlocking.
+
+However, it would it might just as good to gather up dirty pages and flush them
+as part of an global exit. You might luck out and flush out the results of two
+descents in one page flush. How often would be you be that sort of lucky that it
+would warrant an early flush.
+
 ## Changes for Next Release
 
+ * Peek of next page during insert with read lock, release immediately. #111.
  * Mutator should return false if index is to low instead of asserting. #110.
  * All Strata constructor options should be in the `options` hash. #109.
  * Fix aspect ratio of `README.md` image. #108.
