@@ -2,7 +2,7 @@
 
 require('./proof')(4, function (step, Strata,
     tmp, equal, deepEqual, serialize, gather, load, objectify, say) {
-  var strata = new Strata(tmp, { leafSize: 3, branchSize: 3 }), fs = require('fs');
+  var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 }), fs = require('fs');
   step(function () {
     serialize(__dirname + '/fixtures/merge.before.json', tmp, step());
   }, function () {

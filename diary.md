@@ -127,4 +127,5 @@ This is fantasitic. Do it.
 ## Changes for Next Release
 
  * Mutator should return false if index is to low instead of asserting. #110.
+ * All Strata constructor options should be in the `options` hash. #109.
  * Fix aspect ratio of `README.md` image. #108.

@@ -10,7 +10,7 @@ require("./proof")(1, function (step, ok, equal, Strata, tmp, deepEqual,
 
   }, function () {
 
-    strata = new Strata(tmp, { leafSize: 3, branchSize: 3 });
+    strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 });
     strata.open(step());
 
   }, function () {

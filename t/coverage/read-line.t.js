@@ -5,7 +5,7 @@ require("./proof")(2, function (step, Strata, deepEqual, tmp, insert, load, obje
   step(function () {
     fs.writeFile(tmp + '/segment00000000', 'x x\n', 'utf8', step());
   }, function () {
-    strata = new Strata(tmp, {});
+    strata = new Strata({ directory: tmp });
     strata.open(step());
   }, function () {
     strata.iterator('a', step(Error));
@@ -14,7 +14,7 @@ require("./proof")(2, function (step, Strata, deepEqual, tmp, insert, load, obje
   }, function () {
     fs.writeFile(tmp + '/segment00000000', 'x 0\n', 'utf8', step());
   }, function () {
-    strata = new Strata(tmp, {});
+    strata = new Strata({ directory: tmp });
     strata.open(step());
   }, function () {
     strata.iterator('a', step(Error));

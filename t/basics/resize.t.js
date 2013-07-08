@@ -6,7 +6,7 @@ require("./proof")(1, function (step, tmp, serialize, equal, load, Strata) {
   step(function () {
     serialize(__dirname + '/fixtures/resize.before.json', tmp, step());
   }, function () {
-    strata = new Strata(tmp, { leafSize: 3, branchSize: 3 });
+    strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 });
     strata.open(step());
   }, function () {
     strata.iterator('b', step());

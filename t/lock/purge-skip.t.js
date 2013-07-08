@@ -9,7 +9,7 @@ require("./proof")(2, function (step, equal, Strata, tmp, serialize) {
 
   }, function () {
 
-    strata = new Strata(tmp, { leafSize: 3, branchSize: 3 });
+    strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 });
     strata.open(step());
 
   }, function () {

@@ -27,7 +27,7 @@ require("./proof")(2, function (step, tmp, Strata, serialize, load, objectify, g
   step(function () {
     serialize(__dirname + "/fixtures/race.before.json", tmp, step());
   }, function () {
-    strata = new Strata(tmp, { leafSize: 3, branchSize: 3, tracer: tracer });
+    strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3, tracer: tracer });
     strata.open(step());
   }, function () {
     strata.mutator("b", step());
@@ -49,7 +49,7 @@ require("./proof")(2, function (step, tmp, Strata, serialize, load, objectify, g
   }, function () {
     serialize(__dirname + "/fixtures/race.before.json", tmp, step());
   }, function () {
-    strata = new Strata(tmp, { leafSize: 3, branchSize: 3, tracer: tracer });
+    strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3, tracer: tracer });
     strata.open(step());
   }, function () {
     strata.mutator("d", step());

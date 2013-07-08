@@ -5,7 +5,7 @@ require("./proof")(1, function (Strata, tmp, serialize, deepEqual, step, gather,
   step(function () {
     serialize(__dirname + "/fixtures/vivify.json", tmp, step());
   }, function () {
-    strata = new Strata(tmp, { leafSize: 3, branchSize: 3 });
+    strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 });
     strata.open(step());
   }, function () {
     strata.vivify(step());

@@ -25,7 +25,7 @@ require("./proof")(4, function (step, ok, equal, Strata, tmp, deepEqual,
 
   }, function () {
 
-    strata = new Strata(tmp, { leafSize: 3, branchSize: 3, tracer: tracer });
+    strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3, tracer: tracer });
     strata.open(step());
 
   }, function () {

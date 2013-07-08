@@ -5,7 +5,7 @@ require("./proof")(4, function (step, tmp, Strata, ok, equal, load, objectify, s
 
   step(function () {
 
-    strata = new Strata(tmp, { leafSize: 3, branchSize: 3 });
+    strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 });
     strata.create(step());
 
   }, function () {

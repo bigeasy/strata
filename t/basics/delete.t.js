@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 var fs = require('fs');
 require('./proof')(3, function (Strata, step, tmp,  load, objectify, serialize, gather, deepEqual) {
-  var strata = new Strata(tmp, { leafSize: 3, branchSize: 3 });
+  var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 });
   step(function () {
     serialize(__dirname + '/fixtures/split.before.json', tmp, step());
   }, function () {

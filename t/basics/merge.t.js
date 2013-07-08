@@ -5,7 +5,7 @@ require("./proof")(3, function (Strata, tmp, load, objectify, serialize, deepEqu
   step(function () {
     serialize(__dirname + "/fixtures/merge.before.json", tmp, step());
   }, function () {
-    strata = new Strata(tmp, { leafSize: 3, branchSize: 3 });
+    strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 });
     strata.open(step());
   }, function () {
     strata.mutator("b", step());

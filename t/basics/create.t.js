@@ -8,7 +8,7 @@ require("./proof")(5, function (Strata, equal, deepEqual, say, tmp, step, ok, lo
 
   }, function () {
 
-    strata = new Strata(tmp, { leafSize: 3, branchSize: 3 });
+    strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 });
     strata.create(step());
 
   }, function () {
@@ -29,7 +29,7 @@ require("./proof")(5, function (Strata, equal, deepEqual, say, tmp, step, ok, lo
 
     deepEqual(actual, expected, "written");
 
-    strata = new Strata(tmp, { leafSize: 3, branchSize: 3 });
+    strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 });
     strata.open(step());
 
   }, function () {

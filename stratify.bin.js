@@ -20,7 +20,7 @@ var cadence = require('cadence'), ok = require('assert'), fs = require('fs');
 var stringify = require('./t/proof').stringify;
 
 require('arguable').parse(__filename, process.argv.slice(2), function (options) {
-  var strata = new Strata(options.params.directory, { branchSize: 3, leafSize: 3 });
+  var strata = new Strata({ directory: options.params.directory, branchSize: 3, leafSize: 3 });
 
   var actions = {};
 

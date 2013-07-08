@@ -12,7 +12,7 @@ require("./proof")(1, function (step, Strata, deepEqual, tmp, insert, load, obje
     error.code = "EACCES";
     callback(error);
   }
-  var strata = new Strata(tmp, { fs: proxy, leafSize: 3 });
+  var strata = new Strata({ directory: tmp, fs: proxy, leafSize: 3 });
 
   step(function () {
     serialize(__dirname + "/../basics/fixtures/split.before.json", tmp, step());

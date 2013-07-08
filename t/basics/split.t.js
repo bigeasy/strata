@@ -6,7 +6,7 @@ require("./proof")(3, function (step, tmp, serialize, deepEqual, load, objectify
   step(function () {
     serialize(__dirname + "/fixtures/split.before.json", tmp, step());
   }, function () {
-    strata = new Strata(tmp, { leafSize: 3, branchSize: 3 });
+    strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 });
     strata.open(step());
   }, function () {
     strata.mutator("b", step());

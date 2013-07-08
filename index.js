@@ -282,8 +282,9 @@ function classify () {
 // configurable to use any of the `crypto` module hashes or no checksum at all.
 
 //
-function Strata (directory, options) {
-  var extractor = options.extractor || extract
+function Strata (options) {
+  var directory = options.directory
+    , extractor = options.extractor || extract
     , comparator = options.comparator || compare
     , fs = options.fs || require('fs')
     , ok = function (condition, message) { if (!condition) throw new Error(message) }
