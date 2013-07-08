@@ -2626,35 +2626,48 @@ function Strata (directory, options) {
     // insert the next record on this page as long as we're here, but we leaf
     // traversal is inefficient for our range,  so don't try too hard.
     //
-    // If she is only inserting a single record, there's no ambiguity, because
-    // she'll use the key of the record to create the mutator. There is no need
+    // If we are only inserting a single record, there's no ambiguity, because
+    // we'll use the key of the record to create the mutator. There is no need
     // to enable peek for a single insert, but there is no real cost either.
     //
     // #### Duplicate Keys
     //
     // Although duplicate keys are not allowed, abstracted duplicate keys are
-    // not difficult for the application developer to implement given a mutator.
-    // The application developer can move forward through a series and append a
-    // record that has one greater than the maximum record.  Not a problem to
-    // worry about ambiguity in this case. Ah, we need to peek though, because
-    // we need to get that number.
+    // not difficult for the application developer to implement. One simply adds
+    // a hidden series value to the key. This creates a series of records in the
+    // leaf pages that have an identical user key disambiguated by the series
+    // value.
     //
-    // **TK**: Fix.
+    // Given a key plus a maximum series value, you will always land after the
+    // last one the series, or else a record that is less than the key, which
+    // means that the series is zero. 
     //
-    // In fact, given a key plus a maximum series value, you will always land
-    // after the last one the series, or else a record that is less than the
-    // key, which means that the series is zero. Deleted keys present a problem,
-    // so we need to expose a leaf page key to the user, which, in case of a
-    // delete, is definitely the greatest in the series.
+    // The maximum series value is a module developer choice, so chose a
+    // `Number`. That way you can search using `Number.MAX_VALUE` as the series
+    // value and you will always land at the spot where a new record should be
+    // appended. The correct series value to store is the series value of the
+    // record at the given insert index plus one if the key is identical, zero
+    // if it is not.
     //
     // **TODO**: Zero is a valid index for the left most leaf page.
-
-    // If the insert index of the record is after the last record, and upon
-    // peeking at the first record of the right sibling leaf page we determine
-    // that the record belongs on a subsequent page, `insert` return `null`.
     //
-    // An exception is raised if the record belongs in a page that is a left
-    // sibling leaf page of the current leaf page.
+    // #### Insert
+
+    // As noted elsewhere, you will provide an insert index, but you will
+    // provide one that you've obtained from either the `Cursor` or through a
+    // call to `indexOf`. Get the correct index, then toddle over to `insert`
+    // and give `insert` the correct index.
+    // 
+    // Why is this index not encapsulated? Because the descent will have
+    // performed a binary search on the leaf, stored the result in the `index`
+    // property of the cursor, and we don't want to repeat that binary search
+    // because we're stingy.
+    //
+    // At some point, you're going to want come back and reconsider
+    // encapsulation. Please, don't. Before long, we're going to want to expose
+    // more the properties of the b&#x2011;tree, not hide them. Encapsulation is
+    // not your friend. It makes you look at this data structure as a black box,
+    // and it is not a black box.
 
     //  &mdash;
 
@@ -2665,12 +2678,22 @@ function Strata (directory, options) {
     // check that the record does not actually belong in a subsequent sibling
     // leaf page.
     //
+    // If the insert index of the record is `0` and this is not the first leaf
+    // page of the tree, `insert` will return `false` indicating that the record
+    // does not belong in the current leaf page.
+    //
     // If there is a right sibling leaf page, it will load the right sibling
     // leaf page and check that the leaf is less than the key of the right
     // sibling leaf page. If the key of the insert record is greater than the
     // key of the right sibling leaf page, then the record does not belong in
     // this leaf page. The record will not be inserted. The method returns
     // `false`.
+    //
+    // If the insert index of the record is after the last record, and upon
+    // peeking at the first record of the right sibling leaf page we determine
+    // that the record belongs on a subsequent page, `insert` will return
+    // `false` indicating that the record does not belong in the current leaf
+    // page.
     //
     // This method will happily accept all other forms of invalid data. The
     // application developer is responsible for maintaining the collation order
@@ -2699,9 +2722,13 @@ function Strata (directory, options) {
 
       // On every leaf page except the first leaf page of the descent (not of
       // the entire tree), the least record is the key, and inserted records are
-      // always greater than the key. We assert this here. Do not catch this
-      // exception, debug your code.
-      ok(index != 0 || page.address == -1, "lesser key");
+      // always greater than the key. Thus, if we have an index of zero and we
+      // are not the first leaf page, the record does not belong in this leaf
+      // page.
+      if (index == 0 && page.address != -1) {
+        callback(null, false);
+        return;
+      }
 
       // An insert location is ambiguous if it would append the record to the
       // current leaf page.
