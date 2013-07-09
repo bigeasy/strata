@@ -136,6 +136,7 @@ would warrant an early flush.
 
 ## Changes for Next Release
 
+ * Return an comparative integer from `Cursor.insert`. #112.
  * Peek of next page during insert with read lock, release immediately. #111.
  * Mutator should return false if index is to low instead of asserting. #110.
  * All Strata constructor options should be in the `options` hash. #109.

@@ -2677,15 +2677,21 @@ function Strata (options) {
     // leaf page.
     //
     // If the insert index of the record is `0` and this is not the first leaf
-    // page of the tree, `insert` will return `false` indicating that the record
-    // does not belong in the current leaf page.
+    // page of the tree, `insert` will return `-1` indicating that the record
+    // belongs in a leaf page to the left of the current leaf page. This is
+    // unambiguous, but it will always require that you descend the tree to find
+    // the correct leaf leaf page for insert.
     //
     // If there is a right sibling leaf page, it will load the right sibling
     // leaf page and check that the leaf is less than the key of the right
     // sibling leaf page. If the key of the insert record is greater than the
     // key of the right sibling leaf page, then the record does not belong in
-    // this leaf page. The record will not be inserted. The method returns
-    // `false`.
+    // this leaf page. The record will not be inserted. The method returns `1`
+    // indicating that the record belongs in a leaf page to the right of the
+    // current leaf page. Because the right leaf page key is cached, the right
+    // leaf page key may change, so the `+1` result is probably correct,
+    // possibly incorrect, but the correct course of action it to descend the
+    // tree again which is always correct and resolves the ambiguity.
     //
     // If the insert index of the record is after the last record, and upon
     // peeking at the first record of the right sibling leaf page we determine
@@ -2724,7 +2730,7 @@ function Strata (options) {
       // are not the first leaf page, the record does not belong in this leaf
       // page.
       if (index == 0 && page.address != -1) {
-        callback(null, false);
+        callback(null, -1);
         return;
       }
 
@@ -2788,7 +2794,7 @@ function Strata (options) {
 
         function compare () {
           if (comparator(key, rightLeafKey) < 0) insert();
-          else callback(null, false);
+          else callback(null, +1);
         }
       }
 
@@ -2818,7 +2824,7 @@ function Strata (options) {
         }
 
         function close () {
-          callback(null, true);
+          callback(null, 0);
         }
       }
     }

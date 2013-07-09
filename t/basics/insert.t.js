@@ -20,7 +20,7 @@ require("./proof")(4, function (step, tmp, Strata, ok, equal, load, objectify, s
 
     }, function (inserted) {
 
-      ok(inserted, "inserted");
+      equal(inserted, 0, "inserted");
 
       cursor.unlock()
 

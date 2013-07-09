@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(3, function (step, Strata, tmp, deepEqual, serialize, gather, ok) {
+require('./proof')(3, function (step, Strata, tmp, deepEqual, serialize, gather, equal) {
   var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 }), fs = require('fs'), ambiguity = [];
   step(function () {
     serialize(__dirname + '/fixtures/ambiguous.before.json', tmp, step());
@@ -20,11 +20,11 @@ require('./proof')(3, function (step, Strata, tmp, deepEqual, serialize, gather,
       cursor.insert('z', 'z', ~index, step());
     }, function (unambiguous) {
       ambiguity.unshift(unambiguous);
-      if (!ambiguity[0]) {
+      if (ambiguity[0]) {
         step.jump(page);
         cursor.next(step());
       } else {
-        deepEqual(ambiguity, [ true, false, false, false ], 'unambiguous');
+        deepEqual(ambiguity, [ 0, 1, 1, 1 ], 'unambiguous');
         cursor.unlock();
       }
     });
