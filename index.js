@@ -2638,7 +2638,7 @@ function Strata (options) {
     //
     // Given a key plus a maximum series value, you will always land after the
     // last one the series, or else a record that is less than the key, which
-    // means that the series is zero. 
+    // means that the series is zero.
     //
     // The maximum series value is a module developer choice, so chose a
     // `Number`. That way you can search using `Number.MAX_VALUE` as the series
@@ -2655,7 +2655,7 @@ function Strata (options) {
     // provide one that you've obtained from either the `Cursor` or through a
     // call to `indexOf`. Get the correct index, then toddle over to `insert`
     // and give `insert` the correct index.
-    // 
+    //
     // Why is this index not encapsulated? Because the descent will have
     // performed a binary search on the leaf, stored the result in the `index`
     // property of the cursor, and we don't want to repeat that binary search

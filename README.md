@@ -116,7 +116,7 @@ function openOrCreate (directory, callback) {
 
 openOrCreate('/home/alan/strata', function (error, strata) {
   if (error) throw error;
-  
+
   // Do something with an open b&#x2011;tree...
 });
 ```
@@ -167,7 +167,7 @@ function hasKey (strata, sought, callback) {
   strata.iterator(sought, check(atLeaf));
 
   function atLeaf (cursor) {
-    found = cursor.index >= 0; 
+    found = cursor.index >= 0;
     cursor.unlock();
     callback(null, found);
   }

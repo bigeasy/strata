@@ -20,9 +20,9 @@ require("./proof")(1, function (step, Strata, deepEqual, tmp, insert, load, obje
     strata.open(step());
   }, function () {
     insert(step, strata, [ "b" ]);
-  }, function () {
-    strata.balance(step(Error));
-  }, function (error) {
+  }, [function () {
+    strata.balance(step());
+  }, function (_, error) {
     equal(error.code, "EACCES", "unlink error");
-  });
+  }]);
 });

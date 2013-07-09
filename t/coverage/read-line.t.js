@@ -7,18 +7,18 @@ require("./proof")(2, function (step, Strata, deepEqual, tmp, insert, load, obje
   }, function () {
     strata = new Strata({ directory: tmp });
     strata.open(step());
-  }, function () {
-    strata.iterator('a', step(Error));
-  }, function (error) {
+  }, [function () {
+    strata.iterator('a', step());
+  }, function (_, error) {
     equal(error.message, 'corrupt line: cannot split line: x x\n', 'cannot split');
-  }, function () {
+  }], function () {
     fs.writeFile(tmp + '/segment00000000', 'x 0\n', 'utf8', step());
   }, function () {
     strata = new Strata({ directory: tmp });
     strata.open(step());
-  }, function () {
-    strata.iterator('a', step(Error));
-  }, function (error) {
+  }, [function () {
+    strata.iterator('a', step());
+  }, function (_, error) {
     equal(error.message, 'corrupt line: invalid checksum', 'invalid checksum');
-  });
+  }]);
 });
