@@ -1,0 +1,175 @@
+/*-----------------------------------*\
+    $GRID
+  \*-----------------------------------*/
+* {
+  margin: 0;
+  padding: 0;
+  position: relative;
+  -webkit-box-sizing: border-box;
+  /* border-box is new to me, AG */
+
+  -moz-box-sizing: border-box;
+  /* https://pinboard.in/u:alan/t:border/t:box */
+
+  box-sizing: border-box;
+}
+.grid {
+  max-width: 100%;
+}
+.unit {
+  display: inline-block;
+  *display: inline;
+  *zoom: 1;
+  vertical-align: top;
+  /* Clearfix */
+
+  overflow: hidden;
+  *overflow: visible;
+}
+.span-grid {
+  width: 100%;
+}
+.one-of-two {
+  width: 50%;
+}
+.one-of-three {
+  width: 33.333333333%;
+}
+.two-of-three {
+  width: 66.666666666%;
+}
+.one-of-four {
+  width: 25%;
+}
+.three-of-four {
+  width: 75%;
+}
+.one-of-five {
+  width: 20%;
+}
+.two-of-five {
+  width: 40%;
+}
+.three-of-five {
+  width: 60%;
+}
+.four-of-five {
+  width: 80%;
+}
+/* vim: set ts=4 sw=4: */
+html {
+  background: #f7f7f7;
+  font-size: 100%;
+  color: #1a1a1a;
+}
+body {
+  font-family: Helvetica;
+  margin: 0 auto;
+  padding: 0 0;
+}
+img {
+  max-width: 100%;
+}
+.container {
+  /* Whatever you want. They’re your oats. */
+
+  max-width: 60em;
+  margin: 0 auto;
+  padding: 0 0;
+}
+.unit.welcome {
+  width: 100%;
+}
+.unit.welcome h1 {
+  font-family: "ABeeZee", "Georgia", sans-serif;
+  /*font-size: 48pt;*/
+
+  font-weight: normal;
+  font-size: 72pt;
+  margin-top: 0.5em;
+  margin-bottom: 0.25em;
+}
+.unit {
+  padding: 0 36px;
+}
+.unit.value-proposition {
+  width: 100%;
+}
+.unit.value-proposition p {
+  margin: 1em 0;
+}
+.unit.description {
+  font-family: "Helvetica", "Raleway", "Merriweather", "Maven Pro", "Helvetica", serif;
+}
+.unit.description p {
+  font-size: 1.45em;
+  margin: 1em 0;
+  /* todo: not working in chrome */
+
+  font-weight: 100;
+}
+.unit.description p strong {
+  font-weight: 700;
+}
+.unit.description ul {
+  font-size: 1.45em;
+  margin: 1em 0;
+  padding-left: 2em;
+}
+.unit.description h2 {
+  font-family: "Inconsolata";
+  font-weight: normal;
+  font-size: 2em;
+  font-style: italic;
+  margin: 1em 0;
+}
+.unit.description h3 {
+  font-family: "Inconsolata";
+  font-weight: normal;
+  font-size: 1.5em;
+}
+.unit.description a {
+  color: #4682b4;
+}
+.unit.description a:visited {
+  color: #9370db;
+}
+.unit.description p code {
+  font-family: "Oxygen Mono";
+  font-size: 0.85em;
+  background: white;
+  padding: 0 0.25em;
+  border: 1px dotted #ccc;
+}
+.unit.benefit {
+  padding: 1em;
+  width: 33.333333333%;
+}
+.unit.benefit h2 {
+  text-align: center;
+  font-size: 1em;
+  margin-bottom: 1em;
+}
+.unit.verbiage {
+  width: 100%;
+}
+.unit.verbiage h2 {
+  font-size: 1em;
+  margin-bottom: 1em;
+}
+.unit.verbiage p {
+  margin-bottom: 1em;
+}
+.unit.description {
+  width: 100%;
+}
+.unit.description .highlight > pre {
+  margin: 2em 0;
+  padding: 1em;
+  font-size: 1.15em;
+  font-family: "Oxygen Mono", 'Monaco', 'Cutive Mono', 'Oxygen Mono', monospace;
+}
+.unit.sidebar {
+  width: 25%;
+}
+/* vim: set ts=4 sw=4: */
