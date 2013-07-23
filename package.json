@@ -1,10 +1,19 @@
 { "name" : "b-tree"
-, "version" : "0.0.3"
+, "version" : "0.0.4"
 , "description" : "Evented I/O B-tree in pure JavaScript for Node.js"
 , "url" : "http://bigeasy.github.com/strata"
-, "keywords" : ["btree", "database", "json", "b-tree"]
+, "keywords" : ["btree", "database", "json", "b-tree", "concurrent", "atomic", "duriable", "isolated", "consistent"]
 , "author" : "Alan Gutierrez <alan@prettyrobots.com>"
-, "contributors" : []
+, "contributors" : [
+      { "name": "Demarius Chrite"
+      , "email": "demarius.chrite@gmail.com"
+      , "url": "https://github.com/demarius"
+      }
+      ,
+      { "name": "Nami-Doc"
+      , "url": "https://github.com/Nami-Doc"
+      }
+    ]
 , "devDependencies": { "proof": "0.0.32" }
 , "scripts" : { "test": "proof platform win32 && proof test */*/*.t.js || t/test" }
 , "engines" : { "node": "> 0.8.0" }
