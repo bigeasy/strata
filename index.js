@@ -1910,7 +1910,7 @@ function Strata (options) {
       locks.shift()
       // Each callback is scheduled using next tick. If any callback waits on
       // I/O, then another one will resume. Concurrency.
-      locks[0].forEach(function (callback) {
+      locks[0].slice().forEach(function (callback) {
         process.nextTick(function () { callback(null, page) });
       });
     }
