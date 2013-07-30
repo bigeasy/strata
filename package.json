@@ -21,6 +21,7 @@
         "test": "proof platform win32 && proof test */*/*.t.js || t/test"
     },
     "homepage": "https://github.com/bigeasy/strata",
+    "bugs": "https://github.com/bigeasy/strata/issues",
     "licenses": [{
         "type": "MIT",
         "url": "http://github.com/bigeasy/strata/raw/master/LICENSE"
