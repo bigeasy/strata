@@ -1808,8 +1808,6 @@ function Strata (options) {
   //
   // TODO Throw? Who's catching these?
   function checkJSONSize (page) {
-  //Unused; we don't really see a reason to continue keeping track of the
-  //stringified object outside of development.
     var size = 0, position, object;
     if (page.address < 0) {
       if (page.positions.length) {
@@ -1817,8 +1815,6 @@ function Strata (options) {
       }
       for (position in page.cache) {
         object = page.cache[position];
-        ok(object.size == JSON.stringify({ record: object.record, key: object.key }).length,
-          "sizes are wrong");
         size += object.size
       }
     } else {
@@ -1874,6 +1870,7 @@ function Strata (options) {
           // Otherwise, we delete the load list, because no load list means the
           // page is loaded.
           } else {
+            checkJSONSize(page);
             delete page.load
           }
         }
@@ -1887,6 +1884,7 @@ function Strata (options) {
     // If the page is already loaded, we wave the descent on through.
     } else {
       //
+      checkJSONSize(page);
       callback(null, page);
     }
   }
@@ -1902,6 +1900,7 @@ function Strata (options) {
   function unlock (page) {
     // Note that it is not possible for this method to be called on an page that
     // has not already been loaded.
+    checkJSONSize(page);
     var locks = page.locks;
     locks[0].shift()
     // Stop when we find a lock queue that has outstanding descents, or when we
