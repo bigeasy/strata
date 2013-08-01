@@ -9,7 +9,7 @@ require("./proof")(2, function (Strata, tmp, step, equal) {
     strata.close(step());
   }, function () {
     strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 });
-    strata.open(step())
+    strata.open(step());
   }, function () {
     equal(strata.size, 0, "json size");
     equal(strata.nextAddress, 2, "next address");

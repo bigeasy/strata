@@ -295,20 +295,20 @@ function Strata (options) {
     , balancer = new Balancer()
     , balancing
     , size = 0
-    , hash = options.checksum || "sha1"
+    , hash = options.checksum || { algorithm: "sha1", count: 0 }
     , checksum
     , crypto
     , constructors = {}
     , tracer = options.tracer || function () { arguments[2]() }
     ;
 
-  switch (hash) {
+  switch (hash.algorithm) {
   case "none":
     checksum = function () { return 0 }
     break;
   default:
     crypto = require("crypto");
-    checksum = function (m) { return crypto.createHash(hash).update(m).digest("hex") }
+    checksum = function (m) { return crypto.createHash(hash.algorithm).update(m).digest("hex") }
   }
 
   function validator (callback) {

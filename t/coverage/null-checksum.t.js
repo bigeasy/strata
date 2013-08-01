@@ -2,7 +2,7 @@
 
 require("./proof")(1, function (step, Strata, equal, ok, tmp) {
   var fs = require('fs'), path = require('path');
-  var strata = new Strata({ directory: tmp, checksum: "none" }) ;
+  var strata = new Strata({ directory: tmp, checksum: { algorithm: "none" } }) ;
 
   step(function () {
     strata.create(step());
