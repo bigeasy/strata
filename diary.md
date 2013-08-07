@@ -123,6 +123,12 @@ This is fantasitic. Do it.
  database design.
  * Creating a r-tree would be yet another primitive for database design.
  * Naming functions build by validator `check` is confusing.
+ * Wondering why I don't put `leaf` and `branch` onto the file names as
+   suffixes, and also, not sure I care if the files have the prefix `segment`.
+   It is going to be easier to format the file names without that.
+ * Since I'm already doing negative and positive inside strata, why don't I use
+   even and odd? That would be consistent with the file system, one
+   representation everywhere.
 
 ## Delayed Writes
 
