@@ -287,6 +287,7 @@ function Strata (options) {
     , extractor = options.extractor || extract
     , comparator = options.comparator || compare
     , fs = options.fs || require('fs')
+    , path = options.path || require('path')
     , ok = function (condition, message) { if (!condition) throw new Error(message) }
     , cache = {}
     , mru = { address: null }
@@ -388,11 +389,9 @@ function Strata (options) {
 
   // Create a file name for a given address with an optional suffix.
   function filename (address, suffix) {
-    var padding;
     address = Math.abs(address);
     suffix || (suffix = "");
-    padding = "00000000".substring(0, 8 - String(address).length);
-    return directory + "/segment" + padding + address + suffix;
+    return path.join(directory, address + suffix)
   }
 
   // Move a replacement page file into place. Unlink the existing page file, if
@@ -1627,9 +1626,8 @@ function Strata (options) {
 
     function list (files) {
       files.forEach(function (file) {
-        var $;
-        if ($ = /^segment(\d+)$/.exec(file)) {
-          nextAddress = Math.max(+($[1]) + 1, nextAddress);
+        if (/^\d+$/.test(file)) {
+          nextAddress = Math.max(+(file) + 1, nextAddress);
         }
       });
       callback(null);

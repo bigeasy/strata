@@ -80,7 +80,9 @@ function load (segments, callback) {
   function parse (json) {
     json = JSON.parse(json);
     for (var file in json) {
-        json[file] = json[file].map(fix);
+        var id = file.replace(/^segment0*/, '') || '0'
+        json[id] = json[file].map(fix);
+        delete json[file]
     }
     callback(null, json);
   }
@@ -158,6 +160,7 @@ function serialize (segments, directory, callback) {
         position += record.length + 1;
       });
       records = records.join("\n") + "\n";
+      console.log(segment)
       fs.writeFile(path.resolve(directory, segment), records, "utf8", check(callback, written));
     });
 
