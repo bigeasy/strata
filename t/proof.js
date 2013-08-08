@@ -11,6 +11,24 @@ function check (callback, forward) {
   }
 }
 
+function fixup () {
+    var leafy
+    return function (json, index) {
+        if (!index && Array.isArray(json[json.length - 1])) {
+            leafy = true
+        }
+        if (leafy && !json[0]) {
+            var positions = json[json.length - 1]
+            var ordered = positions.slice().sort(function (a, b) { return a - b })
+            var positions = positions.map(function (pos) {
+                return ordered.indexOf(pos)
+            })
+            json[json.length - 1] = positions
+        }
+        return json
+    }
+}
+
 function objectify (directory, callback) {
   var files, segments = {}, count = 0;
 
@@ -29,11 +47,13 @@ function objectify (directory, callback) {
     fs.readFile(path.resolve(directory, file), "utf8", check(callback, lines));
 
     function lines (lines) {
+      var fix = fixup()
       lines = lines.split(/\n/);
       lines.pop();
-      lines.forEach(function (json) {
+      lines.forEach(function (json, index) {
         json = json.replace(/[\da-f]+$/, "");
-        segments[file].push(JSON.parse(json));
+        json = fix(JSON.parse(json), index);
+        segments[file].push(json);
       });
       read();
     }
@@ -53,9 +73,17 @@ function stringify (directory, callback) {
 }
 
 function load (segments, callback) {
+  var fix = fixup();
+
   fs.readFile(segments, "utf8", check(callback, parse));
 
-  function parse (json) { callback(null, JSON.parse(json)) }
+  function parse (json) {
+    json = JSON.parse(json);
+    for (var file in json) {
+        json[file] = json[file].map(fix);
+    }
+    callback(null, json);
+  }
 }
 
 function insert (step, strata, values) {
@@ -108,10 +136,26 @@ function serialize (segments, directory, callback) {
 
     files.forEach(function (segment) {
       var records = [];
+      var leafy = Array.isArray(segments[segment][segments[segment].length - 1]);
+      var positions = [];
+      var position = 0;
       segments[segment].forEach(function (line) {
+        if (leafy)  {
+            if (!line[0]) {
+                positions = line.pop().map(function (index) {
+                    return positions[index]
+                });
+                line.push(positions.slice())
+                positions.length = 0
+            } else {
+                positions.push(position);
+            }
+        }
         var record = [ JSON.stringify(line) ];
         record.push(crypto.createHash("sha1").update(record[0]).digest("hex"));
-        records.push(record.join(" "));
+        record = record.join(" ");
+        records.push(record);
+        position += record.length + 1;
       });
       records = records.join("\n") + "\n";
       fs.writeFile(path.resolve(directory, segment), records, "utf8", check(callback, written));
@@ -187,4 +231,5 @@ module.exports = function (dirname) {
     });
   });
 };
+
 module.exports.stringify = stringify;
