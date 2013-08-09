@@ -93,6 +93,8 @@ require("./proof")(4, function (step, ok, equal, Strata, tmp, deepEqual,
   }, function (actual, expected) {
 
     deepEqual(actual, expected, 'merge');
+//    console.log(require('util').inspect(actual, false, null));
+//    console.log(require('util').inspect(expected, false, null));
 
     strata.close(step());
 

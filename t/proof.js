@@ -255,14 +255,10 @@ function createDirectory (json) {
 
   var checksum = 40;
 
-  function addressify (address) {
-    return address % 2 ? - address : address;
-  }
-
   for (var address in json) {
     var object = json[address];
     if (object.children) {
-      directory[address] = [ object.children.map(addressify) ];
+      directory[address] = [ object.children ];
     } else {
       var ghosts = 0;
       var positions = [];
@@ -274,7 +270,7 @@ function createDirectory (json) {
         var index;
         switch (entry.type) {
         case 'pos':
-          record = [ 0, 1, addressify(object.right || 0), ghosts, count + 1, positions.slice() ];
+          record = [ 0, 1, object.right || 0, ghosts, count + 1, positions.slice() ];
           break;
         case 'add':
           records++;

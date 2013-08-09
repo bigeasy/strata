@@ -389,7 +389,6 @@ function Strata (options) {
 
   // Create a file name for a given address with an optional suffix.
   function filename (address, suffix) {
-    address = Math.abs(address);
     suffix || (suffix = "");
     return path.join(directory, address + suffix)
   }
@@ -609,9 +608,13 @@ function Strata (options) {
   // The in memory representation of the leaf page includes the address of the
   // leaf page, the page address of the next leaf page, and a cache that maps
   // record file positions to records that have been loaded from the file.
-  function createLeaf (address, override) {
+  function createLeaf (override) {
+    if (override.address == null) {
+        while (!(nextAddress % 2)) nextAddress++;
+        override.address = nextAddress++;
+    }
     var page =
-    { address: address
+    { address: -1
     , cache: {}
     , entries: 0
     , locks: [[]]
@@ -1029,7 +1032,7 @@ function Strata (options) {
         ok(entry == ++page.entries, "leaf corrupt: incorrect entry position");
         if (index > 0) {
           splice(page, index - 1, 0, position);
-        } else if (~index == 0 && page.address != -1) {
+        } else if (~index == 0 && page.address != 1) {
           ok(!page.ghosts, "double ghosts");
           page.ghosts++
         } else {
@@ -1391,9 +1394,13 @@ function Strata (options) {
   // because the in memory page is used for locking.
 
   //
-  function createBranch (address, override) {
+  function createBranch (override) {
+    if (override.address == null) {
+        while (nextAddress % 2) nextAddress++;
+        override.address = nextAddress++;
+    }
     var page =
-    { address: address
+    { address: -1
     , addresses: []
     , cache: {}
     , locks: [[]]
@@ -1559,8 +1566,8 @@ function Strata (options) {
          "database " + directory + " is not empty.");
 
       // Create a root branch with a single empty leaf.
-      root = encache(createBranch(nextAddress++, { penultimate: true }));
-      leaf = encache(createLeaf(-(nextAddress++)));
+      root = encache(createBranch({ penultimate: true }));
+      leaf = encache(createLeaf({}));
       splice(root, 0, 0, leaf.address);
 
       // Write the root and leaf branches.
@@ -1742,7 +1749,7 @@ function Strata (options) {
     } else {
       // Create a page to load with an empty `load` queue. The presence of the
       // `load` queue indicates that the page needs to be read from file.
-      page = encache(constructors[address < 0 ? "leaf" : "branch"](address, { load: [] }));
+      page = encache(constructors[address % 2 ? "leaf" : "branch"]({ address: address, load: [] }));
     }
 
     // #### Lock Implementation
@@ -1807,7 +1814,7 @@ function Strata (options) {
   // TODO Throw? Who's catching these?
   function checkJSONSize (page) {
     var size = 0, position, object;
-    if (page.address < 0) {
+    if (page.address % 2) {
       if (page.positions.length) {
         size += JSON.stringify(page.positions).length
       }
@@ -1873,7 +1880,7 @@ function Strata (options) {
           }
         }
         // Invoke the correct read function for the page type.
-        if (page.address < 0) {
+        if (page.address % 2) {
           readLeaf(page, loaded);
         } else {
           readBranch(page, loaded);
@@ -1950,7 +1957,7 @@ function Strata (options) {
   // both branch pages and leaf pages.
   function designate (page, index, callback) {
     var key;
-    if (page.address < 0) {
+    if (page.address % 2) {
       stash(page, page.positions[index], validate(callback, function (entry) {
         callback(null, entry.key);
       }));
@@ -1964,7 +1971,7 @@ function Strata (options) {
 
       function next () {
         var key;
-        if (iter.address >= 0) {
+        if (!(iter.address % 2)) {
           lock(iter.addresses[iterIndex], false, validate(callback, function (locked) {
             iterIndex = 0;
             stack.push(iter = locked);
@@ -2273,7 +2280,7 @@ function Strata (options) {
     // Follow the path for the given key.
     function key (key) {
       return function (callback) {
-        return find(page, key, page.address < 0 ? page.ghosts : 1, callback);
+        return find(page, key, page.address % 2 ? page.ghosts : 1, callback);
       }
     }
 
@@ -2320,10 +2327,10 @@ function Strata (options) {
     function address (address) { return function () { return page.address == address } };
 
     // Stop when we reach a penultimate branch page.
-    function penultimate () { return page.addresses[0] < 0 }
+    function penultimate () { return page.addresses[0] % 2 }
 
     // Stop when we reach a leaf page.
-    function leaf () { return page.address < 0 }
+    function leaf () { return page.address % 2 }
 
     // Stop when we reach a certain depth in the tree relative to the current
     // depth.
@@ -2395,13 +2402,13 @@ function Strata (options) {
       }
 
       function directed ($index) {
-        if (page.address >= 0 && $index < 0) {
+        if (!(page.address % 2) && $index < 0) {
           index = (~$index) - 1;
         } else {
           index = $index;
         }
         indexes[page.address] = index;
-        if (uncaching && page.address >= 0) {
+        if (uncaching && !(page.address % 2)) {
           uncacheKey(page, page.addresses[index]);
         }
         downward();
@@ -2725,7 +2732,7 @@ function Strata (options) {
       // always greater than the key. Thus, if we have an index of zero and we
       // are not the first leaf page, the record does not belong in this leaf
       // page.
-      if (index == 0 && page.address != -1) {
+      if (index == 0 && page.address != 1) {
         callback(null, -1);
         return;
       }
@@ -2831,7 +2838,7 @@ function Strata (options) {
     // the `page`.
     function remove (index, callback) {
       // If we're deleting the leaf page key, we ghost the key.
-      var ghost = page.address != -1 && index == 0
+      var ghost = page.address != 1 && index == 0
         , check = validator(callback)
         , fd
         ;
@@ -3492,7 +3499,7 @@ function Strata (options) {
         // Linking to sibling nodes is not performed here.
         function nodify (next) {
           return check(function (page) {
-            ok(page.address < 0, "leaf page expected");
+            ok(page.address % 2, "leaf page expected");
             designate(page, 0, check(identified));
             function identified (key) {
               node = { key: key,
@@ -3518,7 +3525,7 @@ function Strata (options) {
         // page for a split, but not a merge.
         function checkMerge(node) {
           if (node.length - length < 0) {
-            if (node.address != -1 && ! node.left) leftSibling(node);
+            if (node.address != 1 && ! node.left) leftSibling(node);
             else rightSibling(node);
           } else {
             next();
@@ -3627,7 +3634,7 @@ function Strata (options) {
         // its list, because we know it cannot merge with its neighbors.
         if (difference > 0 && node.length > options.leafSize) {
           // Schedule the split.
-          operations.push({  method: "splitLeaf", parameters: [ node.key, ghosts[node.address] ] });
+          operations.unshift({  method: "splitLeaf", parameters: [ node.key, ghosts[node.address] ] });
           // If there's a ghost, delete it from within `splitLeaf`.
           delete ghosts[node.address];
           // Unlink this split node, so that we don't consider it when merging.
@@ -3667,7 +3674,7 @@ function Strata (options) {
         // sibling will be destroyed, so we don't have to tidy up its ghosts.
         if (node.right) {
           ok(!node.right.right, "merge pair still linked to sibling");
-          operations.push({
+          operations.unshift({
             method: "mergeLeaves",
             parameters: [ node.right.key, lengths, !!ghosts[node.address] ]
           });
@@ -3820,7 +3827,7 @@ function Strata (options) {
       // Create a new page with some of the children of the split page.
       function shuffle () {
         // Create a new leaf page.
-        page = createLeaf(-(nextAddress++), { loaded: true });
+        page = createLeaf({ loaded: true });
 
         // Link the leaf page to its siblings.
         page.right = right;
@@ -3999,7 +4006,7 @@ function Strata (options) {
 
       function paginate () {
         // Create a new branch page.
-        var page = createBranch(nextAddress++);
+        var page = createBranch({});
 
         // Add the branch page to our list of new child branch pages.
         children.push(page);
@@ -4115,7 +4122,7 @@ function Strata (options) {
 
       function paginate () {
         // Create a new branch page.
-        var page = createBranch(nextAddress++);
+        var page = createBranch({});
 
         // Add the branch page to our list of new child branch pages.
         children.push(page);
@@ -4523,7 +4530,7 @@ function Strata (options) {
         // We released our lock on the ancestor, but even if it is freed by a
         // cache purge, the properties we test here are still valid.
         if (ancestor.address == 0) {
-          if (ancestor.addresses.length == 1 && ancestor.addresses[0] > 0) {
+          if (ancestor.addresses.length == 1 && !(ancestor.addresses[0] % 2)) {
             fillRoot(callback);
           } else {
             callback(null);
@@ -4898,7 +4905,7 @@ function Strata (options) {
     function expand (parent, pages, index, callback) {
       if (index < pages.length) {
         var address = pages[index].address;
-        lock(address, false, check(address < 0 ? leaf : branch));
+        lock(address, false, check(address % 2 ? leaf : branch));
       } else {
         callback(null, pages);
       }

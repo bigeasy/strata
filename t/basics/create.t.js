@@ -13,7 +13,7 @@ require("./proof")(5, function (Strata, equal, deepEqual, say, tmp, step, ok, lo
 
   }, function () {
 
-    equal(strata.size, 4, "json size");
+    equal(strata.size, 3, "json size");
     strata.close(step());
 
   }, function () {
