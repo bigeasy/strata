@@ -28,8 +28,8 @@ require("./proof")(3, function (step, tmp, serialize, deepEqual, load, objectify
 
   }, function(actual, expected) {
 
-    say(expected);
     say(actual);
+    say(expected);
 
     deepEqual(actual, expected, "split");
 

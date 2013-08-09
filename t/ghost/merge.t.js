@@ -29,6 +29,8 @@ require('./proof')(1, function (step, Strata, tmp, deepEqual, serialize, load, o
     load(__dirname + '/fixtures/merge.after.json', step());
   }, function (actual, expected) {
     deepEqual(actual, expected, 'after balance');
+    console.log(require('util').inspect(actual, false, null))
+    console.log(require('util').inspect(expected, false, null))
     strata.close(step());
   });
 });

@@ -11,26 +11,8 @@ function check (callback, forward) {
   }
 }
 
-function fixup () {
-    var leafy
-    return function (json, index) {
-        if (!index && Array.isArray(json[json.length - 1])) {
-            leafy = true
-        }
-        if (leafy && !json[0]) {
-            var positions = json[json.length - 1]
-            var ordered = positions.slice().sort(function (a, b) { return a - b })
-            var positions = positions.map(function (pos) {
-                return ordered.indexOf(pos)
-            })
-            json[json.length - 1] = positions
-        }
-        return json
-    }
-}
-
 function objectify (directory, callback) {
-  var files, segments = {}, count = 0;
+  var files, dir = {}, count = 0;
 
   fs.readdir(directory, check(callback, list));
 
@@ -42,25 +24,23 @@ function objectify (directory, callback) {
   }
 
   function readFile (file) {
-    segments[file] = [];
+    dir[file] = [];
 
     fs.readFile(path.resolve(directory, file), "utf8", check(callback, lines));
 
     function lines (lines) {
-      var fix = fixup()
       lines = lines.split(/\n/);
       lines.pop();
       lines.forEach(function (json, index) {
         json = json.replace(/[\da-f]+$/, "");
-        json = fix(JSON.parse(json), index);
-        segments[file].push(json);
+        dir[file].push(JSON.parse(json));
       });
       read();
     }
   }
 
   function read () {
-    if (++count == files.length) callback(null, segments);
+    if (++count == files.length) callback(null, renumber(order(abstracted(dir))));
   }
 }
 
@@ -73,18 +53,10 @@ function stringify (directory, callback) {
 }
 
 function load (segments, callback) {
-  var fix = fixup();
-
   fs.readFile(segments, "utf8", check(callback, parse));
 
   function parse (json) {
-    json = JSON.parse(json);
-    for (var file in json) {
-        var id = file.replace(/^segment0*/, '') || '0'
-        json[id] = json[file].map(fix);
-        delete json[file]
-    }
-    callback(null, json);
+    callback(null, renumber(order(JSON.parse(json))));
   }
 }
 
@@ -133,39 +105,200 @@ function serialize (segments, directory, callback) {
   if (typeof segments == "string") load(segments, check(callback, write));
   else write (segments);
 
-  function write (segments) {
-    var files = Object.keys(segments), count = 0;
+  function write (json) {
+    var dir = createDirectory(json);
+    var files = Object.keys(dir);
+    var count = 0;
 
-    files.forEach(function (segment) {
+    files.forEach(function (file) {
       var records = [];
-      var leafy = Array.isArray(segments[segment][segments[segment].length - 1]);
-      var positions = [];
-      var position = 0;
-      segments[segment].forEach(function (line) {
-        if (leafy)  {
-            if (!line[0]) {
-                positions = line.pop().map(function (index) {
-                    return positions[index]
-                });
-                line.push(positions.slice())
-                positions.length = 0
-            } else {
-                positions.push(position);
-            }
-        }
+      dir[file].forEach(function (line) {
         var record = [ JSON.stringify(line) ];
         record.push(crypto.createHash("sha1").update(record[0]).digest("hex"));
         record = record.join(" ");
         records.push(record);
-        position += record.length + 1;
       });
       records = records.join("\n") + "\n";
-      console.log(segment)
-      fs.writeFile(path.resolve(directory, segment), records, "utf8", check(callback, written));
+      fs.writeFile(path.resolve(directory, String(file)), records, "utf8", check(callback, written));
     });
 
     function written () { if (++count == files.length) callback(null) }
   }
+}
+
+function convert (json) {
+  var leaves = {}, leaf = 1;
+  while (leaf) {
+    leaves[leaf] = true;
+    leaf = Math.abs(json[leaf].filter(function (line) { return ! line[0] }).pop()[2]);
+  }
+
+  var addresses = Object.keys(json)
+                        .map(function (address) { return + address })
+                        .sort(function (a, b) { return +(a) - +(b) });
+
+  var next = 0;
+  var map = {};
+  addresses.forEach(function (address) {
+    if (leaves[address]) {
+      while (!(next % 2)) next++;
+    } else {
+      while (next % 2) next++;
+    }
+    map[address] = next++;
+  })
+
+  var copy = {}
+  for (var file in json)  {
+    var body = json[file];
+    if (map[file] % 2) {
+      body.filter(function (line) {
+        return !line[0];
+      }).forEach(function (line) {
+        if (line[2]) line[2] = map[Math.abs(line[2])]
+      });
+    } else {
+      body[0] = body[0].map(function (address) { return map[Math.abs(address)] });
+    }
+    copy[map[file]] = json[file];
+  }
+  json = copy;
+
+  return json;
+}
+
+function abstracted (dir) {
+  var output = {};
+
+  dir = convert(dir);
+
+  for (var file in dir) {
+    var record;
+    if (file % 2) {
+      record = { log: [] };
+      dir[file].forEach(function (line) {
+        if (line[0] == 0) {
+          if (line[2]) record.right = Math.abs(line[2]);
+          record.log.push({ type: 'pos' });
+        } else if (line[0] > 0) {
+          record.log.push({ type: 'add', value: line[3] });
+        } else {
+          record.log.push({ type: 'del', index: Math.abs(line[0]) - 1 });
+        }
+      })
+    } else {
+      record = { children: dir[file][0].map(function (address) { return Math.abs(address) }) };
+    }
+    output[file] = record;
+  }
+
+  return output;
+}
+
+function renumber (json) {
+  var addresses = Object.keys(json)
+                        .map(function (address) { return + address })
+                        .sort(function (a, b) { return +(a) - +(b) });
+
+  var next = 0;
+  var map = {};
+  addresses.forEach(function (address) {
+    while ((address % 2) != (next % 2)) next++;
+    map[address] = next++;
+  })
+
+  var copy = {}
+  for (var address in json)  {
+    var object = json[address];
+    if (address % 2) {
+      object.right && (object.right = map[object.right]);
+    } else {
+      object.children = object.children.map(function (address) {
+        return map[address];
+      })
+    }
+    copy[map[address]] = json[address];
+  }
+
+  return copy;
+}
+
+function order (json) {
+  for (var address in json) {
+    var object = json[address];
+    if (address % 2) {
+      var order = [];
+      object.log.forEach(function (entry) {
+        var index;
+        switch (entry.type) {
+        case 'add':
+          for (index = 0; index < order.length; index++) {
+            if (order[index] > entry.value) {
+              break;
+            }
+          }
+          order.splice(index, 0, entry.value);
+          break;
+        case 'del':
+          order.splice(entry.index, 1);
+          break;
+        }
+      })
+      object.order = order;
+    }
+  }
+  return json;
+}
+
+function createDirectory (json) {
+  var directory = {};
+
+  var checksum = 40;
+
+  function addressify (address) {
+    return address % 2 ? - address : address;
+  }
+
+  for (var address in json) {
+    var object = json[address];
+    if (object.children) {
+      directory[address] = [ object.children.map(addressify) ];
+    } else {
+      var ghosts = 0;
+      var positions = [];
+      var position = 0;
+      var order = [];
+      var records = 0;
+      directory[address] = object.log.map(function (entry, count) {
+        var record;
+        var index;
+        switch (entry.type) {
+        case 'pos':
+          record = [ 0, 1, addressify(object.right || 0), ghosts, count + 1, positions.slice() ];
+          break;
+        case 'add':
+          records++;
+          for (index = 0; index < order.length; index++) {
+            if (order[index] > entry.value) {
+              break;
+            }
+          }
+          order.splice(index, 0, entry.value);
+          positions.splice(index, 0, position);
+          record = [ index + 1, records, count + 1, entry.value  ];
+          break;
+        case 'del':
+          records--;
+          record = [ -(entry.index + 1), records, count + 1  ];
+          break;
+        }
+        position += JSON.stringify(record).length + 1 + checksum + 1;
+        return record;
+      })
+    }
+  }
+
+  return directory;
 }
 
 function deltree (directory, callback) {
@@ -236,3 +369,5 @@ module.exports = function (dirname) {
 };
 
 module.exports.stringify = stringify;
+
+/* vim: set sw=2 ts=2: */
