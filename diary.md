@@ -140,6 +140,37 @@ as part of an global exit. You might luck out and flush out the results of two
 descents in one page flush. How often would be you be that sort of lucky that it
 would warrant an early flush.
 
+## Position Array Jumping
+
+I'm not sure what I had against reading backwards from the end of leaf
+page. We're going to read those records if we jump, we're going to scan
+for newlines while we do it, and we're going to keep the objects we
+read.
+
+No, it doesn't help you to jump back to it, except maybe to look for the
+leaf page to the right, but that wouldn't be a part of normal operation,
+only recovery. At times you consider ways to make counted B-Trees
+simpiler by caching the record count, but why cache the record count and
+not the leaf key? In order to get to the record count, you would have
+had to have already read in the leaf key, which means reading back to
+the positions array.
+
+Not jumping to it, mind you, because if you jump to it, you won't know
+if the first entry is the key, until you replay the log.
+
+Oh, wait, no. The positions array does contain the key. The first value
+does not change except for merges and ghost deletions, the operations
+that write out a position array. We can add the key to that record. Now
+we can get the count from the last record and key by jumping to the
+positons array.
+
+Plus, we can jump to the position array and load it for the key, but
+leave the leaf page in an unloaded state. If we've only cracked it to
+get the key, it's primed and ready to read.
+
+But, ultimately, I believe I'm going to implement counted B-Trees using
+an additional Strata tree.
+
 ## Changes for Next Release
 
  * Upgrade Proof to 0.0.31. #113.
