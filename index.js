@@ -700,7 +700,7 @@ function Strata (options) {
   // The file descriptor must be open for for append.
 
   //
-  function writeJSON (fd, page, object, callback) {
+  function writeJSON (fd, page, object, bookmarked, callback) {
     var check = validator(callback)
       , offset = 0
       , buffer
@@ -708,10 +708,6 @@ function Strata (options) {
       , line
       , position
       ;
-
-    // Format the line with checksums.
-    json = JSON.stringify(object);
-    line = json + " " + checksum(json);
 
     // Read the file size if we have no insert position.
     if (page.position) positioned();
@@ -725,6 +721,16 @@ function Strata (options) {
 
     // Allocate a buffer and write the JSON and new line.
     function positioned () {
+      // Update the position of last position array.
+      if (bookmarked) page.bookmark = page.position;
+
+      // Append position of last position array.
+      object.push(page.position);
+
+      // Format the line with checksums.
+      json = JSON.stringify(object);
+      line = json + " " + checksum(json);
+
       var length = Buffer.byteLength(line, "utf8");
 
       buffer = new Buffer(length + 1);
@@ -829,7 +835,7 @@ function Strata (options) {
   // Write an insert object.
   function writeInsert (fd, page, index, record, callback) {
     var entry = [ index + 1, page.positions.length - page.ghosts + 1, ++page.entries, record ];
-    writeJSON(fd, page, entry, callback);
+    writeJSON(fd, page, entry, false, callback);
   }
 
   // #### Delete Entries
@@ -863,7 +869,7 @@ function Strata (options) {
   // Write a delete object.
   function writeDelete (fd, page, index, callback) {
     var entry = [ -(index + 1), page.positions.length - page.ghosts - 1, ++page.entries ];
-    writeJSON(fd, page, entry, callback);
+    writeJSON(fd, page, entry, false, callback);
   }
 
   // #### Position Array Entires
@@ -918,7 +924,7 @@ function Strata (options) {
   // Write an position array entry.
   function writePositions (fd, page, callback) {
     var entry = [ 0, 1, page.right, page.ghosts, ++page.entries, page.positions ];
-    writeJSON(fd, page, entry, callback);
+    writeJSON(fd, page, entry, true, callback);
   }
 
   // #### Reading Leaves
@@ -1004,9 +1010,11 @@ function Strata (options) {
             page.ghosts = entry.shift();
             page.entries = entry.shift();
             positions = entry.shift();
+            page.bookmark = entry.shift();
             replay();
             return;
           } else {
+            page.bookmark = entry.pop();
             position = start + i + 1;
             if (index > 0) {
               cache[position] = entry.pop();
@@ -1122,6 +1130,7 @@ function Strata (options) {
       function json (bytes, buffer) {
         var entry;
         if (entry = readJSON(buffer, bytes)) {
+          entry.pop();
           record = entry.pop();
           fs.close(fd, check(closed));
         } else {

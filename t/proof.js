@@ -32,7 +32,7 @@ function objectify (directory, callback) {
       lines = lines.split(/\n/);
       lines.pop();
       lines.forEach(function (json, index) {
-        json = json.replace(/[\da-f]+$/, "");
+        json = json.replace(/\s[\da-f]+$/, "");
         dir[file].push(JSON.parse(json));
       });
       read();
@@ -263,6 +263,7 @@ function createDirectory (json) {
       var ghosts = 0;
       var positions = [];
       var position = 0;
+      var bookmark = 0;
       var order = [];
       var records = 0;
       directory[address] = object.log.map(function (entry, count) {
@@ -270,7 +271,8 @@ function createDirectory (json) {
         var index;
         switch (entry.type) {
         case 'pos':
-          record = [ 0, 1, object.right || 0, ghosts, count + 1, positions.slice() ];
+          record = [ 0, 1, object.right || 0, ghosts, count + 1, positions.slice(), bookmark ];
+          bookmark = position;
           break;
         case 'add':
           records++;
@@ -281,11 +283,11 @@ function createDirectory (json) {
           }
           order.splice(index, 0, entry.value);
           positions.splice(index, 0, position);
-          record = [ index + 1, records, count + 1, entry.value  ];
+          record = [ index + 1, records, count + 1, entry.value, bookmark ];
           break;
         case 'del':
           records--;
-          record = [ -(entry.index + 1), records, count + 1  ];
+          record = [ -(entry.index + 1), records, count + 1, bookmark ];
           break;
         }
         position += JSON.stringify(record).length + 1 + checksum + 1;

@@ -1,7 +1,7 @@
 var fs = require('fs')
 var util = require('util')
 
-var json = JSON.parse(fs.readFileSync('empty.before.json', 'utf8'))
+var json = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'))
 
 var directory = {}
 
@@ -19,13 +19,15 @@ for (var address in json) {
         var ghosts = 0
         var positions = []
         var position = 0
+        var bookmark = 0
         var order = []
         var records = 0
         directory[address] = object.log.map(function (entry, count) {
             var record, index
             switch (entry.type) {
             case 'pos':
-                record = [ 0, 1, addressify(object.right || 0), ghosts, count + 1, positions.slice() ]
+                bookmark = position
+                record = [ 0, 1, addressify(object.right || 0), ghosts, count + 1, positions.slice(), bookmark ]
                 break
             case 'add':
                 records++
@@ -36,11 +38,11 @@ for (var address in json) {
                 }
                 order.splice(index, 0, entry.value)
                 positions.splice(index, 0, position)
-                record = [ index + 1, records, count + 1, entry.value  ]
+                record = [ index + 1, records, count + 1, entry.value, bookmark ]
                 break
             case 'del':
                 records--;
-                record = [ -(entry.index + 1), records, count + 1  ]
+                record = [ -(entry.index + 1), records, count + 1, bookmark ]
             }
             position += JSON.stringify(record).length + 1 + checksum + 1
             return record
