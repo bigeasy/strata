@@ -79,25 +79,24 @@ function gather (step, strata) {
     records = []
     strata.iterator(step());
   }, function (cursor) {
-    step(function () {
-      return true;
-    }, page = function (more) {
-      if (more) return cursor.offset;
-      cursor.unlock();
-      step(null, records);
-    }, item = function (i) {
-      if (i < cursor.length) {
-        cursor.get(i, step());
-        step()(null, i);
+    step(function (more) {
+      if (!more) {
+        cursor.unlock();
+        step(null, records);
       } else {
-        step.jump(page);
-        cursor.next(step());
+        step(function () {
+          step(function (index) {
+            step(function () {
+              cursor.get(index + cursor.offset, step());
+            }, function (record) {
+              records.push(record);
+            })
+          })(cursor.length - cursor.offset);
+        }, function () {
+          cursor.next(step());
+        })
       }
-    }, function (record, i) {
-      records.push(record);
-      step.jump(item);
-      step()(null, i + 1);
-    });
+    })(null, true);
   });
 }
 

@@ -14,20 +14,19 @@ require('./proof')(3, function (step, Strata, tmp, deepEqual, serialize, gather,
     strata.mutator('a', step());
   }, function (cursor) {
     var page;
-    step(page = function () {
+    var page = step(function () {
       cursor.indexOf('z', step());
     }, function (index) {
       cursor.insert('z', 'z', ~index, step());
     }, function (unambiguous) {
       ambiguity.unshift(unambiguous);
       if (ambiguity[0]) {
-        step.jump(page);
-        cursor.next(step());
+        cursor.next(step(page, 0));
       } else {
         deepEqual(ambiguity, [ 0, 1, 1, 1 ], 'unambiguous');
         cursor.unlock();
       }
-    });
+    })(1);
   }, function () {
     gather(step, strata);
   }, function (records) {
