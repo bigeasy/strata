@@ -36,6 +36,8 @@ require('./proof')(1, function (step, Strata, tmp, deepEqual, serialize, load, o
     objectify(tmp, step());
     load(__dirname + '/fixtures/empty.after.json', step());
   }, function (actual, expected) {
+    console.log(require('util').inspect(actual, false, null));
+    console.log(require('util').inspect(expected, false, null));
     deepEqual(actual, expected, 'after balance');
     strata.close(step());
   });

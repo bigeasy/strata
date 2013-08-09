@@ -1,7 +1,7 @@
 var fs = require('fs')
 var util = require('util')
 
-var json = JSON.parse(fs.readFileSync('t/basics/fixtures/merge.before.json', 'utf8'))
+var json = JSON.parse(fs.readFileSync('empty.before.json', 'utf8'))
 
 var directory = {}
 
@@ -38,6 +38,9 @@ for (var address in json) {
                 positions.splice(index, 0, position)
                 record = [ index + 1, records, count + 1, entry.value  ]
                 break
+            case 'del':
+                records--;
+                record = [ -(entry.index + 1), records, count + 1  ]
             }
             position += JSON.stringify(record).length + 1 + checksum + 1
             return record

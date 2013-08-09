@@ -1,34 +1,36 @@
 {
-  "segment00000000": [
-    [ -1 ]
-  ],
-  "segment00000001": [
-    [ 0, 1, 0, 0, 1, [] ],
-    [ 1, 1, 2, "a" ],
-    [ 2, 2, 3, "b" ],
-    [ 3, 3, 4, "c" ],
-    [ 4, 4, 5, "d" ],
-    [ 5, 5, 6, "e" ],
-    [ 6, 6, 7, "f" ],
-    [ 7, 7, 8, "g" ],
-    [ 8, 8, 9, "h" ],
-    [ 9, 9, 10, "i" ],
-    [ 10, 10, 11, "j" ],
-    [ 11, 11, 12, "k" ],
-    [ 12, 12, 13, "l" ],
-    [ 13, 13, 14, "m" ],
-    [ 14, 14, 15, "n" ],
-    [ 15, 15, 16, "o" ],
-    [ 16, 16, 17, "p" ],
-    [ 17, 17, 18, "q" ],
-    [ 18, 18, 19, "r" ],
-    [ 19, 19, 20, "s" ],
-    [ 20, 20, 21, "t" ],
-    [ 21, 21, 22, "u" ],
-    [ 22, 22, 23, "v" ],
-    [ 23, 23, 24, "w" ],
-    [ 24, 24, 25, "x" ],
-    [ 25, 25, 26, "y" ],
-    [ 26, 26, 27, "z" ]
-  ]
+    "0": {
+        "children": [ 1 ]
+    },
+    "1": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "a" },
+            { "type": "add", "value": "b" },
+            { "type": "add", "value": "c" },
+            { "type": "add", "value": "d" },
+            { "type": "add", "value": "e" },
+            { "type": "add", "value": "f" },
+            { "type": "add", "value": "g" },
+            { "type": "add", "value": "h" },
+            { "type": "add", "value": "i" },
+            { "type": "add", "value": "j" },
+            { "type": "add", "value": "k" },
+            { "type": "add", "value": "l" },
+            { "type": "add", "value": "m" },
+            { "type": "add", "value": "n" },
+            { "type": "add", "value": "o" },
+            { "type": "add", "value": "p" },
+            { "type": "add", "value": "q" },
+            { "type": "add", "value": "r" },
+            { "type": "add", "value": "s" },
+            { "type": "add", "value": "t" },
+            { "type": "add", "value": "u" },
+            { "type": "add", "value": "v" },
+            { "type": "add", "value": "w" },
+            { "type": "add", "value": "x" },
+            { "type": "add", "value": "y" },
+            { "type": "add", "value": "z" }
+        ]
+    }
 }

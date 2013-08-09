@@ -58,6 +58,8 @@ for (var file in dir) {
         record.log.push({ type: 'pos' });
       } else if (line[0] > 0) {
         record.log.push({ type: 'add', value: line[3] });
+      } else {
+        record.log.push({ type: 'del', index: Math.abs(line[0]) - 1 });
       }
     })
   } else {
@@ -94,9 +96,11 @@ for (var file in json) {
       puts(logSep, '            ', obj(entry));
       logSep = ',\n';
     });
-    puts('\n        ]\n');
+    puts('\n        ]');
     if (json[file].right) {
-      puts('        "right": ' + json[file].right + '\n');
+      puts(',\n        "right": ' + json[file].right + '\n');
+    } else {
+      puts('\n');
     }
   } else {
     puts('        "children": ', array(json[file].children), '\n');
