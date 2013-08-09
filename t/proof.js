@@ -270,7 +270,8 @@ function createDirectory (json) {
         var index;
         switch (entry.type) {
         case 'pos':
-          record = [ 0, 1, object.right || 0, ghosts, count + 1, positions.slice(), bookmark ];
+          record = [ 0, 1, object.right || 0, ghosts, count + 1 ].concat(positions);
+          record.push(bookmark);
           bookmark = position;
           break;
         case 'add':

@@ -923,7 +923,7 @@ function Strata (options) {
 
   // Write an position array entry.
   function writePositions (fd, page, callback) {
-    var entry = [ 0, 1, page.right, page.ghosts, ++page.entries, page.positions ];
+    var entry = [ 0, 1, page.right, page.ghosts, ++page.entries ].concat(page.positions);
     writeJSON(fd, page, entry, true, callback);
   }
 
@@ -1009,8 +1009,8 @@ function Strata (options) {
             page.right = entry.shift();
             page.ghosts = entry.shift();
             page.entries = entry.shift();
-            positions = entry.shift();
-            page.bookmark = entry.shift();
+            page.bookmark = entry.pop();
+            positions = entry;
             replay();
             return;
           } else {
