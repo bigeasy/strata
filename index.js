@@ -836,9 +836,9 @@ function Strata (options) {
   //
   // The JSON array elements form a structure as follows.
   //
+  //  * Count of entries in leaf page including insert.
   //  * One-based index into position array.
   //  * Count of records in leaf page including insert.
-  //  * Count of entries in leaf page including insert.
   //  * Record to insert.
   //
   // When we read the insert entry, we will place the record in the record cache
@@ -846,7 +846,7 @@ function Strata (options) {
 
   // Write an insert object.
   function writeInsert (fd, page, index, record, callback) {
-    var entry = [ index + 1, page.positions.length - page.ghosts + 1, ++page.entries, record ];
+    var entry = [ ++page.entries, index + 1, page.positions.length - page.ghosts + 1, record ];
     writeJSON({ fd: fd, page: page, entry: entry }, callback);
   }
 
@@ -862,9 +862,9 @@ function Strata (options) {
   //
   // The JSON array elements of a delete entry form a structure as follows.
   //
+  //  * Count of entries in leaf page including delete.
   //  * Negated one-based index into position array.
   //  * Count of records in leaf page including delete.
-  //  * Count of entries in leaf page including delete.
   //
   // Special handling of a deleted first record is required when we replay the
   // journal. The first record of a leaf page is not actually deleted from their
@@ -880,7 +880,7 @@ function Strata (options) {
 
   // Write a delete object.
   function writeDelete (fd, page, index, callback) {
-    var entry = [ -(index + 1), page.positions.length - page.ghosts - 1, ++page.entries ];
+    var entry = [ ++page.entries, -(index + 1), page.positions.length - page.ghosts - 1 ];
     writeJSON({ fd: fd, page: page, entry: entry }, callback);
   }
 
@@ -920,11 +920,11 @@ function Strata (options) {
   //
   // The JSON array elements of a delete entry form a structure as follows.
   //
+  //  * Count of entries in leaf page including insert.
   //  * Zero to indicate a position array entry.
   //  * Leaf page file format version number.
   //  * Address of the right sibling leaf page.
   //  * Count of ghost records, only ever `0` or `1`.
-  //  * Count of entries in leaf page including insert.
   //  * The position array.
   //
   // The position array entry also acts as a header. We always place one at the
@@ -935,15 +935,15 @@ function Strata (options) {
 
   // Write an position array entry.
   function writePositions (fd, page, callback) {
-    var entry = [ 0, 1, page.right, page.ghosts, ++page.entries ].concat(page.positions);
+    var entry = [ ++page.entries, 0, 1, page.right, page.ghosts ].concat(page.positions);
     writeJSON({ fd: fd, page: page, entry: entry, type: "position" }, callback);
   }
 
   function writeFooter (fd, page, callback) {
     ok(page.bookmark != null);
     var entry = [
-      0, 0, page.bookmark, page.bookmarkLength,
-      page.right, page.positions.length - page.ghosts - 1, ++page.entries
+      ++page.entries, 0, 0, page.bookmark, page.bookmarkLength,
+      page.right, page.positions.length - page.ghosts - 1
     ];
     writeJSON({ fd: fd, page: page, entry: entry, type: "footer" }, callback);
   }
@@ -1025,12 +1025,13 @@ function Strata (options) {
           k = i
           if (buffer[k] == 0x0A) k++
           entry = readLine(buffer.toString("utf8", i, j));
+          var number = entry.shift();
           index = entry.shift();
           if (index == 0) {
             if (entry.shift()) {
               page.right = entry.shift();
               page.ghosts = entry.shift();
-              page.entries = entry.shift();
+              page.entries = number;
               var z = entry.pop();
               ok(k + start == z);
               page.bookmark = k + start;
@@ -1039,7 +1040,7 @@ function Strata (options) {
               replay();
               return;
             } else {
-              splices.push([ 0 ]);
+              splices.push([ number, 0 ]);
             }
           } else {
             page.bookmark = entry.pop();
@@ -1047,7 +1048,7 @@ function Strata (options) {
             if (index > 0) {
               cache[position] = entry.pop();
             }
-            splices.push([ index, position, entry.pop() ]);
+            splices.push([ number, index, position ]);
           }
           j = i + 1;
         }
@@ -1065,12 +1066,9 @@ function Strata (options) {
       // objects that we've gathered up in our splices array.
       splices.reverse()
       splices.forEach(function ($) {
-        var index = $[0], position = $[1], entry = $[2];
-        if (!index) {
-          ++page.entries;
-          return;
-        }
+        var entry = $[0], index = $[1], position = $[2];
         ok(entry == ++page.entries, "leaf corrupt: incorrect entry position");
+        if (!index) return;
         if (index > 0) {
           splice(page, index - 1, 0, position);
         } else if (~index == 0 && page.address != 1) {

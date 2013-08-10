@@ -140,21 +140,21 @@ function abstracted (dir, lengths) {
       position = 0;
       dir[file].forEach(function (json, index) {
         var length = lengths[file][index];
-        if (json[0] == 0) {
-          if (json[1]) {
-            if (json[2]) record.right = Math.abs(json[2]);
+        if (json[1] == 0) {
+          if (json[2]) {
+            if (json[3]) record.right = Math.abs(json[3]);
             bookmark = { position: position, length: length };
             record.log.push({ type: 'pos' });
           } else {
-            if (json[2] != bookmark.position || json[3] != bookmark.length) {
+            if (json[3] != bookmark.position || json[4] != bookmark.length) {
               console.log(require('util').inspect(dir, false, null), bookmark);
               throw new Error;
             }
           }
-        } else if (json[0] > 0) {
+        } else if (json[1] > 0) {
           record.log.push({ type: 'add', value: json[3] });
         } else {
-          record.log.push({ type: 'del', index: Math.abs(json[0]) - 1 });
+          record.log.push({ type: 'del', index: Math.abs(json[1]) - 1 });
         }
         position += length;
       })
@@ -243,7 +243,7 @@ function createDirectory (json) {
         var index;
         switch (entry.type) {
         case 'pos':
-          record = [ 0, 1, object.right || 0, ghosts, count + 1 ].concat(positions);
+          record = [ count + 1, 0, 1, object.right || 0, ghosts ].concat(positions);
           record.push(bookmark = position);
           break;
         case 'add':
@@ -255,11 +255,11 @@ function createDirectory (json) {
           }
           order.splice(index, 0, entry.value);
           positions.splice(index, 0, position);
-          record = [ index + 1, records, count + 1, entry.value, bookmark ];
+          record = [ count + 1, index + 1, records, entry.value, bookmark ];
           break;
         case 'del':
           records--;
-          record = [ -(entry.index + 1), records, count + 1, bookmark ];
+          record = [ count + 1, -(entry.index + 1), records, bookmark ];
           break;
         }
         position += JSON.stringify(record).length + 1 + checksum + 1;
