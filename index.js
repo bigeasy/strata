@@ -623,7 +623,7 @@ function Strata (options) {
     , right: 0
     , size: 0
     };
-    return extend(page, override || {});
+    return extend(page, override);
   }
 
   constructors.leaf = createLeaf;
@@ -1448,7 +1448,7 @@ function Strata (options) {
     , penultimate: true
     , size: 0
     };
-    return extend(page, override || {});
+    return extend(page, override);
   }
   constructors.branch = createBranch;
 
