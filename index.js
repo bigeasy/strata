@@ -700,7 +700,7 @@ function Strata (options) {
   // The file descriptor must be open for for append.
 
   //
-  function writeJSON (fd, page, object, bookmarked, callback) {
+  function writeJSON (options, callback) {
     var check = validator(callback)
       , offset = 0
       , buffer
@@ -710,25 +710,26 @@ function Strata (options) {
       ;
 
     // Read the file size if we have no insert position.
-    if (page.position) positioned();
-    else fs.fstat(fd, check(stat));
+    if (options.page.position) positioned();
+    else fs.fstat(options.fd, check(stat));
 
     // Get the file size as our insert position. Position to end of file.
     function stat (stat) {
-      page.position = stat.size;
+      options.page.position = stat.size;
       positioned();
     }
 
     // Allocate a buffer and write the JSON and new line.
     function positioned () {
       // Update the position of last position array.
-      if (bookmarked) page.bookmark = page.position;
-
+      if (options.type == "position") {
+        options.page.bookmark = options.page.position;
+      }
       // Append position of last position array.
-      object.push(page.position);
+      options.entry.push(options.page.position);
 
       // Format the line with checksums.
-      json = JSON.stringify(object);
+      json = JSON.stringify(options.entry);
       line = json + " " + checksum(json);
 
       var length = Buffer.byteLength(line, "utf8");
@@ -737,7 +738,7 @@ function Strata (options) {
       buffer.write(line);
       buffer[length] = 0x0A;
 
-      position = page.position;
+      position = options.page.position;
 
       send();
     }
@@ -746,11 +747,11 @@ function Strata (options) {
     // are actually written and write the difference if we come up short.
     // Return the file position of the appended JSON object.
     function send () {
-      fs.write(fd, buffer, offset, buffer.length - offset, page.position, check(sent));
+      fs.write(options.fd, buffer, offset, buffer.length - offset, options.page.position, check(sent));
     }
 
     function sent(written) {
-      page.position += written;
+      options.page.position += written;
       offset += written;
       if (offset == buffer.length) callback(null, position);
       else send();
@@ -835,7 +836,7 @@ function Strata (options) {
   // Write an insert object.
   function writeInsert (fd, page, index, record, callback) {
     var entry = [ index + 1, page.positions.length - page.ghosts + 1, ++page.entries, record ];
-    writeJSON(fd, page, entry, false, callback);
+    writeJSON({ fd: fd, page: page, entry: entry }, callback);
   }
 
   // #### Delete Entries
@@ -869,7 +870,7 @@ function Strata (options) {
   // Write a delete object.
   function writeDelete (fd, page, index, callback) {
     var entry = [ -(index + 1), page.positions.length - page.ghosts - 1, ++page.entries ];
-    writeJSON(fd, page, entry, false, callback);
+    writeJSON({ fd: fd, page: page, entry: entry }, callback);
   }
 
   // #### Position Array Entires
@@ -924,7 +925,12 @@ function Strata (options) {
   // Write an position array entry.
   function writePositions (fd, page, callback) {
     var entry = [ 0, 1, page.right, page.ghosts, ++page.entries ].concat(page.positions);
-    writeJSON(fd, page, entry, true, callback);
+    writeJSON({ fd: fd, page: page, entry: entry, type: "position" }, callback);
+  }
+
+  function writeFooter (fd, page, callback) {
+    var entry = [ 0, 0, page.right, page.positions.length - page.ghosts - 1, ++page.entries ];
+    writeJSON({ fd: fd, page: page, entry: entry, type: "footer" }, callback);
   }
 
   // #### Reading Leaves
