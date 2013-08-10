@@ -1162,7 +1162,7 @@ function Strata (options) {
   // object will be found immediately.
 
   // Note that we close the file descriptor before this function returns.
-  function rewriteLeaf (page, suffix, callback) {
+  function rewriteLeaf (page, key, suffix, callback) {
     var fd
       , check = validator(callback)
       , positions = []
@@ -1170,6 +1170,8 @@ function Strata (options) {
       , done
       , index = 0
       ;
+
+    ok(Array.isArray(key), "key is array");
 
     // Open the new leaf page file and reset our file position.
     fs.open(filename(page.address, suffix), "a", 0644, check(opened));
@@ -1581,7 +1583,7 @@ function Strata (options) {
 
       // Write the root and leaf branches.
       writeBranch(root, ".replace", check(written));
-      rewriteLeaf(leaf, ".replace", check(written));
+      rewriteLeaf(leaf, [], ".replace", check(written));
     }
 
     // When we've written the leaves, move them into place.
@@ -3877,12 +3879,16 @@ function Strata (options) {
         // Remove the positions that have been merged.
         splice(split, offset, length);
 
-        // Write the left most leaf page from which new pages were split.
-        rewriteLeaf(page, ".replace", check(replaced));
+        designate(page, 0, check(rewrite));
 
-        // Schedule the page for rewriting and encaching.
-        replacements.push(page);
-        uncached.push(page);
+        function rewrite (key) {
+          // Schedule the page for replacing and encaching.
+          replacements.push(page);
+          uncached.push(page);
+
+          // Write the left most leaf page from which new pages were split.
+          rewriteLeaf(page, [key], ".replace", check(replaced));
+        }
       }
 
       function replaced () {
@@ -3894,9 +3900,16 @@ function Strata (options) {
         // Link the leaf page to the last created new leaf page.
         split.right = right;
 
-        // Write the left most leaf page from which new pages were split.
-        rewriteLeaf(split, ".replace", check(transact));
-        replacements.push(split);
+        if (split.address == 1) rewrite([]);
+        else designate(split, 0, check(function (key) { rewrite([key]) }));
+
+        function rewrite (key) {
+          // Write the left most leaf page from which new pages were split.
+          rewriteLeaf(split, key, ".replace", check(transact));
+
+          // Schedule the page for replacing and encaching.
+          replacements.push(split);
+        }
       }
 
       // Write the penultimate branch.
@@ -4647,9 +4660,14 @@ function Strata (options) {
           // the b&#x2011;tree.
           splice(leaves.right.page, 0, leaves.right.page.positions.length);
 
-          // Rewrite the left leaf page. Move the right leaf page aside for the
-          // pending unlink.
-          rewriteLeaf(leaves.left.page, ".replace", check(resume));
+          if (leaves.left.page.address == 1) rewrite([]);
+          else designate(leaves.left.page, 0, check(function (key) { rewrite([key]) }));
+
+          function rewrite (key) {
+            // Rewrite the left leaf page. Move the right leaf page aside for the
+            // pending unlink.
+            rewriteLeaf(leaves.left.page, key, ".replace", check(resume));
+          }
         }
 
         // Continue with the generalized merge function. `true` indicates that
@@ -4997,3 +5015,5 @@ module.exports = Strata;
 //
 // * <a name="map">**map**</a> &mdash; A JavaScript Object that is used as a key
 // value store. We use the term *map*, because the term *object* is ambiguous.
+//
+/* vim: set ts=2 sw=2: */
