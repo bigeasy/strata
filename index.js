@@ -940,6 +940,7 @@ function Strata (options) {
   }
 
   function writeFooter (fd, page, callback) {
+    ok(page.bookmark != null);
     var entry = [
       0, 0, page.bookmark, page.bookmarkLength,
       page.right, page.positions.length - page.ghosts - 1, ++page.entries
@@ -1021,6 +1022,7 @@ function Strata (options) {
       while (i != 0) {
         i = i - 1
         if (buffer[i] == 0x0A || i == 0 && start == 0) {
+          var xyz = j - i - (i == 0 ? 0 : 1);
           entry = readLine(buffer.toString("utf8", i, j));
           j = i + 1;
           index = entry.shift();
@@ -1030,6 +1032,7 @@ function Strata (options) {
               page.ghosts = entry.shift();
               page.entries = entry.shift();
               page.bookmark = entry.pop();
+              page.bookmarkLength = xyz;
               positions = entry;
               replay();
               return;

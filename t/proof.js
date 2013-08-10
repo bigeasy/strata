@@ -2,6 +2,7 @@ var fs = require("fs")
   , path = require("path")
   , crypto = require("crypto")
   , Strata = require("..")
+  , ok = require("assert").ok
   ;
 
 function check (callback, forward) {
@@ -12,7 +13,7 @@ function check (callback, forward) {
 }
 
 function objectify (directory, callback) {
-  var files, dir = {}, count = 0;
+  var files, dir = {}, lengths = {}, count = 0;
 
   fs.readdir(directory, check(callback, list));
 
@@ -25,22 +26,24 @@ function objectify (directory, callback) {
 
   function readFile (file) {
     dir[file] = [];
+    lengths[file] = [];
 
     fs.readFile(path.resolve(directory, file), "utf8", check(callback, lines));
 
     function lines (lines) {
       lines = lines.split(/\n/);
       lines.pop();
-      lines.forEach(function (json, index) {
-        json = json.replace(/\s[\da-f]+$/, "");
+      lines.forEach(function (line, index) {
+        var json = line.replace(/\s[\da-f]+$/, "");
         dir[file].push(JSON.parse(json));
+        lengths[file][index] = line.length + 1;
       });
       read();
     }
   }
 
   function read () {
-    if (++count == files.length) callback(null, renumber(order(abstracted(dir))));
+    if (++count == files.length) callback(null, renumber(order(abstracted(dir, lengths))));
   }
 }
 
@@ -125,23 +128,35 @@ function serialize (segments, directory, callback) {
   }
 }
 
-function abstracted (dir) {
+function abstracted (dir, lengths) {
   var output = {};
+  var position = 0;
+  var bookmark;
 
   for (var file in dir) {
     var record;
     if (file % 2) {
       record = { log: [] };
-      dir[file].forEach(function (line) {
-        if (line[0] == 0) {
-          if (!line[1]) return;
-          if (line[2]) record.right = Math.abs(line[2]);
-          record.log.push({ type: 'pos' });
-        } else if (line[0] > 0) {
-          record.log.push({ type: 'add', value: line[3] });
+      position = 0;
+      dir[file].forEach(function (json, index) {
+        var length = lengths[file][index];
+        if (json[0] == 0) {
+          if (json[1]) {
+            if (json[2]) record.right = Math.abs(json[2]);
+            bookmark = { position: position, length: length };
+            record.log.push({ type: 'pos' });
+          } else {
+            if (json[2] != bookmark.position || json[3] != bookmark.length) {
+              console.log(require('util').inspect(dir, false, null), bookmark);
+              throw new Error;
+            }
+          }
+        } else if (json[0] > 0) {
+          record.log.push({ type: 'add', value: json[3] });
         } else {
-          record.log.push({ type: 'del', index: Math.abs(line[0]) - 1 });
+          record.log.push({ type: 'del', index: Math.abs(json[0]) - 1 });
         }
+        position += length;
       })
     } else {
       record = { children: dir[file][0].map(function (address) { return Math.abs(address) }) };
@@ -229,8 +244,7 @@ function createDirectory (json) {
         switch (entry.type) {
         case 'pos':
           record = [ 0, 1, object.right || 0, ghosts, count + 1 ].concat(positions);
-          record.push(bookmark);
-          bookmark = position;
+          record.push(bookmark = position);
           break;
         case 'add':
           records++;
