@@ -125,51 +125,8 @@ function serialize (segments, directory, callback) {
   }
 }
 
-function convert (json) {
-  var leaves = {}, leaf = 1;
-  while (leaf) {
-    leaves[leaf] = true;
-    leaf = Math.abs(json[leaf].filter(function (line) { return ! line[0] && line[1] }).pop()[2]);
-  }
-
-  var addresses = Object.keys(json)
-                        .map(function (address) { return + address })
-                        .sort(function (a, b) { return +(a) - +(b) });
-
-  var next = 0;
-  var map = {};
-  addresses.forEach(function (address) {
-    if (leaves[address]) {
-      while (!(next % 2)) next++;
-    } else {
-      while (next % 2) next++;
-    }
-    map[address] = next++;
-  })
-
-  var copy = {}
-  for (var file in json)  {
-    var body = json[file];
-    if (map[file] % 2) {
-      body.filter(function (line) {
-        return !line[0];
-      }).forEach(function (line) {
-        if (line[2]) line[2] = map[Math.abs(line[2])]
-      });
-    } else {
-      body[0] = body[0].map(function (address) { return map[Math.abs(address)] });
-    }
-    copy[map[file]] = json[file];
-  }
-  json = copy;
-
-  return json;
-}
-
 function abstracted (dir) {
   var output = {};
-
-  dir = convert(dir);
 
   for (var file in dir) {
     var record;
