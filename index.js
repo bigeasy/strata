@@ -1017,22 +1017,24 @@ function Strata (options) {
     }
 
     function iterate () {
-      var i = end - start, j = i, entry, index, position;
+      var i = end - start, j = i, entry, index, position, k;
       ok(buffer[--i] == 0x0A, "corrupt leaves: no newline at end of file");
       while (i != 0) {
         i = i - 1
         if (buffer[i] == 0x0A || i == 0 && start == 0) {
-          var xyz = j - i - (i == 0 ? 0 : 1);
+          k = i
+          if (buffer[k] == 0x0A) k++
           entry = readLine(buffer.toString("utf8", i, j));
-          j = i + 1;
           index = entry.shift();
           if (index == 0) {
             if (entry.shift()) {
               page.right = entry.shift();
               page.ghosts = entry.shift();
               page.entries = entry.shift();
-              page.bookmark = entry.pop();
-              page.bookmarkLength = xyz;
+              var z = entry.pop();
+              ok(k + start == z);
+              page.bookmark = k + start;
+              page.bookmarkLength = j - k;
               positions = entry;
               replay();
               return;
@@ -1047,6 +1049,7 @@ function Strata (options) {
             }
             splices.push([ index, position, entry.pop() ]);
           }
+          j = i + 1;
         }
       }
       end = start + j;
