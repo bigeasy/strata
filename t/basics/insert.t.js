@@ -24,7 +24,7 @@ require("./proof")(4, function (step, tmp, Strata, ok, equal, load, objectify, s
 
       cursor.unlock()
 
-      equal(strata.size, 32, "json size");
+      equal(strata.size, 38, "json size");
 
       strata.close(step());
 

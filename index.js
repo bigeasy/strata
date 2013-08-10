@@ -620,6 +620,7 @@ function Strata (options) {
     , locks: [[]]
     , ghosts: 0
     , positions: []
+    , lengths: []
     , right: 0
     , size: 0
     };
@@ -730,14 +731,14 @@ function Strata (options) {
       json = JSON.stringify(options.entry);
       line = json + " " + checksum(json);
 
-      var length = Buffer.byteLength(line, "utf8");
+      var length = Buffer.byteLength(line, "utf8") + 1;
 
-      buffer = new Buffer(length + 1);
+      buffer = new Buffer(length);
       buffer.write(line);
-      buffer[length] = 0x0A;
+      buffer[length - 1] = 0x0A;
 
       if (options.type == "position") {
-        options.page.bookmarkLength = length + 1;
+        options.page.bookmarkLength = length;
       }
 
       position = options.page.position;
@@ -757,9 +758,9 @@ function Strata (options) {
       offset += written;
       if (offset == buffer.length) {
         if (options.type == "footer") {
-          callback(null, position);
+          callback(null, position, length);
         } else {
-          writeFooter(options.fd, options.page, function () { callback(null, position) })
+          writeFooter(options.fd, options.page, function () { callback(null, position, length) })
         }
       } else {
         send();
@@ -962,6 +963,7 @@ function Strata (options) {
       // Note that if we don't find a position array that has been written to
       // the leaf page file, then we'll start with an empty position array.
       , positions = []
+      , lengths = []
       // Temporary cache of records read while searching for position array
       // object.
       , cache     = {}
@@ -1034,6 +1036,7 @@ function Strata (options) {
               page.bookmark = k + start;
               page.bookmarkLength = j - k;
               positions = entry.slice(0, entry.length / 2);
+              lengths = entry.slice(entry.length / 2);
               replay();
               return;
             } else {
@@ -1044,7 +1047,7 @@ function Strata (options) {
             if (index > 0) {
               cache[position] = entry.pop();
             }
-            splices.push([ number, index, position ]);
+            splices.push([ number, index, position, j - k ]);
           }
           j = i + 1;
         }
@@ -1056,22 +1059,25 @@ function Strata (options) {
     function replay() {
       // Prime our page with the positions array read from the leaf file, or else
       // an empty positions array.
-      splice(page, 0, 0, positions);
+      splice('positions', page, 0, 0, positions);
+      splice('lengths', page, 0, 0, lengths);
 
       // Now we replay the inserts and deletes described by the insert and delete
       // objects that we've gathered up in our splices array.
       splices.reverse()
       splices.forEach(function ($) {
-        var entry = $[0], index = $[1], position = $[2];
+        var entry = $[0], index = $[1], position = $[2], length = $[3];
         ok(entry == ++page.entries, "leaf corrupt: incorrect entry position");
         if (!index) return;
         if (index > 0) {
-          splice(page, index - 1, 0, position);
+          splice('positions', page, index - 1, 0, position);
+          splice('lengths', page, index - 1, 0, length);
         } else if (~index == 0 && page.address != 1) {
           ok(!page.ghosts, "double ghosts");
           page.ghosts++
         } else {
-          splice(page, -(index + 1), 1);
+          splice('positions', page, -(index + 1), 1);
+          splice('lengths', page, -(index + 1), 1);
         }
       });
 
@@ -1189,12 +1195,10 @@ function Strata (options) {
 
   // Note that we close the file descriptor before this function returns.
   function rewriteLeaf (page, key, suffix, callback) {
-    var fd
-      , check = validator(callback)
-      , positions = []
+    var check = validator(callback)
       , cache = {}
-      , done
       , index = 0
+      , done, fd, positions
       ;
 
     ok(Array.isArray(key), "key is array");
@@ -1209,7 +1213,8 @@ function Strata (options) {
       page.entries = 0;
 
       // Capture the positions, while truncating the page position array.
-      positions = splice(page, 0, page.positions.length);
+      positions = splice('positions', page, 0, page.positions.length);
+      splice('lengths', page, 0, page.lengths.length);
 
       // Write an empty positions array to act as a header.
       writePositions(fd, page, check(iterate))
@@ -1235,8 +1240,9 @@ function Strata (options) {
       }
 
       // Append the position to the page and stash the position and object.
-      function written (position) {
-        splice(page, page.positions.length, 0, position);
+      function written (position, length) {
+        splice('positions', page, page.positions.length, 0, position);
+        splice('lengths', page, page.lengths.length, 0, length);
         cache[position] = object;
         iterate();
       }
@@ -1466,12 +1472,16 @@ function Strata (options) {
   // accounted for.
 
   //
-  function splice (page, offset, length, insert) {
+  function splice (collection, page, offset, length, insert) {
+    ok(typeof collection == 'string', 'incorrect collection passed to splice');
+
     // Get the references, either page addresses or record positions.
-    var values = page.addresses || page.positions
+    var values = page[collection]
       , json
       , removals
       ;
+
+    ok(values, 'incorrect collection passed to splice');
 
     // We remove first, then append. We used the array returned by `splice` to
     // generate a JSON substring, whose length we remove form the JSON size of
@@ -1558,7 +1568,7 @@ function Strata (options) {
     // Read addresses from JSON branch file.
     fs.readFile(filename(page.address), "utf8", validate(callback, function (file) {
       // Splice addresses into page.
-      splice(page, 0, 0, readLine(file))
+      splice('addresses', page, 0, 0, readLine(file))
       callback(null, page);
     }));
   }
@@ -1605,7 +1615,7 @@ function Strata (options) {
       // Create a root branch with a single empty leaf.
       root = encache(createBranch({ penultimate: true }));
       leaf = encache(createLeaf({}));
-      splice(root, 0, 0, leaf.address);
+      splice('addresses', root, 0, 0, leaf.address);
 
       // Write the root and leaf branches.
       writeBranch(root, ".replace", check(written));
@@ -1854,6 +1864,7 @@ function Strata (options) {
     if (page.address % 2) {
       if (page.positions.length) {
         size += JSON.stringify(page.positions).length
+        size += JSON.stringify(page.lengths).length
       }
       for (position in page.cache) {
         object = page.cache[position];
@@ -2853,9 +2864,10 @@ function Strata (options) {
           writeInsert(fd = $, page, index, record, check(written));
         }
 
-        function written (position) {
+        function written (position, lengths) {
           // Insert the position into the page a cache the record.
-          splice(page, index, 0, position);
+          splice('positions', page, index, 0, position);
+          splice('lengths', page, index, 0, lengths);
           cacheRecord(page, position, record, key);
 
           // Update the length of the current page.
@@ -2890,7 +2902,7 @@ function Strata (options) {
         writeDelete(fd = $, page, index, check(written));
       }
 
-      function written (position) {
+      function written () {
         // If we've created a ghost record, we don't delete the record, we
         // simply move the `ghosts` for the page forward to `1`. If the current
         // offset of the cursor is `0`, we move that forward to `1`. Otherwise,
@@ -2900,7 +2912,8 @@ function Strata (options) {
           offset || offset++;
         } else {
           uncacheRecord(page, page.positions[index]);
-          splice(page, index, 1);
+          splice('positions', page, index, 1);
+          splice('lengths', page, index, 1);
 // **FIXME**:          length = page.length
         }
         fs.close(fd, check(closed));
@@ -3871,7 +3884,7 @@ function Strata (options) {
         right = page.address;
 
         // Add the address to our parent penultimate branch.
-        splice(penultimate.page, penultimate.index + 1, 0, page.address);
+        splice('addresses', penultimate.page, penultimate.index + 1, 0, page.address);
 
         // Determine the number of records to add to this page from the split
         // leaf. Add an additional record if we have a remainder.
@@ -3885,13 +3898,15 @@ function Strata (options) {
       function copy () {
         // Fetch the record and read it from cache or file.
         var position = split.positions[index];
+        var length = split.lengths[index];
 
         stash(split, position, check(uncache));
 
         function uncache (object) {
           uncacheRecord(split, position);
           // Add it to our new page.
-          splice(page, page.positions.length, 0, position);
+          splice('positions', page, page.positions.length, 0, position);
+          splice('lengths', page, page.lengths.length, 0, length);
           cacheRecord(page, position, object.record, object.key);
           index++;
           if (index < offset + length) copy();
@@ -3903,7 +3918,8 @@ function Strata (options) {
       // the new leaf.
       function copied() {
         // Remove the positions that have been merged.
-        splice(split, offset, length);
+        splice('positions', split, offset, length);
+        splice('lengths', split, offset, length);
 
         designate(page, 0, check(rewrite));
 
@@ -4066,13 +4082,13 @@ function Strata (options) {
         var offset = split.addresses.length - length;
 
         // Cut off a chunk of addresses.
-        var cut = splice(split, offset, length);
+        var cut = splice('addresses', split, offset, length);
 
         // Uncache the keys from our splitting branch.
         cut.forEach(function (address) { uncacheKey(split, address) });
 
         // Add the keys to our new branch page.
-        splice(page, 0, 0, cut);
+        splice('addresses', page, 0, 0, cut);
 
         // Continue until there is one page left.
         if (--pages > 1) paginate();
@@ -4085,7 +4101,7 @@ function Strata (options) {
         children.reverse()
 
         // Insert the child branch page addresses onto our parent.
-        splice(parent.page, parent.index + 1, 0, children.map(function (page) { return page.address }));
+        splice('addresses', parent.page, parent.index + 1, 0, children.map(function (page) { return page.address }));
 
         // Add the split page to the list of children, order doesn't matter.
         children.unshift(full.page);
@@ -4182,13 +4198,13 @@ function Strata (options) {
         var offset = root.addresses.length - length;
 
         // Cut off a chunk of addresses.
-        var cut = splice(root, offset, length);
+        var cut = splice('addresses', root, offset, length);
 
         // Uncache the keys from the root branch.
         cut.forEach(function (address) { uncacheKey(root, address) });
 
         // Add the keys to our new branch page.
-        splice(page, 0, 0, cut);
+        splice('addresses', page, 0, 0, cut);
 
         // Continue until all the pages have been moved to new pages.
         if (--pages) paginate();
@@ -4200,7 +4216,7 @@ function Strata (options) {
         children.reverse()
 
         // Push the child branch page addresses onto our empty root.
-        splice(root, 0, 0, children.map(function (page) { return page.address }));
+        splice('addresses', root, 0, 0, children.map(function (page) { return page.address }));
 
         // Write the child branch pages.
         children.forEach(function (page) { writeBranch(page, ".replace", check(childWritten)) });
@@ -4284,7 +4300,8 @@ function Strata (options) {
       ok(page.ghosts, "no ghosts");
 
       // Remove the ghosted record from the references array and the record cache.
-      uncacheRecord(page, splice(page, 0, 1).shift());
+      uncacheRecord(page, splice('positions', page, 0, 1).shift());
+      splice('lengths', page, 0, 1);
       page.ghosts = 0
 
       // Open the leaf page file and write out the shifted positions array.
@@ -4515,7 +4532,7 @@ function Strata (options) {
         var index = parents.right.indexes[ancestor.address];
 
         uncacheKey(ancestor, ancestor.addresses[index]);
-        splice(ancestor, index, 1);
+        splice('addresses', ancestor, index, 1);
 
         empties = singles.slice();
         writeBranch(ancestor, ".pending", check(rewriteEmpties));
@@ -4670,9 +4687,10 @@ function Strata (options) {
           // Uncache the record from the right leaf page.
           uncacheRecord(leaves.right.page, position);
 
-          // Add it to our new page. The negative positions are temporary. We'll
-          // get real file positions when we rewrite.
-          splice(leaves.left.page, leaves.left.page.positions.length, 0, -(position + 1));
+          // Add it to our new page. The negative positions and lengths are
+          // temporary. We'll get real file positions when we rewrite.
+          splice('positions', leaves.left.page, leaves.left.page.positions.length, 0, -(position + 1));
+          splice('lengths', leaves.left.page, leaves.left.page.lengths.length, 0, -(position + 1));
           cacheRecord(leaves.left.page, -(position + 1), object.record, object.key);
 
           if (++index < leaves.right.page.positions.length) fetch();
@@ -4684,7 +4702,8 @@ function Strata (options) {
         function rewriteLeftLeaf () {
           // Remove the positions the outgoing page to update the JSON size of
           // the b&#x2011;tree.
-          splice(leaves.right.page, 0, leaves.right.page.positions.length);
+          splice('positions', leaves.right.page, 0, leaves.right.page.positions.length);
+          splice('lengths', leaves.right.page, 0, leaves.right.page.lengths.length);
 
           if (leaves.left.page.address == 1) rewrite([]);
           else designate(leaves.left.page, 0, check(function (key) { rewrite([key]) }));
@@ -4814,9 +4833,9 @@ function Strata (options) {
         // Merging branch pages by slicing out all the addresses in the right
         // page and adding them to the left page. Uncache the keys we've
         // removed.
-        var cut = splice(pages.right.page, 0, pages.right.page.addresses.length);
+        var cut = splice('addresses', pages.right.page, 0, pages.right.page.addresses.length);
         cut.forEach(function (address) { uncacheKey(pages.right.page, address) });
-        splice(pages.left.page, pages.left.page.addresses.length, 0, cut);
+        splice('addresses', pages.left.page, pages.left.page.addresses.length, 0, cut);
 
         // Write out the left branch page. The generalized merge function will
         // handle the rest of the page rewriting.
@@ -4859,11 +4878,11 @@ function Strata (options) {
       // the root branch page, then rewrite the root branch page.
       function fill () {
         var cut;
-        cut = splice(root.page, 0, root.page.addresses.length);
+        cut = splice('addresses', root.page, 0, root.page.addresses.length);
         cut.forEach(function (address) { uncacheKey(root.page, address) });
-        cut = splice(child.page, 0, child.page.addresses.length);
+        cut = splice('addresses', child.page, 0, child.page.addresses.length);
         cut.forEach(function (address) { uncacheKey(child.page, address) });
-        splice(root.page, root.page.addresses.length, 0, cut);
+        splice('addresses', root.page, root.page.addresses.length, 0, cut);
 
         writeBranch(root.page, ".pending", check(rewriteChild));
       }
