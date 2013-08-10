@@ -708,6 +708,7 @@ function Strata (options) {
       , json
       , line
       , position
+      , length
       ;
 
     // Read the file size if we have no insert position.
@@ -731,7 +732,7 @@ function Strata (options) {
       json = JSON.stringify(options.entry);
       line = json + " " + checksum(json);
 
-      var length = Buffer.byteLength(line, "utf8") + 1;
+      length = Buffer.byteLength(line, "utf8") + 1;
 
       buffer = new Buffer(length);
       buffer.write(line);
