@@ -139,6 +139,7 @@ function abstracted (dir, lengths) {
       record = { log: [] };
       position = 0;
       dir[file].forEach(function (json, index) {
+        ok(index + 1 == json[0], 'entry record is wrong');
         var length = lengths[file][index];
         if (json[1] == 0) {
           if (json[2]) {
@@ -237,6 +238,7 @@ function createDirectory (json) {
       var position = 0;
       var order = [];
       var records = 0;
+      var bookmark;
       directory[address] = object.log.map(function (entry, count) {
         var record;
         var index;
@@ -260,9 +262,16 @@ function createDirectory (json) {
           record = [ count + 1, -(entry.index + 1), records ];
           break;
         }
-        position += JSON.stringify(record).length + 1 + checksum + 1;
+        var length = JSON.stringify(record).length + 1 + checksum + 1;
+        if (entry.type == 'pos') {
+          bookmark = { position: position, length: length };
+        }
+        position += length;
         return record;
       })
+      directory[address].push([
+        directory[address].length + 1, 0, 0, bookmark.position, bookmark.length, object.right, records
+      ])
     }
   }
 
