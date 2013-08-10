@@ -171,6 +171,13 @@ get the key, it's primed and ready to read.
 But, ultimately, I believe I'm going to implement counted B-Trees using
 an additional Strata tree.
 
+## More Caching
+
+If we do position array jumping, we might open up a read stream to begin to read
+the leaf page, or an initial buffer, but leave it there, not proceeding until
+someone actually visits the leaf page. We can put this information in the
+Magazine perhaps in a separate Magazine for partially read pages?
+
 ## Changes for Next Release
 
  * Upgrade Proof to 0.0.31. #113.
