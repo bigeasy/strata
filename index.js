@@ -3898,7 +3898,8 @@ function Strata (options) {
       function copy () {
         // Fetch the record and read it from cache or file.
         var position = split.positions[index];
-        var length = split.lengths[index];
+
+        ok(index < split.positions.length);
 
         stash(split, position, check(uncache));
 
@@ -3906,7 +3907,7 @@ function Strata (options) {
           uncacheRecord(split, position);
           // Add it to our new page.
           splice('positions', page, page.positions.length, 0, position);
-          splice('lengths', page, page.lengths.length, 0, length);
+          splice('lengths', page, page.lengths.length, 0, split.lengths[index]);
           cacheRecord(page, position, object.record, object.key);
           index++;
           if (index < offset + length) copy();
