@@ -235,7 +235,6 @@ function createDirectory (json) {
       var ghosts = 0;
       var positions = [];
       var position = 0;
-      var bookmark = 0;
       var order = [];
       var records = 0;
       directory[address] = object.log.map(function (entry, count) {
@@ -244,7 +243,6 @@ function createDirectory (json) {
         switch (entry.type) {
         case 'pos':
           record = [ count + 1, 0, 1, object.right || 0, ghosts ].concat(positions);
-          record.push(bookmark = position);
           break;
         case 'add':
           records++;
@@ -255,11 +253,11 @@ function createDirectory (json) {
           }
           order.splice(index, 0, entry.value);
           positions.splice(index, 0, position);
-          record = [ count + 1, index + 1, records, entry.value, bookmark ];
+          record = [ count + 1, index + 1, records, entry.value ];
           break;
         case 'del':
           records--;
-          record = [ count + 1, -(entry.index + 1), records, bookmark ];
+          record = [ count + 1, -(entry.index + 1), records ];
           break;
         }
         position += JSON.stringify(record).length + 1 + checksum + 1;

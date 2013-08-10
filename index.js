@@ -725,8 +725,6 @@ function Strata (options) {
       if (options.type == "position") {
         options.page.bookmark = options.page.position;
       }
-      // Append position of last position array.
-      options.entry.push(options.page.position);
 
       // Format the line with checksums.
       json = JSON.stringify(options.entry);
@@ -943,7 +941,7 @@ function Strata (options) {
     ok(page.bookmark != null);
     var entry = [
       ++page.entries, 0, 0, page.bookmark, page.bookmarkLength,
-      page.right, page.positions.length - page.ghosts - 1
+      page.right, page.positions.length - page.ghosts
     ];
     writeJSON({ fd: fd, page: page, entry: entry, type: "footer" }, callback);
   }
@@ -1032,8 +1030,6 @@ function Strata (options) {
               page.right = entry.shift();
               page.ghosts = entry.shift();
               page.entries = number;
-              var z = entry.pop();
-              ok(k + start == z);
               page.bookmark = k + start;
               page.bookmarkLength = j - k;
               positions = entry;
@@ -1043,7 +1039,6 @@ function Strata (options) {
               splices.push([ number, 0 ]);
             }
           } else {
-            page.bookmark = entry.pop();
             position = start + i + 1;
             if (index > 0) {
               cache[position] = entry.pop();
@@ -1161,7 +1156,6 @@ function Strata (options) {
       function json (bytes, buffer) {
         var entry;
         if (entry = readJSON(buffer, bytes)) {
-          entry.pop();
           record = entry.pop();
           fs.close(fd, check(closed));
         } else {
