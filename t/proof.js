@@ -129,7 +129,7 @@ function convert (json) {
   var leaves = {}, leaf = 1;
   while (leaf) {
     leaves[leaf] = true;
-    leaf = Math.abs(json[leaf].filter(function (line) { return ! line[0] }).pop()[2]);
+    leaf = Math.abs(json[leaf].filter(function (line) { return ! line[0] && line[1] }).pop()[2]);
   }
 
   var addresses = Object.keys(json)

@@ -738,6 +738,10 @@ function Strata (options) {
       buffer.write(line);
       buffer[length] = 0x0A;
 
+      if (options.type == "position") {
+        options.page.bookmarkLength = length + 1;
+      }
+
       position = options.page.position;
 
       send();
@@ -936,7 +940,10 @@ function Strata (options) {
   }
 
   function writeFooter (fd, page, callback) {
-    var entry = [ 0, 0, page.right, page.positions.length - page.ghosts - 1, ++page.entries ];
+    var entry = [
+      0, 0, page.bookmark, page.bookmarkLength,
+      page.right, page.positions.length - page.ghosts - 1, ++page.entries
+    ];
     writeJSON({ fd: fd, page: page, entry: entry, type: "footer" }, callback);
   }
 
