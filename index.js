@@ -935,7 +935,7 @@ function Strata (options) {
   // Write an position array entry.
   function writePositions (fd, page, callback) {
     var entry = [ ++page.entries, 0, 1, page.right, page.ghosts ]
-    entry = entry.concat(page.positions).concat(page.positions);
+    entry = entry.concat(page.positions).concat(page.lengths);
     writeJSON({ fd: fd, page: page, entry: entry, type: "position" }, callback);
   }
 

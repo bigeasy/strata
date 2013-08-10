@@ -235,6 +235,7 @@ function createDirectory (json) {
     } else {
       var ghosts = 0;
       var positions = [];
+      var lengths = [];
       var position = 0;
       var order = [];
       var records = 0;
@@ -245,7 +246,7 @@ function createDirectory (json) {
         switch (entry.type) {
         case 'pos':
           record = [ count + 1, 0, 1, object.right || 0, ghosts ]
-          record = record.concat(positions).concat(positions);
+          record = record.concat(positions).concat(lengths);
           break;
         case 'add':
           records++;
@@ -264,8 +265,13 @@ function createDirectory (json) {
           break;
         }
         var length = JSON.stringify(record).length + 1 + checksum + 1;
-        if (entry.type == 'pos') {
+        switch (entry.type) {
+        case 'pos':
           bookmark = { position: position, length: length };
+          break;
+        case 'add':
+          lengths.splice(index, 0, length);
+          break;
         }
         position += length;
         return record;
