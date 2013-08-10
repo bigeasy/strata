@@ -1132,15 +1132,10 @@ function Strata (options) {
   //
   // Note how we allow we keep track of the minimum buffer size that will
   // accommodate the largest possible buffer.
-  //
-  // **TODO**: Have a minimum buffer that we constantly reuse, uh no. That will
-  // be shared by descents.
 
   //
-  function readRecord (page, position, callback) {
-    var length = options.readRecordStartLength || 1024,
-        check = validator(callback),
-        record;
+  function readRecord (page, position, length, callback) {
+    var check = validator(callback), record;
 
     if (page.position) positioned();
     else fs.stat(filename(page.address), check(stat));
@@ -1157,11 +1152,14 @@ function Strata (options) {
     function input (fd) {
       read();
 
+      // todo: retry if not all read.
       function read () {
         fs.read(fd, new Buffer(length), 0, length, position, check(json));
       }
 
       function json (bytes, buffer) {
+        ok(bytes == length, "incomplete read");
+        ok(buffer[length - 1] == 0x0A, "newline expected");
         var entry;
         if (entry = readJSON(buffer, bytes)) {
           record = entry.pop();
@@ -1199,7 +1197,7 @@ function Strata (options) {
     var check = validator(callback)
       , cache = {}
       , index = 0
-      , done, fd, positions
+      , done, fd, positions, lengths
       ;
 
     ok(Array.isArray(key), "key is array");
@@ -1215,7 +1213,7 @@ function Strata (options) {
 
       // Capture the positions, while truncating the page position array.
       positions = splice('positions', page, 0, page.positions.length);
-      splice('lengths', page, 0, page.lengths.length);
+      lengths = splice('lengths', page, 0, page.lengths.length);
 
       // Write an empty positions array to act as a header.
       writePositions(fd, page, check(iterate))
@@ -1229,10 +1227,10 @@ function Strata (options) {
 
     // Rewrite an object in the positions array.
     function rewrite () {
-      var position = positions.shift(), object;
+      var position = positions.shift(), length = lengths.shift(), object;
 
       // Read the object from the current page.
-      stash(page, position, check(stashed));
+      stash(page, position, length, check(stashed));
 
       // Uncache the object and write the record to the new file.
       function stashed ($) {
@@ -1981,10 +1979,17 @@ function Strata (options) {
 
   // Read a record cache entry from the cache. Load the record and cache it of
   // it is not already cached.
-  function stash (page, position, callback) {
+  function stash (page, positionOrIndex, length, callback) {
+    var position = positionOrIndex;
+    if (arguments.length == 3) {
+      callback = length;
+      position = page.positions[positionOrIndex];
+      length = page.lengths[positionOrIndex];
+    }
+    ok(length);
     var stash;
     if (!(stash = page.cache[position])) {
-      readRecord(page, position, validate(callback, function (record) {
+      readRecord(page, position, length, validate(callback, function (record) {
         callback(null, cacheRecord(page, position, record));
       }));
     } else {
@@ -2007,7 +2012,7 @@ function Strata (options) {
   function designate (page, index, callback) {
     var key;
     if (page.address % 2) {
-      stash(page, page.positions[index], validate(callback, function (entry) {
+      stash(page, index, validate(callback, function (entry) {
         callback(null, entry.key);
       }));
     } else if (!(key = page.cache[page.addresses[index]])) {
@@ -2027,7 +2032,7 @@ function Strata (options) {
             next();
           }));
         } else {
-          stash(iter, iter.positions[iterIndex], validate(callback, function (entry) {
+          stash(iter, iterIndex, validate(callback, function (entry) {
             stack.forEach(function (page) { unlock(page) });
             cacheKey(page, page.addresses[index], entry.key);
             callback(null, entry.key);
@@ -2570,7 +2575,7 @@ function Strata (options) {
 
     // Get a record at a given index from the current leaf page.
     function get (index, callback) {
-      stash(page, page.positions[index], validator(callback)(unstashed));
+      stash(page, index, validator(callback)(unstashed));
       function unstashed (entry) { callback(null, entry.record) }
     };
 
@@ -3551,7 +3556,8 @@ function Strata (options) {
         function nodify (next) {
           return check(function (page) {
             ok(page.address % 2, "leaf page expected");
-            designate(page, 0, check(identified));
+            if (page.address == 1) identified();
+            else designate(page, 0, check(identified));
             function identified (key) {
               node = { key: key,
                        address: page.address,
@@ -3902,7 +3908,7 @@ function Strata (options) {
 
         ok(index < split.positions.length);
 
-        stash(split, position, check(uncache));
+        stash(split, index, check(uncache));
 
         function uncache (object) {
           uncacheRecord(split, position);
@@ -4680,7 +4686,7 @@ function Strata (options) {
         function fetch () {
           // Fetch the record and read it from cache or file.
           position = leaves.right.page.positions[index];
-          stash(leaves.right.page, position, check(copy));
+          stash(leaves.right.page, index, check(copy));
         }
 
         // Append a record fetched from the right leaf page to the left leaf
@@ -5012,7 +5018,7 @@ function Strata (options) {
 
         function get (recordIndex) {
           if (recordIndex < page.positions.length) {
-            stash(page, page.positions[recordIndex], check(push));
+            stash(page, recordIndex, check(push));
           } else {
             unlock(page);
             expand(parent, pages, index + 1, callback);
