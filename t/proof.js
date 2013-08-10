@@ -177,6 +177,7 @@ function abstracted (dir) {
       record = { log: [] };
       dir[file].forEach(function (line) {
         if (line[0] == 0) {
+          if (!line[1]) return;
           if (line[2]) record.right = Math.abs(line[2]);
           record.log.push({ type: 'pos' });
         } else if (line[0] > 0) {

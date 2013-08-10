@@ -753,8 +753,15 @@ function Strata (options) {
     function sent(written) {
       options.page.position += written;
       offset += written;
-      if (offset == buffer.length) callback(null, position);
-      else send();
+      if (offset == buffer.length) {
+        if (options.type == "footer") {
+          callback(null, position);
+        } else {
+          writeFooter(options.fd, options.page, function () { callback(null, position) })
+        }
+      } else {
+        send();
+      }
     }
   }
 
@@ -1011,14 +1018,17 @@ function Strata (options) {
           j = i + 1;
           index = entry.shift();
           if (index == 0) {
-            entry.shift(); // leaf page file format version
-            page.right = entry.shift();
-            page.ghosts = entry.shift();
-            page.entries = entry.shift();
-            page.bookmark = entry.pop();
-            positions = entry;
-            replay();
-            return;
+            if (entry.shift()) {
+              page.right = entry.shift();
+              page.ghosts = entry.shift();
+              page.entries = entry.shift();
+              page.bookmark = entry.pop();
+              positions = entry;
+              replay();
+              return;
+            } else {
+              splices.push([ 0 ]);
+            }
           } else {
             page.bookmark = entry.pop();
             position = start + i + 1;
@@ -1043,6 +1053,10 @@ function Strata (options) {
       splices.reverse()
       splices.forEach(function ($) {
         var index = $[0], position = $[1], entry = $[2];
+        if (!index) {
+          ++page.entries;
+          return;
+        }
         ok(entry == ++page.entries, "leaf corrupt: incorrect entry position");
         if (index > 0) {
           splice(page, index - 1, 0, position);
