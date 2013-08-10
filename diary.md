@@ -178,6 +178,25 @@ the leaf page, or an initial buffer, but leave it there, not proceeding until
 someone actually visits the leaf page. We can put this information in the
 Magazine perhaps in a separate Magazine for partially read pages?
 
+## Breaking the Rule of Append
+
+I'm struggling to fight file girth, but it occours to me that the reason I'm
+struggling so much is that I've make sure that the only writes are appends. I
+like the property because it favors durability. I know that I'm only ever
+growing the file this way.
+
+However, I could, as easily add a record to the end of the file. That record
+could be a footer. It could contain all our housekeeping data. I could
+overwrite that footer at each new write.
+
+Which is why I believe I need to add a footer record, even though, for now, I'm
+going to keep the only-append. With it, overwrite becomes an option. If anyone
+notices or cares about the girth, their is an answer, a place to go. Until then,
+every leaf page file is going to be a log.
+
+In fact, if I am going this route, why don't I simply write out the key over and
+over again?
+
 ## Changes for Next Release
 
  * Upgrade Proof to 0.0.31. #113.
