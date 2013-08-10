@@ -15,7 +15,7 @@
         }
     ],
     "devDependencies": {
-        "proof": "0.0.35"
+        "proof": "0.0.36"
     },
     "scripts": {
         "test": "proof platform win32 && proof test */*/*.t.js || t/test"
