@@ -244,7 +244,8 @@ function createDirectory (json) {
         var index;
         switch (entry.type) {
         case 'pos':
-          record = [ count + 1, 0, 1, object.right || 0, ghosts ].concat(positions);
+          record = [ count + 1, 0, 1, object.right || 0, ghosts ]
+          record = record.concat(positions).concat(positions);
           break;
         case 'add':
           records++;
