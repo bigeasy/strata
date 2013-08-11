@@ -884,6 +884,47 @@ function Strata (options) {
     writeJSON({ fd: fd, page: page, entry: entry }, callback);
   }
 
+  // Read or write buffers to the file system. We work with buffers, not
+  // streams. For binary especially, we're mostly just filling buffers, so we
+  // may as well perform our file operations on buffers.
+  //
+  // Note that both `fs.read` and `fs.write` can be interrupted by the
+  // operationg system, just like any system call. We need to check to see if
+  // we've actually read or written the amount we expected, and continue with
+  // the remainder if we haven't.
+
+  //
+  function io (direction, filename, callback) {
+    var check = validator(callback);
+
+    // looks like I'm getting ready to say goodbye to append "a".
+    fs.open(filename, direction[0], check(opened));
+
+    function opened (fd) {
+      fs.fstat(fd, check(stat));
+
+      function stat (stat) {
+        callback(null, fd, stat, function (buffer, position, callback) {
+          var check = validator(callback), offset = 0;
+
+          var length = stat.size - position
+          var slice = length < buffer.length ? buffer.slice(0, length) : buffer
+
+          done(0);
+
+          function done (count) {
+            if (count < slice.length - offset) {
+              offset += count;
+              fs[direction](fd, slice, offset, slice.length - offset, position + offset, check(done));
+            } else {
+              callback(null, slice, position);
+            }
+          }
+        })
+      }
+    }
+  }
+
   // #### Position Array Entires
   //
   // A position array entry contains the position array itself. On occasion, we
@@ -972,6 +1013,8 @@ function Strata (options) {
       , buffer    = new Buffer(options.readLeafStartLength || 1024)
       , slice     = buffer.slice(0, 0)
       , end
+      , bookmark
+      , footer
       , was = -1
       , start
       , length
@@ -983,116 +1026,85 @@ function Strata (options) {
 
     // We don't cache file descriptors after the leaf page file read. We will
     // close the file descriptors before the function returns.
-    fs.open(filename(page.address), "r+", check(opened));
+    io('read', filename(page.address), check(opened))
 
-    function opened ($1) {
-      fs.fstat(fd = $1, check(stat));
-    }
+    function opened (fd, stat, read) {
+      read(buffer, Math.max(0, stat.size - buffer.length), check(footer));
 
-    function stat (stat) {
-      start = stat.size, end = stat.size;
-      input();
-    }
-
-    // As we read backwards through the leaf page file, we're going to have
-    // buffers that begin with half a line. My instinct is to save that half a
-    // line by copying it to the end of the buffer, because it seems wasteful to
-    // go to the disk to get something that we already have in memory, but it is
-    // simpiler to adjust the offsets and reread that half a line.
-    function input () {
-      if (end == was) buffer = new Buffer(buffer.length * 2);
-      start = end - buffer.length;
-      if (start < 0) start = 0;
-      offset = 0;
-      slice = buffer.slice(0, end - start);
-      was = end;
-      load(0);
-    }
-
-    function load (read) {
-      if (read < slice.length - offset) {
-        offset += read;
-        fs.read(fd, slice, offset, slice.length - offset, start + offset, check(load));
-      } else {
-        iterate();
-      }
-    }
-
-    function iterate () {
-      var i = end - start, j = i, entry, index, position, k;
-      ok(buffer[--i] == 0x0A, "corrupt leaves: no newline at end of file");
-      while (i != 0) {
-        i = i - 1
-        if (buffer[i] == 0x0A || i == 0 && start == 0) {
-          k = i
-          if (buffer[k] == 0x0A) k++
-          entry = readLine(buffer.toString("utf8", i, j));
-          var number = entry.shift();
-          index = entry.shift();
-          if (index == 0) {
-            if (entry.shift()) {
-              page.right = entry.shift();
-              page.ghosts = entry.shift();
-              page.entries = number;
-              page.bookmark = k + start;
-              page.bookmarkLength = j - k;
-              positions = entry.slice(0, entry.length / 2);
-              lengths = entry.slice(entry.length / 2);
-              replay();
-              return;
-            } else {
-              splices.push([ number, 0 ]);
-            }
-          } else {
-            position = start + i + 1;
-            if (index > 0) {
-              cache[position] = entry.pop();
-            }
-            splices.push([ number, index, position, j - k ]);
+      // todo: check that the last charcter is a new line.
+      function footer (slice) {
+        for (var i = slice.length - 1; i != -1; i--) {
+          if (slice[i] == 0x5b) {
+            footer = readLine(slice.toString('utf8', i))
+            bookmark = { position: footer[3], length: footer[4] };
+            read(buffer, bookmark.position, check(positioned));
+            return;
           }
-          j = i + 1;
+        }
+        // We're probably going to request a medic, not try to heal on open.
+        throw new Error('long log replay on broken log')
+      }
+
+      function positioned (slice) {
+        var positions = readLine(slice.toString('utf8', 0, bookmark.length));
+
+        page.entries = positions.shift();
+        ok(positions.shift() == 0, "expected housekeeping type");
+        ok(positions.shift() == 1, "expected position type");
+        page.right = positions.shift();
+        page.ghosts = positions.shift();
+
+        ok(!(positions.length % 2), "expecting even number of positions and lengths");
+        var lengths = positions.splice(positions.length / 2)
+
+        // Prime our page with the positions array read from the leaf file, or else
+        // an empty positions array.
+        splice('positions', page, 0, 0, positions);
+        splice('lengths', page, 0, 0, lengths);
+
+        page.bookmark = bookmark.position;
+        page.bookmarkLength = bookmark.length;
+
+        replay(slice.slice(bookmark.length), bookmark.position + bookmark.length)
+      }
+
+      function replay (slice, start) {
+        var stop = slice.length, offset = 0;
+        for (var i = offset, I = slice.length; i < I; i++) {
+          if (slice[i] == 0x0a) {
+            var position = start + offset;
+            var length = (i - offset) + 1;
+            ok(length);
+            var entry = readLine(slice.toString('utf8', offset, offset + length));
+            ok(entry.shift() == ++page.entries, "entry count is off");
+            var index = entry.shift();
+            if (index > 0) {
+              splice('positions', page, index - 1, 0, position);
+              splice('lengths', page, index - 1, 0, length);
+              cacheRecord(page, position, entry.pop());
+            } else if (~index == 0 && page.address != 1) {
+              ok(!page.ghosts, "double ghosts");
+              page.ghosts++;
+            } else if (index < 0) {
+              uncacheRecord(page, splice('positions', page, -(index + 1), 1).shift());
+              splice('lengths', page, -(index + 1), 1);
+            }
+            offset += length;
+          }
+        }
+
+        if (start + buffer.length < stat.size) {
+          if (offset == 0) {
+            buffer = new Buffer(buffer.length * 2)
+            read(buffer, start, check(replay));
+          } else {
+            read(buffer, start + offset, check(replay));
+          }
+        } else {
+          fs.close(fd, check(closed));
         }
       }
-      end = start + j;
-      input();
     }
-
-    function replay() {
-      // Prime our page with the positions array read from the leaf file, or else
-      // an empty positions array.
-      splice('positions', page, 0, 0, positions);
-      splice('lengths', page, 0, 0, lengths);
-
-      // Now we replay the inserts and deletes described by the insert and delete
-      // objects that we've gathered up in our splices array.
-      splices.reverse()
-      splices.forEach(function ($) {
-        var entry = $[0], index = $[1], position = $[2], length = $[3];
-        ok(entry == ++page.entries, "leaf corrupt: incorrect entry position");
-        if (!index) return;
-        if (index > 0) {
-          splice('positions', page, index - 1, 0, position);
-          splice('lengths', page, index - 1, 0, length);
-        } else if (~index == 0 && page.address != 1) {
-          ok(!page.ghosts, "double ghosts");
-          page.ghosts++
-        } else {
-          splice('positions', page, -(index + 1), 1);
-          splice('lengths', page, -(index + 1), 1);
-        }
-      });
-
-      // Cache the records we read while searching for the position array object.
-      page.positions.forEach(function (position) {
-        if (cache[position]) {
-          cacheRecord(page, position, cache[position]);
-        }
-      });
-
-      // Close the file descriptor.
-      fs.close(fd, closed);
-    }
-
     // Return the loaded page.
     function closed () {
       callback(null, page);
