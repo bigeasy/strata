@@ -197,6 +197,55 @@ every leaf page file is going to be a log.
 In fact, if I am going this route, why don't I simply write out the key over and
 over again?
 
+## Quick Split and Merge; Log then Rewrite
+
+A number of different situations for writing can be more live than they are now.
+
+Currently, we're locking a branch page while we rewrite a leaf page. That is
+going to be a bottleneck in performance. Holding onto an exclusive lock of a
+leaf page is bad, but holding onto an exclusive lock on a branch page is worse.
+
+Since we're separating locking from caching, one thing we can do to improve
+performance is to cache everything prior to performing the split or merge. We
+can descend the tree as a reader, visiting each page that will participate in
+the split or merge, adding an additional reference count to the cache.
+
+If we're doing time series data, the balancer can suggest that instead of
+splitting, we simply add a new page to the end of branch parent, or else split,
+but split by truncating, instead of splitting in half, or have a simple
+heuristic which is that if the page to split is the right most page, we split by
+truncating, which might mean we have a degenerate last page for most trees, but
+a tightly packed tree for append trees.
+
+Now that branch pages are logs, we only need to write our changes to the log
+while we exclusive lock, but we can downgrade to a shared lock while we rewrite
+the branch page.
+
+Logged splits would be much more difficult. We would write to the page our
+intention to split the page in a house keeping record of some sort. That would
+say, hey, we split this into three pages, but how does that work in memory? Do
+we have an abstraction that is a cached pseudo page where new writes are
+appended to the current leaf page log, even as we copy records into new page
+files? The pseudo page would have to update both the new cleaned up page, and
+the old split page. Actually, that seems rather easier, to simply say, here are
+two new pages in memory, update them, now update this old version of the left
+page. When the left page flushes, this write is committed. The writes to the new
+pages do not have to flush.
+
+What do you write out onto disk when you split to make the split occur as
+quickly as possible? Maybe a footer record that says "coming soon?" How do you
+read the actual page it references, when it is going to be to the left of the
+reference? I suppose when you split, the actual page stays linked as the right
+most page, it's left siblings are references.
+
+Merges could work the same way, we merely log the intent to merge, but while
+we're writing out the new merged page, iterators will land on the current left
+page, and iterate to the right page, which is no longer linked into the tree.
+
+Keep in mind that, if we end up blindly appending stuff, we might want to
+replace insert and delete indexes with the actual keys. That would only change
+delete log entries, since we can extract the key from the record.
+
 ## Changes for Next Release
 
  * Upgrade Proof to 0.0.31. #113.
