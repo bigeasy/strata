@@ -1,0 +1,5 @@
+<t/merge/fixtures/branch.before.json
+-c-g
+!
+~
+!

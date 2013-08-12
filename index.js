@@ -1,3 +1,4 @@
+var chosingBrachesToMerge
 // An evented I/O b&#x2011;tree for Node.js.
 //
 // TK Define ***least child page***.
@@ -2058,8 +2059,8 @@ function Strata (options) {
 
   function unwind (callback) {
     var vargs = [ null ].concat(__slice.call(arguments, 1));
-    callback.apply(null, vargs);
-//    process.nextTick(function () { callback.apply(null, vargs) });
+//    callback.apply(null, vargs);
+    process.nextTick(function () { callback.apply(null, vargs) });
   }
 
   // Binary search implemented, as always, by having a peek at [Algorithms in
@@ -2346,7 +2347,8 @@ function Strata (options) {
     // Follow the path for the given key.
     function key (key) {
       return function (callback) {
-        return find(page, key, page.address % 2 ? page.ghosts : 1, callback);
+        var found = find(page, key, page.address % 2 ? page.ghosts : 1, callback);
+        return found;
       }
     }
 
@@ -2382,7 +2384,14 @@ function Strata (options) {
     // matches the given key.
     function found (key) {
       return function () {
-        return page.addresses[0] != 0 && index != 0 && comparator(page.cache[page.addresses[index]],  key) == 0;
+        var found = page.addresses[0] != 0 && index != 0 && comparator(page.cache[page.addresses[index]],  key) == 0;
+        // an assertion to cache the error condition earlier.
+        if (!(found || !(page.addresses[0] % 2))) {
+          console.log(page.address)
+        }
+        if (chosingBrachesToMerge && page.cache) console.log(key, page.addresses[index], page.cache)
+        ok(found || !(page.addresses[0] % 2), "we never search for key we will not find");
+        return found
       }
     }
 
@@ -4389,14 +4398,15 @@ function Strata (options) {
     // and leaf pages below. The function merge a page into its left sibling. A
     // specialized implementation of the a merge inovkes this function providing
     //
-    //  * a key that designates the page to merge,
+    //  * a key that designates the page to merge into it's left sibling,
+    //  * optionally, the key of the left sibling if it needs to be locked,
     //  * a stopper function that will generate a stop function that will stop
     //  the descent at the page to merge,
     //  * a merger function that will accept the two pages to merge as
     //  arguments, merge them, and write out the left page, and
     //  * a callback to invoke when the merge is completed.
 
-    //
+    // todo: add lock
     function mergePages (key, stopper, merger, ghostly, callback) {
       // Create a list of descents whose pages we'll unlock before we leave.
       var check = validator(callback),
@@ -4778,6 +4788,8 @@ function Strata (options) {
       // property and the branch page to the right in its `greater` property.
       function findPage (key) {
         descents.push(center = new Descent());
+        chosingBrachesToMerge = true
+        console.log('descent')
         center.descend(center.key(key), center.address(address), check(findLeftPage))
       }
 
