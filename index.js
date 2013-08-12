@@ -2385,16 +2385,9 @@ function Strata (options) {
     // matches the any of the given keys.
     function found (keys) {
       return function () {
-        var found = page.addresses[0] != 0 && index != 0 && keys.some(function (key) {
+        return page.addresses[0] != 0 && index != 0 && keys.some(function (key) {
           return comparator(page.cache[page.addresses[index]],  key) == 0;
         });
-        // an assertion to cache the error condition earlier.
-        if (!(found || !(page.addresses[0] % 2))) {
-          console.log(page.address);
-        }
-        if (chosingBrachesToMerge && page.cache) console.log(key, page.addresses[index], page.cache)
-        ok(found || !(page.addresses[0] % 2), "we never search for key we will not find");
-        return found
       }
     }
 
@@ -4421,14 +4414,14 @@ function Strata (options) {
     //  arguments, merge them, and write out the left page, and
     //  * a callback to invoke when the merge is completed.
 
-    // todo: add lock
-    function mergePages (key, stopper, merger, ghostly, callback) {
+    function mergePages (key, leftKey, stopper, merger, ghostly, callback) {
       // Create a list of descents whose pages we'll unlock before we leave.
       var check = validator(callback),
           descents = [], locked = [], singles = [], parents = {}, pages = {},
-          ancestor, pivot, empties;
+          ancestor, pivot, empties, ghosted;
 
       var keys = [ key ]
+      if (leftKey) keys.push(leftKey)
 
       // Descent the tree stopping at the branch page that contains a key for
       // the leaf page that we are going to delete when we merge it into its
@@ -4442,12 +4435,34 @@ function Strata (options) {
       // Upgrade the lock on the pivot branch page to an exclusive lock. From
       // here on out, all descents will lock pages exclusively.
       function upgrade () {
-        pivot.upgrade(check(parentOfPageToMerge));
+        var found = pivot.page.cache[pivot.page.addresses[pivot.index]]
+        if (comparator(found, keys[0]) == 0) {
+          pivot.upgrade(check(parentOfPageToMerge));
+        } else {
+          pivot.upgrade(check(leftAboveRight));
+        }
+      }
+
+      // If the left key is above the right key, we make a note of it here, so
+      // we can explicitly clear it's key when we reach the right key in the
+      // branch pages to merge.
+      function leftAboveRight () {
+        descents.push(pivot = (ghosted = pivot).fork())
+        keys.pop()
+        pivot.uncaching = true
+        pivot.descend(pivot.key(key), pivot.found(keys), check(parentOfPageToMerge))
       }
 
       // From the pivot, descend to the branch page that is the parent of the
       // page for the given key.
       function parentOfPageToMerge () {
+        // If the left key is above the right key in the branch pages, we've
+        // visited it and taken not of it. Now it's time to clear it's key so
+        // that the next descent will obtain the key from the newly merged page.
+        if (ghosted) {
+          uncacheKey(ghosted.page, ghosted.page.addresses[ghosted.index]);
+        }
+
         // We're okay calling `descend` after uncaching the pivot branch page
         // key because we don't reference the branch page's keys when
         // determining when to stop, that would be using `found` as a stop
@@ -4681,7 +4696,7 @@ function Strata (options) {
         // todo: really want page.key
         ok(leftKey == null ||
            comparator(leftKey, leaves.left.page.cache[leaves.left.page.positions[0]].key)  == 0,
-           "key is as expected")
+           "left key is not as expected")
 
         var left = (leaves.left.page.positions.length - leaves.left.page.ghosts);
         var right = (leaves.right.page.positions.length - leaves.right.page.ghosts);
@@ -4778,7 +4793,7 @@ function Strata (options) {
       }
 
       // Invoke the generalized merge function with our specializations.
-      mergePages(key, stopper, merger, ghostly, callback);
+      mergePages(key, leftKey, stopper, merger, ghostly, callback);
     }
 
     // Determine if the branch page at the given address can be merged with
@@ -4813,7 +4828,6 @@ function Strata (options) {
       function findPage (key) {
         descents.push(center = new Descent());
         chosingBrachesToMerge = true
-        console.log('descent')
         center.descend(center.key(key), center.address(address), check(findLeftPage))
       }
 
@@ -4906,7 +4920,7 @@ function Strata (options) {
       }
 
       // Invoke the generalized merge function with our specializations.
-      mergePages(key, stopper, merger, false, callback);
+      mergePages(key, null, stopper, merger, false, callback);
     }
 
     // When the root branch page has only a single child, and that child is a
