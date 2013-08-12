@@ -246,6 +246,14 @@ Keep in mind that, if we end up blindly appending stuff, we might want to
 replace insert and delete indexes with the actual keys. That would only change
 delete log entries, since we can extract the key from the record.
 
+## Null Keys
+
+No. We've already decided that there are no duplicate keys, but we've provided a
+solution, a simulated duplicate key using a series value. Now, what is going to
+be more common, duplicate keys? Or an index that permits a single null?
+
+Shaking my head gear clear of all this hanging on.
+
 ## Changes for Next Release
 
  * Upgrade Proof to 0.0.31. #113.
