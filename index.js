@@ -661,6 +661,7 @@ function Strata (options) {
 
     // Extract the key if none was provided.
     if (key == null) key = extractor(record);
+    ok(key != null, "null keys are forbidden");
 
     // Create a cache entry.
     var entry = page.cache[position] = { record: record, key: key };
