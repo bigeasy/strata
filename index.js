@@ -2381,13 +2381,15 @@ function Strata (options) {
     // terminate the descent.
 
     // Stop when we've reached the branch page that contains a child whose key
-    // matches the given key.
-    function found (key) {
+    // matches the any of the given keys.
+    function found (keys) {
       return function () {
-        var found = page.addresses[0] != 0 && index != 0 && comparator(page.cache[page.addresses[index]],  key) == 0;
+        var found = page.addresses[0] != 0 && index != 0 && keys.some(function (key) {
+          return comparator(page.cache[page.addresses[index]],  key) == 0;
+        });
         // an assertion to cache the error condition earlier.
         if (!(found || !(page.addresses[0] % 2))) {
-          console.log(page.address)
+          console.log(page.address);
         }
         if (chosingBrachesToMerge && page.cache) console.log(key, page.addresses[index], page.cache)
         ok(found || !(page.addresses[0] % 2), "we never search for key we will not find");
@@ -3612,7 +3614,7 @@ function Strata (options) {
 
         function leftSibling (node) {
           var descent = new Descent();
-          descent.descend(descent.key(node.key), descent.found(node.key), check(goToLeaf));
+          descent.descend(descent.key(node.key), descent.found([node.key]), check(goToLeaf));
 
           function goToLeaf () {
             descent.index--;
@@ -4358,7 +4360,7 @@ function Strata (options) {
 
       // Descend to the ghost key and lock exclusively.
       descents.push(pivot = new Descent());
-      pivot.descend(pivot.key(key), pivot.found(key), check(upgrade));
+      pivot.descend(pivot.key(key), pivot.found([key]), check(upgrade));
 
       function upgrade () {
         pivot.upgrade(check(descendLeaf));
@@ -4413,6 +4415,8 @@ function Strata (options) {
           descents = [], locked = [], singles = [], parents = {}, pages = {},
           ancestor, pivot, empties;
 
+      var keys = [ key ]
+
       // Descent the tree stopping at the branch page that contains a key for
       // the leaf page that we are going to delete when we merge it into its
       // left sibling. We're going to refer to this branch page as the pivot
@@ -4420,7 +4424,7 @@ function Strata (options) {
       // from the pivot branch page, because it will no longer be correct once
       // the leaf page is deleted.
       descents.push(pivot = new Descent());
-      pivot.descend(pivot.key(key), pivot.found(key), check(upgrade))
+      pivot.descend(pivot.key(key), pivot.found(keys), check(upgrade))
 
       // Upgrade the lock on the pivot branch page to an exclusive lock. From
       // here on out, all descents will lock pages exclusively.
