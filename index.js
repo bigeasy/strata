@@ -3715,7 +3715,7 @@ function Strata (options) {
         if (difference > 0 && node.length > options.leafSize) {
           // Schedule the split.
           operations.unshift({  method: "splitLeaf", parameters: [ node.key, ghosts[node.address] ] });
-          // If there's a ghost, delete it from within `splitLeaf`.
+          // If there's a ghost, we call `deleteGhost` from within `splitLeaf`.
           delete ghosts[node.address];
           // Unlink this split node, so that we don't consider it when merging.
           unlink(node);
@@ -3750,13 +3750,25 @@ function Strata (options) {
       // Merge the node to the right of each head node into the head node.
       for (address in ordered) {
         node = ordered[address];
-        // Schedule the merge. Note that a leaf page merged into its left
-        // sibling will be destroyed, so we don't have to tidy up its ghosts.
+        // Schedule the merge. Ghost tidy is performed by the merge. We cannot
+        // use the standard delete ghost operation because the left page of the
+        // merge may be empty.
+        //
+        // If it is empty, once we delete the ghost, there is no record to use
+        // for a leaf page key. The only way to deal with empty pages is to
+        // merge them into their right siblings.
+        //
+        // Which creates another special case, merging two empty pages. If the
+        // left page is not the left most page, it is going to need a key, so it
+        // may as well keep the ghost record and it's key. Again, the default
+        // delete ghosts has no concept of this.
+
+        //
         if (node.right) {
           ok(!node.right.right, "merge pair still linked to sibling");
           operations.unshift({
             method: "mergeLeaves",
-            parameters: [ node.right.key, lengths, !!ghosts[node.address] ]
+            parameters: [ node.right.key, node.key, lengths, !!ghosts[node.address] ]
           });
           delete ghosts[node.address];
           delete ghosts[node.right.address];
@@ -4649,7 +4661,7 @@ function Strata (options) {
     // constructed.
 
     //
-    function mergeLeaves (key, unbalanced, ghostly, callback) {
+    function mergeLeaves (key, leftKey, unbalanced, ghostly, callback) {
       // The generalized merge function needs to stop at the parent of the leaf
       // page we with to merge into its left leaf page sibling. We tell it to
       // stop it reaches a branch page that has leaf pages as children. We call
@@ -4664,6 +4676,11 @@ function Strata (options) {
       // can merge with its right sibling.
       function merger (leaves, callback) {
         var check = validator(callback);
+
+        // todo: really want page.key
+        ok(leftKey == null ||
+           comparator(leftKey, leaves.left.page.cache[leaves.left.page.positions[0]].key)  == 0,
+           "key is as expected")
 
         var left = (leaves.left.page.positions.length - leaves.left.page.ghosts);
         var right = (leaves.right.page.positions.length - leaves.right.page.ghosts);
@@ -4687,6 +4704,8 @@ function Strata (options) {
 
         var index;
 
+        // Note how we do not delete a ghost if the two merge pages together
+        // form an empty page. We'll still need a key, so keep the ghost key.
         function deleteGhost () {
           if (ghostly && left + right) exorcise(leaves.left.page, check(merge));
           else merge();
