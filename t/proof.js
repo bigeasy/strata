@@ -355,5 +355,6 @@ module.exports = function (dirname) {
 };
 
 module.exports.stringify = stringify;
+module.exports.serialize = serialize;
 
 /* vim: set sw=2 ts=2: */

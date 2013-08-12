@@ -17,7 +17,7 @@ var Strata = require('./index'), processing = false, queue = [ { type: 'create' 
 
 var cadence = require('cadence'), ok = require('assert'), fs = require('fs');
 
-var stringify = require('./t/proof').stringify;
+var harness = require('./t/proof');
 
 function pretty (json) {
     function s (o) { return JSON.stringify(o) }
@@ -152,9 +152,17 @@ require('arguable').parse(__filename, process.argv.slice(2), function (options) 
 
   actions.stringify = cadence(function (step, action) {
     step(function () {
-      stringify(options.params.directory, step());
+      harness.stringify(options.params.directory, step());
     }, function (result) {
       fs.writeFile(action.file, pretty(JSON.parse(result)), 'utf8', step());
+    });
+  });
+
+  actions.serialize = cadence(function (step, action) {
+    step(function () {
+      harness.serialize(action.file, options.params.directory, step());
+    }, function () {
+      strata.open(step());
     });
   });
 
@@ -197,6 +205,10 @@ require('arguable').parse(__filename, process.argv.slice(2), function (options) 
         case '>':
           queue.push({ type: 'stringify', file: line.substring(1) });
           break;
+        case '<':
+          queue.shift();
+          queue.push({ type: 'serialize', file: line.substring(1) });
+          break;
         case '~':
           queue.push({ type: 'balance' });
           break;
@@ -210,3 +222,5 @@ require('arguable').parse(__filename, process.argv.slice(2), function (options) 
   });
 
 });
+
+/* vim: set ts=2 sw=2: */
