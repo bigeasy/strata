@@ -48,34 +48,34 @@ require('arguable').parse(__filename, process.argv.slice(2), function (options) 
     step(function () {
       strata.mutator(action.values[0], step());
     }, function (cursor) {
-      var next;
-      step(next = function () {
+      step(function () {
         cursor.indexOf(action.values[0], step());
       }, function (index) {
         ok(index < 0);
         cursor.insert(action.values[0], action.values[0], ~ index, step());
         action.values.shift();
-        if (action.values.length) step.jump(next);
       }, function () {
-        cursor.unlock();
-      });
+        if (!action.values.length) {
+            cursor.unlock();
+            step(null);
+        }
+      })();
     });
   });
 
   actions.remove = cadence(function (step, action) {
     var mutate, next;
-    step(next = function () {
+    step(function () {
       if (action.values.length) strata.mutator(action.values[0], step());
       else step(null);
     }, function (cursor) {
       action.values.shift();
-      step.jump(next);
       if (cursor.index >= 0) step(function () {
         cursor.remove(cursor.index, step());
       }, function () {
         cursor.unlock();
       });
-    });
+    })();
   });
 
   actions.balance = function (action, callback) {
