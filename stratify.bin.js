@@ -85,7 +85,7 @@ require('arguable').parse(__filename, process.argv.slice(2), function (options) 
   function print (tree, address, index, depth) {
     tree.forEach(function (child, index) {
       var padding = new Array(depth + 1).join('   ');
-      if (child.address < 0) {
+      if (child.address % 2) {
         var key = index ? child.children[0] : '<';
         while (key.length != 2) key = key + ' ';
         process.stdout.write(padding + key + ' -> ');
