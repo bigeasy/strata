@@ -19,6 +19,47 @@ var cadence = require('cadence'), ok = require('assert'), fs = require('fs');
 
 var stringify = require('./t/proof').stringify;
 
+function pretty (json) {
+    function s (o) { return JSON.stringify(o) }
+    function array (a) {
+      return '[ ' + a.join(', ') + ' ]';
+    }
+    function obj (o) {
+      var entries = [];
+      for (var k in o) {
+        entries.push(s(k) + ': ' + s(o[k]));
+      }
+      return '{ ' + entries.join(', ') + ' }';
+    }
+    var buffer = []
+    function puts (string) { buffer.push.apply(buffer, arguments) }
+    puts('{\n');
+    var fileSep = ''
+    for (var file in json) {
+      puts(fileSep, '    ', s(file), ': {\n');
+      if (file % 2) {
+        puts('        "log": [\n');
+        var logSep = '';
+        json[file].log.forEach(function (entry) {
+          puts(logSep, '            ', obj(entry));
+          logSep = ',\n';
+        });
+        puts('\n        ]');
+        if (json[file].right) {
+          puts(',\n        "right": ' + json[file].right + '\n');
+        } else {
+          puts('\n');
+        }
+      } else {
+        puts('        "children": ', array(json[file].children), '\n');
+      }
+      puts('    }');
+      fileSep = ',\n'
+    }
+    puts('\n}\n');
+    return buffer.join('')
+}
+
 require('arguable').parse(__filename, process.argv.slice(2), function (options) {
   var strata = new Strata({ directory: options.params.directory, branchSize: 3, leafSize: 3 });
 
@@ -113,7 +154,7 @@ require('arguable').parse(__filename, process.argv.slice(2), function (options) 
     step(function () {
       stringify(options.params.directory, step());
     }, function (result) {
-      fs.writeFile(action.file, result, 'utf8', step());
+      fs.writeFile(action.file, pretty(JSON.parse(result)), 'utf8', step());
     });
   });
 

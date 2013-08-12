@@ -47,6 +47,8 @@ function objectify (directory, callback) {
   }
 }
 
+// todo: pretty print should be in here, so I can use it from stratify and the
+// stringify utility.
 function stringify (directory, callback) {
   objectify(directory, check(callback, segments));
 
