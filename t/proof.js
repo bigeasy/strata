@@ -503,6 +503,16 @@ function script (options, callback) {
     });
   });
 
+  actions.fixture = cadence(function (step, action) {
+    step(function () {
+      objectify(options.directory, step());
+      load(action.file, step());
+    }, function (actual, expected) {
+      console.log('comparing');
+      options.deepEqual(actual, expected);
+    });
+  });
+
   function consume (callback) {
     if (queue.length) {
       var action = queue.shift();
@@ -544,6 +554,9 @@ function script (options, callback) {
         case '<':
           queue.shift();
           queue.push({ type: 'serialize', file: line.substring(1) });
+          break;
+        case '=':
+          queue.push({ type: 'fixture', file: line.substring(1) });
           break;
         case '~':
           queue.push({ type: 'balance' });
