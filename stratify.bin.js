@@ -13,7 +13,7 @@
 
  */
 
-var Strata = require('./index'), processing = false, queue = [ { type: 'create' } ];
+var Strata = require('./index'), queue = [ { type: 'create' } ];
 
 var cadence = require('cadence'), ok = require('assert'), fs = require('fs');
 
@@ -61,7 +61,17 @@ function pretty (json) {
 }
 
 require('arguable').parse(__filename, process.argv.slice(2), function (options) {
-  var strata = new Strata({ directory: options.params.directory, branchSize: 3, leafSize: 3 });
+  script({
+    directory: options.params.directory,
+    file: options.argv.shift(),
+    deepEqual: require('assert').deepEqual
+  }, function (error) {
+    if (error) throw error
+  });
+})
+
+function script (options, callback) {
+  var strata = new Strata({ directory: options.directory, branchSize: 3, leafSize: 3 });
 
   var actions = {};
 
@@ -152,7 +162,7 @@ require('arguable').parse(__filename, process.argv.slice(2), function (options) 
 
   actions.stringify = cadence(function (step, action) {
     step(function () {
-      harness.stringify(options.params.directory, step());
+      harness.stringify(options.directory, step());
     }, function (result) {
       fs.writeFile(action.file, pretty(JSON.parse(result)), 'utf8', step());
     });
@@ -160,7 +170,7 @@ require('arguable').parse(__filename, process.argv.slice(2), function (options) 
 
   actions.serialize = cadence(function (step, action) {
     step(function () {
-      harness.serialize(action.file, options.params.directory, step());
+      harness.serialize(action.file, options.directory, step());
     }, function () {
       strata.open(step());
     });
@@ -168,7 +178,6 @@ require('arguable').parse(__filename, process.argv.slice(2), function (options) 
 
   function consume (callback) {
     if (queue.length) {
-      processing = true;
       var action = queue.shift();
       actions[action.type](action, function (error) {
         if (error) callback(error);
@@ -177,18 +186,18 @@ require('arguable').parse(__filename, process.argv.slice(2), function (options) 
         });
       });
     } else {
-      processing = false;
       callback();
     }
   }
 
-  var buffer = '';
-  process.stdin.setEncoding('utf8');
-  process.stdin.on('readable', function () {
-    var data;
-    while ((data = process.stdin.read()) != null) {
-      var lines = (buffer + data).split(/\n/);
-      buffer = lines.pop();
+  cadence(function (step) {
+    var buffer = '';
+    var fs = require('fs')
+    step(function () {
+      fs.readFile(options.file, 'utf8', step());
+    }, function (body) {
+      var lines = body.split(/\n/);
+      lines.pop();
       lines.forEach(function (line) {
         switch (line[0]) {
         case '-':
@@ -217,10 +226,13 @@ require('arguable').parse(__filename, process.argv.slice(2), function (options) 
           break;
         }
       });
-      if (!processing) consume(function (error) { if (error) throw error });
-    }
-  });
-
-});
+      step(function (action) {
+        actions[action.type](action, step());
+      }, function () {
+        process.nextTick(step());
+      })(queue);
+    });
+  })(callback);
+}
 
 /* vim: set ts=2 sw=2: */
