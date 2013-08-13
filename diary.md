@@ -254,6 +254,13 @@ be more common, duplicate keys? Or an index that permits a single null?
 
 Shaking my head gear clear of all this hanging on.
 
+## Error Propagation
+
+I've got a problem now, and it's one that I solved in Cadence. I've got a
+wrapper around my callback that simplifies error handling, but if I've called a
+callback in user space that throws an exception, I'm going to swallow that user
+space exception, when really it was supposed to propagate.
+
 ## Changes for Next Release
 
  * Upgrade Proof to 0.0.31. #113.
