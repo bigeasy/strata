@@ -1,4 +1,3 @@
-var chosingBrachesToMerge
 // An evented I/O b&#x2011;tree for Node.js.
 //
 // TK Define ***least child page***.
@@ -4860,7 +4859,6 @@ function Strata (options) {
       // property and the branch page to the right in its `greater` property.
       function findPage (key) {
         descents.push(center = new Descent());
-        chosingBrachesToMerge = true
         center.descend(center.key(key), center.address(address), check(findLeftPage))
       }
 
