@@ -1095,6 +1095,13 @@ function Strata (options) {
         replay(slice.slice(bookmark.length), bookmark.position + bookmark.length)
       }
 
+      // Each line is terminated by a newline. In case your concerned that the
+      // scan for a new line will mistake a byte inside a multi-byte character
+      // for a newline, have a look at
+      // [UTF-8](http://en.wikipedia.org/wiki/UTF-8#Description). All bytes
+      // participating in a multi-byte character have their leading bit set, all
+      // single-byte characters have their leading bit unset. Therefore, `"\n"`
+      // is unambiguous.
       function replay (slice, start) {
         var stop = slice.length, offset = 0;
         for (var i = offset, I = slice.length; i < I; i++) {
@@ -1138,39 +1145,22 @@ function Strata (options) {
     }
   }
 
-  // Each line is terminated by a newline. In case your concerned that this
-  // simple search will mistake a byte inside a multi-byte character for a
-  // newline, have a look at
-  // [UTF-8](http://en.wikipedia.org/wiki/UTF-8#Description). All bytes
-  // participating in a multi-byte character have their leading bit set, all
-  // single-byte characters have their leading bit unset. Therefore, `"\n"` is
-  // unambiguous.
-
-  // Search for the newline that separates JSON records.
-  function readJSON (buffer, read) {
-    for (var i = 0; i < read; i++) {
-      if (buffer[i] == 0x0A) {
-        return readLine(buffer.toString("utf8", 0, i + 1));
-      }
-    }
-  }
-
-  // Our backward read can load a position array that has been written to the
-  // leaf page file, without having to load all of the records referenced by the
-  // position array. We will have to load the records as they are requested.
+  // We can load a leaf page from position array that has been written to the
+  // leaf page file through to the end of the file loading the records appended
+  // since the position array was logged. We can load the appended records
+  // without having to load all of the records referenced by the position array
+  // prior to its logging. We load the prior records as they are requested.
   //
   // To load a record, we open the file and jump to the position indicated by
-  // the position array. We then read the insert object that introduced the
-  // record to the leaf page file.
+  // the position array. We allocate a buffer using the length for the record
+  // that was stored in the positions entry. We then read the insert object that
+  // introduced the record to the leaf page file.
   //
   // We open a file descriptor and then close it after the record has been read.
   // The desire to cache the file descriptor is strong, but it would complicate
   // the shutdown of the b&#x2011;tree. As it stands, we can always simply let
   // the b&#x2011;tree succumb to the garbage collector, because we hold no
   // other system resources that need to be explicitly released.
-  //
-  // Note how we allow we keep track of the minimum buffer size that will
-  // accommodate the largest possible buffer.
 
   //
   function readRecord (page, position, length, callback) {
@@ -1199,15 +1189,8 @@ function Strata (options) {
       function json (bytes, buffer) {
         ok(bytes == length, "incomplete read");
         ok(buffer[length - 1] == 0x0A, "newline expected");
-        var entry;
-        if (entry = readJSON(buffer, bytes)) {
-          record = entry.pop();
-          fs.close(fd, check(closed));
-        } else {
-          ok(length <= page.position - position, "cannot find end of record.");
-          length = length << 1
-          read();
-        }
+        record = readLine(buffer.toString("utf8")).pop();
+        fs.close(fd, check(closed));
       }
     }
 
