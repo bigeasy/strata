@@ -323,7 +323,7 @@ function Strata (options) {
     ok(typeof callback == "function",'no callback function');
     return function (error) {
       if (error) {
-        callback(error);
+        toUserLand(callback, error);
       } else {
         try {
           if (type && report) {
@@ -336,15 +336,7 @@ function Strata (options) {
           if (thrownByUser === error) {
             throw error
           }
-          try {
-            callback(error);
-          } catch (e) {
-            // In this case, Strata has generated an error and the user wants to
-            // unwind the stack. It is a Strata internal error, but Strata
-            // should not catch it again.
-            thrownByUser = e
-            throw e
-          }
+          toUserLand(callback, error);
         }
       }
     }
