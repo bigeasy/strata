@@ -3,3 +3,4 @@
 !
 ~
 !
+=t/merge/fixtures/unpurged-key.after.json

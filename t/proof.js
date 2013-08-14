@@ -349,6 +349,7 @@ module.exports = function (dirname) {
              , serialize: serialize
              , gather: gather
              , objectify: objectify
+             , script: script
              };
     });
   });
@@ -508,8 +509,7 @@ function script (options, callback) {
       objectify(options.directory, step());
       load(action.file, step());
     }, function (actual, expected) {
-      console.log('comparing');
-      options.deepEqual(actual, expected);
+      options.deepEqual(actual, expected, action.file);
     });
   });
 
