@@ -1069,7 +1069,7 @@ function Strata (options) {
           }
         }
         // We're probably going to request a medic, not try to heal on open.
-        throw new Error('long log replay on broken log')
+        throw new Error('cannot find footer in last ' + buffer.length + ' bytes')
       }
 
       function positioned (slice) {
