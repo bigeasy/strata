@@ -317,6 +317,8 @@ function Strata (options) {
     return function (forward, type, report) { return validate(callback, forward, type, report) }
   }
 
+  var thrownByUser
+
   function validate (callback, forward, type, report) {
     ok(typeof forward == "function", 'no forward function');
     ok(typeof callback == "function",'no callback function');
@@ -331,9 +333,33 @@ function Strata (options) {
             forward.apply(null, __slice.call(arguments, 1));
           }
         } catch (error) {
-          callback(error);
+          // Do not catch an exception thrown by the user.
+          if (thrownByUser === error) {
+            throw error
+          }
+          try {
+            callback(error);
+          } catch (e) {
+            // In this case, Strata has generated an error and the user wants to
+            // unwind the stack. It is a Strata internal error, but Strata
+            // should not catch it again.
+            thrownByUser = e
+            throw e
+          }
         }
       }
+    }
+  }
+
+  // When we a user's callback, we wrap our call. If the user has thrown an
+  // exception we make sure that `validate` will not catch it and feed it back
+  // to the user as a Strata generated Error.
+  function toUserLand (callback) {
+    try {
+      callback.apply(null, __slice.call(arguments, 1))
+    } catch (error) {
+      thrownByUser = error
+      throw error
     }
   }
 
@@ -1644,7 +1670,7 @@ function Strata (options) {
     }
 
     function replaced() {
-      if (--count == 0) callback();
+      if (--count == 0) toUserLand(callback);
     }
   }
 
@@ -1697,7 +1723,7 @@ function Strata (options) {
           nextAddress = Math.max(+(file) + 1, nextAddress);
         }
       });
-      callback(null);
+      toUserLand(callback, null);
     }
   }
 
@@ -1706,7 +1732,14 @@ function Strata (options) {
   // **TODO**: Need to actually purge cache and set sizes to zero.
 
   // &mdash;
-  function close (callback) { callback(null) }
+  function close (callback) {
+    // In case this is the last we hear from the user.
+    thrownByUser = null;
+
+    // Nothing to do now, since we're always writing our pages. Eventually we're
+    // going to flush dirty pages or assert that there are no dirty pages.
+    toUserLand(callback, null);
+  }
 
   // **TODO**: Close medic file.
 
@@ -2060,8 +2093,8 @@ function Strata (options) {
 
   function unwind (callback) {
     var vargs = [ null ].concat(__slice.call(arguments, 1));
-//    callback.apply(null, vargs);
-    process.nextTick(function () { callback.apply(null, vargs) });
+    callback.apply(null, vargs);
+//    process.nextTick(function () { callback.apply(null, vargs) });
   }
 
   // Binary search implemented, as always, by having a peek at [Algorithms in
@@ -2593,7 +2626,7 @@ function Strata (options) {
     // Get a record at a given index from the current leaf page.
     function get (index, callback) {
       stash(page, index, validator(callback)(unstashed));
-      function unstashed (entry) { callback(null, entry.record) }
+      function unstashed (entry) { toUserLand(callback, null, entry.record) }
     };
 
     // Go to the next leaf page, the right sibling leaf page. Returns true if
@@ -2609,7 +2642,7 @@ function Strata (options) {
       if (page.right) {
         lock(page.right, exclusive, validate(callback, locked));
       } else {
-        callback(null, false);
+        toUserLand(callback, null, false);
       }
 
       function locked (next) {
@@ -2624,7 +2657,7 @@ function Strata (options) {
         length = page.positions.length;
 
         // We have advanced.
-        callback(null, true);
+        toUserLand(callback, null, true);
       }
     }
 
@@ -2804,7 +2837,7 @@ function Strata (options) {
       // are not the first leaf page, the record does not belong in this leaf
       // page.
       if (index == 0 && page.address != 1) {
-        callback(null, -1);
+        toUserLand(callback, null, -1);
         return;
       }
 
@@ -2868,7 +2901,7 @@ function Strata (options) {
 
         function compare () {
           if (comparator(key, rightLeafKey) < 0) insert();
-          else callback(null, +1);
+          else toUserLand(callback, null, +1);
         }
       }
 
@@ -2899,7 +2932,7 @@ function Strata (options) {
         }
 
         function close () {
-          callback(null, 0);
+          toUserLand(callback, null, 0);
         }
       }
     }
@@ -2943,7 +2976,7 @@ function Strata (options) {
       }
 
       function closed () {
-        callback(null);
+        toUserLand(callback, null);
       }
     }
 
@@ -4995,6 +5028,9 @@ function Strata (options) {
   function cursor (key, exclusive, callback) {
     var sought, descent, check = validator(callback);
 
+    // As good a time as any to reset our user exception tracking.
+    thrownByUser = null;
+
     // Descend to the penultimate branch page.
     descent = new Descent();
 
@@ -5010,7 +5046,7 @@ function Strata (options) {
     }
 
     function leaf (page, index) {
-      callback(null, new Cursor(exclusive, key, page, index));
+      toUserLand(callback, null, new Cursor(exclusive, key, page, index));
     }
   }
 
@@ -5024,7 +5060,13 @@ function Strata (options) {
     cursor(splat, true, splat.pop());
   }
 
-  function balance (callback) { balancer.balance(callback) }
+  function balance (callback) {
+    balancer.balance(validate(callback, end));
+
+    function end () {
+      toUserLand(callback)
+    }
+  }
 
   // Create an in memory mirror of a small b&#x2011tree for display. This is
   // only intended for use against small trees for the sake of illustration.
@@ -5040,7 +5082,7 @@ function Strata (options) {
     function begin (page) {
       expand(page, root = page.addresses.map(record), 0, check(function () {
         unlock(page);
-        callback(null, root);
+        toUserLand(callback, null, root);
       }));
     }
 
@@ -5049,7 +5091,7 @@ function Strata (options) {
         var address = pages[index].address;
         lock(address, false, check(address % 2 ? leaf : branch));
       } else {
-        callback(null, pages);
+        toUserLand(callback, null, pages);
       }
 
       function branch (page) {
