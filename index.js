@@ -1004,7 +1004,7 @@ function Strata (options) {
     ok(page.bookmark != null);
     var entry = [
       ++page.entries, 0, 0, page.bookmark, page.bookmarkLength,
-      page.right, page.positions.length - page.ghosts
+      page.right || 0, page.positions.length - page.ghosts
     ];
     writeJSON({ fd: fd, page: page, entry: entry, type: "footer" }, callback);
   }
