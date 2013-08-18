@@ -1017,28 +1017,12 @@ function Strata (options) {
 
   //
   function readLeaf (page, callback) {
-    // When we read backwards, we create a list of of the insert and delete
-    // objects in the splices array. When we have found a positions array, we
-    // stop going backwards.
-    var splices   = []
-      // Note that if we don't find a position array that has been written to
-      // the leaf page file, then we'll start with an empty position array.
-      , positions = []
+    // Note that if we don't find a position array that has been written to the
+    // leaf page file, then we'll start with an empty position array.
+    var positions = []
       , lengths = []
-      // Temporary cache of records read while searching for position array
-      // object.
-      , cache     = {}
-      , line      = ""
-      , end
-      // todo: cleanup the unused cruft.
       , bookmark
-      , footer
-      , was = -1
-      , start
-      , length
-      , offset = 0
-      , fd
-      , check = validator(callback);
+      , check = validator(callback)
       ;
 
     // We don't cache file descriptors after the leaf page file read. We will
@@ -1053,7 +1037,7 @@ function Strata (options) {
       function footer (slice) {
         for (var i = slice.length - 1; i != -1; i--) {
           if (slice[i] == 0x5b) {
-            footer = readLine(slice.toString('utf8', i))
+            var footer = readLine(slice.toString('utf8', i))
             bookmark = { position: footer[3], length: footer[4] };
             read(new Buffer(bookmark.length), bookmark.position, check(positioned));
             return;
