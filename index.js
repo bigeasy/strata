@@ -1029,16 +1029,14 @@ function Strata (options) {
       // object.
       , cache     = {}
       , line      = ""
-      , buffer    = new Buffer(options.readLeafStartLength || 1024)
-      , slice     = buffer.slice(0, 0)
       , end
+      // todo: cleanup the unused cruft.
       , bookmark
       , footer
       , was = -1
       , start
       , length
       , offset = 0
-      , read
       , fd
       , check = validator(callback);
       ;
@@ -1048,6 +1046,7 @@ function Strata (options) {
     io('read', filename(page.address), check(opened))
 
     function opened (fd, stat, read) {
+      var buffer = new Buffer(options.readLeafStartLength || 1024);
       read(buffer, Math.max(0, stat.size - buffer.length), check(footer));
 
       // todo: check that the last charcter is a new line.
@@ -1056,7 +1055,7 @@ function Strata (options) {
           if (slice[i] == 0x5b) {
             footer = readLine(slice.toString('utf8', i))
             bookmark = { position: footer[3], length: footer[4] };
-            read(buffer, bookmark.position, check(positioned));
+            read(new Buffer(bookmark.length), bookmark.position, check(positioned));
             return;
           }
         }
@@ -1083,53 +1082,72 @@ function Strata (options) {
 
         page.bookmark = bookmark;
 
-        replay(slice.slice(bookmark.length), bookmark.position + bookmark.length)
-      }
-
-      // Each line is terminated by a newline. In case your concerned that the
-      // scan for a new line will mistake a byte inside a multi-byte character
-      // for a newline, have a look at
-      // [UTF-8](http://en.wikipedia.org/wiki/UTF-8#Description). All bytes
-      // participating in a multi-byte character have their leading bit set, all
-      // single-byte characters have their leading bit unset. Therefore, `"\n"`
-      // is unambiguous.
-      function replay (slice, start) {
-        var stop = slice.length, offset = 0;
-        for (var i = offset, I = slice.length; i < I; i++) {
-          if (slice[i] == 0x0a) {
-            var position = start + offset;
-            var length = (i - offset) + 1;
-            ok(length);
-            var entry = readLine(slice.toString('utf8', offset, offset + length));
-            ok(entry.shift() == ++page.entries, "entry count is off");
-            var index = entry.shift();
-            if (index > 0) {
-              splice('positions', page, index - 1, 0, position);
-              splice('lengths', page, index - 1, 0, length);
-              cacheRecord(page, position, entry.pop());
-            } else if (~index == 0 && page.address != 1) {
-              ok(!page.ghosts, "double ghosts");
-              page.ghosts++;
-            } else if (index < 0) {
-              uncacheRecord(page, splice('positions', page, -(index + 1), 1).shift());
-              splice('lengths', page, -(index + 1), 1);
-            }
-            offset += length;
-          }
-        }
-
-        if (start + buffer.length < stat.size) {
-          if (offset == 0) {
-            buffer = new Buffer(buffer.length * 2)
-            read(buffer, start, check(replay));
-          } else {
-            read(buffer, start + offset, check(replay));
-          }
-        } else {
-          fs.close(fd, check(closed));
-        }
+        replay(fd, stat, read, page, bookmark.position + bookmark.length, callback);
       }
     }
+  }
+
+  // Replay a leaf page or branch page log into the `page` starting with the
+  // entry at the given `position`. The `fd`, `stat`, and `read` parameters are
+  // the results of calleing `io` to create a read function. This is done by the
+  // caller.
+  //  
+  // The `replay` function accepts the `io` function properties so that we don't
+  // have to close and reopen the file when it is called from `readLeaf`. In the
+  // case of a leaf page, the `readLeaf` will have opened the page page log file
+  // to find a positions array waypoint.
+
+  //
+  function replay (fd, stat, read, page, position, callback) {
+    var check = validator(callback)
+      , buffer = new Buffer(options.readLeafStartLength || 1024);
+
+    read(buffer, position, check(replay));
+
+    // Each line is terminated by a newline. In case your concerned that the
+    // scan for a new line will mistake a byte inside a multi-byte character for
+    // a newline, have a look at
+    // [UTF-8](http://en.wikipedia.org/wiki/UTF-8#Description). All bytes
+    // participating in a multi-byte character have their leading bit set, all
+    // single-byte characters have their leading bit unset. Therefore, `"\n"` is
+    // unambiguous.
+    function replay (slice, start) {
+      var stop = slice.length, offset = 0;
+      for (var i = offset, I = slice.length; i < I; i++) {
+        if (slice[i] == 0x0a) {
+          var position = start + offset;
+          var length = (i - offset) + 1;
+          ok(length);
+          var entry = readLine(slice.toString('utf8', offset, offset + length));
+          ok(entry.shift() == ++page.entries, "entry count is off");
+          var index = entry.shift();
+          if (index > 0) {
+            splice('positions', page, index - 1, 0, position);
+            splice('lengths', page, index - 1, 0, length);
+            cacheRecord(page, position, entry.pop());
+          } else if (~index == 0 && page.address != 1) {
+            ok(!page.ghosts, "double ghosts");
+            page.ghosts++;
+          } else if (index < 0) {
+            uncacheRecord(page, splice('positions', page, -(index + 1), 1).shift());
+            splice('lengths', page, -(index + 1), 1);
+          }
+          offset += length;
+        }
+      }
+
+      if (start + buffer.length < stat.size) {
+        if (offset == 0) {
+          buffer = new Buffer(buffer.length * 2)
+          read(buffer, start, check(replay));
+        } else {
+          read(buffer, start + offset, check(replay));
+        }
+      } else {
+        fs.close(fd, check(closed));
+      }
+    }
+
     // Return the loaded page.
     function closed () {
       callback(null, page);
@@ -1552,13 +1570,15 @@ function Strata (options) {
     }
   }
 
-  // We write the branch page to a file as a single JSON object on a single
-  // line. We tuck the page properties into an object, and then serialize that
-  // object. We do not store the branch page keys. They are looked up as needed
-  // as described in the b&#x2011;tree overview above.
+  // We write the branch page as a log of key inserts and deletes. We use the
+  // same format as the leaf page where instead of a record, we write just the
+  // key. We also add of a page address to a branch page insert entry.
   //
-  // We always write a page branch first to a replacement file, then move it
-  // until place using `replace`.
+  // TODO: At this point, we're not actually using the keys. That is a few
+  // commits away. The next statment will change too.
+  //
+  // TODO: Change: We always write a page branch first to a replacement file,
+  // then move it until place using `replace`.
 
   //
   function writeBranch (page, suffix, callback) {
