@@ -865,7 +865,7 @@ function Strata (options) {
 
   // Write an insert object.
   function writeInsert (fd, page, index, record, callback) {
-    var entry = [ ++page.entries, index + 1, page.positions.length - page.ghosts + 1, record ];
+    var entry = [ ++page.entries, index + 1, record ];
     writeJSON({ fd: fd, page: page, entry: entry }, callback);
   }
 
@@ -899,7 +899,7 @@ function Strata (options) {
 
   // Write a delete object.
   function writeDelete (fd, page, index, callback) {
-    var entry = [ ++page.entries, -(index + 1), page.positions.length - page.ghosts - 1 ];
+    var entry = [ ++page.entries, -(index + 1) ];
     writeJSON({ fd: fd, page: page, entry: entry }, callback);
   }
 

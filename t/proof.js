@@ -155,7 +155,7 @@ function abstracted (dir, lengths) {
             }
           }
         } else if (json[1] > 0) {
-          record.log.push({ type: 'add', value: json[3] });
+          record.log.push({ type: 'add', value: json[2] });
         } else {
           record.log.push({ type: 'del', index: Math.abs(json[1]) - 1 });
         }
@@ -259,11 +259,11 @@ function createDirectory (json) {
           }
           order.splice(index, 0, entry.value);
           positions.splice(index, 0, position);
-          record = [ count + 1, index + 1, records, entry.value ];
+          record = [ count + 1, index + 1, entry.value ];
           break;
         case 'del':
           records--;
-          record = [ count + 1, -(entry.index + 1), records ];
+          record = [ count + 1, -(entry.index + 1) ];
           break;
         }
         var length = JSON.stringify(record).length + 1 + checksum + 1;
