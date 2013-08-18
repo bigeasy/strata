@@ -1212,7 +1212,7 @@ function Strata (options) {
     var check = validator(callback)
       , cache = {}
       , index = 0
-      , done, fd, positions, lengths
+      , fd, positions, lengths
       ;
 
     ok(Array.isArray(key), "key is array");
