@@ -777,7 +777,7 @@ function Strata (options) {
       options.page.position += written;
       offset += written;
       if (offset == buffer.length) {
-        if (options.type == "footer") {
+        if (!(options.page.address % 2) || options.type == "footer") {
           callback(null, position, length);
         } else {
           writeFooter(options.fd, options.page, function () { callback(null, position, length) })
@@ -1001,7 +1001,7 @@ function Strata (options) {
   }
 
   function writeFooter (fd, page, callback) {
-    ok(page.bookmark != null);
+    ok(page.address % 2 && page.bookmark != null);
     var entry = [
       ++page.entries, 0, 0, page.bookmark.position, page.bookmark.length,
       page.right || 0, page.positions.length - page.ghosts
@@ -1084,6 +1084,7 @@ function Strata (options) {
   //
   function replay (fd, stat, read, page, position, callback) {
     var check = validator(callback)
+      , leaf = !!(page.address % 2)
       , buffer = new Buffer(options.readLeafStartLength || 1024);
 
     read(buffer, position, check(replay));
@@ -1105,16 +1106,24 @@ function Strata (options) {
           var entry = readLine(slice.toString('utf8', offset, offset + length));
           ok(entry.shift() == ++page.entries, "entry count is off");
           var index = entry.shift();
-          if (index > 0) {
-            splice('positions', page, index - 1, 0, position);
-            splice('lengths', page, index - 1, 0, length);
-            cacheRecord(page, position, entry.pop());
-          } else if (~index == 0 && page.address != 1) {
-            ok(!page.ghosts, "double ghosts");
-            page.ghosts++;
-          } else if (index < 0) {
-            uncacheRecord(page, splice('positions', page, -(index + 1), 1).shift());
-            splice('lengths', page, -(index + 1), 1);
+          if (leaf) {
+            if (index > 0) {
+              splice('positions', page, index - 1, 0, position);
+              splice('lengths', page, index - 1, 0, length);
+              cacheRecord(page, position, entry.pop());
+            } else if (~index == 0 && page.address != 1) {
+              ok(!page.ghosts, "double ghosts");
+              page.ghosts++;
+            } else if (index < 0) {
+              uncacheRecord(page, splice('positions', page, -(index + 1), 1).shift());
+              splice('lengths', page, -(index + 1), 1);
+            }
+          } else {
+            if (index > 0) {
+              splice('addresses', page, index - 1, 0, entry.shift());
+            } else {
+              splice('addresses', page, ~index, 1);
+            }
           }
           offset += length;
         }
@@ -1462,6 +1471,7 @@ function Strata (options) {
     , cache: {}
     , locks: [[]]
     , penultimate: true
+    , entries: 0
     , size: 0
     };
     return extend(page, override);
@@ -1566,27 +1576,47 @@ function Strata (options) {
 
   //
   function writeBranch (page, suffix, callback) {
-    var fn = filename(page.address, suffix), json, line, buffer;
-    json = JSON.stringify(page.addresses);
-    line = json + " " + checksum(json);
-    buffer = new Buffer(line.length + 1);
-    buffer.write(line);
-    buffer[line.length] = 0x0A;
-    fs.writeFile(fn, buffer, "utf8", callback);
+    var check = validator(callback)
+      , addresses = page.addresses.slice();
+
+    page.entries = 0;
+    page.position = 0;
+
+    fs.open(filename(page.address, suffix), "a", 0644, check(opened));
+
+    function opened (fd) {
+      write();
+
+      function write () {
+        if (addresses.length) {
+          var address = addresses.shift();
+          page.entries++;
+          var entry = [ page.entries, page.entries, address ];
+          writeJSON({ fd: fd, page: page, entry: entry }, check(write));
+        } else {
+          fs.close(fd, check(closed));
+        }
+      }
+    }
+
+    function closed () {
+      callback(null);
+    }
   }
 
-  // To read a branch page we read the entire page and evaluate it as JSON. We
-  // did not store the branch page keys. They are looked up as needed as
-  // described in the b&#x2011;tree overview above.
+  // To read a branch we read it as a log file of key inserts and deletes. The
+  // `replay` method will determine the type of page &mdash; branch page or leaf
+  // page &mdash; and update the appropriate collection; addresses for branch
+  // pages, positions and lengths for leaf pages.
 
   //
   function readBranch (page, callback) {
-    // Read addresses from JSON branch file.
-    fs.readFile(filename(page.address), "utf8", validate(callback, function (file) {
-      // Splice addresses into page.
-      splice('addresses', page, 0, 0, readLine(file))
-      callback(null, page);
-    }));
+    var check = validator(callback);
+    io('read', filename(page.address), check(opened));
+
+    function opened (fd, stat, read) {
+      replay(fd, stat, read, page, 0, callback);
+    }
   }
 
   // ### B-Tree Initialization

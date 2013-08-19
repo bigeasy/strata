@@ -162,7 +162,15 @@ function abstracted (dir, lengths) {
         position += length;
       })
     } else {
-      record = { children: dir[file][0].map(function (address) { return Math.abs(address) }) };
+      var children = [];
+      dir[file].forEach(function (json, index) {
+        if (json[1] > 0) {
+          children.splice(json[1] - 1, 0, json[2]);
+        } else {
+          children.splice(~json[1], 1);
+        }
+      })
+      record = { children: children };
     }
     output[file] = record;
   }
@@ -233,7 +241,9 @@ function createDirectory (json) {
   for (var address in json) {
     var object = json[address];
     if (object.children) {
-      directory[address] = [ object.children ];
+      directory[address] = object.children.map(function (address, index) {
+        return [ index + 1, index + 1, address ]; 
+      });
     } else {
       var ghosts = 0;
       var positions = [];
