@@ -2040,7 +2040,6 @@ function Strata (options) {
       position = page.positions[positionOrIndex];
       length = page.lengths[positionOrIndex];
     }
-    console.log(positionOrIndex, length);
     ok(length);
     var stash;
     if (!(stash = page.cache[position])) {
