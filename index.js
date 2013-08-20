@@ -1066,8 +1066,23 @@ function Strata (options) {
 
         page.bookmark = bookmark;
 
-        replay(fd, stat, read, page, bookmark.position + bookmark.length, callback);
+        replay(fd, stat, read, page, bookmark.position + bookmark.length, check(designate));
       }
+    }
+
+    // Unless this is the left most leaf page, load the first record and assign
+    // it's key as the page's key.
+    function designate () {
+      if (page.address == 1) {
+        callback(null, page);
+      } else {
+        stash(page, 0, check(designated));
+      }
+    }
+
+    function designated (entry) {
+      page.key = entry.key
+      callback(null, page)
     }
   }
 
@@ -3916,6 +3931,7 @@ function Strata (options) {
       // Now descend to our leaf to split.
       function fork () {
         descents.push(leaf = penultimate.fork());
+        console.log(leaf.page.addresses);
         leaf.descend(leaf.key(key), leaf.leaf, check(dirty));
       }
 
@@ -4003,16 +4019,14 @@ function Strata (options) {
         splice('positions', split, offset, length);
         splice('lengths', split, offset, length);
 
-        designate(page, 0, check(rewrite));
+        page.key = page.cache[page.positions[0]].key
 
-        function rewrite (key) {
-          // Schedule the page for replacing and encaching.
-          replacements.push(page);
-          uncached.push(page);
+        // Schedule the page for replacing and encaching.
+        replacements.push(page);
+        uncached.push(page);
 
-          // Write the left most leaf page from which new pages were split.
-          rewriteLeaf(page, [key], ".replace", check(replaced));
-        }
+        // Write the left most leaf page from which new pages were split.
+        rewriteLeaf(page, [page.key], ".replace", check(replaced));
       }
 
       function replaced () {
@@ -4351,6 +4365,8 @@ function Strata (options) {
     // different if the left page of the merge is empty. If the left page of the
     // merge is empty, the key will come from the right page, so the left page
     // is `ghostly` and the right page is `corporal`.
+    //
+    // Returns the promoted key.
 
     //
     function exorcise (pivot, ghostly, corporal, callback) {
@@ -4376,13 +4392,16 @@ function Strata (options) {
         }
 
         function closed () {
-          designate(corporal, corporal.ghosts, check(rekey));
+          stash(corporal, corporal.ghosts, check(rekey));
         }
       }
 
-      function rekey (key) {
-        cacheKey(pivot.page, pivot.page.addresses[pivot.index], key);
-        callback(null, true);
+      // Note that we're assigning the page key now, but in the case of a leaf
+      // page merge with an empty left leaf page, the cache and positions are
+      // going to be updated by the merge, not by this function. 
+      function rekey (entry) {
+        cacheKey(pivot.page, pivot.page.addresses[pivot.index], entry.key);
+        callback(null, ghostly.key = entry.key);
       }
     }
 
@@ -4418,8 +4437,7 @@ function Strata (options) {
       }
 
       // Release all locks.
-      function release () {
-        var key = leaf.page.cache[leaf.page.positions[0]].key;
+      function release (key) {
         descents.forEach(function (descent) { unlock(descent.page) });
         callback(null, key);
       }
