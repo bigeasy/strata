@@ -4419,7 +4419,7 @@ function Strata (options) {
 
       // Release all locks.
       function release () {
-        var key = leaf.page.positions[0];
+        var key = leaf.page.cache[leaf.page.positions[0]].key;
         descents.forEach(function (descent) { unlock(descent.page) });
         callback(null, key);
       }
