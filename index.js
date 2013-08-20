@@ -1075,7 +1075,7 @@ function Strata (options) {
   // entry at the given `position`. The `fd`, `stat`, and `read` parameters are
   // the results of calleing `io` to create a read function. This is done by the
   // caller.
-  //  
+  //
   // The `replay` function accepts the `io` function properties so that we don't
   // have to close and reopen the file when it is called from `readLeaf`. In the
   // case of a leaf page, the `readLeaf` will have opened the page page log file
@@ -2040,6 +2040,7 @@ function Strata (options) {
       position = page.positions[positionOrIndex];
       length = page.lengths[positionOrIndex];
     }
+    console.log(positionOrIndex, length);
     ok(length);
     var stash;
     if (!(stash = page.cache[position])) {
@@ -3886,6 +3887,11 @@ function Strata (options) {
         , records, remainder, right, index, offset, length
         ;
 
+      // todo: check again for ghosts, they may have appeared in the time since
+      // we created our plan, in fact, why are we not doing a separate search
+      // and descent here?
+
+      // todo: Wait a tick! What is the key if the page is the 1st page?
       if (ghosts) deleteGhost(key, check(exorcised));
       else penultimate();
 
@@ -4338,62 +4344,46 @@ function Strata (options) {
       }
     }
 
-    // ### Delete Ghosts
-    //
-    // Remove a ghost record from the positions array of a  leaf page. This
-    // method does not remove the ghost record itself from the leaf page, that
-    // only happens when we merge this page into its left sibling. (Or we
-    // rewrite it as part of a vacuum, but that's not implemented yet.)
-    //
-    // At the time of writing, I've forgotten if there is any breakage that
-    // occurs when you leave ghosts in place, beyond the fact that you are now
-    // balancing your tree based on data that it does not contain. Primarily I
-    // want to get rid of ghosts just because. I believe that if I were to take
-    // the time to think about it, I'd find a nicely illustrative example of a
-    // tree that would be taller than it needs to be because we're using keys
-    // that do not exist in the data set, and are never going to be added back.
-    //
-    // At one point in this project, this would have prompted me to pause and
-    // reflect, to step away from the computer, to take a walk, to try to
-    // understand why I made this decision, so that I could write for you a
-    // justification for the decision. This is not unreasonable, but I don't
-    // know that I always did this for the right reasons.
-    //
-    // At this point in my life, I know that any significant software system is
-    // impossible to hold in one's head. In the past, I might be able to read
-    // through source code and create a picture of how it worked in my mind,
-    // which would lead me to mistakenly believe that I was able to understand
-    // that software in its entirety. There was a time, though, when the thought
-    // of introducing a bug in a system would be something that would be a
-    // source of embarrassment, evidence that I was not a real coder. As much as
-    // I thought education was beneath me, I still felt that compulsion of the
-    // autodidactic to prove his knowledge.
+    // Remove a ghost record from the positions array of the leaf page
+    // `ghostly`. When the ghost is removed, update the key in the branch page
+    // referenced by the `pivot` with the first key of the key of the leaf page
+    // `corporal`, excluding it's possible ghost. During split and ghost
+    // deletion, `ghostly` and `corporal` are the same, during merge they are
+    // different if the left page of the merge is empty. If the left page of the
+    // merge is empty, the key will come from the right page, so the left page
+    // is `ghostly` and the right page is `corporal`.
 
     //
-    function exorcise (page, callback) {
+    function exorcise (pivot, ghostly, corporal, callback) {
       var fd, check = validator(callback);
 
       // Shouldn't call unless necessary.
-      ok(page.ghosts, "no ghosts");
+      ok(ghostly.ghosts, "no ghosts");
+      ok(corporal.positions.length - corporal.ghosts > 0, "no replacement");
 
       // Remove the ghosted record from the references array and the record cache.
-      uncacheRecord(page, splice('positions', page, 0, 1).shift());
-      splice('lengths', page, 0, 1);
-      page.ghosts = 0
+      uncacheRecord(ghostly, splice('positions', ghostly, 0, 1).shift());
+      splice('lengths', ghostly, 0, 1);
+      ghostly.ghosts = 0
 
       // Open the leaf page file and write out the shifted positions array.
-      fs.open(filename(page.address), 'a', 0644, check(opened));
+      fs.open(filename(ghostly.address), 'a', 0644, check(leafOpened));
 
-      function opened (fd) {
-        writePositions(fd, page, check(written));
+      function leafOpened (fd) {
+        writePositions(fd, ghostly, check(written));
 
         function written () {
           fs.close(fd, check(closed));
         }
 
         function closed () {
-          callback(null, true);
+          designate(corporal, corporal.ghosts, check(rekey));
         }
+      }
+
+      function rekey (key) {
+        cacheKey(pivot.page, pivot.page.addresses[pivot.index], key);
+        callback(null, true);
       }
     }
 
@@ -4412,17 +4402,11 @@ function Strata (options) {
         pivot.upgrade(check(descendLeaf));
       }
 
-      // Uncache the pivot key and begin a descent that will clear cached keys all
-      // the way to the leaf page.
+      // Lock the pivot key. We're going to write a new key to the branch page
+      // log and replace the key in the cache.
       //
-      // We're okay calling `descend` after uncaching the pivot branch page key
-      // because we don't reference the branch page's keys when determining when
-      // to stop, that would be `found` instead of `leaf`. The `key` function
-      // will use branch page keys starting with the child of the pivot branch
-      // page.
+      // todo: uncaching is outgoing.
       function descendLeaf () {
-        uncacheKey(pivot.page, pivot.page.addresses[pivot.index]);
-
         descents.push(leaf = pivot.fork());
         leaf.uncaching = true;
 
@@ -4431,7 +4415,7 @@ function Strata (options) {
 
       // Remove the ghosted record from the references array and the record cache.
       function shift () {
-        exorcise(leaf.page, check(release));
+        exorcise(pivot, leaf.page, leaf.page, check(release));
       }
 
       // Release all locks.
@@ -4444,7 +4428,7 @@ function Strata (options) {
 
     // A generalized merge function with a specialization each for branch pages
     // and leaf pages below. The function merge a page into its left sibling. A
-    // specialized implementation of the a merge inovkes this function providing
+    // specialized implementation of a merge invokes this function providing
     //
     //  * a key that designates the page to merge into it's left sibling,
     //  * optionally, the key of the left sibling if it needs to be locked,
@@ -4470,58 +4454,66 @@ function Strata (options) {
       // from the pivot branch page, because it will no longer be correct once
       // the leaf page is deleted.
       descents.push(pivot = new Descent());
-      pivot.descend(pivot.key(key), pivot.found(keys), check(upgrade))
+      pivot.descend(pivot.key(key), pivot.found(keys), check(lockPivot))
 
-      // Upgrade the lock on the pivot branch page to an exclusive lock. From
-      // here on out, all descents will lock pages exclusively.
-      function upgrade () {
+      // Get an exclusive lock on the branch page that contains the right key
+      // or, if we're merging branch pages, the right key or the left key, which
+      // ever comes first. After upgrade our shared lock to an exclusive lock,
+      // all locks as we descend the tree will be exclusive.
+      function lockPivot () {
         var found = pivot.page.cache[pivot.page.addresses[pivot.index]]
         if (comparator(found, keys[0]) == 0) {
-          pivot.upgrade(check(parentOfPageToMerge));
+          pivot.upgrade(check(atPivot));
         } else {
           pivot.upgrade(check(leftAboveRight));
         }
       }
 
-      // If the left key is above the right key, we make a note of it here, so
-      // we can explicitly clear it's key when we reach the right key in the
-      // branch pages to merge.
+      // If we need to lock the left key for ghost busting, and the left key is
+      // above the right key, we need to capture the left key as the ghosted
+      // descent, then descend to right key. We've already upgrade our descent
+      // so that it will exclusively.
       function leftAboveRight () {
         descents.push(pivot = (ghosted = pivot).fork())
         keys.pop()
         pivot.uncaching = true
-        pivot.descend(pivot.key(key), pivot.found(keys), check(parentOfPageToMerge))
+        pivot.descend(pivot.key(key), pivot.found(keys), check(atPivot))
       }
 
-      // From the pivot, descend to the branch page that is the parent of the
-      // page for the given key.
-      function parentOfPageToMerge () {
-        // If the left key is above the right key in the branch pages, we've
-        // visited it and taken not of it. Now it's time to clear it's key so
-        // that the next descent will obtain the key from the newly merged page.
-        if (ghosted) {
-          uncacheKey(ghosted.page, ghosted.page.addresses[ghosted.index]);
+      // We're at the pivot, the branch containing the right key. The path to
+      // the left of the right key is the path to left branch of the merge,
+      // provided you go down the left path once, and then all the way to the
+      // right. From the pivot, descend to the branch page that is the parent of
+      // the page for the given key.
+      function atPivot () {
+        // If we have a left key, but we've yet to encounter a ranch page that
+        // contains the left key, then guess what; it's this page. Fork the
+        // current descent, decrement it's index and make not of it as the
+        // ghosted branch.
+        if (leftKey && !ghosted) {
+          descents.push(ghosted = pivot.fork());
+          ghosted.index--;
         }
 
-        // We're okay calling `descend` after uncaching the pivot branch page
-        // key because we don't reference the branch page's keys when
-        // determining when to stop, that would be using `found` as a stop
-        // function. Here we're going to use `address` or `penultimate` to stop
-        // the descent. The `key` function will use branch page keys starting
-        // with the child of the pivot branch page.
-        uncacheKey(pivot.page, pivot.page.addresses[pivot.index]);
-
         // Create a forked descent that will descend to the parent branch page
-        // of the right page of the merge, uncaching the keys cached for the
-        // path we'll follow.
+        // of the right page of the merge.
         parents.right = pivot.fork();
-        parents.right.uncaching = true;
 
         // We gather branch pages on the path to the right page of the merge
         // with a single child whose descendants consist only of the leaf page
-        // or a branch page with a single child must be deleted. If we are
-        // gathering pages and encounter a branch page with more than one child,
-        // we release the pages we've gathered.
+        // or a branch page with a single child. These are pages that must be
+        // deleted. Basically any direct ancestors of the right leaf page with
+        // only one child form a linked list to the leaf page. After the right
+        // page is merged into its left sibling and deleted, the linked list
+        // goes nowhere.
+        //
+        // Another way of thinking of it is that we a branch page with only one
+        // child doesn't count as a parent for the sake of merge. We need to
+        // delete it and remove an entry from it's parent branch page. Unless,
+        // of course, it's parent branch page has only one child, etc.
+        //
+        // If we are gathering pages and encounter a branch page with more than
+        // one child, we release the pages we've gathered.
         parents.right.unlocker = function (parent, child) {
           if (child.addresses.length == 1) {
             if (singles.length == 0) singles.push(parent);
@@ -4536,9 +4528,31 @@ function Strata (options) {
         }
 
         // Descent to the parent branch page of the right page of the merge.
-        parents.right.descend(parents.right.key(key), stopper(parents.right), check(parentOfLeftSibling));
+        parents.right.descend(parents.right.key(key), stopper(parents.right), check(atRightParent));
       }
 
+      // Gerk! Gerk! Gerk! Gerk alert! Gerk level: triple gerk.
+      //
+      // I'm trying to sort out how to descent to the left page, while trying to
+      // sort out how to hold a lock on the left key pivot, if we're merging
+      // leaf pages. I've become confused, hence the gerk alert, and I do hope
+      // that gerk doesn't mean anything profane to someone in my far flung
+      // audience, it's the noise I made when I realized how stupid I am.
+      //
+      // Anyhoo, all this writing is getting old and needs to be refreshed, I'm
+      // dreading it. Some humor to blunt the dread. Also, to see where the
+      // Docco is rotting, like right here.
+      //
+      // Somewhere in this Docco, it has probably already been said, but I'll
+      // say it again, we use the key of the right leaf page, because we know it
+      // exists in the page. When we find it, we know that the child that
+      // precedes the right key is the path to the left branch. There is no
+      // other way. Introducing the locking of the left key for ghost busting,
+      // that confused me. It might confuse you as well. I need to lock the page
+      // that contains the key, but that doesn't change the logic to go down the
+      // path to the left page. I don't want to change too much logic. It's
+      // pretty stable and somewhat tested.
+      //
       // From the pivot, descent to the parent branch page of the left sibling
       // of page for the given key.
       //
@@ -4549,21 +4563,19 @@ function Strata (options) {
       // down the tree. Once a search or mutate descent reaches a leaf page, it
       // then has the option to navigate from leaf page to leaf page from left
       // to right.
-      function parentOfLeftSibling () {
+      function atRightParent () {
         parents.left = pivot.fork();
         parents.left.index--;
-        if (ghostly) {
-          uncacheKey(parents.left.page, parents.left.page.addresses[parents.left.index]);
-          parents.left.uncaching = true;
-        }
+        // todo: that ghosted page up there, we could just use the left parent
+        // here, not an additional descent. But, meh.
         parents.left.descend(parents.left.right,
                              parents.left.level(parents.right.depth),
-                             check(gatherLockedPages));
+                             check(atLeftParent));
       }
 
       // Take note of which pages have been locked during our descent to find
       // the parent branch pages of the two pages we want to merge.
-      function gatherLockedPages (callback) {
+      function atLeftParent (callback) {
         // If we encountered singles, then we're going to delete all the branch
         // pages that would be empty, then remove a child from an ancestor above
         // the parent branch page of the page we're merging.
@@ -4573,14 +4585,6 @@ function Strata (options) {
         // If we encountered no singles, then we may still have gone down
         // separate paths to reach the parent page. If so, the pivot branch page
         // and the parent branch page are separate, so we can
-        //
-        // TODO: Unlock the pivot page here, for what good it will do anyone,
-        // since the key has been uncached, a full descent is necessary to
-        // designate the branch.
-        //
-        // TODO: Obviously, we also need to remove the keys of zero index child
-        // of the descent, otherwise it will be read again from a child branch
-        // page without visiting the child leaf page.
         } else {
           ancestor = parents.right.page;
           if (parents.right.page.address != pivot.page.address) {
@@ -4592,34 +4596,54 @@ function Strata (options) {
           descents.push(parents.left);
         }
 
-        descendToLeftPageToMerge();
-      }
-
-      // Descend to the pages we want to merge. Note that if we're on the
-      // penultimate page, the next descent will follow the index we decremented
-      // above, the leaf page to the left of the keyed page, instead of going to
-      // the right-most leaf page.
-      function descendToLeftPageToMerge () {
+        // Descend to the pages we want to merge. Note that if we're on the
+        // penultimate page, the next descent will follow the index we
+        // decremented above, the leaf page to the left of the keyed page,
+        // instead of going to the right-most leaf page.
         descents.push(pages.left = parents.left.fork());
-        pages.left.descend(pages.left.left, pages.left.level(parents.left.depth + 1), check(descendToRightPageToMerge));
+        pages.left.descend(pages.left.left, pages.left.level(parents.left.depth + 1), check(atLeftPage));
       }
 
       // We use `left` in both cases, because we don't need an index into the
       // page to merge, only a lock on the leaf page.
-      function descendToRightPageToMerge (callback) {
+      function atLeftPage (callback) {
         descents.push(pages.right = parents.right.fork());
-        pages.right.descend(pages.right.left, pages.right.level(parents.right.depth + 1), check(merge));
+        pages.right.descend(pages.right.left, pages.right.level(parents.right.depth + 1), check(atRightPage));
       }
 
-      function merge () {
-        merger(pages, check(merged));
+      // When we reach the right page, we can merge the right page we perform
+      // our merge.
+      function atRightPage () {
+        merger(pages, ghosted, check(merged));
       }
 
+      // We check to see that a merge was actually performed. It may be the case
+      // that we're merging leaves and they've grown since we made our balance
+      // plan.
       function merged (dirty) {
         if (dirty) uncachePivot();
         else release(callback)();
       }
 
+      // todo: Here's a challenge. If we're merging leaf pages, and we're now
+      // keeping keys in branch pages, how do we determine the to replace the
+      // pivot key if it is not in the penultimate branch. If the pivot key is
+      // in the penultimate branch page, then it is deleted by the merge. If it
+      // is not in the penultimate branch, then right leaf page is the key of
+      // least leaf page of it's penultimate branch page parent once it has been
+      // removed.
+      //
+      // That is, it will be the key of the right leaf page sibling of the right
+      // leaf page in the merge. We can lock left to right to peek at that key
+      // in the `mergeLeaves` function, returning the new key for the pivot page
+      // as part of the `merged` callback.
+      //
+      // Before I commit this, do I need to uncache the pivot key in the case of
+      // a branch page merge? Do branch page merges replace keys at all? Or do
+      // they only delete keys? Obviously, it can only delete keys. There is no
+      // re-keying, so this only occurs for a leaf page merge.
+
+      //
       function uncachePivot () {
         // Uncache the pivot key.
         uncacheKey(pivot.page, pivot.page.addresses[pivot.index]);
@@ -4730,10 +4754,10 @@ function Strata (options) {
       // set of unbalanced pages we inspect the next time we balance. The leaf
       // page for the key cannot merge with it's left sibling, but perhaps it
       // can merge with its right sibling.
-      function merger (leaves, callback) {
+      function merger (leaves, pivot, callback) {
         var check = validator(callback);
 
-        // todo: really want page.key
+        // todo: really, really want page.key
         ok(leftKey == null ||
            comparator(leftKey, leaves.left.page.cache[leaves.left.page.positions[0]].key)  == 0,
            "left key is not as expected")
@@ -4763,8 +4787,15 @@ function Strata (options) {
         // Note how we do not delete a ghost if the two merge pages together
         // form an empty page. We'll still need a key, so keep the ghost key.
         function deleteGhost () {
-          if (ghostly && left + right) exorcise(leaves.left.page, check(merge));
-          else merge();
+          if (ghostly && left + right) {
+            if (left) {
+              exorcise(pivot, leaves.left.page, leaves.left.page, check(merge));
+            } else {
+              exorcise(pivot, leaves.left.page, leaves.right.page, check(merge));
+            }
+          } else {
+            merge();
+          }
         }
 
         function merge () {
@@ -4850,6 +4881,10 @@ function Strata (options) {
       // Please don't go back and try to find a way to pass the key into this
       // function. The key we used to arrive at this page during the previous
       // merge has been removed from the b&#x2011;tree.
+      //
+      // Please do go back. Times have changed. We're actively managing the
+      // keys. We ought to have the key. Also, it's, yeah much better because we
+      // don't have designate any longer.
       lock(address, false, check(getKey));
 
       function getKey (page) {
@@ -4938,7 +4973,7 @@ function Strata (options) {
         return descent.child(address);
       }
 
-      function merger (pages, callback) {
+      function merger (pages, pivot, callback) {
         // Merging branch pages by slicing out all the addresses in the right
         // page and adding them to the left page. Uncache the keys we've
         // removed.
