@@ -1232,14 +1232,12 @@ function Strata (options) {
   // object will be found immediately.
 
   // Note that we close the file descriptor before this function returns.
-  function rewriteLeaf (page, key, suffix, callback) {
+  function rewriteLeaf (page, suffix, callback) {
     var check = validator(callback)
       , cache = {}
       , index = 0
       , fd, positions, lengths
       ;
-
-    ok(Array.isArray(key), "key is array");
 
     // Open the new leaf page file and reset our file position.
     fs.open(filename(page.address, suffix), "a", 0644, check(opened));
@@ -1680,7 +1678,7 @@ function Strata (options) {
 
       // Write the root and leaf branches.
       writeBranch(root, ".replace", check(written));
-      rewriteLeaf(leaf, [], ".replace", check(written));
+      rewriteLeaf(leaf, ".replace", check(written));
     }
 
     // When we've written the leaves, move them into place.
@@ -4026,7 +4024,7 @@ function Strata (options) {
         uncached.push(page);
 
         // Write the left most leaf page from which new pages were split.
-        rewriteLeaf(page, [page.key], ".replace", check(replaced));
+        rewriteLeaf(page, ".replace", check(replaced));
       }
 
       function replaced () {
@@ -4043,7 +4041,7 @@ function Strata (options) {
 
         function rewrite (key) {
           // Write the left most leaf page from which new pages were split.
-          rewriteLeaf(split, key, ".replace", check(transact));
+          rewriteLeaf(split, ".replace", check(transact));
 
           // Schedule the page for replacing and encaching.
           replacements.push(split);
@@ -4868,7 +4866,7 @@ function Strata (options) {
           function rewrite (key) {
             // Rewrite the left leaf page. Move the right leaf page aside for the
             // pending unlink.
-            rewriteLeaf(leaves.left.page, key, ".replace", check(resume));
+            rewriteLeaf(leaves.left.page, ".replace", check(resume));
           }
         }
 
