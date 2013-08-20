@@ -1980,9 +1980,7 @@ function Strata (options) {
         // TODO Errors going to multiple callbacks, invocations that can
         // generate multiple errors.
         function loaded (error) {
-          page.load.forEach(function (callback) {
-            process.nextTick(function () { callback(error, page) });
-          });
+          var load = page.load.slice();
           // On error we reset the load list.
           if (error) {
             page.load.length = 0;
@@ -1992,6 +1990,9 @@ function Strata (options) {
             checkJSONSize(page);
             delete page.load
           }
+          load.forEach(function (callback) {
+            unwind(callback, error, page);
+          });
         }
         // Invoke the correct read function for the page type.
         if (page.address % 2) {
@@ -2029,7 +2030,7 @@ function Strata (options) {
       // Each callback is scheduled using next tick. If any callback waits on
       // I/O, then another one will resume. Concurrency.
       locks[0].slice().forEach(function (callback) {
-        process.nextTick(function () { callback(null, page) });
+        unwind(callback, null, page);
       });
     }
   }
@@ -2112,9 +2113,9 @@ function Strata (options) {
   }
 
   function unwind (callback) {
-    var vargs = [ null ].concat(__slice.call(arguments, 1));
-    callback.apply(null, vargs);
-//    process.nextTick(function () { callback.apply(null, vargs) });
+    var vargs = __slice.call(arguments, 1);
+    if (options.nextTick) process.nextTick(function () { callback.apply(null, vargs) });
+    else callback.apply(null, vargs);
   }
 
   // Binary search implemented, as always, by having a peek at [Algorithms in
@@ -2135,14 +2136,14 @@ function Strata (options) {
         mid = low + ((high - low) >>> 1);
         designate(page, mid, check(compare));
       } else {
-        unwind(callback, ~low);
+        unwind(callback, null, ~low);
       }
     }
 
     function compare (other) {
       var compare = comparator(key, other);
       if (compare == 0) {
-        unwind(callback, mid);
+        unwind(callback, null, mid);
       } else {
         if (compare > 0) low = mid + 1;
         else high = mid - 1;
@@ -2503,7 +2504,7 @@ function Strata (options) {
 
       function downward () {
         if (stop()) {
-          unwind(callback, page, index);
+          unwind(callback, null, page, index);
         } else {
           // We'll only ever go here if we're at a branch page.
           if (index + 1 < page.addresses.length) {
