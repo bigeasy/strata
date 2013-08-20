@@ -413,9 +413,19 @@ function script (options, callback) {
 
   var actions = {};
 
-  actions.create = function (action, callback) {
-    strata.create(callback);
-  }
+  actions.create = cadence(function (step, action) {
+    step(function () {
+      fs.readdir(options.directory, step());
+    }, function (list) {
+      list = list.filter(function (file) { return ! /^\./.test(file) });
+      if (!list.every(function (file) { return /^\d+$/.test(file) })) {
+        throw new Error("doesn't look like a strata directory");
+      }
+      step(function (file) { fs.unlink(file, step()) })(list);
+    }, function () {
+      strata.create(step());
+    });
+  })
 
   var alphabet = 'abcdefghiklmnopqrstuvwxyz'.split('');
 
