@@ -4668,7 +4668,6 @@ function Strata (options) {
           if (pivot.page.address != parents.right.page.address && key) {
             replacePivotKey(key);
           } else {
-            uncacheKey(pivot.page, pivot.page.addresses[pivot.index], key);
             renameRightPageToMerge();
           }
         } else {
@@ -4712,15 +4711,38 @@ function Strata (options) {
       function rewriteKeyedBranchPage () {
         var index = parents.right.indexes[ancestor.address];
 
-        if (!index) {
-          if(pivot.page.address != parents.right.page.address) {
-          }
-        }
         uncacheKey(ancestor, ancestor.addresses[index]);
         splice('addresses', ancestor, index, 1);
 
+        if (pivot.page.address != ancestor.address) {
+          say({
+            parent: {
+              index: parents.right.indexes[parents.right.page.address],
+              address: parents.right.page.address,
+              length: parents.right.page.addresses.length
+            },
+            ancestor: {
+              index: pages.right.indexes[ancestor.address],
+              address: ancestor.address
+            }
+          })
+          ok(!index, "expected ancestor to be removed from zero index");
+          ok(ancestor.addresses[index], "expected ancestor to have right sibling");
+          // todo: this is only a problem for this milestone.
+          designate(ancestor, 0, check(replacementAgainOverHere));
+        } else {
+          sliceEmpties();
+        }
+      }
+
+      function sliceEmpties () {
         empties = singles.slice();
         writeBranch(ancestor, ".pending", check(rewriteEmpties));
+      }
+
+      function replacementAgainOverHere (key) {
+        cacheKey(pivot.page, pivot.page.addresses[pivot.index], key);
+        sliceEmpties();
       }
 
       function rewriteEmpties () {
