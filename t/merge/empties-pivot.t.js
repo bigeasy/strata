@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+Error.stackTraceLimit = Infinity
+
 require('./proof')(1, function (step, Strata, tmp, deepEqual, serialize, load, objectify) {
   var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 }), fs = require('fs');
   step(function () {
@@ -15,8 +17,10 @@ require('./proof')(1, function (step, Strata, tmp, deepEqual, serialize, load, o
       cursor.unlock();
     });
   }, function () {
+    console.log('before balance');
     strata.balance(step());
   }, function () {
+    console.log('after balance');
     objectify(tmp, step());
     load(__dirname + '/fixtures/empties-pivot.after.json', step());
   }, function (actual, expected) {

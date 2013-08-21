@@ -155,6 +155,11 @@ function extend(to, from) {
 // Used to manipulate `argument` arrays.
 var __slice = [].slice;
 
+function say () {
+    var args = __slice.call(arguments);
+    console.log(require('util').inspect(args, false, null));
+}
+
 // ## Collation
 //
 // A b&#x2011;tree has a collation defined by the application developer.
@@ -2439,6 +2444,12 @@ function Strata (options) {
     // matches the any of the given keys.
     function found (keys) {
       return function () {
+        say({
+          address: page.address == null ? page : page.address,
+          references: page.positions || page.addresses,
+          cache: page.cache,
+          keys: keys,
+        })
         return page.addresses[0] != 0 && index != 0 && keys.some(function (key) {
           return comparator(page.cache[page.addresses[index]],  key) == 0;
         });
@@ -3836,6 +3847,7 @@ function Strata (options) {
     }
 
     function operate (callback) {
+      say({ operations: operations });
       var check = validator(callback), address;
       function shift () {
         var operation = operations.shift();
@@ -4636,33 +4648,60 @@ function Strata (options) {
       // We check to see that a merge was actually performed. It may be the case
       // that we're merging leaves and they've grown since we made our balance
       // plan.
-      function merged (dirty) {
-        if (dirty) uncachePivot();
-        else release(callback)();
+      function merged (dirty, key) {
+        say({
+          message: 'merged',
+          right: pages.right.page.right,
+          key: key,
+          pivot: {
+            key: pivot.page.cache[pivot.page.addresses[pivot.index]],
+            address: pivot.page.addresses[pivot.index],
+            index: pivot.index
+          },
+          addresses: {
+            pivot: pivot.page.address,
+            penultimate: parents.right.page.address
+          }
+        })
+        if (dirty) {
+          ok(pivot.page.address != null && parents.right.page.address != null, "debug sanity check");
+          if (pivot.page.address != parents.right.page.address && key) {
+            replacePivotKey(key);
+          } else {
+            uncacheKey(pivot.page, pivot.page.addresses[pivot.index], key);
+            renameRightPageToMerge();
+          }
+        } else {
+          release(callback)();
+        }
       }
 
-      // todo: Here's a challenge. If we're merging leaf pages, and we're now
-      // keeping keys in branch pages, how do we determine the to replace the
-      // pivot key if it is not in the penultimate branch. If the pivot key is
-      // in the penultimate branch page, then it is deleted by the merge. If it
-      // is not in the penultimate branch, then right leaf page is the key of
-      // least leaf page of it's penultimate branch page parent once it has been
-      // removed.
+      // If we're merging leaf pages and the pivot is not in the penultimate
+      // branch, it means we've removed the least branch page of a penultimate
+      // branch page. That in turn means that the pivot key which is above the
+      // penultimate branch is now invalid. It is referencing a key that has
+      // been merged into its left leaf page sibling as an ordinary record key.
       //
-      // That is, it will be the key of the right leaf page sibling of the right
-      // leaf page in the merge. We can lock left to right to peek at that key
-      // in the `mergeLeaves` function, returning the new key for the pivot page
-      // as part of the `merged` callback.
+      // The new key is now the right leaf page sibling of the right leaf page
+      // of the merge. It is now the least leaf page of the penultimate branch,
+      // so it's key does not apply to the penultimate branch. It has been
+      // elevated to the pivot branch.
       //
-      // Before I commit this, do I need to uncache the pivot key in the case of
-      // a branch page merge? Do branch page merges replace keys at all? Or do
-      // they only delete keys? Obviously, it can only delete keys. There is no
-      // re-keying, so this only occurs for a leaf page merge.
+      // The `mergeLeaves` function will open the right sibling leaf page of the
+      // right leaf page of the merge with a shared lock and fetch that page's
+      // key, returning it to us. If there is no right leaf page sibling for the
+      // right leaf page of the merge, then the key returned will be null, but
+      // in this case the pivot will be in a penultimate branch page.
+      //
+      // The `mergeBranches` function will never return a key. Merging branch
+      // pages only deletes keys and does not change keys.
+      //
+      // todo: rewrite the key.
 
       //
-      function uncachePivot () {
-        // Uncache the pivot key.
-        uncacheKey(pivot.page, pivot.page.addresses[pivot.index]);
+      function replacePivotKey (key) {
+        console.log('replace', key);
+        cacheKey(pivot.page, pivot.page.addresses[pivot.index], key);
         renameRightPageToMerge();
       }
 
@@ -4673,6 +4712,10 @@ function Strata (options) {
       function rewriteKeyedBranchPage () {
         var index = parents.right.indexes[ancestor.address];
 
+        if (!index) {
+          if(pivot.page.address != parents.right.page.address) {
+          }
+        }
         uncacheKey(ancestor, ancestor.addresses[index]);
         splice('addresses', ancestor, index, 1);
 
@@ -4871,11 +4914,28 @@ function Strata (options) {
           }
         }
 
+        // Peek at the right sibling page for a new pivot key.
+        function getPivotKey () {
+          if (leaves.right.page.right) {
+            lock(leaves.right.page.right, false, check(extractKey));
+          } else {
+            resume();
+          }
+
+          function extractKey (page) {
+            page.unlock();
+            resume(page.key);
+          }
+        }
+
         // Continue with the generalized merge function. `true` indicates that
         // we did indeed merge pages and the pages participating in the merge
-        // should be rewritten.
-        function resume () {
-          callback(null, true);
+        // should be rewritten. We give a new right key in case one is needed to
+        // replace the pivot. If the pivot is in the penultimate branch page, it
+        // will be deleted, but if it is above the penultimate branch page, it
+        // will need a replacement.
+        function resume (key) {
+          callback(null, true, key);
         }
       }
 
@@ -4907,6 +4967,7 @@ function Strata (options) {
         designate(page, 0, check(unlockPage));
 
         function unlockPage (key) {
+          //console.log('on the lookout for', key);
           unlock(page);
           findPage(key);
         }
@@ -4969,6 +5030,7 @@ function Strata (options) {
       }
 
       function propagate (key) {
+        console.log('merging right based on', key);
         release();
         mergeBranches(key, choice.page.address, callback);
       }
