@@ -4937,6 +4937,7 @@ function Strata (options) {
         }
 
         // Peek at the right sibling page for a new pivot key.
+        // todo: this is dead code, remove
         function getPivotKey () {
           if (leaves.right.page.right) {
             lock(leaves.right.page.right, false, check(extractKey));
@@ -4946,7 +4947,7 @@ function Strata (options) {
 
           function extractKey (page) {
             page.unlock();
-            resume(page.key);
+            resume();
           }
         }
 
