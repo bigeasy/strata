@@ -4936,29 +4936,11 @@ function Strata (options) {
           }
         }
 
-        // Peek at the right sibling page for a new pivot key.
-        // todo: this is dead code, remove
-        function getPivotKey () {
-          if (leaves.right.page.right) {
-            lock(leaves.right.page.right, false, check(extractKey));
-          } else {
-            resume();
-          }
-
-          function extractKey (page) {
-            page.unlock();
-            resume();
-          }
-        }
-
         // Continue with the generalized merge function. `true` indicates that
         // we did indeed merge pages and the pages participating in the merge
-        // should be rewritten. We give a new right key in case one is needed to
-        // replace the pivot. If the pivot is in the penultimate branch page, it
-        // will be deleted, but if it is above the penultimate branch page, it
-        // will need a replacement.
-        function resume (key) {
-          callback(null, true, key);
+        // should be rewritten.
+        function resume () {
+          callback(null, true);
         }
       }
 
