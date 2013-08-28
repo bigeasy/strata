@@ -1229,7 +1229,7 @@ function Strata (options) {
   // then using `relink` to replace the current leaf page file with the
   // replacement.
   //
-  // All of records referenced by the current position array are appended into
+  // All records referenced by the current position array are appended into
   // the replacement leaf page file using insert objects. A position array
   // object is appended to the end of the replacement leaf page file. The
   // rewritten leaf page file will load quickly, because the position array
@@ -1311,8 +1311,8 @@ function Strata (options) {
   //
   // * A branch page contains an array of addresses of child pages.
   // * The left most address is the left child of the entire branch page.
-  // * The branch page keys are looked up as needed  by descending the tree to
-  // the left most leaf page of a child and using the leaf page page key.
+  // * The branch page keys are looked up as needed by descending the tree to
+  // the left most leaf page of a child and using the leaf page key.
   // * The root branch page is always at address `0`.
   //
   // To find a record in the b&#x2011;tree, we first use a tree of branch pages
@@ -1360,7 +1360,7 @@ function Strata (options) {
   // the left most leaf page, which accepts all the records less than the first
   // key, and therefore may accept a record less than its current least record.
   //
-  // An insertion can only insert a into the left most leaf page of a
+  // An insertion can only insert into the left most leaf page of a
   // penultimate branch page a record less than the least record of the leaf
   // page.
   //
@@ -1420,7 +1420,7 @@ function Strata (options) {
   //
   // ### Keys and First Records
   //
-  // We said that it is only possible for an insertion to insert a into the left
+  // We said that it is only possible for an insertion to insert into the left
   // most child leaf page of a penultimate branch page a record less than the
   // least record. We can say about a tree rooted by an interior branch page,
   // that an insertion is only able to insert into the left most leaf page in
@@ -1461,7 +1461,7 @@ function Strata (options) {
 
   // ### Branch Page Files
   //
-  // We create a new branch pages in memory. They do not exist on disk until
+  // We create new branch pages in memory. They do not exist on disk until
   // they are first written.
   //
   // A new branch page is given the next unused page number.
@@ -1589,7 +1589,7 @@ function Strata (options) {
   // commits away. The next statment will change too.
   //
   // TODO: Change: We always write a page branch first to a replacement file,
-  // then move it until place using `replace`.
+  // then move it into place using `replace`.
 
   //
   function writeBranch (page, suffix, callback) {
@@ -1700,9 +1700,9 @@ function Strata (options) {
 
   // #### Opening
   //
-  // Opening an existing database is a matter checking for any evidence of a
+  // Opening an existing database is a matter of checking for any evidence of a
   // hard shutdown. You never know. There may be a banged up leaf page file, one
-  // who's last append did not complete. We won't know that until we open it.
+  // whose last append did not complete. We won't know that until we open it.
   //
   // **TODO**: Ah, no. Let's revisit. Here's a simple strategy. Open touches a
   // file.  Closing deletes the file. If we open and the file exists, then we
@@ -1837,7 +1837,7 @@ function Strata (options) {
   //
   // #### Lock Properties
   //
-  // The locking mechanism is a writer preferred shared read, exclusive write
+  // The locking mechanism is a writer-preferred shared read, exclusive write
   // lock. If a descent holds an exclusive write lock, then all lock requests by
   // other descents are blocked. If one or more descents hold a shared read
   // lock, then any request for an exclusive write lock is blocked. Any request
@@ -1925,7 +1925,7 @@ function Strata (options) {
   // accurate count of the heft of our pages. After a while, this code will be
   // removed, and we'll count on assertions in our unit tests to catch errors.
 
-  // This only check that the JSON size is correct for the give page contents,
+  // This only checks that the JSON size is correct for the give page contents,
   // not for the entire b&#x2011;tree.
   //
   // TODO Throw? Who's catching these?
@@ -2022,7 +2022,7 @@ function Strata (options) {
 
   //
   function unlock (page) {
-    // Note that it is not possible for this method to be called on an page that
+    // Note that it is not possible for this method to be called on any page that
     // has not already been loaded.
     checkJSONSize(page);
     var locks = page.locks;
@@ -2161,13 +2161,13 @@ function Strata (options) {
   // We use the term *descent* to describe b&#x2011;tree operations, because all
   // b&#x2011;tree operations require a descent of the b&#x2011;tree, a
   // traversal of the b&#x2011;tree starting from the root. Whenever we are
-  // search the tree, insert or delete records, or balance the tree with a page
+  // search the tree, insert or delete records, or balance the tree with page
   // splits and merges, we first begin with a descent of the b&#x2011;tree, from
   // the root, to find the page we want to act upon.
   //
   // #### Descent as Unit of Work
   //
-  // We use the term descent to describe the both traversal of the b&#x2011;tree
+  // We use the term descent to describe both the traversal of the b&#x2011;tree
   // and the subsequent actions performed when when the desired page is found.
   //
   // The descent is the unit of work in our concurrency model.  A descent is
@@ -2194,8 +2194,7 @@ function Strata (options) {
   //
   // When we descend to leaf pages of a search b&#x2011;tree to obtain records,
   // we *search* the b&#x2011;tree. When we change the size of the b&#x2011;tree
-  // by adding or deleting records we *edit* the b&#x2011;tree. When we change
-  // the structure of the b&#x2011;tree by splitting or merging pages, we
+  // by adding or deleting records we *edit* the b&#x2011;tree. When we change // the structure of the b&#x2011;tree by splitting or merging pages, we
   // *balance* the b&#x2011;tree.
   //
   // We talk about search descents, edit descents, and balance descents we we
