@@ -7,7 +7,7 @@
 // Strata stores JSON objects on disk, according to a sort order of your
 // choosing, indexed for fast retrieval.
 //
-// Strata is faster than a flat file, lighter than a database, with more
+// Strata is faster than a flat file and lighter than a database, with more
 // capacity than an in&#x2011;memory tree.
 //
 // Strata is a [b&#x2011;tree](http://en.wikipedia.org/wiki/B-tree)
@@ -23,11 +23,11 @@
 // there are evented I/O requests outstanding.
 //
 // Strata is **persistent**. It stores your tree in page files. The page files
-// are plain old JSON, text files that are easy to manage. You can view them
+// are plain old JSON text files that are easy to manage. You can view them
 // with `less` or `tail -f`, back them up hot using `rsync`, and version them
 // with `git`.
 //
-// Strata is **durable**. It only appends records to to file, so a hard shutdown
+// Strata is **durable**. It only appends records to a file, so a hard shutdown
 // will only ever lose the few last records added. Pages are journaled when they
 // are vacuumed or rewritten.
 //
@@ -36,7 +36,7 @@
 // can use Strata to build an MVCC database table, like PostgreSQL. You can
 // create Strata b&#x2011;trees to create indexes into structured data that is
 // not already in a database, like monster log files. You can use Strata to
-// store your data in what ever form of JSON suits you like a NoSQL database.
+// store your data in what ever form of JSON suits you, like a NoSQL database.
 //
 // As a bonus, Strata is two database primitives in one, because with a time
 // series index, you can use Strata as a write&#x2011;ahead log.
@@ -57,8 +57,8 @@
 //
 // Feel free to fork and explore. Note that Strata is a database primitive, not
 // a database in itself. Before you fork and add features you feel are missing,
-// please consult with me. Perhaps your ideas are better expressed as project
-// that employs Strata, instead of to a patch to Strata itself.
+// please consult with me. Perhaps your ideas are better expressed as a project
+// that employs Strata, instead of as a patch to Strata itself.
 //
 // ## Terminology
 //
@@ -95,12 +95,12 @@
 //
 // This documentation is written to be read through, with no expecation that
 // you, dear reader, will actually read it though. It is merely the style of the
-// documentation. When you jump to read the documentation for specific to
-// block of code, you're liable to read references to "the above", or be asked
+// documentation. When you jump to read the documentation specific to
+// a block of code, you're liable to read references to "the above", or be asked
 // to "see below." The referenced passage should not be too far away, but you'll
 // have go back or keep reading to find it.
 //
-// The documentation is not meant be a handy reference to the interface, but
+// The documentation is not meant to be a handy reference to the interface, but
 // instead an essay on logic behind the implementation. The alternative is to
 // repeat descriptions of difficult concepts every time they are visited by the
 // code. This is going to be painfully dull for the person who gives the code
@@ -124,7 +124,7 @@
 //
 // Strata is a b&#x2011;tree with leaf pages that contain records ordered by the
 // collation order of the tree. Records are stored for retrieval in constant
-// time, addressed by an integer index, so that they can be found using binary
+// time, addressed by an integer index so that they can be found using binary
 // search.
 //
 // Branch pages contain links to other pages, and do not store records
@@ -135,10 +135,10 @@
 // simplify implementation of branch page merges.
 //
 // The order of a branch page is the maximum number of children for a branch
-// page. The order of a leaf page is maximum number of records for a leaf page.
+// page. The order of a leaf page is the maximum number of records for a leaf page.
 // When a page exceeds its order it is split into two or more pages. When two
 // sibling pages next to each other can be combined to create a page less than
-// than the order they are merged.
+// than the order, they are merged.
 //
 // The b&#x2011;tree always has a root branch page. The height of the tree
 // increases when the root branch page is split. It decreases when the root
@@ -187,7 +187,7 @@ function say () {
 // ### Default Collation
 //
 // You will almost certainly define your own extractors and comparators, but the
-// b&#x2011;tree has a default that works for b&#x2011;tree that stores only
+// b&#x2011;tree has a default that works for a b&#x2011;tree that stores only
 // JavaScript primitives.
 
 // Default comparator for JavaScript primitives. You can use `a - b` for
@@ -223,7 +223,7 @@ function classify () {
 
 // ## Pages
 //
-// Our b&#x2011;tree has two types of pages. Leaf pages and branch pages.
+// Our b&#x2011;tree has two types of pages: leaf pages and branch pages.
 //
 // A ***leaf page*** contains records. A ***branch page*** contains references
 // to other pages.
@@ -259,11 +259,11 @@ function classify () {
 //
 // **TK**: Documentation damage. We're now calling a reference array a position
 // array in a leaf page and an address array in a branch page. Do we want to
-// consolidate to reference array? I'm beginning to think so. May actions on
+// consolidate to reference array? I'm beginning to think so. Many actions on
 // this array are the same for both leaf pages and branch pages.
 //
 // When we read records and record keys off the disk, we store them in an object
-// that acts as a cache for the page. The in memory page object contains an
+// that acts as a cache for the page. The in-memory page object contains an
 // array of integers that act as either page addresses or record positions. We
 // call this the ***reference array***. The integers are stored in the reference
 // array in the collation order of the stored records they reference.
@@ -347,9 +347,9 @@ function Strata (options) {
     }
   }
 
-  // When we a user's callback, we wrap our call. If the user has thrown an
-  // exception we make sure that `validate` will not catch it and feed it back
-  // to the user as a Strata generated Error.
+  // When we call a user's callback, we wrap our call. If the user has thrown an
+  // exception, we make sure that `validate` will not catch it and feed it back
+  // to the user as a Strata-generated Error.
   function toUserLand (callback) {
     try {
       callback.apply(null, __slice.call(arguments, 1))
@@ -379,9 +379,9 @@ function Strata (options) {
   // verify the checksum. We use the checksum algorithm specified in the
   // `Strata` constructor.
   //
-  // In our branch page files and leaf page files, we store a JSON string one
+  // In our branch page files and leaf page files, we store one JSON string
   // per line. The checksum is written as a hexadecimal number following the
-  // JSON string. We checksum the JSON string to and compare it to the stored
+  // JSON string. We checksum the JSON string and compare it to the stored
   // checksum.
   //
   // A hyphen stored in place of the hexadecimal indicates no checksum.
@@ -464,13 +464,13 @@ function Strata (options) {
   //
   // Cache entries are the page objects themselves.
   //
-  // It is important that the page objects are unique, that we do not represent
+  // It is important that the page objects are unique and that we do not represent
   // a page file with more than one page object, because the page objects house
   // the locking mechanisms. The page object acts as a mutex for page data.
   //
-  // The cache entires are linked to form a doubly-linked list. The
+  // The cache entries are linked to form a doubly-linked list. The
   // doubly-linked list of cache entries has a head node that has a null
-  // address, so that end of list traversal is unambiguous.
+  // address, so that end-of-list traversal is unambiguous.
   //
   // We always move a page to the front of the core list when we reference it
   // during b&#x2011;tree descent.
@@ -495,13 +495,13 @@ function Strata (options) {
 
   // #### Cache Purge Trigger
   //
-  // There are a few ways we could schedule a cache purge; elapsed time, after a
-  // certain number of requests, when a reference count reaches zero, or when
+  // There are a few ways we could schedule a cache purge: elapsed time; after a
+  // certain number of requests; when a reference count reaches zero; or when
   // when a limit is reached.
   //
   // We take the limits approach. The bulk of a cached page is the size of the
   // references array and the size of objects in records map. We keep track of
-  // those sizes. When we reach an application developer specified maximum size
+  // those sizes. When we reach an application developer-specified maximum size
   // for cached records and page references for the entire b&#x2011;tree, we
   // trigger a cache purge to bring it below the maximum size. The purge will
   // remove entries from the end of the most-recently used list until the limit
@@ -555,12 +555,12 @@ function Strata (options) {
 
   // ### Leaf Pages
   //
-  // Five key things to know about leaf pages.
+  // Five key things to know about leaf pages:
   //
   // * A leaf page is an array of records.
-  // * A leaf page cannot contain two records that share the same key, therefore
+  // * A leaf page cannot contain two records that share the same key; therefore,
   // the b&#x2011;tree cannot contain duplicates.
-  // * The key of the first record is the key for the leaf page, the keys of all
+  // * The key of the first record is the key for the leaf page; the keys of all
   // other records in the leaf page are always greater than the key for the leaf
   // page.
   // * If the first record is deleted, we keep a it as a ghost record, for the
@@ -587,7 +587,7 @@ function Strata (options) {
   // array are sorted according to the b&#x2011;tree collation of the referenced
   // records.
   //
-  // In the leaf page file, a record is stored as JSON string. Not all of the
+  // In the leaf page file, a record is stored as a JSON string. Not all of the
   // records are loaded when the page loads. Records that are not loaded when
   // the page is loaded are loaded as needed. The leaf page keeps a map (a
   // JavaScript `Object`) that maps file positions to deserialized records.
@@ -601,8 +601,8 @@ function Strata (options) {
   // Leaf pages cannot contain duplicate records. Therefore, the b&#x2011;tree
   // cannot contain duplicate records.
   //
-  // You can simulate duplicate records by adding a series value to your key and
-  // which is stored in your record. The cursor implementation is designed
+  // You can simulate duplicate records by adding a series value to your key
+  // which is stored in your record. The cursor implementation is designed to
   // facilitate ***pseudo-duplicate*** keys in this fashion.
   //
   // In theory, leaf pages can contain `null`, and `null` can be used as a key.
@@ -614,21 +614,21 @@ function Strata (options) {
   //
   // When we delete the first record of a leaf page, we keep the first record
   // around, because its key value is the key value for the leaf page. Changing
-  // the key of a leaf page requries re-balancing the tree, so we need to wait
+  // the key of a leaf page requires re-balancing the tree, so we need to wait
   // until we balance to vacuum the deleted first record.
   //
   // When we delete the first record we increment the `ghosts` property of the
   // page by `1`. The acutal length of a leaf page is the value `length` less
   // the value of the `ghosts` property. Only the first record is ever turned
-  // into a ghost if deleted, so the value `ghosts` property is only ever `0` or
-  // `1`.
+  // into a ghost if deleted, so the value of the `ghosts` property is only
+  // ever `0` or `1`.
   //
   // #### Leaf Page Split
   //
   // If the length of a leaf page exceeds the leaf page order, the leaf page is
   // split when the b&#x2011;tree is balanced.
 
-  // The in memory representation of the leaf page includes the address of the
+  // The in-memory representation of the leaf page includes the address of the
   // leaf page, the page address of the next leaf page, and a cache that maps
   // record file positions to records that have been loaded from the file.
   function createLeaf (override) {
@@ -660,7 +660,7 @@ function Strata (options) {
 
   // #### JSON Leaf Page Size
   //
-  // The JSON size of leaf page is the string length of the file position array
+  // The JSON size of a leaf page is the string length of the file position array
   // when serialized to JSON, plus the string length of each record loaded in
   // memory when serialized to JSON.
   //
@@ -722,9 +722,8 @@ function Strata (options) {
   // page in order to compact it, the file descriptor is kept open for the
   // multiple appends of the rewrite.
   //
-  // The file descriptor must be open for for append.
+  // The file descriptor must be open for append.
 
-  //
   function writeJSON (options, callback) {
     var check = validator(callback)
       , offset = 0
@@ -796,10 +795,10 @@ function Strata (options) {
   // ### Leaf Page Journal
   //
   // The leaf page acts as an edit journal recording edit events. Each event is
-  // stored as a ***journal entry***. These journal entires are appended to the
+  // stored as a ***journal entry***. These journal entries are appended to the
   // leaf page files as JSON arrays, one JSON array per line in the file.
   //
-  // There are three types of journal entires recorded in a leaf page; ***insert
+  // There are three types of journal entires recorded in a leaf page: ***insert
   // entires***, ***delete entries***, and ***position array entries***.
   //
   // The insert and delete entries record changes to the the leaf page.
@@ -881,7 +880,7 @@ function Strata (options) {
   // zero based position array, indicating the index of the position array
   // element that should be deleted.
   //
-  // The next two elements are the journal housekeeping. The last element is of
+  // The next two elements are the journal housekeeping. The last element of
   // the insert entry is the record object.
   //
   // The JSON array elements of a delete entry form a structure as follows.
@@ -913,7 +912,7 @@ function Strata (options) {
   // may as well perform our file operations on buffers.
   //
   // Note that both `fs.read` and `fs.write` can be interrupted by the
-  // operationg system, just like any system call. We need to check to see if
+  // operating system, just like any system call. We need to check to see if
   // we've actually read or written the amount we expected, and continue with
   // the remainder if we haven't.
 
@@ -949,7 +948,7 @@ function Strata (options) {
     }
   }
 
-  // #### Position Array Entires
+  // #### Position Array Entries
   //
   // A position array entry contains the position array itself. On occasion, we
   // store a copy of a constructed position array entry in the leaf page file so
@@ -978,12 +977,12 @@ function Strata (options) {
   //
   // We write an array with a leaf page file format version number, indicating
   // the version of the leaf page file format, and therefore the version of
-  // entire the b&#x2011;tree file format.
+  // the entire b&#x2011;tree file format.
   //
   // We also include the address of the right sibling. This address will only
   // change when the leaf page file is rewritten.
   //
-  // The JSON array elements of a delete entry form a structure as follows.
+  // The JSON array elements of a delete entry form a structure as follows:
   //
   //  * Count of entries in leaf page including insert.
   //  * Zero to indicate a position array entry.
@@ -998,7 +997,7 @@ function Strata (options) {
   //
   // **TK**: Counted b&#x2011;trees.
 
-  // Write an position array entry.
+  // Write a position array entry.
   function writePositions (fd, page, callback) {
     var entry = [ ++page.entries, 0, 1, page.right, page.ghosts ]
     entry = entry.concat(page.positions).concat(page.lengths);
@@ -1017,7 +1016,7 @@ function Strata (options) {
   // #### Reading Leaves
 
   // Here is the backward search for a position in array in practice. We don't
-  // really ever start from the beginning. The backwards than forwards read is
+  // really ever start from the beginning. The backwards-then-forwards read is
   // just as resilient.
 
   //
@@ -1038,7 +1037,7 @@ function Strata (options) {
       var buffer = new Buffer(options.readLeafStartLength || 1024);
       read(buffer, Math.max(0, stat.size - buffer.length), check(footer));
 
-      // todo: check that the last charcter is a new line.
+      // todo: check that the last character is a new line.
       function footer (slice) {
         for (var i = slice.length - 1; i != -1; i--) {
           if (slice[i] == 0x5b) {
@@ -1075,8 +1074,8 @@ function Strata (options) {
       }
     }
 
-    // Unless this is the left most leaf page, load the first record and assign
-    // it's key as the page's key.
+    // Unless this is the leftmost leaf page, load the first record and assign
+    // its key as the page's key.
     function designate () {
       if (page.address == 1) {
         callback(null, page);
@@ -1093,12 +1092,12 @@ function Strata (options) {
 
   // Replay a leaf page or branch page log into the `page` starting with the
   // entry at the given `position`. The `fd`, `stat`, and `read` parameters are
-  // the results of calleing `io` to create a read function. This is done by the
+  // the results of calling `io` to create a read function. This is done by the
   // caller.
   //
   // The `replay` function accepts the `io` function properties so that we don't
   // have to close and reopen the file when it is called from `readLeaf`. In the
-  // case of a leaf page, the `readLeaf` will have opened the page page log file
+  // case of a leaf page, the `readLeaf` will have opened the page log file
   // to find a positions array waypoint.
 
   //
@@ -1109,7 +1108,7 @@ function Strata (options) {
 
     read(buffer, position, check(replay));
 
-    // Each line is terminated by a newline. In case your concerned that the
+    // Each line is terminated by a newline. In case you're concerned that the
     // scan for a new line will mistake a byte inside a multi-byte character for
     // a newline, have a look at
     // [UTF-8](http://en.wikipedia.org/wiki/UTF-8#Description). All bytes
