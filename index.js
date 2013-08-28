@@ -4926,14 +4926,9 @@ function Strata (options) {
           splice('positions', leaves.right.page, 0, leaves.right.page.positions.length);
           splice('lengths', leaves.right.page, 0, leaves.right.page.lengths.length);
 
-          if (leaves.left.page.address == 1) rewrite([]);
-          else designate(leaves.left.page, 0, check(function (key) { rewrite([key]) }));
-
-          function rewrite (key) {
-            // Rewrite the left leaf page. Move the right leaf page aside for the
-            // pending unlink.
-            rewriteLeaf(leaves.left.page, ".replace", check(resume));
-          }
+          // Rewrite the left leaf page. Move the right leaf page aside for the
+          // pending unlink.
+          rewriteLeaf(leaves.left.page, ".replace", check(resume));
         }
 
         // Continue with the generalized merge function. `true` indicates that
