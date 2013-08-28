@@ -4648,60 +4648,12 @@ function Strata (options) {
       // We check to see that a merge was actually performed. It may be the case
       // that we're merging leaves and they've grown since we made our balance
       // plan.
-      function merged (dirty, key) {
-        say({
-          message: 'merged',
-          right: pages.right.page.right,
-          key: key,
-          pivot: {
-            key: pivot.page.cache[pivot.page.addresses[pivot.index]],
-            address: pivot.page.addresses[pivot.index],
-            index: pivot.index
-          },
-          addresses: {
-            pivot: pivot.page.address,
-            penultimate: parents.right.page.address
-          }
-        })
+      function merged (dirty) {
         if (dirty) {
-          ok(pivot.page.address != null && parents.right.page.address != null, "debug sanity check");
-          if (pivot.page.address != parents.right.page.address && key) {
-            replacePivotKey(key);
-          } else {
-            renameRightPageToMerge();
-          }
+          renameRightPageToMerge();
         } else {
           release(callback)();
         }
-      }
-
-      // If we're merging leaf pages and the pivot is not in the penultimate
-      // branch, it means we've removed the least branch page of a penultimate
-      // branch page. That in turn means that the pivot key which is above the
-      // penultimate branch is now invalid. It is referencing a key that has
-      // been merged into its left leaf page sibling as an ordinary record key.
-      //
-      // The new key is now the right leaf page sibling of the right leaf page
-      // of the merge. It is now the least leaf page of the penultimate branch,
-      // so it's key does not apply to the penultimate branch. It has been
-      // elevated to the pivot branch.
-      //
-      // The `mergeLeaves` function will open the right sibling leaf page of the
-      // right leaf page of the merge with a shared lock and fetch that page's
-      // key, returning it to us. If there is no right leaf page sibling for the
-      // right leaf page of the merge, then the key returned will be null, but
-      // in this case the pivot will be in a penultimate branch page.
-      //
-      // The `mergeBranches` function will never return a key. Merging branch
-      // pages only deletes keys and does not change keys.
-      //
-      // todo: rewrite the key.
-
-      //
-      function replacePivotKey (key) {
-        console.log('replace', key);
-        cacheKey(pivot.page, pivot.page.addresses[pivot.index], key);
-        renameRightPageToMerge();
       }
 
       function renameRightPageToMerge () {
@@ -4715,17 +4667,6 @@ function Strata (options) {
         splice('addresses', ancestor, index, 1);
 
         if (pivot.page.address != ancestor.address) {
-          say({
-            parent: {
-              index: parents.right.indexes[parents.right.page.address],
-              address: parents.right.page.address,
-              length: parents.right.page.addresses.length
-            },
-            ancestor: {
-              index: pages.right.indexes[ancestor.address],
-              address: ancestor.address
-            }
-          })
           ok(!index, "expected ancestor to be removed from zero index");
           ok(ancestor.addresses[index], "expected ancestor to have right sibling");
           // todo: this is only a problem for this milestone.
