@@ -2192,12 +2192,13 @@ function Strata (options) {
   //
   // #### Classes of Descent
   //
-  // When we descend to leaf pages of a search b&#x2011;tree to obtain records,
+  // When we descend to leaf pages of a b&#x2011;tree to obtain records,
   // we *search* the b&#x2011;tree. When we change the size of the b&#x2011;tree
-  // by adding or deleting records we *edit* the b&#x2011;tree. When we change // the structure of the b&#x2011;tree by splitting or merging pages, we
+  // by adding or deleting records we *edit* the b&#x2011;tree. When we change
+  // the structure of the b&#x2011;tree by splitting or merging pages, we
   // *balance* the b&#x2011;tree.
   //
-  // We talk about search descents, edit descents, and balance descents we we
+  // We talk about search descents, edit descents, and balance descents when we
   // describe the interaction of b&#x2011;tree operations.
   //
   // We use these terms in this document to save the chore of writing, and the
