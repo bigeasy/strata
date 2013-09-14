@@ -32,6 +32,8 @@ require("./proof")(1, function (step, Strata, deepEqual, tmp, insert,
     objectify(tmp, step());
     load(__dirname + "/fixtures/write.after.json", step());
   }, function (actual, expected) {
+    say(actual);
+    say(expected);
     deepEqual(actual, expected, "written");
   });
 });

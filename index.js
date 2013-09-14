@@ -157,7 +157,7 @@ var __slice = [].slice;
 
 function say () {
     var args = __slice.call(arguments);
-    console.log(require('util').inspect(args, false, null));
+//    console.log(require('util').inspect(args, false, null));
 }
 
 // ## Collation
@@ -1575,7 +1575,7 @@ function Strata (options) {
   // around. You'll find places where you've spliced the reference array and
   // you're working with the removed addresses. In this case the index is lost.
   function uncacheKey (page, address) {
-    if (page.cache[address]) {
+    if (page.cache[address] !== (void(0))) {
       heft(page, -JSON.stringify(page.cache[address]).length);
       delete page.cache[address];
     }
@@ -1632,7 +1632,22 @@ function Strata (options) {
     io('read', filename(page.address), check(opened));
 
     function opened (fd, stat, read) {
-      replay(fd, stat, read, page, 0, callback);
+      replay(fd, stat, read, page, 0, check(loadKeys));
+
+      function loadKeys (page) {
+        var index = 1;
+
+        loadKey();
+
+        function loadKey () {
+          if (index < page.addresses.length) {
+            designate(page, index++, check(loadKey));
+          } else {
+            console.log('loaded cache', page.cache);
+            callback(null, page);
+          }
+        }
+      }
     }
   }
 
@@ -2087,7 +2102,7 @@ function Strata (options) {
       stash(page, index, validate(callback, function (entry) {
         callback(null, entry.key);
       }));
-    } else if (!(key = page.cache[page.addresses[index]])) {
+    } else if ((key = page.cache[page.addresses[index]]) === (void(0))) {
       var iter = page
         , iterIndex = index
         , stack = []
@@ -2104,12 +2119,20 @@ function Strata (options) {
             next();
           }));
         } else {
-          stash(iter, iterIndex, validate(callback, function (entry) {
-            stack.forEach(function (page) { unlock(page) });
-            cacheKey(page, page.addresses[index], entry.key);
-            callback(null, entry.key);
-          }));
+          if (iter.address == -1) {
+            designated(null);
+          } else {
+            stash(iter, iterIndex, validate(callback, function (entry) {
+              designated(entry.key)
+            }));
+          }
         }
+      }
+
+      function designated (key) {
+        stack.forEach(function (page) { unlock(page) });
+        cacheKey(page, page.addresses[index], key);
+        callback(null, key);
       }
     } else {
       callback(null, key);
@@ -2140,6 +2163,7 @@ function Strata (options) {
         mid = low + ((high - low) >>> 1);
         designate(page, mid, check(compare));
       } else {
+        console.log('not found', key, low);
         unwind(callback, null, ~low);
       }
     }
@@ -2147,6 +2171,7 @@ function Strata (options) {
     function compare (other) {
       var compare = comparator(key, other);
       if (compare == 0) {
+        console.log('found');
         unwind(callback, null, mid);
       } else {
         if (compare > 0) low = mid + 1;
@@ -2517,6 +2542,7 @@ function Strata (options) {
           unwind(callback, null, page, index);
         } else {
           // We'll only ever go here if we're at a branch page.
+          console.log(page.address)
           if (index + 1 < page.addresses.length) {
             greater = fork();
             greater.index++;
@@ -4408,7 +4434,7 @@ function Strata (options) {
 
       // Note that we're assigning the page key now, but in the case of a leaf
       // page merge with an empty left leaf page, the cache and positions are
-      // going to be updated by the merge, not by this function. 
+      // going to be updated by the merge, not by this function.
       function rekey (entry) {
         cacheKey(pivot.page, pivot.page.addresses[pivot.index], entry.key);
         callback(null, ghostly.key = entry.key);
@@ -4904,9 +4930,12 @@ function Strata (options) {
       lock(address, false, check(getKey));
 
       function getKey (page) {
+        console.log(page.addresses, page.cache);
+        //uncacheKey(page, page.addresses[0])
         designate(page, 0, check(unlockPage));
 
         function unlockPage (key) {
+        console.log('just kidding, I meant', page.addresses, page.cache);
           //console.log('on the lookout for', key);
           unlock(page);
           findPage(key);
@@ -4919,7 +4948,8 @@ function Strata (options) {
       // property and the branch page to the right in its `greater` property.
       function findPage (key) {
         descents.push(center = new Descent());
-        center.descend(center.key(key), center.address(address), check(findLeftPage))
+        console.log('looking for', key, address);
+        center.descend(center.key(key), center.address(address), check(findLeftPage));
       }
 
       // The branch page we're testing may not have a left sibling. If it does

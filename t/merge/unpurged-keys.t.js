@@ -1,3 +1,4 @@
+//Error.stackTraceLimit = Infinity
 require('./proof')(1, function (step, tmp, cadence, script, deepEqual) {
   var path = require('path');
   script({
