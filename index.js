@@ -4701,14 +4701,14 @@ function Strata (options) {
         }
       }
 
-      function sliceEmpties () {
-        empties = singles.slice();
-        writeBranch(ancestor, ".pending", check(rewriteEmpties));
-      }
-
       function replacementAgainOverHere (key) {
         cacheKey(pivot.page, pivot.page.addresses[pivot.index], key);
         sliceEmpties();
+      }
+
+      function sliceEmpties () {
+        empties = singles.slice();
+        writeBranch(ancestor, ".pending", check(rewriteEmpties));
       }
 
       function rewriteEmpties () {
