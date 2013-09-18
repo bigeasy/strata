@@ -157,7 +157,7 @@ var __slice = [].slice;
 
 function say () {
     var args = __slice.call(arguments);
-//    console.log(require('util').inspect(args, false, null));
+    console.log(require('util').inspect(args, false, null));
 }
 
 // ## Collation
@@ -1643,7 +1643,6 @@ function Strata (options) {
           if (index < page.addresses.length) {
             designate(page, index++, check(loadKey));
           } else {
-            console.log('loaded cache', page.cache);
             callback(null, page);
           }
         }
@@ -2163,7 +2162,6 @@ function Strata (options) {
         mid = low + ((high - low) >>> 1);
         designate(page, mid, check(compare));
       } else {
-        console.log('not found', key, low);
         unwind(callback, null, ~low);
       }
     }
@@ -2171,7 +2169,6 @@ function Strata (options) {
     function compare (other) {
       var compare = comparator(key, other);
       if (compare == 0) {
-        console.log('found');
         unwind(callback, null, mid);
       } else {
         if (compare > 0) low = mid + 1;
@@ -2468,12 +2465,6 @@ function Strata (options) {
     // matches the any of the given keys.
     function found (keys) {
       return function () {
-        say({
-          address: page.address == null ? page : page.address,
-          references: page.positions || page.addresses,
-          cache: page.cache,
-          keys: keys,
-        })
         return page.addresses[0] != 0 && index != 0 && keys.some(function (key) {
           return comparator(page.cache[page.addresses[index]],  key) == 0;
         });
@@ -2542,7 +2533,6 @@ function Strata (options) {
           unwind(callback, null, page, index);
         } else {
           // We'll only ever go here if we're at a branch page.
-          console.log(page.address)
           if (index + 1 < page.addresses.length) {
             greater = fork();
             greater.index++;
@@ -3872,7 +3862,6 @@ function Strata (options) {
     }
 
     function operate (callback) {
-      say({ operations: operations });
       var check = validator(callback), address;
       function shift () {
         var operation = operations.shift();
@@ -3967,7 +3956,6 @@ function Strata (options) {
       // Now descend to our leaf to split.
       function fork () {
         descents.push(leaf = penultimate.fork());
-        console.log(leaf.page.addresses);
         leaf.descend(leaf.key(key), leaf.leaf, check(dirty));
       }
 
@@ -4930,13 +4918,10 @@ function Strata (options) {
       lock(address, false, check(getKey));
 
       function getKey (page) {
-        console.log(page.addresses, page.cache);
         //uncacheKey(page, page.addresses[0])
         designate(page, 0, check(unlockPage));
 
         function unlockPage (key) {
-        console.log('just kidding, I meant', page.addresses, page.cache);
-          //console.log('on the lookout for', key);
           unlock(page);
           findPage(key);
         }
@@ -4948,7 +4933,6 @@ function Strata (options) {
       // property and the branch page to the right in its `greater` property.
       function findPage (key) {
         descents.push(center = new Descent());
-        console.log('looking for', key, address);
         center.descend(center.key(key), center.address(address), check(findLeftPage));
       }
 
@@ -5000,7 +4984,6 @@ function Strata (options) {
       }
 
       function propagate (key) {
-        console.log('merging right based on', key);
         release();
         mergeBranches(key, choice.page.address, callback);
       }
