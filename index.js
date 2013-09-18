@@ -4690,6 +4690,7 @@ function Strata (options) {
       }
 
       function replacementAgainOverHere (key) {
+        say({ address: pivot.page.addresses[pivot.index], key: key })
         cacheKey(pivot.page, pivot.page.addresses[pivot.index], key);
         sliceEmpties();
       }
