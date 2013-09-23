@@ -2937,10 +2937,10 @@ function Strata (options) {
         }
 
         function load (rightLeafPage) {
-          designate(rightLeafPage, 0, check(designated));
+          stash(rightLeafPage, 0, check(designated));
 
-          function designated (key) {
-            rightLeafKey = key;
+          function designated (entry) {
+            rightLeafKey = entry.key;
             _unlock(rightLeafPage);
             compare();
           }
