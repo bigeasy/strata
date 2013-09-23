@@ -3657,10 +3657,10 @@ function Strata (options) {
         function nodify (next) {
           return check(function (page) {
             ok(page.address % 2, "leaf page expected");
-            if (page.address == 1) identified();
-            else designate(page, 0, check(identified));
-            function identified (key) {
-              node = { key: key,
+            if (page.address == 1) identified({});
+            else stash(page, 0, check(identified));
+            function identified (entry) {
+              node = { key: entry.key,
                        address: page.address,
                        rightAddress: page.right,
                        length: page.positions.length - page.ghosts };
