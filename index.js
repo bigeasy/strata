@@ -4944,24 +4944,36 @@ function Strata (options) {
       // key of the right page of the two pages we want to merge to pass it onto
       // the `mergeBranches` function along with the address of the right page
       // of the two pages we want to merge.
-      var choice;
+      //
+      // In the case of a branch page the key is the key of the leaf page found
+      // by descending along the left edge of the sub-tree beneath the branch
+      // page. This is used to determine where to pivot in `mergeBranches` to
+      // find the left branch page of the merge.
       function choose () {
+        var choice, designator;
+
         if (lesser && lesser.page.addresses.length + center.page.addresses.length <= options.branchSize) {
           choice = center;
         } else if (greater && greater.page.addresses.length + center.page.addresses.length <= options.branchSize) {
           choice = greater;
         }
+
         if (choice) {
-          designate(choice.page, 0, check(propagate));
+          descents.push(designator = choice.fork());
+          designator.descend(designator.left, designator.leaf, check(designate));
         } else {
           release();
           callback(null);
         }
-      }
 
-      function propagate (key) {
-        release();
-        mergeBranches(key, choice.page.address, callback);
+        function designate () {
+          stash(designator.page, 0, check(propagate));
+        }
+
+        function propagate (entry) {
+          release();
+          mergeBranches(entry.key, choice.page.address, callback);
+        }
       }
 
       function release () {
