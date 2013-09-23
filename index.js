@@ -155,10 +155,10 @@ function extend(to, from) {
 // Used to manipulate `argument` arrays.
 var __slice = [].slice;
 
-function say () {
+/*function say () {
     var args = __slice.call(arguments);
     console.log(require('util').inspect(args, false, null));
-}
+}*/
 
 // ## Collation
 //
@@ -4687,7 +4687,6 @@ function Strata (options) {
           // todo: this is only a problem for this milestone.
           ok(ancestor.cache[ancestor.addresses[index]], "expected key to be in memory");
           designation = ancestor.cache[ancestor.addresses[index]];
-          say({ address: pivot.page.addresses[pivot.index], key: designation });
           cacheKey(pivot.page, pivot.page.addresses[pivot.index], designation);
         }
         sliceEmpties();
