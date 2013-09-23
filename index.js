@@ -5155,7 +5155,7 @@ function Strata (options) {
 
       function branch (page) {
         pages[index].children = page.addresses.map(record);
-        if (index) designate(parent, index, check(designated));
+        if (index) designated(parent.cache[parent.addresses[index]])
         else keyed();
 
         function designated (key) {
