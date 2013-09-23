@@ -2160,7 +2160,11 @@ function Strata (options) {
     function test () {
       if (low <= high) {
         mid = low + ((high - low) >>> 1);
-        designate(page, mid, check(compare));
+        if (page.address % 2) {
+          stash(page, mid, check(function (entry) { compare(entry.key) }));
+        } else {
+          compare(page.cache[page.addresses[mid]])
+        }
       } else {
         unwind(callback, null, ~low);
       }
