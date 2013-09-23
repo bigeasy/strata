@@ -4066,16 +4066,11 @@ function Strata (options) {
         // Link the leaf page to the last created new leaf page.
         split.right = right;
 
-        if (split.address == 1) rewrite([]);
-        else designate(split, 0, check(function (key) { rewrite([key]) }));
+        // Write the left most leaf page from which new pages were split.
+        rewriteLeaf(split, ".replace", check(transact));
 
-        function rewrite (key) {
-          // Write the left most leaf page from which new pages were split.
-          rewriteLeaf(split, ".replace", check(transact));
-
-          // Schedule the page for replacing and encaching.
-          replacements.push(split);
-        }
+        // Schedule the page for replacing and encaching.
+        replacements.push(split);
       }
 
       // Write the penultimate branch.
