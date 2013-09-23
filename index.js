@@ -1641,7 +1641,7 @@ function Strata (options) {
 
         function loadKey () {
           if (index < page.addresses.length) {
-            designate(page, index++, check(loadKey));
+            _designate(page, index++, check(loadKey));
           } else {
             callback(null, page);
           }
@@ -2095,7 +2095,7 @@ function Strata (options) {
   // branch child page in the case of a branch page. Because this method
   // operates on both branch pages and leaf pages, our binary search operates on
   // both branch pages and leaf pages.
-  function designate (page, index, callback) {
+  function _designate (page, index, callback) {
     var key;
     if (page.address % 2) {
       stash(page, index, validate(callback, function (entry) {
