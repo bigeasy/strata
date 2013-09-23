@@ -4483,7 +4483,7 @@ function Strata (options) {
       // Create a list of descents whose pages we'll unlock before we leave.
       var check = validator(callback),
           descents = [], locked = [], singles = [], parents = {}, pages = {},
-          ancestor, pivot, empties, ghosted;
+          ancestor, pivot, empties, ghosted, designation;
 
       var keys = [ key ]
       if (leftKey) keys.push(leftKey)
@@ -4676,6 +4676,8 @@ function Strata (options) {
       function rewriteKeyedBranchPage () {
         var index = parents.right.indexes[ancestor.address];
 
+        designation = ancestor.cache[ancestor.addresses[index]];
+
         uncacheKey(ancestor, ancestor.addresses[index]);
         splice('addresses', ancestor, index, 1);
 
@@ -4683,15 +4685,11 @@ function Strata (options) {
           ok(!index, "expected ancestor to be removed from zero index");
           ok(ancestor.addresses[index], "expected ancestor to have right sibling");
           // todo: this is only a problem for this milestone.
-          designate(ancestor, 0, check(replacementAgainOverHere));
-        } else {
-          sliceEmpties();
+          ok(ancestor.cache[ancestor.addresses[index]], "expected key to be in memory");
+          designation = ancestor.cache[ancestor.addresses[index]];
+          say({ address: pivot.page.addresses[pivot.index], key: designation });
+          cacheKey(pivot.page, pivot.page.addresses[pivot.index], designation);
         }
-      }
-
-      function replacementAgainOverHere (key) {
-        say({ address: pivot.page.addresses[pivot.index], key: key })
-        cacheKey(pivot.page, pivot.page.addresses[pivot.index], key);
         sliceEmpties();
       }
 
@@ -4763,7 +4761,7 @@ function Strata (options) {
             callback(null);
           }
         } else {
-          chooseBranchesToMerge(ancestor.address, callback);
+          chooseBranchesToMerge(designation, ancestor.address, callback);
         }
       }
     }
@@ -4903,39 +4901,17 @@ function Strata (options) {
     // branche pages, otherwise procede to the next balance operation.
 
     //
-    function chooseBranchesToMerge (address, callback) {
+    function chooseBranchesToMerge (key, address, callback) {
       var check = validator(callback),
           descents = [],
           choice, lesser, greater, center;
 
-      // Get the key that designates the branch page with the given address.
-      // Please don't go back and try to find a way to pass the key into this
-      // function. The key we used to arrive at this page during the previous
-      // merge has been removed from the b&#x2011;tree.
-      //
-      // Please do go back. Times have changed. We're actively managing the
-      // keys. We ought to have the key. Also, it's, yeah much better because we
-      // don't have designate any longer.
-      lock(address, false, check(getKey));
-
-      function getKey (page) {
-        //uncacheKey(page, page.addresses[0])
-        designate(page, 0, check(unlockPage));
-
-        function unlockPage (key) {
-          unlock(page);
-          findPage(key);
-        }
-      }
-
-      // Now that we have the key we descend to the branch page we want to test
-      // for a potential merge. When we descend, the `Descent` class will track
-      // the path to the branch page that is to the left in its `lesser`
-      // property and the branch page to the right in its `greater` property.
-      function findPage (key) {
-        descents.push(center = new Descent());
-        center.descend(center.key(key), center.address(address), check(findLeftPage));
-      }
+      // Descend to the branch page we want to test for a potential merge. When
+      // we descend, the `Descent` class will track the path to the branch page
+      // that is to the left in its `lesser` property and the branch page to the
+      // right in its `greater` property.
+      descents.push(center = new Descent());
+      center.descend(center.key(key), center.address(address), check(findLeftPage));
 
       // The branch page we're testing may not have a left sibling. If it does
       // the `lesser` property is a `Descent` class that when followed to the
