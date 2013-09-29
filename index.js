@@ -4047,7 +4047,11 @@ function Strata (options) {
         splice('positions', split, offset, length);
         splice('lengths', split, offset, length);
 
+        // Assign the key to the page object. *TODO*: Why is this so handy?
         page.key = page.cache[page.positions[0]].key
+
+        // Set the key value in the penultimate branch page.
+        cacheKey(penultimate.page, page.address, page.key);
 
         // Schedule the page for replacing and encaching.
         replacements.push(page);
