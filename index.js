@@ -4207,6 +4207,12 @@ function Strata (options) {
         // Cut off a chunk of addresses.
         var cut = splice('addresses', split, offset, length);
 
+        // Insert the child branch page addresses onto our parent.
+        splice('addresses', parent.page, parent.index + 1, 0, page.address);
+
+        // Promote the key into our parent.
+        cacheKey(parent.page, page.address, split.cache[cut[0]]);
+
         // Uncache the keys from our splitting branch.
         cut.forEach(function (address) { uncacheKey(split, address) });
 
@@ -4220,12 +4226,6 @@ function Strata (options) {
 
       // Write the penultimate branch.
       function paginated () {
-        // Get our children in the right order. We were pushing above.
-        children.reverse()
-
-        // Insert the child branch page addresses onto our parent.
-        splice('addresses', parent.page, parent.index + 1, 0, children.map(function (page) { return page.address }));
-
         // Add the split page to the list of children, order doesn't matter.
         children.unshift(full.page);
 
