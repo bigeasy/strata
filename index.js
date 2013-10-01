@@ -352,10 +352,10 @@ function Strata (options) {
   // to the user as a Strata-generated Error.
   function toUserLand (callback) {
     try {
-      callback.apply(null, __slice.call(arguments, 1))
+      callback.apply(null, __slice.call(arguments, 1));
     } catch (error) {
-      thrownByUser = error
-      throw error
+      thrownByUser = error;
+      throw error;
     }
   }
 
@@ -391,7 +391,7 @@ function Strata (options) {
     var match = /^\s?(.*)\s((?:-|[\da-f]+))\s?$/i.exec(line);
     ok(match, "corrupt line: cannot split line: " + line);
     ok(match[2] == "-" || checksum(match[1]) == match[2], "corrupt line: invalid checksum");
-    return JSON.parse(match[1])
+    return JSON.parse(match[1]);
   }
 
   // Pages are identified by an integer page address. The page address is a
@@ -930,8 +930,8 @@ function Strata (options) {
         callback(null, fd, stat, function (buffer, position, callback) {
           var check = validator(callback), offset = 0;
 
-          var length = stat.size - position
-          var slice = length < buffer.length ? buffer.slice(0, length) : buffer
+          var length = stat.size - position;
+          var slice = length < buffer.length ? buffer.slice(0, length) : buffer;
 
           done(0);
 
@@ -999,7 +999,7 @@ function Strata (options) {
 
   // Write a position array entry.
   function writePositions (fd, page, callback) {
-    var entry = [ ++page.entries, 0, 1, page.right, page.ghosts ]
+    var entry = [ ++page.entries, 0, 1, page.right, page.ghosts ];
     entry = entry.concat(page.positions).concat(page.lengths);
     writeJSON({ fd: fd, page: page, entry: entry, type: "position" }, callback);
   }
@@ -1041,7 +1041,7 @@ function Strata (options) {
       function footer (slice) {
         for (var i = slice.length - 1; i != -1; i--) {
           if (slice[i] == 0x5b) {
-            var footer = readLine(slice.toString('utf8', i))
+            var footer = readLine(slice.toString('utf8', i));
             bookmark = { position: footer[3], length: footer[4] };
             read(new Buffer(bookmark.length), bookmark.position, check(positioned));
             return;
@@ -1150,7 +1150,7 @@ function Strata (options) {
 
       if (start + buffer.length < stat.size) {
         if (offset == 0) {
-          buffer = new Buffer(buffer.length * 2)
+          buffer = new Buffer(buffer.length * 2);
           read(buffer, start, check(replay));
         } else {
           read(buffer, start + offset, check(replay));
@@ -1257,7 +1257,7 @@ function Strata (options) {
       lengths = splice('lengths', page, 0, page.lengths.length);
 
       // Write an empty positions array to act as a header.
-      writePositions(fd, page, check(iterate))
+      writePositions(fd, page, check(iterate));
     }
 
     function iterate () {
@@ -1947,8 +1947,8 @@ function Strata (options) {
     var size = 0, position, object;
     if (page.address % 2) {
       if (page.positions.length) {
-        size += JSON.stringify(page.positions).length
-        size += JSON.stringify(page.lengths).length
+        size += JSON.stringify(page.positions).length;
+        size += JSON.stringify(page.lengths).length;
       }
       for (position in page.cache) {
         object = page.cache[position];
@@ -1956,7 +1956,7 @@ function Strata (options) {
       }
     } else {
       if (page.addresses.length) {
-        size += JSON.stringify(page.addresses).length
+        size += JSON.stringify(page.addresses).length;
       }
       for (position in page.cache) {
         object = page.cache[position];
@@ -2152,7 +2152,7 @@ function Strata (options) {
   // or the least child page of a branch page.
   //
   // Index is bitwise compliment of the insert location if not found.
-  function find (page, key, low, callback) {
+  function _find (page, key, low, callback) {
     var mid, high = (page.addresses || page.positions).length - 1, check = validator(callback);
 
     test();
@@ -2432,7 +2432,7 @@ function Strata (options) {
     // Follow the path for the given key.
     function key (key) {
       return function (callback) {
-        var found = find(page, key, page.address % 2 ? page.ghosts : 1, callback);
+        var found = _find(page, key, page.address % 2 ? page.ghosts : 1, callback);
         return found;
       }
     }
@@ -2701,7 +2701,7 @@ function Strata (options) {
         unlock(page);
 
         // Advance to the next page.
-        page = next
+        page = next;
 
         // Adjust the range.
         offset = page.ghosts;
@@ -2716,7 +2716,7 @@ function Strata (options) {
     // the bitwise compliment of index where record would be inserted if no such
     // record exists in the leaf page.
     function indexOf (key, callback) {
-      find(page, key, page.ghosts, callback);
+      _find(page, key, page.ghosts, callback);
     }
 
     // Unlock all leaf pages held by the iterator.
@@ -3000,7 +3000,7 @@ function Strata (options) {
         ;
 
       // Record the page as unbalanced.
-      balancer.unbalanced(page)
+      balancer.unbalanced(page);
 
       // Append a delete object to the leaf page file.
       fs.open(filename(page.address), "a", 0644, check(opened));
@@ -3665,9 +3665,9 @@ function Strata (options) {
                        rightAddress: page.right,
                        length: page.positions.length - page.ghosts };
               unlock(page);
-              ordered[node.address] = node
+              ordered[node.address] = node;
               if (page.ghosts)
-                ghosts[node.address] = node
+                ghosts[node.address] = node;
               check(function () { next(node) }, "reference", balancerReport)(null);
             }
           });
@@ -3712,8 +3712,8 @@ function Strata (options) {
           }
 
           function attach (left) {
-            left.right = node
-            node.left = left
+            left.right = node;
+            node.left = left;
 
             rightSibling(node);
           }
@@ -3731,8 +3731,8 @@ function Strata (options) {
           }
 
           function attach (right) {
-            node.right = right
-            right.left = node
+            node.right = right;
+            right.left = node;
 
             next();
           }
@@ -3764,8 +3764,8 @@ function Strata (options) {
         var right;
         if (node) {
           if (right = node.right) {
-            node.right = null
-            right.left = null
+            node.right = null;
+            right.left = null;
           }
         }
         return right;
@@ -3986,7 +3986,7 @@ function Strata (options) {
         records = Math.floor(split.positions.length / pages);
         remainder = split.positions.length % pages;
 
-        right = split.right
+        right = split.right;
 
         // Never a remainder record on the first page.
         offset = split.positions.length
@@ -4336,7 +4336,7 @@ function Strata (options) {
 
       function paginated () {
         // Get our children in the right order. We were pushing above.
-        children.reverse()
+        children.reverse();
 
         // Push the child branch page addresses onto our empty root.
         splice('addresses', root, 0, 0, children.map(function (page) { return page.address }));
@@ -4406,7 +4406,7 @@ function Strata (options) {
       // Remove the ghosted record from the references array and the record cache.
       uncacheRecord(ghostly, splice('positions', ghostly, 0, 1).shift());
       splice('lengths', ghostly, 0, 1);
-      ghostly.ghosts = 0
+      ghostly.ghosts = 0;
 
       // Open the leaf page file and write out the shifted positions array.
       fs.open(filename(ghostly.address), 'a', 0644, check(leafOpened));
@@ -4488,8 +4488,8 @@ function Strata (options) {
           descents = [], locked = [], singles = [], parents = {}, pages = {},
           ancestor, pivot, empties, ghosted, designation;
 
-      var keys = [ key ]
-      if (leftKey) keys.push(leftKey)
+      var keys = [ key ];
+      if (leftKey) keys.push(leftKey);
 
       // Descent the tree stopping at the branch page that contains a key for
       // the leaf page that we are going to delete when we merge it into its
@@ -4498,14 +4498,14 @@ function Strata (options) {
       // from the pivot branch page, because it will no longer be correct once
       // the leaf page is deleted.
       descents.push(pivot = new Descent());
-      pivot.descend(pivot.key(key), pivot.found(keys), check(lockPivot))
+      pivot.descend(pivot.key(key), pivot.found(keys), check(lockPivot));
 
       // Get an exclusive lock on the branch page that contains the right key
       // or, if we're merging branch pages, the right key or the left key, which
       // ever comes first. After upgrade our shared lock to an exclusive lock,
       // all locks as we descend the tree will be exclusive.
       function lockPivot () {
-        var found = pivot.page.cache[pivot.page.addresses[pivot.index]]
+        var found = pivot.page.cache[pivot.page.addresses[pivot.index]];
         if (comparator(found, keys[0]) == 0) {
           pivot.upgrade(check(atPivot));
         } else {
@@ -4518,10 +4518,10 @@ function Strata (options) {
       // descent, then descend to right key. We've already upgrade our descent
       // so that it will exclusively.
       function leftAboveRight () {
-        descents.push(pivot = (ghosted = pivot).fork())
-        keys.pop()
-        pivot.uncaching = true
-        pivot.descend(pivot.key(key), pivot.found(keys), check(atPivot))
+        descents.push(pivot = (ghosted = pivot).fork());
+        keys.pop();
+        pivot.uncaching = true;
+        pivot.descend(pivot.key(key), pivot.found(keys), check(atPivot));
       }
 
       // We're at the pivot, the branch containing the right key. The path to
@@ -4796,7 +4796,7 @@ function Strata (options) {
         // todo: really, really want page.key
         ok(leftKey == null ||
            comparator(leftKey, leaves.left.page.cache[leaves.left.page.positions[0]].key)  == 0,
-           "left key is not as expected")
+           "left key is not as expected");
 
         var left = (leaves.left.page.positions.length - leaves.left.page.ghosts);
         var right = (leaves.right.page.positions.length - leaves.right.page.ghosts);
@@ -4808,10 +4808,10 @@ function Strata (options) {
           // We cannot merge, so we queue one or both of pages for a merge test
           // on the next balancer.
           if (unbalanced[leaves.left.page.address]) {
-            balancer.unbalanced(leaves.left.page, true)
+            balancer.unbalanced(leaves.left.page, true);
           }
           if (unbalanced[leaves.right.page.address]) {
-            balancer.unbalanced(leaves.right.page, true)
+            balancer.unbalanced(leaves.right.page, true);
           }
           callback(null, false);
         } else {
@@ -5127,7 +5127,7 @@ function Strata (options) {
     balancer.balance(validate(callback, end));
 
     function end () {
-      toUserLand(callback)
+      toUserLand(callback);
     }
   }
 
@@ -5159,7 +5159,7 @@ function Strata (options) {
 
       function branch (page) {
         pages[index].children = page.addresses.map(record);
-        if (index) designated(parent.cache[parent.addresses[index]])
+        if (index) designated(parent.cache[parent.addresses[index]]);
         else keyed();
 
         function designated (key) {
