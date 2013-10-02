@@ -67,7 +67,7 @@ Copacetic simply descends the tree in order and checks that the right pages link
 correctly, oh, and I suppose that the items in the page are in order, and then
 you can clear the cache. It cannot run concurrently with balance. It also checks
 that all the cached pages add up so you can't clear the cache, but that is
-probably a syncrhonous operation.
+probably a synchronous operation.
 
 ## Quality
 
@@ -77,7 +77,7 @@ development done more quickly with ncurses.
 
 ## Merging
 
-Going to have to consider the different forms of merge, chosing the right
+Going to have to consider the different forms of merge, choosing the right
 candidate, etc. Not sure if I'm up for the battery of tests before Strata 0.0.3,
 but then again, once they're built, it ought not be too difficult.
 
@@ -88,7 +88,7 @@ Maybe rename `deleteGhost` to `shiftGhost`.
 ## Length Race Condition
 
 Why does the length need to be stored in the page. Can't the balancer grab the
-length into it's nodes? Yes. It is opportunistic. Probably much simpiler.
+length into it's nodes? Yes. It is opportunistic. Probably much simpler.
 
 ## Shifting Ghosts
 
@@ -101,9 +101,9 @@ the leaves without descending.
 
 A leaf format is this:
 
- * A terminatator, currently '\n'.
+ * A terminator, currently '\n'.
  * A checksum, currently SHA1, but always a fixed length.
- * Stuff inbetween the checksum and terminator.
+ * Stuff in between the checksum and terminator.
 
 We could easily make the terminator `0xdeadbeaf` or similar, and the checksum
 could be a binary integer, and the body could be JSON.
@@ -113,7 +113,7 @@ that the terminator is unique, or else we're going to scan and keep scanning
 until we find a buffer that satisfies the checksum. We put the length before the
 terminator we can read backwards easily as we are doing now.
 
-This is fantasitic. Do it.
+This is fantastic. Do it.
 
 ## Inbox
 
@@ -150,7 +150,7 @@ read.
 No, it doesn't help you to jump back to it, except maybe to look for the
 leaf page to the right, but that wouldn't be a part of normal operation,
 only recovery. At times you consider ways to make counted B-Trees
-simpiler by caching the record count, but why cache the record count and
+simpler by caching the record count, but why cache the record count and
 not the leaf key? In order to get to the record count, you would have
 had to have already read in the leaf key, which means reading back to
 the positions array.
@@ -162,7 +162,7 @@ Oh, wait, no. The positions array does contain the key. The first value
 does not change except for merges and ghost deletions, the operations
 that write out a position array. We can add the key to that record. Now
 we can get the count from the last record and key by jumping to the
-positons array.
+positions array.
 
 Plus, we can jump to the position array and load it for the key, but
 leave the leaf page in an unloaded state. If we've only cracked it to
@@ -180,7 +180,7 @@ Magazine perhaps in a separate Magazine for partially read pages?
 
 ## Breaking the Rule of Append
 
-I'm struggling to fight file girth, but it occours to me that the reason I'm
+I'm struggling to fight file girth, but it occurs to me that the reason I'm
 struggling so much is that I've make sure that the only writes are appends. I
 like the property because it favors durability. I know that I'm only ever
 growing the file this way.
