@@ -1,42 +1,38 @@
 #!/usr/bin/env node
 
-require('./proof')(3, function (async, Strata, tmp, deepEqual) {
-  var strata = new Strata(tmp, { leafSize: 3, branchSize: 3 }), fs = require('fs');
-  async(function (serialize) { 
-    serialize(__dirname + '/fixtures/root-drain.before.json', tmp, async());
+require('./proof')(3, function (step, Strata, tmp, deepEqual, serialize, gather, load, objectify) {
+  var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 }), fs = require('fs');
+  step(function () {
+    serialize(__dirname + '/fixtures/root-drain.before.json', tmp, step());
   }, function () {
-    strata.open(async());
+    strata.open(step());
   }, function () {
-    strata.mutator('b', async());
+    strata.mutator('b', step());
   }, function (cursor) {
-    async(function () {
-      cursor.insert('b', 'b', ~ cursor.index, async());
+    step(function () {
+      cursor.insert('b', 'b', ~ cursor.index, step());
     }, function () {
       cursor.unlock()
     });
-  }, function (gather) {
-    gather(async, strata);
+  }, function () {
+    gather(step, strata);
   }, function (records) {
     deepEqual(records, [ 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j' ], 'records');
-    strata.balance(async());
-  }, function (load) {
-    load(__dirname + '/fixtures/root-drain.after.json', async());
-  }, function (expected, objectify) {
-    objectify(tmp, async());
-  }, function (actual, expected, say) {
-    say(expected);
-    say(actual);
-
+    strata.balance(step());
+  }, function () {
+    objectify(tmp, step());
+    load(__dirname + '/fixtures/root-drain.after.json', step());
+  }, function (actual, expected) {
     deepEqual(actual, expected, 'split');
 
-    strata.close(async());
+    strata.close(step());
   }, function () {
-    strata = new Strata(tmp, { leafSize: 3, branchSize: 3 });
-    strata.open(async());
-  }, function (gather) {
-    gather(async, strata);
+    strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 });
+    strata.open(step());
+  }, function () {
+    gather(step, strata);
   }, function (records) {
     deepEqual(records, [ 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j' ], 'records');
-    strata.close(async());
+    strata.close(step());
   });
 });

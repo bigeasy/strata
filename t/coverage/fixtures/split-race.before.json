@@ -1,0 +1,23 @@
+{
+    "0": {
+        "children": [ 1, 3 ]
+    },
+    "1": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "a" },
+            { "type": "add", "value": "b" },
+            { "type": "add", "value": "c" },
+            { "type": "pos" }
+        ],
+        "right": 3
+    },
+    "3": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "e" },
+            { "type": "add", "value": "f" },
+            { "type": "pos" }
+        ]
+    }
+}

@@ -1,0 +1,6 @@
+<t/merge/fixtures/branch.before.json
+-c-g
+!
+~
+!
+=t/merge/fixtures/unpurged-key.after.json

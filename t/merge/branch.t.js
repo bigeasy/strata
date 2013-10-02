@@ -1,43 +1,39 @@
 #!/usr/bin/env node
 
-require('./proof')(3, function (async, Strata, tmp, deepEqual) {
-  var strata = new Strata(tmp, { leafSize: 3, branchSize: 3 }), fs = require('fs');
-  async(function (serialize) { 
-    serialize(__dirname + '/fixtures/branch.before.json', tmp, async());
+require('./proof')(3, function (step, Strata, tmp, deepEqual, serialize, gather, load, objectify) {
+  var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 }), fs = require('fs');
+  step(function () {
+    serialize(__dirname + '/fixtures/branch.before.json', tmp, step());
   }, function () {
-    strata.open(async());
+    strata.open(step());
   }, function () {
-    strata.mutator('h', async());
+    strata.mutator('h', step());
   }, function (cursor) {
-    async(function () {
-      cursor.indexOf('h', async());
+    step(function () {
+      cursor.indexOf('h', step());
     }, function (index) {
-      cursor.remove(index, async());
+      cursor.remove(index, step());
     }, function () {
-      cursor.indexOf('i', async());
+      cursor.indexOf('i', step());
     }, function (index) {
-      cursor.remove(index, async());
+      cursor.remove(index, step());
       cursor.unlock();
     });
-  }, function (gather) {
-    gather(async, strata);
+  }, function () {
+    gather(step, strata);
   }, function (records) {
     deepEqual(records, [ 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'j', 'k', 'l', 'm', 'n' ], 'records');
-    strata.balance(async());
-  }, function (load) {
-    load(__dirname + '/fixtures/branch.after.json', async());
-  }, function (expected, objectify) {
-    objectify(tmp, async());
-  }, function (actual, expected, say) {
-//    say(expected);
-//    say(actual);
-
+    strata.balance(step());
+  }, function () {
+    objectify(tmp, step());
+    load(__dirname + '/fixtures/branch.after.json', step());
+  }, function (actual, expected) {
     deepEqual(actual, expected, 'merge');
-  }, function (gather) {
-    gather(async, strata);
+  }, function () {
+    gather(step, strata);
   }, function (records) {
     deepEqual(records, [ 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'j', 'k', 'l', 'm', 'n' ], 'merged');
   }, function() {
-    strata.close(async());
+    strata.close(step());
   });
 });

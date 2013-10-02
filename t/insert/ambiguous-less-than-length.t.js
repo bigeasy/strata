@@ -1,29 +1,31 @@
 #!/usr/bin/env node
 
-require('./proof')(3, function (async, Strata, tmp, deepEqual) {
-  var strata = new Strata(tmp, { leafSize: 3, branchSize: 3 }), fs = require('fs');
-  async(function (serialize) { 
-    serialize(__dirname + '/fixtures/ambiguous.before.json', tmp, async());
+require('./proof')(3, function (step, Strata, tmp, deepEqual, serialize, gather, equal) {
+  var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 }), fs = require('fs');
+  step(function () {
+    serialize(__dirname + '/fixtures/ambiguous.before.json', tmp, step());
   }, function () {
-    strata.open(async());
-  }, function (gather) {
-    gather(async, strata);
+    strata.open(step());
+  }, function () {
+    gather(step, strata);
   }, function (records) {
-    deepEqual(records, [ 'a', 'b', 'd', 'f', 'g', 'h', 'i', 'l', 'm', 'n' ], 'records');
+    deepEqual(records, [ 'a', 'd', 'f', 'g', 'h', 'i', 'l', 'm', 'n' ], 'records');
   }, function () {
-    strata.mutator('d', async());
+    strata.mutator('d', step());
   }, function (cursor) {
-    cursor.indexOf('e', async());
-  }, function (index, cursor) {
-    cursor.insert('e', 'e', ~index, async());
-  }, function (unambiguous, cursor, ok) {
-    cursor.unlock()
-    ok(unambiguous, 'unambiguous');
-  }, function (gather) {
-    gather(async, strata);
+    step(function () {
+      cursor.indexOf('e', step());
+    }, function (index) {
+      cursor.insert('e', 'e', ~index, step());
+    }, function (unambiguous) {
+      cursor.unlock()
+      equal(unambiguous, 0, 'unambiguous');
+    }, function () {
+      gather(step, strata);
+    });
   }, function (records) {
-    deepEqual(records, [ 'a', 'b', 'd', 'e', 'f', 'g', 'h', 'i', 'l', 'm', 'n' ], 'records after insert');
+    deepEqual(records, [ 'a', 'd', 'e', 'f', 'g', 'h', 'i', 'l', 'm', 'n' ], 'records after insert');
   }, function() {
-    strata.close(async());
+    strata.close(step());
   });
 });

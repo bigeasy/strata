@@ -1,7 +1,6 @@
 language: node_js
 
 node_js:
-  - 0.6
   - 0.8
 
 branches:
@@ -15,3 +14,8 @@ branches:
 
 before_install:
   - npm install
+  - npm install istanbul coveralls
+
+env:
+  global:
+  - secure: "GJDidcJjx0lBVTBcFe+ErYh/XC+B9DJMLkxsQT7v4eVCP/DF/o4vShpUAYs5+3/ogQnAAx5HIISvf7YnnWXazlDfQ3ngb88aqa6OPq4d1fydOifkuwqhcqNY/dHdmGEm1L26BsocsY61TbAUbIwSUc1iruwHHfYxAmRXvui2cVQ="

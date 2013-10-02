@@ -1,21 +1,37 @@
-{ "name" : "b-tree"
-, "version" : "0.0.2"
-, "description" : "Evented I/O B-tree in pure JavaScript for Node.js"
-, "url" : "http://bigeasy.github.com/strata"
-, "keywords" : ["btree", "database", "json", "b-tree"]
-, "author" : "Alan Gutierrez <alan@prettyrobots.com>"
-, "contributors" : []
-, "devDependencies":
-  { "proof": "0.0.15" }
-, "scripts" : { "test": "proof t/*/*.t.js" }
-, "engines" : { "node": "> 0.6.0" }
-, "homepage": "https://github.com/bigeasy/strata"
-, "licenses": [
-  { "type": "MIT"
-  , "url": "http://github.com/bigeasy/strata/raw/master/LICENSE"
-  }]
-, "repository":
-  { "type": "git"
-  , "url": "http://github.com/bigeasy/strata.git"
-  }
+{
+    "name":             "b-tree",
+    "version":          "0.0.3",
+    "author":           "Alan Gutierrez <alan@prettyrobots.com>",
+    "description":      "Evented I/O B-tree in pure JavaScript for Node.js.",
+    "keywords":
+    [
+                        "btree", "database", "json", "b-tree"
+    ],
+    "url":              "http://bigeasy.github.com/strata",
+    "homepage":         "https://github.com/bigeasy/strata",
+    "bugs":             "https://github.com/bigeasy/strata/issues",
+    "repository":
+    {
+                        "type": "git",
+                        "url": "http://github.com/bigeasy/strata.git"
+    },
+    "contributors":
+    [{
+                        "name":   "Demarius Chrite",
+                        "email":  "chrite.demarius@gmail.com",
+                        "web":    "https://github.com/demarius"
+    }],
+    "devDependencies":
+    {
+                        "proof": "0.0.36"
+    },
+    "licenses":
+    [{
+                        "type": "MIT",
+                        "url": "http://github.com/bigeasy/strata/raw/master/LICENSE"
+    }],
+    "scripts":
+    {
+        "test": "proof platform win32 && proof test */*/*.t.js || t/test"
+    }
 }

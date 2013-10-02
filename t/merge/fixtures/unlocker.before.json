@@ -1,0 +1,199 @@
+{
+    "0": {
+        "children": [ 48, 46 ]
+    },
+    "1": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "aa" },
+            { "type": "add", "value": "ab" },
+            { "type": "pos" }
+        ],
+        "right": 33
+    },
+    "3": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "bx" },
+            { "type": "add", "value": "by" },
+            { "type": "add", "value": "bz" },
+            { "type": "pos" }
+        ]
+    },
+    "5": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "bu" },
+            { "type": "add", "value": "bv" },
+            { "type": "add", "value": "bw" },
+            { "type": "pos" }
+        ],
+        "right": 3
+    },
+    "7": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "br" },
+            { "type": "add", "value": "bs" },
+            { "type": "add", "value": "bt" },
+            { "type": "pos" }
+        ],
+        "right": 5
+    },
+    "9": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "bo" },
+            { "type": "add", "value": "bp" },
+            { "type": "add", "value": "bq" },
+            { "type": "pos" }
+        ],
+        "right": 7
+    },
+    "11": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "bl" },
+            { "type": "add", "value": "bm" },
+            { "type": "add", "value": "bn" },
+            { "type": "pos" }
+        ],
+        "right": 9
+    },
+    "13": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "bh" },
+            { "type": "add", "value": "bi" },
+            { "type": "add", "value": "bk" },
+            { "type": "pos" }
+        ],
+        "right": 11
+    },
+    "15": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "be" },
+            { "type": "add", "value": "bf" },
+            { "type": "add", "value": "bg" },
+            { "type": "pos" }
+        ],
+        "right": 13
+    },
+    "17": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "bb" },
+            { "type": "add", "value": "bc" },
+            { "type": "add", "value": "bd" },
+            { "type": "pos" }
+        ],
+        "right": 15
+    },
+    "19": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "ay" },
+            { "type": "add", "value": "az" },
+            { "type": "add", "value": "ba" },
+            { "type": "pos" },
+            { "type": "del", "index": 0 },
+            { "type": "del", "index": 1 }
+        ],
+        "right": 17
+    },
+    "21": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "av" },
+            { "type": "add", "value": "aw" },
+            { "type": "add", "value": "ax" },
+            { "type": "pos" }
+        ],
+        "right": 19
+    },
+    "23": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "as" },
+            { "type": "add", "value": "at" },
+            { "type": "add", "value": "au" },
+            { "type": "pos" }
+        ],
+        "right": 21
+    },
+    "25": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "ap" },
+            { "type": "add", "value": "aq" },
+            { "type": "add", "value": "ar" },
+            { "type": "pos" }
+        ],
+        "right": 23
+    },
+    "27": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "am" },
+            { "type": "add", "value": "an" },
+            { "type": "add", "value": "ao" },
+            { "type": "pos" }
+        ],
+        "right": 25
+    },
+    "29": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "ai" },
+            { "type": "add", "value": "ak" },
+            { "type": "add", "value": "al" },
+            { "type": "pos" }
+        ],
+        "right": 27
+    },
+    "31": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "af" },
+            { "type": "add", "value": "ag" },
+            { "type": "add", "value": "ah" },
+            { "type": "pos" }
+        ],
+        "right": 29
+    },
+    "33": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "ac" },
+            { "type": "add", "value": "ad" },
+            { "type": "add", "value": "ae" },
+            { "type": "pos" }
+        ],
+        "right": 31
+    },
+    "34": {
+        "children": [ 7, 5, 3 ]
+    },
+    "36": {
+        "children": [ 13, 11, 9 ]
+    },
+    "38": {
+        "children": [ 19, 17, 15 ]
+    },
+    "40": {
+        "children": [ 25, 23, 21 ]
+    },
+    "42": {
+        "children": [ 31, 29, 27 ]
+    },
+    "44": {
+        "children": [ 1, 33 ]
+    },
+    "46": {
+        "children": [ 38, 36, 34 ]
+    },
+    "48": {
+        "children": [ 44, 42, 40 ]
+    }
+}

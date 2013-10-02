@@ -1,0 +1,14 @@
+{
+    "0": {
+        "children": [ 1 ]
+    },
+    "1": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "a" },
+            { "type": "add", "value": "b" },
+            { "type": "add", "value": "c" },
+            { "type": "del", "index": 0 }
+        ]
+    }
+}

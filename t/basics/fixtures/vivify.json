@@ -1,0 +1,102 @@
+{
+    "0": {
+        "children": [ 22, 20, 18 ]
+    },
+    "1": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "a" },
+            { "type": "add", "value": "b" },
+            { "type": "pos" }
+        ],
+        "right": 17
+    },
+    "3": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "x" },
+            { "type": "add", "value": "y" },
+            { "type": "add", "value": "z" },
+            { "type": "pos" }
+        ]
+    },
+    "5": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "u" },
+            { "type": "add", "value": "v" },
+            { "type": "add", "value": "w" },
+            { "type": "pos" }
+        ],
+        "right": 3
+    },
+    "7": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "r" },
+            { "type": "add", "value": "s" },
+            { "type": "add", "value": "t" },
+            { "type": "pos" }
+        ],
+        "right": 5
+    },
+    "9": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "o" },
+            { "type": "add", "value": "p" },
+            { "type": "add", "value": "q" },
+            { "type": "pos" }
+        ],
+        "right": 7
+    },
+    "11": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "l" },
+            { "type": "add", "value": "m" },
+            { "type": "add", "value": "n" },
+            { "type": "pos" }
+        ],
+        "right": 9
+    },
+    "13": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "i" },
+            { "type": "add", "value": "j" },
+            { "type": "add", "value": "k" },
+            { "type": "pos" }
+        ],
+        "right": 11
+    },
+    "15": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "f" },
+            { "type": "add", "value": "g" },
+            { "type": "add", "value": "h" },
+            { "type": "pos" }
+        ],
+        "right": 13
+    },
+    "17": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "c" },
+            { "type": "add", "value": "d" },
+            { "type": "add", "value": "e" },
+            { "type": "pos" }
+        ],
+        "right": 15
+    },
+    "18": {
+        "children": [ 7, 5, 3 ]
+    },
+    "20": {
+        "children": [ 13, 11, 9 ]
+    },
+    "22": {
+        "children": [ 1, 17, 15 ]
+    }
+}

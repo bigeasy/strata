@@ -1,0 +1,332 @@
+{
+    "0": {
+        "children": [ 86, 84 ]
+    },
+    "1": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "aa" },
+            { "type": "add", "value": "ab" },
+            { "type": "pos" }
+        ],
+        "right": 55
+    },
+    "3": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "dx" },
+            { "type": "add", "value": "dy" },
+            { "type": "add", "value": "dz" },
+            { "type": "pos" }
+        ]
+    },
+    "5": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "du" },
+            { "type": "add", "value": "dv" },
+            { "type": "add", "value": "dw" },
+            { "type": "pos" }
+        ],
+        "right": 3
+    },
+    "7": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "dr" },
+            { "type": "add", "value": "ds" },
+            { "type": "add", "value": "dt" },
+            { "type": "pos" }
+        ],
+        "right": 5
+    },
+    "9": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "do" },
+            { "type": "add", "value": "dp" },
+            { "type": "add", "value": "dq" },
+            { "type": "pos" }
+        ],
+        "right": 7
+    },
+    "11": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "dl" },
+            { "type": "add", "value": "dm" },
+            { "type": "add", "value": "dn" },
+            { "type": "pos" }
+        ],
+        "right": 9
+    },
+    "13": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "dh" },
+            { "type": "add", "value": "di" },
+            { "type": "add", "value": "dk" },
+            { "type": "pos" }
+        ],
+        "right": 11
+    },
+    "15": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "de" },
+            { "type": "add", "value": "df" },
+            { "type": "add", "value": "dg" },
+            { "type": "pos" }
+        ],
+        "right": 13
+    },
+    "17": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "db" },
+            { "type": "add", "value": "dc" },
+            { "type": "add", "value": "dd" },
+            { "type": "pos" }
+        ],
+        "right": 15
+    },
+    "19": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "cy" },
+            { "type": "add", "value": "cz" },
+            { "type": "add", "value": "da" },
+            { "type": "pos" }
+        ],
+        "right": 17
+    },
+    "21": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "cv" },
+            { "type": "add", "value": "cw" },
+            { "type": "add", "value": "cx" },
+            { "type": "pos" }
+        ],
+        "right": 19
+    },
+    "23": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "cs" },
+            { "type": "add", "value": "ct" },
+            { "type": "add", "value": "cu" },
+            { "type": "pos" }
+        ],
+        "right": 21
+    },
+    "25": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "cp" },
+            { "type": "add", "value": "cq" },
+            { "type": "add", "value": "cr" },
+            { "type": "pos" },
+            { "type": "del", "index": 0 },
+            { "type": "del", "index": 1 }
+        ],
+        "right": 23
+    },
+    "27": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "bt" },
+            { "type": "add", "value": "bu" },
+            { "type": "add", "value": "bv" },
+            { "type": "pos" }
+        ],
+        "right": 25
+    },
+    "29": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "bq" },
+            { "type": "add", "value": "br" },
+            { "type": "add", "value": "bs" },
+            { "type": "pos" }
+        ],
+        "right": 27
+    },
+    "31": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "bn" },
+            { "type": "add", "value": "bo" },
+            { "type": "add", "value": "bp" },
+            { "type": "pos" }
+        ],
+        "right": 29
+    },
+    "33": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "bk" },
+            { "type": "add", "value": "bl" },
+            { "type": "add", "value": "bm" },
+            { "type": "pos" }
+        ],
+        "right": 31
+    },
+    "35": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "bg" },
+            { "type": "add", "value": "bh" },
+            { "type": "add", "value": "bi" },
+            { "type": "pos" }
+        ],
+        "right": 33
+    },
+    "37": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "bd" },
+            { "type": "add", "value": "be" },
+            { "type": "add", "value": "bf" },
+            { "type": "pos" }
+        ],
+        "right": 35
+    },
+    "39": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "ba" },
+            { "type": "add", "value": "bb" },
+            { "type": "add", "value": "bc" },
+            { "type": "pos" }
+        ],
+        "right": 37
+    },
+    "41": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "ax" },
+            { "type": "add", "value": "ay" },
+            { "type": "add", "value": "az" },
+            { "type": "pos" }
+        ],
+        "right": 39
+    },
+    "43": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "au" },
+            { "type": "add", "value": "av" },
+            { "type": "add", "value": "aw" },
+            { "type": "pos" }
+        ],
+        "right": 41
+    },
+    "45": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "ar" },
+            { "type": "add", "value": "as" },
+            { "type": "add", "value": "at" },
+            { "type": "pos" }
+        ],
+        "right": 43
+    },
+    "47": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "ao" },
+            { "type": "add", "value": "ap" },
+            { "type": "add", "value": "aq" },
+            { "type": "pos" }
+        ],
+        "right": 45
+    },
+    "49": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "al" },
+            { "type": "add", "value": "am" },
+            { "type": "add", "value": "an" },
+            { "type": "pos" }
+        ],
+        "right": 47
+    },
+    "51": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "ah" },
+            { "type": "add", "value": "ai" },
+            { "type": "add", "value": "ak" },
+            { "type": "pos" }
+        ],
+        "right": 49
+    },
+    "53": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "ae" },
+            { "type": "add", "value": "af" },
+            { "type": "add", "value": "ag" },
+            { "type": "pos" }
+        ],
+        "right": 51
+    },
+    "55": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "ac" },
+            { "type": "add", "value": "ad" },
+            { "type": "pos" }
+        ],
+        "right": 53
+    },
+    "56": {
+        "children": [ 7, 5, 3 ]
+    },
+    "58": {
+        "children": [ 13, 11, 9 ]
+    },
+    "60": {
+        "children": [ 19, 17, 15 ]
+    },
+    "62": {
+        "children": [ 25, 23, 21 ]
+    },
+    "64": {
+        "children": [ 31, 29, 27 ]
+    },
+    "66": {
+        "children": [ 37, 35, 33 ]
+    },
+    "68": {
+        "children": [ 43, 41, 39 ]
+    },
+    "70": {
+        "children": [ 49, 47, 45 ]
+    },
+    "72": {
+        "children": [ 53, 51 ]
+    },
+    "74": {
+        "children": [ 1, 55 ]
+    },
+    "76": {
+        "children": [ 60, 58, 56 ]
+    },
+    "78": {
+        "children": [ 62 ]
+    },
+    "80": {
+        "children": [ 68, 66, 64 ]
+    },
+    "82": {
+        "children": [ 74, 72, 70 ]
+    },
+    "84": {
+        "children": [ 78, 76 ]
+    },
+    "86": {
+        "children": [ 82, 80 ]
+    }
+}

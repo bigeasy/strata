@@ -1,25 +1,26 @@
 #!/usr/bin/env node
 
 var fs = require("fs"), strata;
-require("./proof")(5, function (Strata, equal, deepEqual, say, tmp, async) {
-  async(function () {
+require("./proof")(5, function (Strata, equal, deepEqual, say, tmp, step, ok, load, objectify) {
+  step(function () {
 
-    strata = new Strata(tmp, { leafSize: 3, branchSize: 3 });
-    strata.create(async());
+    fs.writeFile(tmp + '/.ignore', '', 'utf8', step());
 
   }, function () {
 
-    equal(strata.size, 4, "json size");
-    strata.close(async());
-    
-  }, function (ok, load) {
+    strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 });
+    strata.create(step());
+
+  }, function () {
+
+    equal(strata.size, 3, "json size");
+    strata.close(step());
+
+  }, function () {
 
     ok(1, "created");
-    load(__dirname + "/fixtures/create.after.json", async());
-
-  }, function (expected, objectify) {
-
-    objectify(tmp, async());
+    objectify(tmp, step());
+    load(__dirname + "/fixtures/create.after.json", step());
 
   }, function (actual, expected) {
 
@@ -28,14 +29,14 @@ require("./proof")(5, function (Strata, equal, deepEqual, say, tmp, async) {
 
     deepEqual(actual, expected, "written");
 
-    strata = new Strata(tmp, { leafSize: 3, branchSize: 3 });
-    strata.open(async());
+    strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 });
+    strata.open(step());
 
   }, function () {
 
-    strata.iterator("a", async());
+    strata.iterator("a", step());
 
-  }, function (cursor, equal) {
+  }, function (cursor) {
 
     equal(cursor.length - cursor.offset, 0, "empty");
 
@@ -44,6 +45,6 @@ require("./proof")(5, function (Strata, equal, deepEqual, say, tmp, async) {
     strata.purge(0);
     equal(strata.size, 0, "purged");
 
-    strata.close(async());
+    strata.close(step());
   });
 });

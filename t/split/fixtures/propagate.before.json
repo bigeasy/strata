@@ -1,0 +1,125 @@
+{
+    "0": {
+        "children": [ 10, 8 ]
+    },
+    "1": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "0" },
+            { "type": "add", "value": "1" },
+            { "type": "pos" }
+        ],
+        "right": 7
+    },
+    "3": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "7" },
+            { "type": "add", "value": "8" },
+            { "type": "add", "value": "9" },
+            { "type": "pos" },
+            { "type": "add", "value": "A" },
+            { "type": "add", "value": "B" },
+            { "type": "add", "value": "C" },
+            { "type": "add", "value": "D" },
+            { "type": "add", "value": "E" },
+            { "type": "add", "value": "F" },
+            { "type": "add", "value": "G" },
+            { "type": "add", "value": "H" },
+            { "type": "add", "value": "I" },
+            { "type": "add", "value": "J" },
+            { "type": "add", "value": "K" },
+            { "type": "add", "value": "L" },
+            { "type": "add", "value": "M" },
+            { "type": "add", "value": "N" },
+            { "type": "add", "value": "O" },
+            { "type": "add", "value": "P" },
+            { "type": "add", "value": "Q" },
+            { "type": "add", "value": "R" },
+            { "type": "add", "value": "S" },
+            { "type": "add", "value": "T" },
+            { "type": "add", "value": "U" },
+            { "type": "add", "value": "V" },
+            { "type": "add", "value": "W" },
+            { "type": "add", "value": "X" },
+            { "type": "add", "value": "Y" },
+            { "type": "add", "value": "Z" },
+            { "type": "add", "value": "a" },
+            { "type": "add", "value": "b" },
+            { "type": "add", "value": "c" },
+            { "type": "add", "value": "d" },
+            { "type": "add", "value": "e" },
+            { "type": "add", "value": "f" },
+            { "type": "add", "value": "g" },
+            { "type": "add", "value": "h" },
+            { "type": "add", "value": "i" },
+            { "type": "add", "value": "j" },
+            { "type": "add", "value": "k" },
+            { "type": "add", "value": "l" },
+            { "type": "add", "value": "m" },
+            { "type": "add", "value": "n" },
+            { "type": "add", "value": "o" },
+            { "type": "add", "value": "p" },
+            { "type": "add", "value": "q" },
+            { "type": "add", "value": "r" },
+            { "type": "add", "value": "s" },
+            { "type": "add", "value": "t" },
+            { "type": "add", "value": "u" },
+            { "type": "add", "value": "v" },
+            { "type": "add", "value": "w" },
+            { "type": "add", "value": "x" },
+            { "type": "add", "value": "y" },
+            { "type": "add", "value": "z" },
+            { "type": "add", "value": "za" },
+            { "type": "add", "value": "zb" },
+            { "type": "add", "value": "zc" },
+            { "type": "add", "value": "zd" },
+            { "type": "add", "value": "ze" },
+            { "type": "add", "value": "zf" },
+            { "type": "add", "value": "zg" },
+            { "type": "add", "value": "zh" },
+            { "type": "add", "value": "zi" },
+            { "type": "add", "value": "zj" },
+            { "type": "add", "value": "zk" },
+            { "type": "add", "value": "zl" },
+            { "type": "add", "value": "zm" },
+            { "type": "add", "value": "zn" },
+            { "type": "add", "value": "zo" },
+            { "type": "add", "value": "zp" },
+            { "type": "add", "value": "zq" },
+            { "type": "add", "value": "zr" },
+            { "type": "add", "value": "zs" },
+            { "type": "add", "value": "zt" },
+            { "type": "add", "value": "zu" },
+            { "type": "add", "value": "zv" },
+            { "type": "add", "value": "zw" },
+            { "type": "add", "value": "zx" },
+            { "type": "add", "value": "zy" }
+        ]
+    },
+    "5": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "4" },
+            { "type": "add", "value": "5" },
+            { "type": "add", "value": "6" },
+            { "type": "pos" }
+        ],
+        "right": 3
+    },
+    "7": {
+        "log": [
+            { "type": "pos" },
+            { "type": "add", "value": "2" },
+            { "type": "add", "value": "3" },
+            { "type": "pos" }
+        ],
+        "right": 5
+    },
+    "8": {
+        "children": [ 5, 3 ]
+    },
+    "10": {
+        "children": [ 1, 7 ]
+    }
+}

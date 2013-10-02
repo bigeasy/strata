@@ -1,6 +1,4 @@
-lib-cov
-.DS_Store
-.AppleDouble
-node_modules
-*.swp
-docs
+/node_modules
+/.proof.out
+/coverage
+/t/*/tmp
