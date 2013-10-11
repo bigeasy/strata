@@ -242,7 +242,7 @@ function createDirectory (json) {
     var object = json[address];
     if (object.children) {
       directory[address] = object.children.map(function (address, index) {
-        return [ index + 1, index + 1, address ]; 
+        return [ index + 1, index + 1, address ];
       });
     } else {
       var ghosts = 0;
