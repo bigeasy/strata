@@ -413,7 +413,7 @@ function Strata (options) {
   // Create a file name for a given address with an optional suffix.
   function filename (address, suffix) {
     suffix || (suffix = "");
-    return path.join(directory, address + suffix)
+    return path.join(directory, address + suffix);
   }
 
   // Move a replacement page file into place. Unlink the existing page file, if
