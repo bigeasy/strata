@@ -2507,15 +2507,6 @@ function Strata (options) {
       unlocking = true;
     }
 
-    // #### Uncaching
-    //
-    // When we descend to remove a leaf page for a merge, to change the key
-    // value of a leaf page, we want to discard any cached references to the key
-    // value in the branch pages on the path to the leaf page. This property is
-    // turned off by default and it is not inherited by a fork.
-    var uncaching = false;
-    function uncaching_ ($uncaching) { uncaching = $uncaching }
-
     // However, there is the special case of a descent to delete a page as a
     // result of a  merge where we're going to want to hold onto the locks to
     // multiple pages on the path to the page we want to delete. The merge
@@ -2563,9 +2554,6 @@ function Strata (options) {
           index = $index;
         }
         indexes[page.address] = index;
-        if (uncaching && !(page.address % 2)) {
-          uncacheKey(page, page.addresses[index]);
-        }
         downward();
       }
     }
@@ -2575,7 +2563,7 @@ function Strata (options) {
                                key, left, right,
                                found, address, child, penultimate, leaf, level,
                                _page, _depth, _index, index_, _indexes, _lesser, _greater,
-                               uncaching_, unlocker_);
+                               unlocker_);
   }
 
 
@@ -4449,11 +4437,8 @@ function Strata (options) {
 
       // Lock the pivot key. We're going to write a new key to the branch page
       // log and replace the key in the cache.
-      //
-      // todo: uncaching is outgoing.
       function descendLeaf () {
         descents.push(leaf = pivot.fork());
-        leaf.uncaching = true;
 
         leaf.descend(leaf.key(key), leaf.leaf, check(shift));
       }
@@ -4520,7 +4505,6 @@ function Strata (options) {
       function leftAboveRight () {
         descents.push(pivot = (ghosted = pivot).fork());
         keys.pop();
-        pivot.uncaching = true;
         pivot.descend(pivot.key(key), pivot.found(keys), check(atPivot));
       }
 
