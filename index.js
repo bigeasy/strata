@@ -1594,7 +1594,14 @@ function Strata (options) {
   //
   function writeBranch (page, suffix, callback) {
     var check = validator(callback)
-      , addresses = page.addresses.slice();
+      , addresses = page.addresses.slice()
+      , keys = addresses.map(function (address, index) {
+          return index ? page.cache[address] : null
+      })
+      ;
+
+    ok(keys[0] == null, "first key is null");
+    //ok(keys.slice(1).every(function (key) { return key != null }), "null keys");
 
     page.entries = 0;
     page.position = 0;
@@ -4279,7 +4286,8 @@ function Strata (options) {
 
     // &mdash;
     function drainRoot (callback) {
-      var root, pages, records, remainder, children = [], check = validator(callback);
+      var root, pages, records, remainder,
+          children = [], keys = {}, check = validator(callback);
 
       // Lock the root. No descent needed.
       lock(0, true, check(partition));
@@ -4311,11 +4319,23 @@ function Strata (options) {
         // Cut off a chunk of addresses.
         var cut = splice('addresses', root, offset, length);
 
-        // Uncache the keys from the root branch.
-        cut.forEach(function (address) { uncacheKey(root, address) });
+        // Uncache the keys from the root branch. Key a map of the current keys
+        // to assign to the new page.
+        cut.forEach(function (address) {
+          keys[address] = root.cache[address];
+          uncacheKey(root, address);
+        });
 
         // Add the keys to our new branch page.
         splice('addresses', page, 0, 0, cut);
+
+        // Assign the keys to the new branch page.
+        cut.slice(1).forEach(function (address) {
+          cacheKey(page, address, keys[address]);
+        });
+
+        // The key of the new page is first key from the cut addresses.
+        keys[page.address] = keys[cut[0]];
 
         // Continue until all the pages have been moved to new pages.
         if (--pages) paginate();
@@ -4328,6 +4348,11 @@ function Strata (options) {
 
         // Push the child branch page addresses onto our empty root.
         splice('addresses', root, 0, 0, children.map(function (page) { return page.address }));
+
+        // Assign the keys to the new root addresses.
+        root.addresses.slice(1).forEach(function (address) {
+          cacheKey(root, address, keys[address]);
+        });
 
         // Write the child branch pages.
         children.forEach(function (page) { writeBranch(page, ".replace", check(childWritten)) });
@@ -4957,6 +4982,7 @@ function Strata (options) {
           stash(designator.page, 0, check(propagate));
         }
 
+        // TODO: Okay. Yes. Actual, factual key.
         function propagate (entry) {
           release();
           mergeBranches(entry.key, choice.page.address, callback);
