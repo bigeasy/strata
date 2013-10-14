@@ -1601,7 +1601,7 @@ function Strata (options) {
       ;
 
     ok(keys[0] == null, "first key is null");
-    //ok(keys.slice(1).every(function (key) { return key != null }), "null keys");
+    // ok(keys.slice(1).every(function (key) { return key != null }), "null keys");
 
     page.entries = 0;
     page.position = 0;
@@ -5005,13 +5005,28 @@ function Strata (options) {
         return descent.child(address);
       }
 
+      // Merge addresses of right branch page into the left branch page.
       function merger (pages, pivot, callback) {
         // Merging branch pages by slicing out all the addresses in the right
         // page and adding them to the left page. Uncache the keys we've
         // removed.
         var cut = splice('addresses', pages.right.page, 0, pages.right.page.addresses.length);
-        cut.forEach(function (address) { uncacheKey(pages.right.page, address) });
+
+        // Uncache the keys from the right branch page.
+        var keys = {};
+        cut.slice(1).forEach(function (address) {
+          keys[address] = pages.right.page.cache[address];
+          uncacheKey(pages.right.page, address)
+        });
+
+        // Write the keys into the cache of the left branch page. The key for
+        // the first child of the right branch page is the key given to
+        // `mergeBranches` that was used to right branch page.
         splice('addresses', pages.left.page, pages.left.page.addresses.length, 0, cut);
+        cut.slice(1).forEach(function (address) {
+          cacheKey(pages.left.page, address, keys[address]);
+        });
+        cacheKey(pages.left.page, cut[0], key);
 
         // Write out the left branch page. The generalized merge function will
         // handle the rest of the page rewriting.
