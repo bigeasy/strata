@@ -5007,6 +5007,9 @@ function Strata (options) {
 
       // Merge addresses of right branch page into the left branch page.
       function merger (pages, pivot, callback) {
+        // The key given to `mergeBranches` is the key for the given address.
+        ok(address == pages.right.page.address, "unexpected address");
+
         // Merging branch pages by slicing out all the addresses in the right
         // page and adding them to the left page. Uncache the keys we've
         // removed.
