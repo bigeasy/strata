@@ -4506,7 +4506,7 @@ function Strata (options) {
     function mergePages (key, leftKey, stopper, merger, ghostly, callback) {
       // Create a list of descents whose pages we'll unlock before we leave.
       var check = validator(callback),
-          descents = [], locked = [], singles = [], parents = {}, pages = {},
+          descents = [], singles = { left: [], right: [] }, parents = {}, pages = {},
           ancestor, pivot, empties, ghosted, designation;
 
       var keys = [ key ];
@@ -4592,16 +4592,21 @@ function Strata (options) {
         //
         // If we are gathering pages and encounter a branch page with more than
         // one child, we release the pages we've gathered.
-        parents.right.unlocker = function (parent, child) {
-          if (child.addresses.length == 1) {
-            if (singles.length == 0) singles.push(parent);
-            singles.push(child);
-          } else if (singles.length) {
-            if (singles[0].address == pivot.page.address) singles.shift();
-            singles.forEach(unlock);
-            singles.length = 0;
-          } else if (parent.address != pivot.page.address) {
-            unlock(parent);
+        parents.right.unlocker = createSingleUnlocker(singles.right);
+
+        function createSingleUnlocker (singles) {
+          ok(singles != null, "null singles");
+          return function (parent, child) {
+            if (child.addresses.length == 1) {
+              if (singles.length == 0) singles.push(parent);
+              singles.push(child);
+            } else if (singles.length) {
+              if (singles[0].address == pivot.page.address) singles.shift();
+              singles.forEach(unlock);
+              singles.length = 0;
+            } else if (parent.address != pivot.page.address) {
+              unlock(parent);
+            }
           }
         }
 
@@ -4657,9 +4662,8 @@ function Strata (options) {
         // If we encountered singles, then we're going to delete all the branch
         // pages that would be empty, then remove a child from an ancestor above
         // the parent branch page of the page we're merging.
-        if (singles.length) {
-          locked = singles.slice();
-          ancestor = singles.shift();
+        if (singles.right.length) {
+          ancestor = singles.right.shift();
         // If we encountered no singles, then we may still have gone down
         // separate paths to reach the parent page. If so, the pivot branch page
         // and the parent branch page are separate, so we can
@@ -4733,7 +4737,7 @@ function Strata (options) {
       }
 
       function sliceEmpties () {
-        empties = singles.slice();
+        empties = singles.right.slice();
         writeBranch(ancestor, ".pending", check(rewriteEmpties));
       }
 
@@ -4752,7 +4756,7 @@ function Strata (options) {
         // rebalanced? It can force a propagation of balance and merge checking
         // of the parent.
 
-        empties = singles.slice();
+        empties = singles.right.slice();
         // Renaming pending to commit will cause the merge to roll forward.
         rename(ancestor, ".pending", ".commit", check(unlinkEmpties));
       }
@@ -4784,7 +4788,7 @@ function Strata (options) {
         return function () {
           // Release locks.
           descents.forEach(function (descent) { unlock(descent.page) });
-          locked.forEach(unlock);
+          singles.right.forEach(unlock);
           next();
         }
       }
