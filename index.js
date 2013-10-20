@@ -2481,6 +2481,10 @@ function Strata (options) {
     // matches the any of the given keys.
     function found (keys) {
       return function () {
+        if (page.addresses && page.cache)
+          console.log(keys, page.address, page.cache, page.keys, page.addresses, page.cache[page.addresses[index]]);
+        else if (page.positions)
+          console.log(keys, page.cache, page.positions);
         return page.addresses[0] != 0 && index != 0 && keys.some(function (key) {
           return comparator(page.cache[page.addresses[index]],  key) == 0;
         });
@@ -3691,6 +3695,7 @@ function Strata (options) {
         }
 
         function leftSibling (node) {
+          console.log('find left sibling', node.key);
           var descent = new Descent();
           descent.descend(descent.key(node.key), descent.found([node.key]), check(goToLeaf));
 
@@ -4445,6 +4450,7 @@ function Strata (options) {
       // page merge with an empty left leaf page, the cache and positions are
       // going to be updated by the merge, not by this function.
       function rekey (entry) {
+        console.log('exorcise rekey', pivot.page.address, pivot.page.cache);
         cacheKey(pivot.page, pivot.page.addresses[pivot.index], entry.key);
         callback(null, ghostly.key = entry.key);
       }
@@ -4521,6 +4527,7 @@ function Strata (options) {
       // all locks as we descend the tree will be exclusive.
       function lockPivot () {
         var found = pivot.page.cache[pivot.page.addresses[pivot.index]];
+        console.log('found', found);
         if (comparator(found, keys[0]) == 0) {
           pivot.upgrade(check(atPivot));
         } else {
@@ -4533,6 +4540,7 @@ function Strata (options) {
       // descent, then descend to right key. We've already upgrade our descent
       // so that it will exclusively.
       function leftAboveRight () {
+        console.log('LEFT above RIGHT');
         descents.push(pivot = (ghosted = pivot).fork());
         keys.pop();
         pivot.descend(pivot.key(key), pivot.found(keys), check(atPivot));
@@ -4548,9 +4556,21 @@ function Strata (options) {
         // contains the left key, then guess what; it's this page. Fork the
         // current descent, decrement it's index and make not of it as the
         // ghosted branch.
+        //
+        // TODO: No, if we encounter the pivot above the parent level, then this
+        // is just the start of the path to the parent of the left page.
+        //
+        // TODO: And then it gets funky, you're always going right, but if
+        // you're going through single pages, then you're encountering a linked
+        // list, so it is going to be the last page that is not single before
+        // the leaf page.
+        //
+        // This takes place down there when we go left from the pivot, and we
+        // have to have an unlock strategy again.
         if (leftKey && !ghosted) {
           descents.push(ghosted = pivot.fork());
           ghosted.index--;
+          console.log('ghosted', ghosted.page.address, ghosted.page.addresses, ghosted.page.cache);
         }
 
         // Create a forked descent that will descend to the parent branch page
@@ -4695,6 +4715,8 @@ function Strata (options) {
 
         designation = ancestor.cache[ancestor.addresses[index]];
 
+        console.log('uncaching', index, ancestor.addreses, ancestor.cache);
+        console.log('uncaching parents', parents.left.page.address, parents.right.page.address, parents.left.page.addresses, parents.right.page.addresses);
         uncacheKey(ancestor, ancestor.addresses[index]);
         splice('addresses', ancestor, index, 1);
 
@@ -4704,6 +4726,7 @@ function Strata (options) {
           // todo: this is only a problem for this milestone.
           ok(ancestor.cache[ancestor.addresses[index]], "expected key to be in memory");
           designation = ancestor.cache[ancestor.addresses[index]];
+          console.log('designation', designation);
           cacheKey(pivot.page, pivot.page.addresses[pivot.index], designation);
         }
         sliceEmpties();
@@ -4797,6 +4820,7 @@ function Strata (options) {
       // stop it reaches a branch page that has leaf pages as children. We call
       // these penultimate pages.
       function stopper (descent) { return descent.penultimate }
+        console.log('leaf merge', leftKey, key);
 
       // By the time we lock the leaf pages exclusively, their sizes may have
       // changed so that they are no longer candidates for merge. If that is
@@ -4841,6 +4865,7 @@ function Strata (options) {
             if (left) {
               exorcise(pivot, leaves.left.page, leaves.left.page, check(merge));
             } else {
+          console.log('deleting ghost', left, right);
               exorcise(pivot, leaves.left.page, leaves.right.page, check(merge));
             }
           } else {
@@ -4904,6 +4929,7 @@ function Strata (options) {
         // we did indeed merge pages and the pages participating in the merge
         // should be rewritten.
         function resume () {
+          console.log('merged', leftKey, key, leaves.left.page.address, leaves.left.page.positions, leaves.left.page.cache);
           callback(null, true);
         }
       }
@@ -4922,6 +4948,7 @@ function Strata (options) {
           descents = [],
           choice, lesser, greater, center;
 
+      console.log('choosing branches to merge', key, address);
       // Descend to the branch page we want to test for a potential merge. When
       // we descend, the `Descent` class will track the path to the branch page
       // that is to the left in its `lesser` property and the branch page to the
@@ -4967,6 +4994,7 @@ function Strata (options) {
       // page. This is used to determine where to pivot in `mergeBranches` to
       // find the left branch page of the merge.
       function choose () {
+        console.log('descended choosing branches to merge');
         var choice, designator;
 
         if (lesser && lesser.page.addresses.length + center.page.addresses.length <= options.branchSize) {
@@ -4984,7 +5012,11 @@ function Strata (options) {
         }
 
         function designate () {
-          stash(designator.page, 0, check(propagate));
+          _designate(choice.page, 0, check(doubleCheck));
+          function doubleCheck (key) {
+            console.log("double check designation", designator.page.ghosts, designator.page.positions.length, key);
+            stash(designator.page, 0, check(propagate));
+          }
         }
 
         // TODO: Okay. Yes. Actual, factual key.
@@ -5004,6 +5036,7 @@ function Strata (options) {
 
     //
     function mergeBranches (key, address, callback) {
+      console.log('mergeBranches', key);
       // The generalized merge branch needs to stop at the parent of the branch
       // page we wish to merge into its left branch page sibling.
       function stopper (descent) {
@@ -5027,6 +5060,7 @@ function Strata (options) {
           uncacheKey(pages.right.page, address)
         });
 
+        var i = pages.left.page.addresses.length;
         // Write the keys into the cache of the left branch page. The key for
         // the first child of the right branch page is the key given to
         // `mergeBranches` that was used to right branch page.
@@ -5034,6 +5068,7 @@ function Strata (options) {
         cut.slice(1).forEach(function (address) {
           cacheKey(pages.left.page, address, keys[address]);
         });
+        console.log('assigning', key);
         //cacheKey(pages.left.page, cut[0], key);
 
         // Write out the left branch page. The generalized merge function will
@@ -5044,7 +5079,15 @@ function Strata (options) {
         // indeed merge some pages, so rewriting and propagation should be
         // performed.
         function resume () {
-          callback(null, true);
+          if (true) {
+            callback(null, true);
+          } else {
+            console.log('designating index:', i, pages.left.page.addresses[i]);
+            _designate(pages.left.page, i, validate(callback, function (key) {
+              console.log("done designated", key);
+              callback(null, true);
+            }));
+          }
         }
       }
 
@@ -5060,6 +5103,7 @@ function Strata (options) {
 
     //
     function fillRoot (callback) {
+      console.log('fillRoot');
       var check = validator(callback), descents = [], root, child;
 
       // Start by locking the root exclusively.
