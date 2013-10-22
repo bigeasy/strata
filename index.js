@@ -5070,7 +5070,6 @@ function Strata (options) {
           uncacheKey(pages.right.page, address)
         });
 
-        var i = pages.left.page.addresses.length;
         // Write the keys into the cache of the left branch page. The key for
         // the first child of the right branch page is the key given to
         // `mergeBranches` that was used to right branch page.
@@ -5090,15 +5089,7 @@ function Strata (options) {
         // indeed merge some pages, so rewriting and propagation should be
         // performed.
         function resume () {
-          if (true) {
-            callback(null, true);
-          } else {
-            console.log('designating index:', i, pages.left.page.addresses[i]);
-            _designate(pages.left.page, i, validate(callback, function (key) {
-              console.log("done designated", key);
-              callback(null, true);
-            }));
-          }
+          callback(null, true);
         }
       }
 
