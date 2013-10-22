@@ -4219,10 +4219,19 @@ function Strata (options) {
         cacheKey(parent.page, page.address, split.cache[cut[0]]);
 
         // Uncache the keys from our splitting branch.
-        cut.forEach(function (address) { uncacheKey(split, address) });
+        var keys = {};
+        cut.forEach(function (address) {
+          keys[address] = split.cache[address];
+          uncacheKey(split, address);
+        });
 
         // Add the keys to our new branch page.
         splice('addresses', page, 0, 0, cut);
+
+        // Copy the keys into the new branch page.
+        cut.slice(1).forEach(function (address) {
+          cacheKey(page, address, keys[address]);
+        });
 
         // Continue until there is one page left.
         if (--pages > 1) paginate();
