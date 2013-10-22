@@ -784,7 +784,7 @@ function Strata (options) {
         if (!(options.page.address % 2) || options.type == "footer") {
           callback(null, position, length);
         } else {
-          writeFooter(options.fd, options.page, function () { callback(null, position, length) })
+          writeFooter(options.fd, options.page, function () { callback(null, position, length) });
         }
       } else {
         send();
@@ -943,7 +943,7 @@ function Strata (options) {
               callback(null, slice, position);
             }
           }
-        })
+        });
       }
     }
   }
@@ -1031,7 +1031,7 @@ function Strata (options) {
 
     // We don't cache file descriptors after the leaf page file read. We will
     // close the file descriptors before the function returns.
-    io('read', filename(page.address), check(opened))
+    io('read', filename(page.address), check(opened));
 
     function opened (fd, stat, read) {
       var buffer = new Buffer(options.readLeafStartLength || 1024);
@@ -1048,7 +1048,7 @@ function Strata (options) {
           }
         }
         // We're probably going to request a medic, not try to heal on open.
-        throw new Error('cannot find footer in last ' + buffer.length + ' bytes')
+        throw new Error('cannot find footer in last ' + buffer.length + ' bytes');
       }
 
       function positioned (slice) {
@@ -1061,7 +1061,7 @@ function Strata (options) {
         page.ghosts = positions.shift();
 
         ok(!(positions.length % 2), "expecting even number of positions and lengths");
-        var lengths = positions.splice(positions.length / 2)
+        var lengths = positions.splice(positions.length / 2);
 
         // Prime our page with the positions array read from the leaf file, or else
         // an empty positions array.
@@ -1085,8 +1085,8 @@ function Strata (options) {
     }
 
     function designated (entry) {
-      page.key = entry.key
-      callback(null, page)
+      page.key = entry.key;
+      callback(null, page);
     }
   }
 
@@ -1192,7 +1192,7 @@ function Strata (options) {
 
     function stat (stat) {
       page.position = stat.size;
-      positioned(stat.size)
+      positioned(stat.size);
     }
 
     function positioned () {
@@ -1601,7 +1601,7 @@ function Strata (options) {
       ;
 
     ok(keys[0] == null, "first key is null");
-    // ok(keys.slice(1).every(function (key) { return key != null }), "null keys");
+    //ok(keys.slice(1).every(function (key) { return key != null }), "null keys");
 
     page.entries = 0;
     page.position = 0;
@@ -1929,7 +1929,7 @@ function Strata (options) {
       locks.push([ callback ]);
       locks.push([]);
       if (locks[0].length == 0) {
-        locks.shift()
+        locks.shift();
         load(page, callback);
       }
     } else {
@@ -2047,11 +2047,11 @@ function Strata (options) {
     // has not already been loaded.
     checkJSONSize(page);
     var locks = page.locks;
-    locks[0].shift()
+    locks[0].shift();
     // Stop when we find a lock queue that has outstanding descents, or when we
     // reach the final queue of shared locks.
     while (locks[0].length == 0 && locks.length != 1) {
-      locks.shift()
+      locks.shift();
       // Each callback is scheduled using next tick. If any callback waits on
       // I/O, then another one will resume. Concurrency.
       locks[0].slice().forEach(function (callback) {
@@ -2129,7 +2129,7 @@ function Strata (options) {
             designated(null);
           } else {
             stash(iter, iterIndex, validate(callback, function (entry) {
-              designated(entry.key)
+              designated(entry.key);
             }));
           }
         }
@@ -5067,7 +5067,7 @@ function Strata (options) {
         var keys = {};
         cut.slice(1).forEach(function (address) {
           keys[address] = pages.right.page.cache[address];
-          uncacheKey(pages.right.page, address)
+          uncacheKey(pages.right.page, address);
         });
 
         // Write the keys into the cache of the left branch page. The key for
