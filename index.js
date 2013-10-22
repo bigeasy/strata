@@ -5078,8 +5078,9 @@ function Strata (options) {
         cut.slice(1).forEach(function (address) {
           cacheKey(pages.left.page, address, keys[address]);
         });
+        ok(cut.length, "cut is zero length");
         console.log('assigning', key);
-        //cacheKey(pages.left.page, cut[0], key);
+        cacheKey(pages.left.page, cut[0], key);
 
         // Write out the left branch page. The generalized merge function will
         // handle the rest of the page rewriting.
