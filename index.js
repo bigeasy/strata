@@ -1601,7 +1601,7 @@ function Strata (options) {
       ;
 
     ok(keys[0] == null, "first key is null");
-    //ok(keys.slice(1).every(function (key) { return key != null }), "null keys");
+    ok(keys.slice(1).every(function (key) { return key != null }), "null keys");
 
     page.entries = 0;
     page.position = 0;
@@ -5132,11 +5132,23 @@ function Strata (options) {
       // the root branch page, then rewrite the root branch page.
       function fill () {
         var cut;
-        cut = splice('addresses', root.page, 0, root.page.addresses.length);
-        cut.forEach(function (address) { uncacheKey(root.page, address) });
+        ok(root.page.addresses.length == 1, "only one address expected");
+        ok(!Object.keys(root.page.cache).length, "no keys expected");
+
+        splice('addresses', root.page, 0, root.page.addresses.length);
+
         cut = splice('addresses', child.page, 0, child.page.addresses.length);
-        cut.forEach(function (address) { uncacheKey(child.page, address) });
+
+        var keys = {};
+        cut.slice(1).forEach(function (address) {
+          keys[address] = child.page.cache[address];
+          uncacheKey(child.page, address);
+        });
+
         splice('addresses', root.page, root.page.addresses.length, 0, cut);
+        cut.slice(1).forEach(function  (address) {
+          cacheKey(root.page, address, keys[address]);
+        });
 
         writeBranch(root.page, ".pending", check(rewriteChild));
       }
