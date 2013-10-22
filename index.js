@@ -5031,14 +5031,9 @@ function Strata (options) {
         }
 
         function designate () {
-          _designate(choice.page, 0, check(doubleCheck));
-          function doubleCheck (key) {
-            console.log("double check designation", designator.page.ghosts, designator.page.positions.length, key);
-            stash(designator.page, 0, check(propagate));
-          }
+          stash(designator.page, 0, check(propagate));
         }
 
-        // TODO: Okay. Yes. Actual, factual key.
         function propagate (entry) {
           release();
           mergeBranches(entry.key, choice.page.address, callback);
