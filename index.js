@@ -4541,9 +4541,26 @@ function Strata (options) {
       // so that it will exclusively.
       function leftAboveRight () {
         console.log('LEFT above RIGHT');
-        descents.push(pivot = (ghosted = pivot).fork());
+        ghosted = { page: pivot.page, index: pivot.index };
+        descents.push(pivot = pivot.fork());
         keys.pop();
         pivot.descend(pivot.key(key), pivot.found(keys), check(atPivot));
+      }
+
+      function createSingleUnlocker (singles) {
+        ok(singles != null, "null singles");
+        return function (parent, child) {
+          if (child.addresses.length == 1) {
+            if (singles.length == 0) singles.push(parent);
+            singles.push(child);
+          } else if (singles.length) {
+            if (singles[0].address == pivot.page.address) singles.shift();
+            singles.forEach(unlock);
+            singles.length = 0;
+          } else if (parent.address != pivot.page.address) {
+            unlock(parent);
+          }
+        }
       }
 
       // We're at the pivot, the branch containing the right key. The path to
@@ -4567,11 +4584,6 @@ function Strata (options) {
         //
         // This takes place down there when we go left from the pivot, and we
         // have to have an unlock strategy again.
-        if (leftKey && !ghosted) {
-          descents.push(ghosted = pivot.fork());
-          ghosted.index--;
-          console.log('ghosted', ghosted.page.address, ghosted.page.addresses, ghosted.page.cache);
-        }
 
         // Create a forked descent that will descend to the parent branch page
         // of the right page of the merge.
@@ -4593,22 +4605,6 @@ function Strata (options) {
         // If we are gathering pages and encounter a branch page with more than
         // one child, we release the pages we've gathered.
         parents.right.unlocker = createSingleUnlocker(singles.right);
-
-        function createSingleUnlocker (singles) {
-          ok(singles != null, "null singles");
-          return function (parent, child) {
-            if (child.addresses.length == 1) {
-              if (singles.length == 0) singles.push(parent);
-              singles.push(child);
-            } else if (singles.length) {
-              if (singles[0].address == pivot.page.address) singles.shift();
-              singles.forEach(unlock);
-              singles.length = 0;
-            } else if (parent.address != pivot.page.address) {
-              unlock(parent);
-            }
-          }
-        }
 
         // Descent to the parent branch page of the right page of the merge.
         parents.right.descend(parents.right.key(key), stopper(parents.right), check(atRightParent));
@@ -4649,8 +4645,7 @@ function Strata (options) {
       function atRightParent () {
         parents.left = pivot.fork();
         parents.left.index--;
-        // todo: that ghosted page up there, we could just use the left parent
-        // here, not an additional descent. But, meh.
+        parents.left.unlocker = createSingleUnlocker(singles.left);
         parents.left.descend(parents.left.right,
                              parents.left.level(parents.right.depth),
                              check(atLeftParent));
@@ -4672,6 +4667,16 @@ function Strata (options) {
           if (parents.right.page.address != pivot.page.address) {
             descents.push(parents.right);
           }
+        }
+
+        if (leftKey && !ghosted) {
+          if (singles.left.length) {
+            ghosted = { page: singles.left[0], index: parents.left.indexes[singles.left[0].address] };
+          } else {
+            ghosted = { page: parents.left.page, index: parents.left.index };
+            ok(parents.left.index == parents.left.indexes[parents.left.page.address], "TODO: ok to replace the above");
+          }
+          console.log('ghosted', ghosted.page.address, ghosted.page.addresses, ghosted.page.cache);
         }
 
         if (parents.left.page.address != pivot.page.address) {
@@ -4789,6 +4794,7 @@ function Strata (options) {
           // Release locks.
           descents.forEach(function (descent) { unlock(descent.page) });
           singles.right.forEach(unlock);
+          singles.left.forEach(unlock);
           next();
         }
       }
@@ -4832,7 +4838,7 @@ function Strata (options) {
       // set of unbalanced pages we inspect the next time we balance. The leaf
       // page for the key cannot merge with it's left sibling, but perhaps it
       // can merge with its right sibling.
-      function merger (leaves, pivot, callback) {
+      function merger (leaves, ghosted, callback) {
         var check = validator(callback);
 
         // todo: really, really want page.key
@@ -4867,10 +4873,10 @@ function Strata (options) {
         function deleteGhost () {
           if (ghostly && left + right) {
             if (left) {
-              exorcise(pivot, leaves.left.page, leaves.left.page, check(merge));
+              exorcise(ghosted, leaves.left.page, leaves.left.page, check(merge));
             } else {
           console.log('deleting ghost', left, right);
-              exorcise(pivot, leaves.left.page, leaves.right.page, check(merge));
+              exorcise(ghosted, leaves.left.page, leaves.right.page, check(merge));
             }
           } else {
             merge();
@@ -5048,7 +5054,7 @@ function Strata (options) {
       }
 
       // Merge addresses of right branch page into the left branch page.
-      function merger (pages, pivot, callback) {
+      function merger (pages, ghosted, callback) {
         // The key given to `mergeBranches` is the key for the given address.
         ok(address == pages.right.page.address, "unexpected address");
 
