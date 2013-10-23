@@ -2169,11 +2169,6 @@ function Strata (options) {
         mid = low + ((high - low) >>> 1);
         if (page.address % 2) {
           stash(page, mid, check(function (entry) { compare(entry.key) }));
-        } else if (page.cache[page.addresses[mid]] == null) {
-            _designate(page, mid, check(function (key) {
-              console.log("designation necessary:", key, page.addresses[mid]);
-              compare(key);
-            }));
         } else {
           compare(page.cache[page.addresses[mid]]);
         }
@@ -2183,6 +2178,7 @@ function Strata (options) {
     }
 
     function compare (other) {
+      ok(other != null, "key is null in find");
       var compare = comparator(key, other);
       if (compare == 0) {
         unwind(callback, null, mid);
