@@ -4731,10 +4731,7 @@ function Strata (options) {
           designation = ancestor.cache[ancestor.addresses[index]];
           cacheKey(pivot.page, pivot.page.addresses[pivot.index], designation);
         }
-        sliceEmpties();
-      }
 
-      function sliceEmpties () {
         empties = singles.right.slice();
         writeBranch(ancestor, ".pending", check(rewriteEmpties));
       }
