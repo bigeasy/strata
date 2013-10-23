@@ -53,7 +53,6 @@ require('./proof')(3, function (step, Strata, tmp, deepEqual, serialize, gather,
     deepEqual(records, [ 'a', 'b', 'c', 'd',  'f', 'j', 'k', 'l' ], 'records');
     strata.balance(step());
   }, function () {
-    console.log("second balance");
     strata.balance(step());
   }, function () {
     objectify(tmp, step());
