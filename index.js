@@ -1562,7 +1562,7 @@ function Strata (options) {
   // Add a key to the branch page cache and recalculate JSON size. Uncache any
   // existing key for the address.
   function cacheKey (page, address, key) {
-    uncacheKey(page, address);
+    ok(page.cache[address] === (void(0)), "key already cached");
     heft(page, JSON.stringify(key).length);
     page.cache[address] = key;
   }
@@ -1575,10 +1575,9 @@ function Strata (options) {
   // around. You'll find places where you've spliced the reference array and
   // you're working with the removed addresses. In this case the index is lost.
   function uncacheKey (page, address) {
-    if (page.cache[address] !== (void(0))) {
-      heft(page, -JSON.stringify(page.cache[address]).length);
-      delete page.cache[address];
-    }
+    ok(page.cache[address] !== (void(0)), "key not cached");
+    heft(page, -JSON.stringify(page.cache[address]).length);
+    delete page.cache[address];
   }
 
   // We write the branch page as a log of key inserts and deletes. We use the
@@ -4331,7 +4330,7 @@ function Strata (options) {
 
         // Uncache the keys from the root branch. Key a map of the current keys
         // to assign to the new page.
-        cut.forEach(function (address) {
+        cut.slice(offset ? 0 : 1).forEach(function (address) {
           keys[address] = root.cache[address];
           uncacheKey(root, address);
         });
@@ -4450,6 +4449,7 @@ function Strata (options) {
       // page merge with an empty left leaf page, the cache and positions are
       // going to be updated by the merge, not by this function.
       function rekey (entry) {
+        uncacheKey(pivot.page, pivot.page.addresses[pivot.index], entry.key);
         cacheKey(pivot.page, pivot.page.addresses[pivot.index], entry.key);
         callback(null, ghostly.key = entry.key);
       }
@@ -4720,7 +4720,7 @@ function Strata (options) {
 
         designation = ancestor.cache[ancestor.addresses[index]];
 
-        uncacheKey(ancestor, ancestor.addresses[index]);
+        var address = ancestor.addresses[index];
         splice('addresses', ancestor, index, 1);
 
         if (pivot.page.address != ancestor.address) {
@@ -4729,7 +4729,11 @@ function Strata (options) {
           // todo: this is only a problem for this milestone.
           ok(ancestor.cache[ancestor.addresses[index]], "expected key to be in memory");
           designation = ancestor.cache[ancestor.addresses[index]];
+          uncacheKey(pivot.page, pivot.page.addresses[pivot.index], designation);
           cacheKey(pivot.page, pivot.page.addresses[pivot.index], designation);
+        } else{
+          ok(index, 'expected ancestor to be non-zero');
+          uncacheKey(ancestor, address);
         }
 
         empties = singles.right.slice();
