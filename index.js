@@ -1594,12 +1594,10 @@ function Strata (options) {
   function writeBranch (page, suffix, callback) {
     var check = validator(callback)
       , addresses = page.addresses.slice()
-      , keys = addresses.map(function (address, index) {
-          return index ? page.cache[address] : null
-      })
+      , keys = addresses.map(function (address, index) { return page.cache[address] })
       ;
 
-    ok(keys[0] == null, "first key is null");
+    ok(keys[0] === (void(0)), "first key is null");
     ok(keys.slice(1).every(function (key) { return key != null }), "null keys");
 
     page.entries = 0;
@@ -4729,7 +4727,8 @@ function Strata (options) {
           // todo: this is only a problem for this milestone.
           ok(ancestor.cache[ancestor.addresses[index]], "expected key to be in memory");
           designation = ancestor.cache[ancestor.addresses[index]];
-          uncacheKey(pivot.page, pivot.page.addresses[pivot.index], designation);
+          uncacheKey(ancestor, ancestor.addresses[0]);
+          uncacheKey(pivot.page, pivot.page.addresses[pivot.index]);
           cacheKey(pivot.page, pivot.page.addresses[pivot.index], designation);
         } else{
           ok(index, 'expected ancestor to be non-zero');
