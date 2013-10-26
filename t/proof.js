@@ -110,7 +110,7 @@ function serialize (segments, directory, callback) {
   else write (segments);
 
   function write (json) {
-    var dir = createDirectory(json);
+    var dir = directivize(json);
     var files = Object.keys(dir);
     var count = 0;
 
@@ -233,7 +233,7 @@ function order (json) {
   return json;
 }
 
-function createDirectory (json) {
+function directivize (json) {
   var directory = {};
 
   var checksum = 40;
