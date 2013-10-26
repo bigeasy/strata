@@ -2559,6 +2559,10 @@ function Strata (options) {
           index = $index;
         }
         indexes[page.address] = index;
+        if (!(page.address % 2)) {
+          ok(page.addresses.length, 'page has addresses');
+          ok(page.cache[page.addresses[0]] == (void(0)), 'first key is cached');
+        }
         downward();
       }
     }
