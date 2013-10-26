@@ -1139,9 +1139,16 @@ function Strata (options) {
             }
           } else {
             if (index > 0) {
-              splice('addresses', page, index - 1, 0, entry.shift());
+              var address = entry.shift(), key = entry.shift();
+              splice('addresses', page, index - 1, 0, address);
+              if (key !== null) {
+                cacheKey(page, address, key);
+              }
             } else {
-              splice('addresses', page, ~index, 1);
+              var cut = splice('addresses', page, ~index, 1);
+              if (~index) {
+                uncacheKey(page, cut[0]);
+              }
             }
           }
           offset += length;
@@ -1611,8 +1618,9 @@ function Strata (options) {
       function write () {
         if (addresses.length) {
           var address = addresses.shift();
+          var key = page.entries ? page.cache[address] : null;
           page.entries++;
-          var entry = [ page.entries, page.entries, address ];
+          var entry = [ page.entries, page.entries, address, key ];
           writeJSON({ fd: fd, page: page, entry: entry }, check(write));
         } else {
           fs.close(fd, check(closed));
@@ -1641,11 +1649,13 @@ function Strata (options) {
       function loadKeys (page) {
         var index = 1;
 
-        loadKey();
+        if (page.addresses.length > 1) _designate(page, index, check(loadKey));
+        else callback(null, page);
 
-        function loadKey () {
-          if (index < page.addresses.length) {
-            _designate(page, index++, check(loadKey));
+        function loadKey (key) {
+          ok(key == page.cache[page.addresses[index]], 'key matches');
+          if (++index < page.addresses.length) {
+            _designate(page, index, check(loadKey));
           } else {
             callback(null, page);
           }
@@ -2134,7 +2144,6 @@ function Strata (options) {
 
       function designated (key) {
         stack.forEach(function (page) { unlock(page) });
-        cacheKey(page, page.addresses[index], key);
         callback(null, key);
       }
     } else {

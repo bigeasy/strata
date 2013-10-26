@@ -223,6 +223,9 @@ function order (json) {
           order.splice(index, 0, entry.value);
           break;
         case 'del':
+          if (!entry.index && !object.ghost) {
+            object.ghost = order[0];
+          }
           order.splice(entry.index, 1);
           break;
         }
@@ -234,7 +237,16 @@ function order (json) {
 }
 
 function directivize (json) {
-  var directory = {};
+  var directory = {}, keys = {};
+
+  function key (address) {
+    var object = json[address];
+    if (object.children) {
+      return key(object.children[0]);
+    } else {
+      return object.ghost || object.order[0];
+    }
+  }
 
   var checksum = 40;
 
@@ -242,7 +254,7 @@ function directivize (json) {
     var object = json[address];
     if (object.children) {
       directory[address] = object.children.map(function (address, index) {
-        return [ index + 1, index + 1, address ];
+        return [ index + 1, index + 1, address, index ? key(address) : null ];
       });
     } else {
       var ghosts = 0;
