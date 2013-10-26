@@ -1075,7 +1075,8 @@ function Strata (options) {
     }
 
     // Unless this is the leftmost leaf page, load the first record and assign
-    // its key as the page's key.
+    // its key as the page's key. TODO: Am I actually using this now that keys
+    // are stored in branches? I think not.
     function designate () {
       if (page.address == 1) {
         callback(null, page);
