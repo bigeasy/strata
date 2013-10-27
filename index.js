@@ -727,6 +727,7 @@ function Strata (options) {
   function writeJSON (options, callback) {
     var check = validator(callback)
       , offset = 0
+      , entry
       , buffer
       , json
       , line
@@ -752,7 +753,11 @@ function Strata (options) {
       }
 
       // Format the line with checksums.
-      json = JSON.stringify(options.entry);
+      entry = options.header.slice();
+      if (options.body !== (void(0))) {
+        entry.push(options.body);
+      }
+      json = JSON.stringify(entry);
       line = json + " " + checksum(json);
 
       length = Buffer.byteLength(line, "utf8") + 1;
@@ -869,8 +874,8 @@ function Strata (options) {
 
   // Write an insert object.
   function writeInsert (fd, page, index, record, callback) {
-    var entry = [ ++page.entries, index + 1, record ];
-    writeJSON({ fd: fd, page: page, entry: entry }, callback);
+    var header = [ ++page.entries, index + 1 ];
+    writeJSON({ fd: fd, page: page, header: header, body: record }, callback);
   }
 
   // #### Delete Entries
@@ -903,8 +908,8 @@ function Strata (options) {
 
   // Write a delete object.
   function writeDelete (fd, page, index, callback) {
-    var entry = [ ++page.entries, -(index + 1) ];
-    writeJSON({ fd: fd, page: page, entry: entry }, callback);
+    var header = [ ++page.entries, -(index + 1) ];
+    writeJSON({ fd: fd, page: page, header: header }, callback);
   }
 
   // Read or write buffers to the file system. We work with buffers, not
@@ -999,18 +1004,18 @@ function Strata (options) {
 
   // Write a position array entry.
   function writePositions (fd, page, callback) {
-    var entry = [ ++page.entries, 0, 1, page.right, page.ghosts ];
-    entry = entry.concat(page.positions).concat(page.lengths);
-    writeJSON({ fd: fd, page: page, entry: entry, type: "position" }, callback);
+    var header = [ ++page.entries, 0, 1, page.right, page.ghosts ];
+    header = header.concat(page.positions).concat(page.lengths);
+    writeJSON({ fd: fd, page: page, header: header, type: "position" }, callback);
   }
 
   function writeFooter (fd, page, callback) {
     ok(page.address % 2 && page.bookmark != null);
-    var entry = [
+    var header = [
       ++page.entries, 0, 0, page.bookmark.position, page.bookmark.length,
       page.right || 0, page.positions.length - page.ghosts
     ];
-    writeJSON({ fd: fd, page: page, entry: entry, type: "footer" }, callback);
+    writeJSON({ fd: fd, page: page, header: header, type: "footer" }, callback);
   }
 
   // #### Reading Leaves
@@ -1609,8 +1614,8 @@ function Strata (options) {
           var address = addresses.shift();
           var key = page.entries ? page.cache[address] : null;
           page.entries++;
-          var entry = [ page.entries, page.entries, address, key ];
-          writeJSON({ fd: fd, page: page, entry: entry }, check(write));
+          var header = [ page.entries, page.entries, address ];
+          writeJSON({ fd: fd, page: page, header: header, body: key }, check(write));
         } else {
           fs.close(fd, check(closed));
         }
