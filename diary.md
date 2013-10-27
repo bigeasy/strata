@@ -259,6 +259,47 @@ Keep in mind that, if we end up blindly appending stuff, we might want to
 replace insert and delete indexes with the actual keys. That would only change
 delete log entries, since we can extract the key from the record.
 
+Currently, branch page updates are handled by rewriting the pages, locking the
+page while they are being rewritten, then using the atomic nature of a rename to
+put the new pages in place. The lock, however, blocks other descents from making
+progress, so we want to hold it for as short a time as possible, not for the
+duration of an entire rewrite.
+
+This is making me consider some sort of a balance plan file, or maybe just a
+balance intention file that has the instructions for a single balance written to
+the directory. During recovery, this single balance is performed. Alternatively,
+there could be a directory that has a file for each plan in the balance, and as
+the balance is performed, a file is removed, the files are ordered by a numeric
+name.
+
+This is possible because we've made the balance thread of executation seprate
+and it's goal is not to be lightening fast, but to be lightening fast about
+holding exclusive locks. If the update to the branch pages is done with an
+append to a file, then that is faster than copying the entire file, or at least
+one imagines it would be.
+
+The merges could simply be a log file, actually. Writing out JSON per line for
+each action and then logging the completion of each action, in addition to
+logging any follow on actions. Thus, you have a plan to split a page, so you get
+to the page and create a new page that is an empty split, just a pointer to the
+page it split from, update it's parent branch page by adding a key to the page,
+which let's say is the root, so there is nothing more to do (the root does not
+need to split.) When you create the empty split you add an entry in the merge
+log that says to come back and complete the split, you add an entry to the merge
+log to come back and rewrite branch page the way it is rewritten now.
+
+Until it is rewritten inserts get appended to the old page file, but inserted
+into the correct in memory page object. A rewerite needs to hold a read only
+lock on all the split pages, to copy them, but it can do it in two steps, once
+for each page, then again holding all pages to check to see if anything changed,
+maybe even having some queue of operations to check, instead of having to go
+back and try to descern the differences, simply an array, that if present
+gathers up writes.
+
+Except that this now means that we want to hold the pages in memory so that they
+are not flushed and those writes lost, and we want to do that independently of
+the read and write lock mechanism.
+
 ## Null Keys
 
 No. We've already decided that there are no duplicate keys, but we've provided a
