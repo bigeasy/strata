@@ -1070,23 +1070,11 @@ function Strata (options) {
 
         page.bookmark = bookmark;
 
-        replay(fd, stat, read, page, bookmark.position + bookmark.length, check(designate));
+        replay(fd, stat, read, page, bookmark.position + bookmark.length, check(done));
       }
     }
 
-    // Unless this is the leftmost leaf page, load the first record and assign
-    // its key as the page's key. TODO: Am I actually using this now that keys
-    // are stored in branches? I think not.
-    function designate () {
-      if (page.address == 1) {
-        callback(null, page);
-      } else {
-        stash(page, 0, check(designated));
-      }
-    }
-
-    function designated (entry) {
-      page.key = entry.key;
+    function done () {
       callback(null, page);
     }
   }
