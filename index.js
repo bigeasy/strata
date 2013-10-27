@@ -1197,7 +1197,7 @@ function Strata (options) {
     }
 
     function positioned () {
-      fs.open(filename(page.address), "r", check(input));
+      fs.open(filename(page.address), 'r', check(input));
     }
 
     function input (fd) {
@@ -1245,7 +1245,7 @@ function Strata (options) {
       ;
 
     // Open the new leaf page file and reset our file position.
-    fs.open(filename(page.address, suffix), "a", 0644, check(opened));
+    fs.open(filename(page.address, suffix), 'a', 0644, check(opened));
 
     function opened ($1) {
       fd = $1;
@@ -1604,7 +1604,7 @@ function Strata (options) {
     page.entries = 0;
     page.position = 0;
 
-    fs.open(filename(page.address, suffix), "a", 0644, check(opened));
+    fs.open(filename(page.address, suffix), 'a', 0644, check(opened));
 
     function opened (fd) {
       write();
@@ -2965,7 +2965,7 @@ function Strata (options) {
         // Since we need to fsync anyway, we open the file and close the file
         // when we append a JSON object to it. Because no file handles are kept
         // open, the b&#x2011;tree object can left to garbage collection.
-        fs.open(filename(page.address), "a", 0644, check(write));
+        fs.open(filename(page.address), 'a', 0644, check(write));
 
         function write ($) {
           writeInsert(fd = $, page, index, record, check(written));
@@ -3003,7 +3003,7 @@ function Strata (options) {
       balancer.unbalanced(page);
 
       // Append a delete object to the leaf page file.
-      fs.open(filename(page.address), "a", 0644, check(opened));
+      fs.open(filename(page.address), 'a', 0644, check(opened));
 
       function opened ($) {
         writeDelete(fd = $, page, index, check(written));
