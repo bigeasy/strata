@@ -197,6 +197,19 @@ every leaf page file is going to be a log.
 In fact, if I am going this route, why don't I simply write out the key over and
 over again?
 
+*update*: Still bothers me, the girth, but if I'm vacuuming frequently, it won't
+be sucha bother, will it? If vacuum turns out to be something that is done
+regularly, then investing in the rewind will not have been worth it.
+
+But, I'm starting to not like append only, because it only protects against a
+certain type of error that could be caught by testing. It starts to feel like
+type saftey, a talisman against corruption, one more thing that we do that make
+it impossible, impossible I say! to corrupt files because we're only ever
+appending and the operating system will protect us from ourselves.
+
+Yes, vacuuming is something that needs to be done, but in the mean time, all
+that cruft. I don't know why I don't err on the side of tidy.
+
 ## Quick Split and Merge; Log then Rewrite
 
 A number of different situations for writing can be more live than they are now.
