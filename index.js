@@ -769,6 +769,8 @@ function Strata (options) {
     // are actually written and write the difference if we come up short.
     // Return the file position of the appended JSON object.
     function send () {
+      console.log(options.page.address, options.page.position);
+      //if (options.page.address && options.page.position > 53) throw new Error;
       fs.write(options.fd, buffer, offset, buffer.length - offset, options.page.position, check(sent));
     }
 
@@ -1237,7 +1239,7 @@ function Strata (options) {
       ;
 
     // Open the new leaf page file and reset our file position.
-    fs.open(filename(page.address, suffix), 'a', 0644, check(opened));
+    fs.open(filename(page.address, suffix), 'w', 0644, check(opened));
 
     function opened ($1) {
       fd = $1;
@@ -1596,7 +1598,7 @@ function Strata (options) {
     page.entries = 0;
     page.position = 0;
 
-    fs.open(filename(page.address, suffix), 'a', 0644, check(opened));
+    fs.open(filename(page.address, suffix), 'w', 0644, check(opened));
 
     function opened (fd) {
       write();
@@ -2957,7 +2959,7 @@ function Strata (options) {
         // Since we need to fsync anyway, we open the file and close the file
         // when we append a JSON object to it. Because no file handles are kept
         // open, the b&#x2011;tree object can left to garbage collection.
-        fs.open(filename(page.address), 'a', 0644, check(write));
+        fs.open(filename(page.address), 'r+', 0644, check(write));
 
         function write ($) {
           writeInsert(fd = $, page, index, record, check(written));
@@ -2995,7 +2997,7 @@ function Strata (options) {
       balancer.unbalanced(page);
 
       // Append a delete object to the leaf page file.
-      fs.open(filename(page.address), 'a', 0644, check(opened));
+      fs.open(filename(page.address), 'r+', 0644, check(opened));
 
       function opened ($) {
         writeDelete(fd = $, page, index, check(written));
@@ -4428,7 +4430,7 @@ function Strata (options) {
       ghostly.ghosts = 0;
 
       // Open the leaf page file and write out the shifted positions array.
-      fs.open(filename(ghostly.address), 'a', 0644, check(leafOpened));
+      fs.open(filename(ghostly.address), 'r+', 0644, check(leafOpened));
 
       function leafOpened (fd) {
         writePositions(fd, ghostly, check(written));
