@@ -735,45 +735,35 @@ function Strata (options) {
       , length
       ;
 
-    // Read the file size if we have no insert position.
-    if (options.page.position) positioned();
-    else fs.fstat(options.fd, check(stat));
+    ok(options.page.position != null, "page has not been positioned: " + options.page.position);
 
-    // Get the file size as our insert position. Position to end of file.
-    function stat (stat) {
-      options.page.position = stat.size;
-      positioned();
+    // Update the position of last position array.
+    if (options.type == "position") {
+      options.page.bookmark = { position: options.page.position };
     }
+
+    // Format the line with checksums.
+    entry = options.header.slice();
+    if (options.body !== (void(0))) {
+      entry.push(options.body);
+    }
+    json = JSON.stringify(entry);
+    line = json + " " + checksum(json);
 
     // Allocate a buffer and write the JSON and new line.
-    function positioned () {
-      // Update the position of last position array.
-      if (options.type == "position") {
-        options.page.bookmark = { position: options.page.position };
-      }
+    length = Buffer.byteLength(line, "utf8") + 1;
 
-      // Format the line with checksums.
-      entry = options.header.slice();
-      if (options.body !== (void(0))) {
-        entry.push(options.body);
-      }
-      json = JSON.stringify(entry);
-      line = json + " " + checksum(json);
+    buffer = new Buffer(length);
+    buffer.write(line);
+    buffer[length - 1] = 0x0A;
 
-      length = Buffer.byteLength(line, "utf8") + 1;
-
-      buffer = new Buffer(length);
-      buffer.write(line);
-      buffer[length - 1] = 0x0A;
-
-      if (options.type == "position") {
-        options.page.bookmark.length = length;
-      }
-
-      position = options.page.position;
-
-      send();
+    if (options.type == "position") {
+      options.page.bookmark.length = length;
     }
+
+    position = options.page.position;
+
+    send();
 
     // Write may be interrupted by a signal, so we keep track of how many bytes
     // are actually written and write the difference if we come up short.
@@ -1039,6 +1029,8 @@ function Strata (options) {
     io('read', filename(page.address), check(opened));
 
     function opened (fd, stat, read) {
+      page.position = stat.size;
+
       var buffer = new Buffer(options.readLeafStartLength || 1024);
       read(buffer, Math.max(0, stat.size - buffer.length), check(footer));
 
