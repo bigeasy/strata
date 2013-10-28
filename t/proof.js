@@ -141,6 +141,7 @@ function abstracted (dir, lengths) {
       record = { log: [] };
       position = 0;
       dir[file].forEach(function (json, index) {
+              //console.log(require('util').inspect(dir, false, null), json, bookmark);
         ok(index + 1 == json[0], 'entry record is wrong');
         var length = lengths[file][index];
         if (json[1] == 0) {
@@ -150,7 +151,7 @@ function abstracted (dir, lengths) {
             record.log.push({ type: 'pos' });
           } else {
             if (json[3] != bookmark.position || json[4] != bookmark.length) {
-              console.log(require('util').inspect(dir, false, null), bookmark);
+              console.log(require('util').inspect(dir, false, null), json, bookmark);
               throw new Error;
             }
           }
@@ -301,7 +302,7 @@ function directivize (json) {
         return record;
       })
       directory[address].push([
-        directory[address].length + 1, 0, 0, bookmark.position, bookmark.length, object.right, records
+        directory[address].length + 1, 0, 0, bookmark.position, bookmark.length, object.right, records, position
       ])
     }
   }

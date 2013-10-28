@@ -769,8 +769,6 @@ function Strata (options) {
     // are actually written and write the difference if we come up short.
     // Return the file position of the appended JSON object.
     function send () {
-      console.log(options.page.address, options.page.position);
-      //if (options.page.address && options.page.position > 53) throw new Error;
       fs.write(options.fd, buffer, offset, buffer.length - offset, options.page.position, check(sent));
     }
 
@@ -1005,9 +1003,13 @@ function Strata (options) {
     ok(page.address % 2 && page.bookmark != null);
     var header = [
       ++page.entries, 0, 0, page.bookmark.position, page.bookmark.length,
-      page.right || 0, page.positions.length - page.ghosts
+      page.right || 0, page.positions.length - page.ghosts, page.position
     ];
-    writeJSON({ fd: fd, page: page, header: header, type: "footer" }, callback);
+    writeJSON({ fd: fd, page: page, header: header, type: "footer" }, validate(callback, function (position, length) {
+      page.position = header[7];
+      page.entries--;
+      callback(null, position, length);
+    }));
   }
 
   // #### Reading Leaves
@@ -1031,8 +1033,6 @@ function Strata (options) {
     io('read', filename(page.address), check(opened));
 
     function opened (fd, stat, read) {
-      page.position = stat.size;
-
       var buffer = new Buffer(options.readLeafStartLength || 1024);
       read(buffer, Math.max(0, stat.size - buffer.length), check(footer));
 
@@ -1042,6 +1042,8 @@ function Strata (options) {
           if (slice[i] == 0x5b) {
             var footer = readLine(slice.toString('utf8', i));
             bookmark = { position: footer[3], length: footer[4] };
+            page.position = footer[7];
+            ok(page.position != null, 'no page position');
             read(new Buffer(bookmark.length), bookmark.position, check(positioned));
             return;
           }
@@ -1074,6 +1076,7 @@ function Strata (options) {
     }
 
     function done () {
+      page.entries--;
       callback(null, page);
     }
   }
