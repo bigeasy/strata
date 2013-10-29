@@ -34,7 +34,7 @@ function objectify (directory, callback) {
       lines = lines.split(/\n/);
       lines.pop();
       lines.forEach(function (line, index) {
-        var json = line.replace(/^[\da-f]+\s/, "");
+        var json = line.replace(/^\d+\s[\da-f]+\s/, "");
         dir[file].push(JSON.parse(json));
         lengths[file][index] = line.length + 1;
       });
@@ -120,7 +120,12 @@ function serialize (segments, directory, callback) {
         var record = [ JSON.stringify(line) ];
         record.unshift(crypto.createHash("sha1").update(record[0]).digest("hex"));
         record = record.join(" ");
-        records.push(record);
+
+        var length = record.length;
+        var entire = length + String(length).length + 1;
+        length = Math.max(entire, length + String(entire).length + 1);
+
+        records.push(length + " " + record);
       });
       records = records.join("\n") + "\n";
       fs.writeFile(path.resolve(directory, String(file)), records, "utf8", check(callback, written));
@@ -290,6 +295,8 @@ function directivize (json) {
           break;
         }
         var length = JSON.stringify(record).length + 1 + checksum + 1;
+        var entire = length + String(length).length + 1;
+        length = Math.max(entire, length + String(entire).length + 1);
         switch (entry.type) {
         case 'pos':
           bookmark = { position: position, length: length };

@@ -388,13 +388,13 @@ function Strata (options) {
 
   //
   function readLine (buffer) {
-    for (var count = 1, i = 0, I = buffer.length; i < I && count; i++) {
+    for (var count = 2, i = 0, I = buffer.length; i < I && count; i++) {
       if (buffer[i] == 0x20) count--;
     }
     ok(!count, 'corrupt line: could not find end of line header');
     var header = buffer.toString('utf8', 0, i - 1).split(' ');
     var body = buffer.slice(i, buffer.length - 1);
-    ok(header[0] == "-" || checksum(body) == header[0], "corrupt line: invalid checksum");
+    ok(header[1] == "-" || checksum(body) == header[1], "corrupt line: invalid checksum");
     return JSON.parse(body.toString());
   }
 
@@ -757,8 +757,16 @@ function Strata (options) {
     // Allocate a buffer and write the JSON and new line.
     length = Buffer.byteLength(line, "utf8") + 1;
 
+    // Could use `Math.max`, but want the test coverage.
+    var entire = length + String(length).length + 1;
+    if (entire < length + String(entire).length + 1) {
+      length = length + String(entire).length + 1;
+    } else {
+      length = entire;
+    }
+
     buffer = new Buffer(length);
-    buffer.write(line);
+    buffer.write(String(length) + " " + line);
     buffer[length - 1] = 0x0A;
 
     if (options.type == "position") {
