@@ -115,6 +115,29 @@ terminator we can read backwards easily as we are doing now.
 
 This is fantastic. Do it.
 
+*Update*: What I've come to is something that is counted, but still plain text.
+
+I'd given a lot of thought to how to pack a binary file format, because that's
+what binary makes you think. Somehow, coming back to Strata after a ways away,
+I'm becoming better at seeing the trade-offs inherient in programming. I can see
+the value of my plain text file format, it has not receeded as Strata has
+progressed. It is always reassuring, when things are working as poorly, when a
+test won't pass and won't to open these files and have a look.
+
+## Compression
+
+First, this morning, I'm thinking compression and I'm thinking, no I'd rather
+not, because Strata offers control and makes things generally accessible to
+developers and compression adds complexity for little gain. If you really want
+to compress your payloads, maybe compress them before you write them to the
+database?
+
+Or maybe, if you'd like, we can gzip the entire leaf page file, and catenate to
+an unzipped file. Then when we vacuum we can run it all again, but you're asking
+that the entire page be loaded into memory, which is a trade-off, and you're
+going to have to decide, but it is a full trade-off. Using `gzip` against a full
+leaf will get the best compression imaginable; slow but efficient.
+
 ## Inbox
 
  * `nextTick` behavior ought to make coverage happen quickly, especially a
