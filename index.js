@@ -387,7 +387,8 @@ function Strata (options) {
   // A hyphen stored in place of the hexadecimal indicates no checksum.
 
   //
-  function readLine (line) {
+  function readLine (buffer) {
+    var line = buffer.toString();
     var match = /^\s?(.*)\s((?:-|[\da-f]+))\s?$/i.exec(line);
     ok(match, "corrupt line: cannot split line: " + line);
     ok(match[2] == "-" || checksum(match[1]) == match[2], "corrupt line: invalid checksum");
@@ -1040,7 +1041,7 @@ function Strata (options) {
       function footer (slice) {
         for (var i = slice.length - 1; i != -1; i--) {
           if (slice[i] == 0x5b) {
-            var footer = readLine(slice.toString('utf8', i));
+            var footer = readLine(slice.slice(i));
             bookmark = { position: footer[3], length: footer[4] };
             page.position = footer[7];
             ok(page.position != null, 'no page position');
@@ -1053,7 +1054,7 @@ function Strata (options) {
       }
 
       function positioned (slice) {
-        var positions = readLine(slice.toString('utf8', 0, bookmark.length));
+        var positions = readLine(slice.slice(0, bookmark.length));
 
         page.entries = positions.shift();
         ok(positions.shift() == 0, "expected housekeeping type");
@@ -1113,7 +1114,7 @@ function Strata (options) {
           var position = start + offset;
           var length = (i - offset) + 1;
           ok(length);
-          var entry = readLine(slice.toString('utf8', offset, offset + length));
+          var entry = readLine(slice.slice(offset, offset + length));
           ok(entry.shift() == ++page.entries, "entry count is off");
           var index = entry.shift();
           if (leaf) {
@@ -1208,7 +1209,7 @@ function Strata (options) {
       function json (bytes, buffer) {
         ok(bytes == length, "incomplete read");
         ok(buffer[length - 1] == 0x0A, "newline expected");
-        record = readLine(buffer.toString("utf8")).pop();
+        record = readLine(buffer).pop();
         fs.close(fd, check(closed));
       }
     }
