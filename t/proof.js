@@ -34,7 +34,7 @@ function objectify (directory, callback) {
       lines = lines.split(/\n/);
       lines.pop();
       lines.forEach(function (line, index) {
-        var json = line.replace(/\s[\da-f]+$/, "");
+        var json = line.replace(/^[\da-f]+\s/, "");
         dir[file].push(JSON.parse(json));
         lengths[file][index] = line.length + 1;
       });
@@ -118,7 +118,7 @@ function serialize (segments, directory, callback) {
       var records = [];
       dir[file].forEach(function (line) {
         var record = [ JSON.stringify(line) ];
-        record.push(crypto.createHash("sha1").update(record[0]).digest("hex"));
+        record.unshift(crypto.createHash("sha1").update(record[0]).digest("hex"));
         record = record.join(" ");
         records.push(record);
       });

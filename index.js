@@ -388,11 +388,14 @@ function Strata (options) {
 
   //
   function readLine (buffer) {
-    var line = buffer.toString();
-    var match = /^\s?(.*)\s((?:-|[\da-f]+))\s?$/i.exec(line);
-    ok(match, "corrupt line: cannot split line: " + line);
-    ok(match[2] == "-" || checksum(match[1]) == match[2], "corrupt line: invalid checksum");
-    return JSON.parse(match[1]);
+    for (var count = 1, i = 0, I = buffer.length; i < I && count; i++) {
+      if (buffer[i] == 0x20) count--;
+    }
+    ok(!count, 'corrupt line: could not find end of line header');
+    var header = buffer.toString('utf8', 0, i - 1).split(' ');
+    var body = buffer.slice(i, buffer.length - 1);
+    ok(header[0] == "-" || checksum(body) == header[0], "corrupt line: invalid checksum");
+    return JSON.parse(body.toString());
   }
 
   // Pages are identified by an integer page address. The page address is a
@@ -749,7 +752,7 @@ function Strata (options) {
       entry.push(options.body);
     }
     json = JSON.stringify(entry);
-    line = json + " " + checksum(json);
+    line = checksum(json) + " " + json;
 
     // Allocate a buffer and write the JSON and new line.
     length = Buffer.byteLength(line, "utf8") + 1;
@@ -1033,15 +1036,17 @@ function Strata (options) {
     // close the file descriptors before the function returns.
     io('read', filename(page.address), check(opened));
 
+    // Search for the last line. There are always at least two lines in a page
+    // file, the final line being a footer.
     function opened (fd, stat, read) {
       var buffer = new Buffer(options.readLeafStartLength || 1024);
       read(buffer, Math.max(0, stat.size - buffer.length), check(footer));
 
       // todo: check that the last character is a new line.
       function footer (slice) {
-        for (var i = slice.length - 1; i != -1; i--) {
-          if (slice[i] == 0x5b) {
-            var footer = readLine(slice.slice(i));
+        for (var i = slice.length - 2; i != -1; i--) {
+          if (slice[i] == 0x0a) {
+            var footer = readLine(slice.slice(i + 1));
             bookmark = { position: footer[3], length: footer[4] };
             page.position = footer[7];
             ok(page.position != null, 'no page position');
