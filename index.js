@@ -311,16 +311,15 @@ function Strata (options) {
     var algorithm;
     switch (algorithm = options.checksum || "sha1") {
     case "none":
-      return function () { return "0" }
-      /*checksum = function () {
+      return function () {
         return {
-          update: function () {},
+          update: function () { return this },
           digest: function () { return '0' }
         }
-      }*/
+      }
     default:
       var crypto = require("crypto");
-      return function (m) { return crypto.createHash(algorithm).update(m).digest("hex") }
+      return function (m) { return crypto.createHash(algorithm) }
     }
   })();
 
@@ -401,7 +400,7 @@ function Strata (options) {
     ok(!count, 'corrupt line: could not find end of line header');
     var header = buffer.toString('utf8', 0, i - 1).split(' ');
     var body = buffer.slice(i, buffer.length - 1);
-    ok(header[1] == "-" || checksum(body) == header[1], "corrupt line: invalid checksum");
+    ok(header[1] == "-" || checksum().update(body).digest("hex") == header[1], "corrupt line: invalid checksum");
     return JSON.parse(body.toString());
   }
 
@@ -759,7 +758,7 @@ function Strata (options) {
       entry.push(options.body);
     }
     json = JSON.stringify(entry);
-    line = checksum(json) + " " + json;
+    line = checksum().update(json).digest("hex") + " " + json;
 
     // Allocate a buffer and write the JSON and new line.
     length = Buffer.byteLength(line, "utf8") + 1;
