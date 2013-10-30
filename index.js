@@ -409,11 +409,10 @@ function Strata (options) {
       hash.update(body);
     }
     ok(fields[1] == "-" || hash.digest("hex") == fields[1], "corrupt line: invalid checksum");
-    var entry = JSON.parse(fields[2]);
     if (buffer[i - 1] == 0x20) {
-      entry.push(JSON.parse(body.toString()));
+      body = JSON.parse(body.toString());
     }
-    return entry;
+    return { length: +(fields[0]), header: JSON.parse(fields[2]), body: body }
   }
 
   // Pages are identified by an integer page address. The page address is a
@@ -1087,7 +1086,7 @@ function Strata (options) {
       function footer (slice) {
         for (var i = slice.length - 2; i != -1; i--) {
           if (slice[i] == 0x0a) {
-            var footer = readLine(slice.slice(i + 1));
+            var footer = readLine(slice.slice(i + 1)).header;
             bookmark = { position: footer[3], length: footer[4] };
             page.position = footer[7];
             ok(page.position != null, 'no page position');
@@ -1100,7 +1099,7 @@ function Strata (options) {
       }
 
       function positioned (slice) {
-        var positions = readLine(slice.slice(0, bookmark.length));
+        var positions = readLine(slice.slice(0, bookmark.length)).header;
 
         page.entries = positions.shift();
         ok(positions.shift() == 0, "expected housekeeping type");
@@ -1165,13 +1164,14 @@ function Strata (options) {
           var position = start + offset;
           ok(length);
           var entry = readLine(slice.slice(offset, offset + length));
-          ok(entry.shift() == ++page.entries, "entry count is off");
-          var index = entry.shift();
+          var header = entry.header;
+          ok(header.shift() == ++page.entries, "entry count is off");
+          var index = header.shift();
           if (leaf) {
             if (index > 0) {
               splice('positions', page, index - 1, 0, position);
               splice('lengths', page, index - 1, 0, length);
-              cacheRecord(page, position, entry.pop());
+              cacheRecord(page, position, entry.body/*, entry.length */);
             } else if (~index == 0 && page.address != 1) {
               ok(!page.ghosts, "double ghosts");
               page.ghosts++;
@@ -1181,10 +1181,10 @@ function Strata (options) {
             }
           } else {
             if (index > 0) {
-              var address = entry.shift(), key = entry.shift();
+              var address = header.shift();
               splice('addresses', page, index - 1, 0, address);
               if (index - 1) {
-                cacheKey(page, address, key);
+                cacheKey(page, address, entry.body);
               }
             } else {
               var cut = splice('addresses', page, ~index, 1);
@@ -1259,7 +1259,8 @@ function Strata (options) {
       function json (bytes, buffer) {
         ok(bytes == length, "incomplete read");
         ok(buffer[length - 1] == 0x0A, "newline expected");
-        record = readLine(buffer).pop();
+        // todo: return entry, maybe rename read entry.
+        record = readLine(buffer).body;
         fs.close(fd, check(closed));
       }
     }
