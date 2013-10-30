@@ -301,21 +301,28 @@ function Strata (options) {
     , balancer = new Balancer()
     , balancing
     , size = 0
-    , hash = options.checksum || { algorithm: "sha1", count: 0 }
     , checksum
-    , crypto
     , constructors = {}
     , tracer = options.tracer || function () { arguments[2]() }
     ;
 
-  switch (hash.algorithm) {
-  case "none":
-    checksum = function () { return 0 }
-    break;
-  default:
-    crypto = require("crypto");
-    checksum = function (m) { return crypto.createHash(hash.algorithm).update(m).digest("hex") }
-  }
+  checksum = (function () {
+    if (typeof options.checksum == "function") return options.checksum;
+    var algorithm;
+    switch (algorithm = options.checksum || "sha1") {
+    case "none":
+      return function () { return "0" }
+      /*checksum = function () {
+        return {
+          update: function () {},
+          digest: function () { return '0' }
+        }
+      }*/
+    default:
+      var crypto = require("crypto");
+      return function (m) { return crypto.createHash(algorithm).update(m).digest("hex") }
+    }
+  })();
 
   function validator (callback) {
     return function (forward, type, report) { return validate(callback, forward, type, report) }

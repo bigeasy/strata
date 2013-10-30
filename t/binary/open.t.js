@@ -12,10 +12,6 @@ require("./proof")(2, function (Strata, tmp, step, equal) {
         size: 8,
         extractor: function (buffer) { return buffer.readDoubleLE(0) }
       },
-      checksum: {
-        size: 20,
-        algorithm: 'sha1'
-      },
       leafSize: 3,
       branchSize: 3
     });
