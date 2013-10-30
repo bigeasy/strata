@@ -700,8 +700,8 @@ function Strata (options) {
 
   //
   function cacheRecord (page, position, record, key) {
-    // Uncache the exisiting record.
-    uncacheRecord(page, position);
+    // Assert that their is no record cached.
+    ok (!page.cache[position], 'record already cached for position');
 
     // Extract the key if none was provided.
     if (key == null) key = extractor(record);
@@ -2131,9 +2131,18 @@ function Strata (options) {
     ok(length);
     var stash;
     if (!(stash = page.cache[position])) {
-      readRecord(page, position, length, validate(callback, function (record) {
-        callback(null, cacheRecord(page, position, record));
-      }));
+      page.cache[position] = stash = [ callback ];
+      readRecord(page, position, length, function (error, record) {
+        if (!error) {
+          delete page.cache[position];
+          var entry = cacheRecord(page, position, record);
+        }
+        stash.forEach(function (callback) {
+          callback(error, entry);
+        });
+      });
+    } else if (Array.isArray(stash)) {
+      stash.push(callback);
     } else {
       callback(null, stash);
     }
