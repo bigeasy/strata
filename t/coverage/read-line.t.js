@@ -3,7 +3,7 @@
 require("./proof")(2, function (step, Strata, deepEqual, tmp, insert, load, objectify, equal) {
   var fs = require('fs'), strata;
   step(function () {
-    fs.writeFile(tmp + '/0', 'x_x\n', 'utf8', step());
+    fs.writeFile(tmp + '/0', '6 x_x\n', 'utf8', step());
   }, function () {
     strata = new Strata({ directory: tmp });
     strata.open(step());
@@ -12,7 +12,7 @@ require("./proof")(2, function (step, Strata, deepEqual, tmp, insert, load, obje
   }, function (_, error) {
     equal(error.message, 'corrupt line: could not find end of line header', 'cannot find header');
   }], function () {
-    fs.writeFile(tmp + '/0', '1 x 0\n', 'utf8', step());
+    fs.writeFile(tmp + '/0', '6 x 0\n', 'utf8', step());
   }, function () {
     strata = new Strata({ directory: tmp });
     strata.open(step());

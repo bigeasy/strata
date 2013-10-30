@@ -1121,11 +1121,15 @@ function Strata (options) {
     // single-byte characters have their leading bit unset. Therefore, `"\n"` is
     // unambiguous.
     function replay (slice, start) {
-      var stop = slice.length, offset = 0;
-      for (var i = offset, I = slice.length; i < I; i++) {
-        if (slice[i] == 0x0a) {
+      for (var offset = 0, i = 0, I = slice.length; i < I; i++) {
+        if (slice[i] == 0x20) {
+          var sip = slice.toString('utf8', offset, i);
+          length = parseInt(sip);
+          ok(String(length).length == sip.length, 'invalid length');
+          if (offset + length > slice.length) {
+            break;
+          }
           var position = start + offset;
-          var length = (i - offset) + 1;
           ok(length);
           var entry = readLine(slice.slice(offset, offset + length));
           ok(entry.shift() == ++page.entries, "entry count is off");
@@ -1156,7 +1160,7 @@ function Strata (options) {
               }
             }
           }
-          offset += length;
+          i = offset = offset + length;
         }
       }
 

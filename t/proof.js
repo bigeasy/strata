@@ -121,7 +121,7 @@ function serialize (segments, directory, callback) {
         record.unshift(crypto.createHash("sha1").update(record[0]).digest("hex"));
         record = record.join(" ");
 
-        var length = record.length;
+        var length = record.length + 1;
         var entire = length + String(length).length + 1;
         length = Math.max(entire, length + String(entire).length + 1);
 
