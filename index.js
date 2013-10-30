@@ -1156,7 +1156,7 @@ function Strata (options) {
             if (index > 0) {
               var address = entry.shift(), key = entry.shift();
               splice('addresses', page, index - 1, 0, address);
-              if (key !== null) {
+              if (index - 1) {
                 cacheKey(page, address, key);
               }
             } else {
