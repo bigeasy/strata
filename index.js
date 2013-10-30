@@ -313,7 +313,7 @@ function Strata (options) {
     case "none":
       return function () {
         return {
-          update: function () { return this },
+          update: function () {},
           digest: function () { return '0' }
         }
       }
@@ -397,11 +397,23 @@ function Strata (options) {
     for (var count = 2, i = 0, I = buffer.length; i < I && count; i++) {
       if (buffer[i] == 0x20) count--;
     }
+    for (count = 1; i < I && count; i++) {
+      if (buffer[i] == 0x20 || buffer[i] == 0x0a) count--;
+    }
     ok(!count, 'corrupt line: could not find end of line header');
-    var header = buffer.toString('utf8', 0, i - 1).split(' ');
-    var body = buffer.slice(i, buffer.length - 1);
-    ok(header[1] == "-" || checksum().update(body).digest("hex") == header[1], "corrupt line: invalid checksum");
-    return JSON.parse(body.toString());
+    var fields = buffer.toString('utf8', 0, i - 1).split(' ');
+    var hash = checksum();
+    hash.update(fields[2]);
+    if (buffer[i - 1] == 0x20) {
+      var body = buffer.slice(i, buffer.length - 1);
+      hash.update(body);
+    }
+    ok(fields[1] == "-" || hash.digest("hex") == fields[1], "corrupt line: invalid checksum");
+    var entry = JSON.parse(fields[2]);
+    if (buffer[i - 1] == 0x20) {
+      entry.push(JSON.parse(body.toString()));
+    }
+    return entry;
   }
 
   // Pages are identified by an integer page address. The page address is a
@@ -754,14 +766,26 @@ function Strata (options) {
 
     // Format the line with checksums.
     entry = options.header.slice();
-    if (options.body !== (void(0))) {
-      entry.push(options.body);
-    }
     json = JSON.stringify(entry);
-    line = checksum().update(json).digest("hex") + " " + json;
+    var hash = checksum();
+    hash.update(json);
 
     // Allocate a buffer and write the JSON and new line.
-    length = Buffer.byteLength(line, "utf8") + 1;
+    length = 0
+
+    var separator = "";
+    if (options.body != null) {
+      var stringified = JSON.stringify(options.body);
+      var body = new Buffer(Buffer.byteLength(stringified, 'utf8'));
+      body.write(stringified);
+      separator = " ";
+      length += body.length;
+      hash.update(body);
+    }
+
+    line = hash.digest("hex") + " " + json + separator;
+
+    length += Buffer.byteLength(line, "utf8") + 1;
 
     // Could use `Math.max`, but want the test coverage.
     var entire = length + String(length).length + 1;
@@ -773,6 +797,9 @@ function Strata (options) {
 
     buffer = new Buffer(length);
     buffer.write(String(length) + " " + line);
+    if (options.body != null) {
+      body.copy(buffer, buffer.length - 1 - body.length);
+    }
     buffer[length - 1] = 0x0A;
 
     if (options.type == "position") {

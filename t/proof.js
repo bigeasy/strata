@@ -34,8 +34,12 @@ function objectify (directory, callback) {
       lines = lines.split(/\n/);
       lines.pop();
       lines.forEach(function (line, index) {
-        var json = line.replace(/^\d+\s[\da-f]+\s/, "");
-        dir[file].push(JSON.parse(json));
+        var $ = /^\d+\s[\da-f]+\s(\S+)(?:\s(.*))?$/.exec(line);
+        var record = { header: JSON.parse($[1]) };
+        if ($[2]) {
+          record.body = JSON.parse($[2]);
+        }
+        dir[file].push(record);
         lengths[file][index] = line.length + 1;
       });
       read();
@@ -117,8 +121,15 @@ function serialize (segments, directory, callback) {
     files.forEach(function (file) {
       var records = [];
       dir[file].forEach(function (line) {
-        var record = [ JSON.stringify(line) ];
-        record.unshift(crypto.createHash("sha1").update(record[0]).digest("hex"));
+        var record = [ JSON.stringify(line.header) ];
+        var hash = crypto.createHash("sha1");
+        hash.update(record[0]);
+        if (line.body) {
+          var body = JSON.stringify(line.body);
+          hash.update(body);
+          record.push(body);
+        }
+        record.unshift(hash.digest("hex"));
         record = record.join(" ");
 
         var length = record.length + 1;
@@ -145,7 +156,8 @@ function abstracted (dir, lengths) {
     if (file % 2) {
       record = { log: [] };
       position = 0;
-      dir[file].forEach(function (json, index) {
+      dir[file].forEach(function (line, index) {
+        var json = line.header;
               //console.log(require('util').inspect(dir, false, null), json, bookmark);
         ok(index + 1 == json[0], 'entry record is wrong');
         var length = lengths[file][index];
@@ -161,7 +173,7 @@ function abstracted (dir, lengths) {
             }
           }
         } else if (json[1] > 0) {
-          record.log.push({ type: 'add', value: json[2] });
+          record.log.push({ type: 'add', value: line.body });
         } else {
           record.log.push({ type: 'del', index: Math.abs(json[1]) - 1 });
         }
@@ -170,10 +182,10 @@ function abstracted (dir, lengths) {
     } else {
       var children = [];
       dir[file].forEach(function (json, index) {
-        if (json[1] > 0) {
-          children.splice(json[1] - 1, 0, json[2]);
+        if (json.header[1] > 0) {
+          children.splice(json.header[1] - 1, 0, json.header[2]);
         } else {
-          children.splice(~json[1], 1);
+          children.splice(~json.header[1], 1);
         }
       })
       record = { children: children };
@@ -260,7 +272,7 @@ function directivize (json) {
     var object = json[address];
     if (object.children) {
       directory[address] = object.children.map(function (address, index) {
-        return [ index + 1, index + 1, address, index ? key(address) : null ];
+        return { header: [ index + 1, index + 1, address ], body: index ? key(address) : null };
       });
     } else {
       var ghosts = 0;
@@ -275,8 +287,8 @@ function directivize (json) {
         var index;
         switch (entry.type) {
         case 'pos':
-          record = [ count + 1, 0, 1, object.right || 0, ghosts ]
-          record = record.concat(positions).concat(lengths);
+          record = [ count + 1, 0, 1, object.right || 0, ghosts ];
+          record = { header: record.concat(positions).concat(lengths) };
           break;
         case 'add':
           records++;
@@ -287,14 +299,17 @@ function directivize (json) {
           }
           order.splice(index, 0, entry.value);
           positions.splice(index, 0, position);
-          record = [ count + 1, index + 1, entry.value ];
+          record = { header: [ count + 1, index + 1 ], body: entry.value };
           break;
         case 'del':
           records--;
-          record = [ count + 1, -(entry.index + 1) ];
+          record = { header: [ count + 1, -(entry.index + 1) ] };
           break;
         }
-        var length = JSON.stringify(record).length + 1 + checksum + 1;
+        var length = JSON.stringify(record.header).length + 1 + checksum + 1;
+        if (record.body != null) {
+          length += JSON.stringify(record.body).length + 1;
+        }
         var entire = length + String(length).length + 1;
         length = Math.max(entire, length + String(entire).length + 1);
         switch (entry.type) {
@@ -308,9 +323,9 @@ function directivize (json) {
         position += length;
         return record;
       })
-      directory[address].push([
+      directory[address].push({ header: [
         directory[address].length + 1, 0, 0, bookmark.position, bookmark.length, object.right, records, position
-      ])
+      ]})
     }
   }
 
