@@ -30,7 +30,7 @@ require("./proof")(7, function (serialize, tmp, equal, step, Strata, ok) {
     }, function (got) {
 
       equal(got, "a", "get");
-      equal(strata.size, 35, "json size after read");
+      equal(strata.size, 65, "json size after read");
 
       cursor.unlock();
 

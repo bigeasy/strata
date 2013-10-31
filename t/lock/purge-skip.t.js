@@ -18,9 +18,9 @@ require("./proof")(2, function (step, equal, Strata, tmp, serialize) {
 
   }, function (cursor) {
 
-    equal(strata.size, 62, 'before purge');
+    equal(strata.size, 92, 'before purge');
     strata.purge(0);
-    equal(strata.size, 39, 'after purge');
+    equal(strata.size, 69, 'after purge');
     cursor.unlock();
 
   }, function() {

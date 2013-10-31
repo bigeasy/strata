@@ -698,19 +698,23 @@ function Strata (options) {
   // object at the time of caching.
 
   //
-  function cacheRecord (page, position, record, key) {
-    // Assert that their is no record cached.
-    ok (!page.cache[position], 'record already cached for position');
-
-    // Extract the key if none was provided.
-    if (key == null) key = extractor(record);
+  function _cacheRecord (page, position, record, length) {
+    // Extract the key.
+    var key = extractor(record);
     ok(key != null, "null keys are forbidden");
 
     // Create a cache entry.
-    var entry = page.cache[position] = { record: record, key: key };
+    var entry = { record: record, key: key, size: length };
 
-    // Calculate the size.
-    entry.size = JSON.stringify(entry).length
+    // Add to cache.
+    return encacheEntry(page, position, entry);
+  }
+
+  function encacheEntry (page, reference, entry) {
+    // Assert that their is no record cached.
+    ok (!page.cache[reference], 'record already cached for position');
+
+    page.cache[reference] = entry;
 
     // Increment the page size and the size of the b&#x2011;tree.
     heft(page, entry.size);
@@ -721,12 +725,12 @@ function Strata (options) {
 
   // Delete a record from the leaf page cache. Deduct the cached JSON size of the
   // record entry from the size of the page and the size of b&#x2011;tree.
-  function uncacheRecord (page, position) {
-    var entry;
-    if (entry = page.cache[position]) {
-      heft(page, -entry.size);
-      delete page.cache[position];
-    }
+  function uncacheEntry (page, reference) {
+    var entry = page.cache[reference];
+    ok (entry, "entry not cached");
+    heft(page, -entry.size);
+    delete page.cache[reference];
+    return entry;
   }
 
   // ### Appends for Durability
@@ -1141,6 +1145,7 @@ function Strata (options) {
   function replay (fd, stat, read, page, position, callback) {
     var check = validator(callback)
       , leaf = !!(page.address % 2)
+      , seen = {}
       , buffer = new Buffer(options.readLeafStartLength || 1024);
 
     read(buffer, position, check(replay));
@@ -1169,14 +1174,16 @@ function Strata (options) {
           var index = header.shift();
           if (leaf) {
             if (index > 0) {
+              seen[position] = true;
               splice('positions', page, index - 1, 0, position);
               splice('lengths', page, index - 1, 0, length);
-              cacheRecord(page, position, entry.body/*, entry.length */);
+              _cacheRecord(page, position, entry.body, entry.length);
             } else if (~index == 0 && page.address != 1) {
               ok(!page.ghosts, "double ghosts");
               page.ghosts++;
             } else if (index < 0) {
-              uncacheRecord(page, splice('positions', page, -(index + 1), 1).shift());
+              var outgoing = splice('positions', page, -(index + 1), 1).shift()
+              if (seen[outgoing]) uncacheEntry(page, outgoing);
               splice('lengths', page, -(index + 1), 1);
             }
           } else {
@@ -1234,7 +1241,7 @@ function Strata (options) {
 
   //
   function readRecord (page, position, length, callback) {
-    var check = validator(callback), record;
+    var check = validator(callback), entry;
 
     if (page.position) positioned();
     else fs.stat(filename(page.address), check(stat));
@@ -1260,13 +1267,13 @@ function Strata (options) {
         ok(bytes == length, "incomplete read");
         ok(buffer[length - 1] == 0x0A, "newline expected");
         // todo: return entry, maybe rename read entry.
-        record = readLine(buffer).body;
+        entry = readLine(buffer);
         fs.close(fd, check(closed));
       }
     }
 
     function closed() {
-      callback(null, record);
+      callback(null, entry);
     }
   }
 
@@ -1318,22 +1325,22 @@ function Strata (options) {
 
     // Rewrite an object in the positions array.
     function rewrite () {
-      var position = positions.shift(), length = lengths.shift(), object;
+      var position = positions.shift(), length = lengths.shift(), entry;
 
       // Read the object from the current page.
       stash(page, position, length, check(stashed));
 
       // Uncache the object and write the record to the new file.
       function stashed ($) {
-        uncacheRecord(page, position);
-        writeInsert(fd, page, index++, (object = $).record, check(written));
+        uncacheEntry(page, position);
+        writeInsert(fd, page, index++, (entry = $).record, check(written));
       }
 
       // Append the position to the page and stash the position and object.
       function written (position, length) {
         splice('positions', page, page.positions.length, 0, position);
         splice('lengths', page, page.lengths.length, 0, length);
-        cache[position] = object;
+        cache[position] = entry;
         iterate();
       }
     }
@@ -1341,10 +1348,10 @@ function Strata (options) {
     // Cache the objects we've read from the existing page and write a positions
     // array entry.
     function append() {
-      var object;
+      var entry;
       for (var position in cache) {
-        object = cache[position];
-        cacheRecord(page, position, object.record, object.key);
+        entry = cache[position];
+        encacheEntry(page, position, entry);
       }
       writePositions(fd, page, check(close));
     }
@@ -2001,23 +2008,21 @@ function Strata (options) {
   //
   // TODO Throw? Who's catching these?
   function checkJSONSize (page) {
-    var size = 0, position, object;
+    var size = 0, position;
     if (page.address % 2) {
       if (page.positions.length) {
         size += JSON.stringify(page.positions).length;
         size += JSON.stringify(page.lengths).length;
       }
       for (position in page.cache) {
-        object = page.cache[position];
-        size += object.size
+        size += page.cache[position].size;
       }
     } else {
       if (page.addresses.length) {
         size += JSON.stringify(page.addresses).length;
       }
       for (position in page.cache) {
-        object = page.cache[position];
-        size += JSON.stringify(object).length
+        size += JSON.stringify(page.cache[position]).length
       }
     }
     ok(size == page.size, "sizes are wrong");
@@ -2133,10 +2138,10 @@ function Strata (options) {
     var stash;
     if (!(stash = page.cache[position])) {
       page.cache[position] = stash = [ callback ];
-      readRecord(page, position, length, function (error, record) {
+      readRecord(page, position, length, function (error, entry) {
         if (!error) {
           delete page.cache[position];
-          var entry = cacheRecord(page, position, record);
+          var entry = _cacheRecord(page, position, entry.body, entry.length);
         }
         stash.forEach(function (callback) {
           callback(error, entry);
@@ -3033,7 +3038,7 @@ function Strata (options) {
           // Insert the position into the page a cache the record.
           splice('positions', page, index, 0, position);
           splice('lengths', page, index, 0, lengths);
-          cacheRecord(page, position, record, key);
+          _cacheRecord(page, position, record, JSON.stringify(record).length);
 
           // Update the length of the current page.
           length = page.positions.length;
@@ -3076,7 +3081,7 @@ function Strata (options) {
           page.ghosts++;
           offset || offset++;
         } else {
-          uncacheRecord(page, page.positions[index]);
+          uncacheEntry(page, page.positions[index]);
           splice('positions', page, index, 1);
           splice('lengths', page, index, 1);
 // **FIXME**:          length = page.length
@@ -4086,12 +4091,12 @@ function Strata (options) {
 
         stash(split, index, check(uncache));
 
-        function uncache (object) {
-          uncacheRecord(split, position);
+        function uncache (entry) {
+          uncacheEntry(split, position);
           // Add it to our new page.
           splice('positions', page, page.positions.length, 0, position);
           splice('lengths', page, page.lengths.length, 0, split.lengths[index]);
-          cacheRecord(page, position, object.record, object.key);
+          encacheEntry(page, position, entry);
           index++;
           if (index < offset + length) copy();
           else copied();
@@ -4489,7 +4494,7 @@ function Strata (options) {
       ok(corporal.positions.length - corporal.ghosts > 0, "no replacement");
 
       // Remove the ghosted record from the references array and the record cache.
-      uncacheRecord(ghostly, splice('positions', ghostly, 0, 1).shift());
+      uncacheEntry(ghostly, splice('positions', ghostly, 0, 1).shift());
       splice('lengths', ghostly, 0, 1);
       ghostly.ghosts = 0;
 
@@ -4964,15 +4969,15 @@ function Strata (options) {
 
         // Append a record fetched from the right leaf page to the left leaf
         // page.
-        function copy (object) {
+        function copy (entry) {
           // Uncache the record from the right leaf page.
-          uncacheRecord(leaves.right.page, position);
+          uncacheEntry(leaves.right.page, position);
 
           // Add it to our new page. The negative positions and lengths are
           // temporary. We'll get real file positions when we rewrite.
           splice('positions', leaves.left.page, leaves.left.page.positions.length, 0, -(position + 1));
           splice('lengths', leaves.left.page, leaves.left.page.lengths.length, 0, -(position + 1));
-          cacheRecord(leaves.left.page, -(position + 1), object.record, object.key);
+          encacheEntry(leaves.left.page, -(position + 1), entry);
 
           if (++index < leaves.right.page.positions.length) fetch();
           else rewriteLeftLeaf();
