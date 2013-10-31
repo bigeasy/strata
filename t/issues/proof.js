@@ -1,1 +1,1 @@
-module.exports = require("../proof")(__dirname);
+module.exports = require('../proof')(__dirname)

@@ -1,50 +1,50 @@
 #!/usr/bin/env node
 
-var fs = require("fs"), strata;
-require("./proof")(5, function (Strata, equal, deepEqual, say, tmp, step, ok, load, objectify) {
-  step(function () {
+var fs = require('fs'), strata
+require('./proof')(5, function (Strata, equal, deepEqual, say, tmp, step, ok, load, objectify) {
+    step(function () {
 
-    fs.writeFile(tmp + '/.ignore', '', 'utf8', step());
+        fs.writeFile(tmp + '/.ignore', '', 'utf8', step())
 
-  }, function () {
+    }, function () {
 
-    strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 });
-    strata.create(step());
+        strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
+        strata.create(step())
 
-  }, function () {
+    }, function () {
 
-    equal(strata.size, 3, "json size");
-    strata.close(step());
+        equal(strata.size, 3, 'json size')
+        strata.close(step())
 
-  }, function () {
+    }, function () {
 
-    ok(1, "created");
-    objectify(tmp, step());
-    load(__dirname + "/fixtures/create.after.json", step());
+        ok(1, 'created')
+        objectify(tmp, step())
+        load(__dirname + '/fixtures/create.after.json', step())
 
-  }, function (actual, expected) {
+    }, function (actual, expected) {
 
-    say(actual);
-    say(expected);
+        say(actual)
+        say(expected)
 
-    deepEqual(actual, expected, "written");
+        deepEqual(actual, expected, 'written')
 
-    strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 });
-    strata.open(step());
+        strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
+        strata.open(step())
 
-  }, function () {
+    }, function () {
 
-    strata.iterator("a", step());
+        strata.iterator('a', step())
 
-  }, function (cursor) {
+    }, function (cursor) {
 
-    equal(cursor.length - cursor.offset, 0, "empty");
+        equal(cursor.length - cursor.offset, 0, 'empty')
 
-    cursor.unlock()
+        cursor.unlock()
 
-    strata.purge(0);
-    equal(strata.size, 0, "purged");
+        strata.purge(0)
+        equal(strata.size, 0, 'purged')
 
-    strata.close(step());
-  });
-});
+        strata.close(step())
+    })
+})

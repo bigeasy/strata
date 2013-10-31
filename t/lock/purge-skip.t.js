@@ -1,32 +1,32 @@
 #!/usr/bin/env node
 
-require("./proof")(2, function (step, equal, Strata, tmp, serialize) {
-  var strata;
+require('./proof')(2, function (step, equal, Strata, tmp, serialize) {
+    var strata
 
-  step(function () {
+    step(function () {
 
-    serialize(__dirname + '/fixtures/tree.before.json', tmp, step());
+        serialize(__dirname + '/fixtures/tree.before.json', tmp, step())
 
-  }, function () {
+    }, function () {
 
-    strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 });
-    strata.open(step());
+        strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
+        strata.open(step())
 
-  }, function () {
+    }, function () {
 
-    strata.mutator('h', step());
+        strata.mutator('h', step())
 
-  }, function (cursor) {
+    }, function (cursor) {
 
-    equal(strata.size, 92, 'before purge');
-    strata.purge(0);
-    equal(strata.size, 69, 'after purge');
-    cursor.unlock();
+        equal(strata.size, 92, 'before purge')
+        strata.purge(0)
+        equal(strata.size, 69, 'after purge')
+        cursor.unlock()
 
-  }, function() {
+    }, function() {
 
-    strata.close(step());
+        strata.close(step())
 
-  });
-});
+    })
+})
 

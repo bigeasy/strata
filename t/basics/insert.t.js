@@ -1,52 +1,52 @@
 #!/usr/bin/env node
 
-require("./proof")(4, function (step, tmp, Strata, ok, equal, load, objectify, say, deepEqual) {
-  var fs = require("fs"), strata;
-
-  step(function () {
-
-    strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 });
-    strata.create(step());
-
-  }, function () {
-
-    strata.mutator("a", step());
-
-  }, function (cursor) {
+require('./proof')(4, function (step, tmp, Strata, ok, equal, load, objectify, say, deepEqual) {
+    var fs = require('fs'), strata
 
     step(function () {
 
-      cursor.insert("a", "a", ~ cursor.index, step());
+        strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
+        strata.create(step())
 
-    }, function (inserted) {
+    }, function () {
 
-      equal(inserted, 0, "inserted");
+        strata.mutator('a', step())
 
-      cursor.unlock()
+    }, function (cursor) {
 
-      equal(strata.size, 14, "json size");
+        step(function () {
 
-      strata.close(step());
+            cursor.insert('a', 'a', ~ cursor.index, step())
 
-    });
+        }, function (inserted) {
 
-  }, function () {
+            equal(inserted, 0, 'inserted')
 
-    objectify(tmp, step());
-    load(__dirname + "/fixtures/insert.json", step());
+            cursor.unlock()
 
-  }, function (actual, expected) {
+            equal(strata.size, 14, 'json size')
 
-    say(expected);
-    say(actual);
+            strata.close(step())
 
-    deepEqual(actual, expected, "insert");
+        })
 
-    say(expected.segment00000001);
+    }, function () {
 
-    strata.purge(0);
-    deepEqual(strata.size, 0, "purged");
+        objectify(tmp, step())
+        load(__dirname + '/fixtures/insert.json', step())
 
-    strata.close(step());
-  });
-});
+    }, function (actual, expected) {
+
+        say(expected)
+        say(actual)
+
+        deepEqual(actual, expected, 'insert')
+
+        say(expected.segment00000001)
+
+        strata.purge(0)
+        deepEqual(strata.size, 0, 'purged')
+
+        strata.close(step())
+    })
+})
