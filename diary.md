@@ -124,6 +124,20 @@ the value of my plain text file format, it has not receeded as Strata has
 progressed. It is always reassuring, when things are working as poorly, when a
 test won't pass and won't to open these files and have a look.
 
+## Records and Keys
+
+I'd imagined to use Strata to create a database that stores objects and the keys
+would be defined from within those objects. There would be a means of
+serializing these objects that works for both keys and records.
+
+With key/value stores, the key is not within the object, so the interface needs
+to amalgamate the key and value.
+
+This is confusing and I've thought about it before. It is a trade off and there
+is no obvious way in which the complexity can be reduced. If you extract the
+key, you need to find some way to serialize it once again, immediately, to get
+the length of the key, in order to have a value for the heft of the page.
+
 ## Compression
 
 First, this morning, I'm thinking compression and I'm thinking, no I'd rather
