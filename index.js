@@ -1981,7 +1981,7 @@ function Strata (options) {
     // If there were no locks outstanding, then it could be the case that page
     // has not been loaded. Note that, if there were locks outstanding, then the
     // page is already loaded, so we do not have to invoke load now or later.
-    locks = page.locks
+    locks = page.locks;
     if (exclusive) {
       locks.push([ callback ]);
       locks.push([]);
