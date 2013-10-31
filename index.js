@@ -1694,23 +1694,7 @@ function Strata (options) {
     io('read', filename(page.address), check(opened));
 
     function opened (fd, stat, read) {
-      replay(fd, stat, read, page, 0, check(loadKeys));
-
-      function loadKeys (page) {
-        var index = 1;
-
-        if (page.addresses.length > 1) _designate(page, index, check(loadKey));
-        else callback(null, page);
-
-        function loadKey (key) {
-          ok(key == page.cache[page.addresses[index]], 'key matches');
-          if (++index < page.addresses.length) {
-            _designate(page, index, check(loadKey));
-          } else {
-            callback(null, page);
-          }
-        }
-      }
+      replay(fd, stat, read, page, 0, callback);
     }
   }
 
@@ -2161,52 +2145,10 @@ function Strata (options) {
   // look it up, because its cache entry for the key will be `null`.
   //
   // But, don't use a `null` key. Create a pseudo-duplicate `null` instead.
+  //
+  // TODO: Nice note. Move it somewhere.
 
-  // Get the key for the record in the case of a leaf page, or the key of the
-  // branch child page in the case of a branch page. Because this method
-  // operates on both branch pages and leaf pages, our binary search operates on
-  // both branch pages and leaf pages.
-  function _designate (page, index, callback) {
-    var key;
-    if (page.address % 2) {
-      stash(page, index, validate(callback, function (entry) {
-        callback(null, entry.key);
-      }));
-    } else if ((key = page.cache[page.addresses[index]]) === (void(0))) {
-      var iter = page
-        , iterIndex = index
-        , stack = []
-        ;
-
-      next();
-
-      function next () {
-        var key;
-        if (!(iter.address % 2)) {
-          lock(iter.addresses[iterIndex], false, validate(callback, function (locked) {
-            iterIndex = 0;
-            stack.push(iter = locked);
-            next();
-          }));
-        } else {
-          if (iter.address == -1) {
-            designated(null);
-          } else {
-            stash(iter, iterIndex, validate(callback, function (entry) {
-              designated(entry.key);
-            }));
-          }
-        }
-      }
-
-      function designated (key) {
-        stack.forEach(function (page) { unlock(page) });
-        callback(null, key);
-      }
-    } else {
-      callback(null, key);
-    }
-  }
+  //
 
   function unwind (callback) {
     var vargs = __slice.call(arguments, 1);
