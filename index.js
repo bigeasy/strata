@@ -117,7 +117,7 @@ function Strata (options) {
         }
     }
 
-    function readLine (buffer, isKey) {
+    function readEntry (buffer, isKey) {
         for (var count = 2, i = 0, I = buffer.length; i < I && count; i++) {
             if (buffer[i] == 0x20) count--
         }
@@ -250,7 +250,7 @@ function Strata (options) {
         return entry
     }
 
-    function writeJSON (options, callback) {
+    function writeEntry (options, callback) {
         var check = validator(callback),
             offset = 0,
             entry,
@@ -331,12 +331,12 @@ function Strata (options) {
 
     function writeInsert (fd, page, index, record, callback) {
         var header = [ ++page.entries, index + 1 ]
-        writeJSON({ fd: fd, page: page, header: header, body: record }, callback)
+        writeEntry({ fd: fd, page: page, header: header, body: record }, callback)
     }
 
     function writeDelete (fd, page, index, callback) {
         var header = [ ++page.entries, -(index + 1) ]
-        writeJSON({ fd: fd, page: page, header: header }, callback)
+        writeEntry({ fd: fd, page: page, header: header }, callback)
     }
 
     function io (direction, filename, callback) {
@@ -372,7 +372,7 @@ function Strata (options) {
     function writePositions (fd, page, callback) {
         var header = [ ++page.entries, 0, 1, page.right, page.ghosts ]
         header = header.concat(page.positions).concat(page.lengths)
-        writeJSON({ fd: fd, page: page, header: header, type: 'position' }, callback)
+        writeEntry({ fd: fd, page: page, header: header, type: 'position' }, callback)
     }
 
     function writeFooter (fd, page, callback) {
@@ -381,7 +381,7 @@ function Strata (options) {
             ++page.entries, 0, 0, page.bookmark.position, page.bookmark.length,
             page.right || 0, page.positions.length - page.ghosts, page.position
         ]
-        writeJSON({ fd: fd, page: page, header: header, type: 'footer' }, validate(callback, function (position, length) {
+        writeEntry({ fd: fd, page: page, header: header, type: 'footer' }, validate(callback, function (position, length) {
             page.position = header[7]
             page.entries--
             callback(null, position, length)
@@ -403,7 +403,7 @@ function Strata (options) {
             function footer (slice) {
                 for (var i = slice.length - 2; i != -1; i--) {
                     if (slice[i] == 0x0a) {
-                        var footer = readLine(slice.slice(i + 1)).header
+                        var footer = readEntry(slice.slice(i + 1)).header
                         bookmark = { position: footer[3], length: footer[4] }
                         page.position = footer[7]
                         ok(page.position != null, 'no page position')
@@ -415,7 +415,7 @@ function Strata (options) {
             }
 
             function positioned (slice) {
-                var positions = readLine(slice.slice(0, bookmark.length)).header
+                var positions = readEntry(slice.slice(0, bookmark.length)).header
 
                 page.entries = positions.shift()
                 ok(positions.shift() == 0, 'expected housekeeping type')
@@ -460,7 +460,7 @@ function Strata (options) {
                     }
                     var position = start + offset
                     ok(length)
-                    var entry = readLine(slice.slice(offset, offset + length), !leaf)
+                    var entry = readEntry(slice.slice(offset, offset + length), !leaf)
                     var header = entry.header
                     ok(header.shift() == ++page.entries, 'entry count is off')
                     var index = header.shift()
@@ -538,7 +538,7 @@ function Strata (options) {
             function json (bytes, buffer) {
                 ok(bytes == length, 'incomplete read')
                 ok(buffer[length - 1] == 0x0A, 'newline expected')
-                entry = readLine(buffer, false)
+                entry = readEntry(buffer, false)
                 fs.close(fd, check(closed))
             }
         }
@@ -682,7 +682,7 @@ function Strata (options) {
                     var key = page.entries ? getKey(page.cache[address]) : null
                     page.entries++
                     var header = [ page.entries, page.entries, address ]
-                    writeJSON({ fd: fd, page: page, header: header, body: key, isKey: true }, check(write))
+                    writeEntry({ fd: fd, page: page, header: header, body: key, isKey: true }, check(write))
                 } else {
                     fs.close(fd, check(closed))
                 }
