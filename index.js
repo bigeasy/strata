@@ -646,15 +646,11 @@ function Strata (options) {
     }
 
     function cacheKey (page, address, key) {
-        ok(page.cache[address] === (void(0)), 'key already cached')
-        heft(page, JSON.stringify(key).length)
-        page.cache[address] = key
+        return encacheEntry(page, address, { key: key, size: JSON.stringify(key).length });
     }
 
     function uncacheKey (page, address) {
-        ok(page.cache[address] !== (void(0)), 'key not cached')
-        heft(page, -JSON.stringify(page.cache[address]).length)
-        delete page.cache[address]
+        return uncacheEntry(page, address);
     }
 
     function writeBranch (page, suffix, callback) {
@@ -1635,11 +1631,11 @@ function Strata (options) {
 
                 splice('addresses', parent.page, parent.index + 1, 0, page.address)
 
-                cacheKey(parent.page, page.address, split.cache[cut[0]])
+                cacheKey(parent.page, page.address, getKey(split.cache[cut[0]]))
 
                 var keys = {}
                 cut.forEach(function (address) {
-                    keys[address] = split.cache[address]
+                    keys[address] = getKey(split.cache[address])
                     uncacheKey(split, address)
                 })
 
@@ -1716,7 +1712,7 @@ function Strata (options) {
                 var cut = splice('addresses', root, offset, length)
 
                 cut.slice(offset ? 0 : 1).forEach(function (address) {
-                    keys[address] = root.cache[address]
+                    keys[address] = getKey(root.cache[address])
                     uncacheKey(root, address)
                 })
 
@@ -1957,7 +1953,7 @@ function Strata (options) {
                     designation = ancestor.cache[ancestor.addresses[index]]
                     uncacheKey(ancestor, ancestor.addresses[0])
                     uncacheKey(pivot.page, pivot.page.addresses[pivot.index])
-                    cacheKey(pivot.page, pivot.page.addresses[pivot.index], designation)
+                    cacheKey(pivot.page, pivot.page.addresses[pivot.index], getKey(designation))
                 } else{
                     ok(index, 'expected ancestor to be non-zero')
                     uncacheKey(ancestor, address)
@@ -2018,7 +2014,7 @@ function Strata (options) {
                         callback(null)
                     }
                 } else {
-                    chooseBranchesToMerge(designation, ancestor.address, callback)
+                    chooseBranchesToMerge(getKey(designation), ancestor.address, callback)
                 }
             }
         }
@@ -2318,7 +2314,7 @@ function Strata (options) {
 
             function branch (page) {
                 pages[index].children = page.addresses.map(record)
-                if (index) designated(parent.cache[parent.addresses[index]])
+                if (index) designated(getKey(parent.cache[parent.addresses[index]]))
                 else keyed()
 
                 function designated (key) {
@@ -2375,7 +2371,8 @@ function Strata (options) {
     }
 
     function getKey (entry) {
-        return entry;
+        ok(entry.key);
+        return entry.key;
     }
 
     return classify.call(this, create, open,
