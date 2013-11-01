@@ -21,6 +21,11 @@
                         "email":  "chrite.demarius@gmail.com",
                         "web":    "https://github.com/demarius"
     }],
+    "dependencies":
+    {
+                        "magazine": "0.0.0",
+                        "sequester": "0.0.1"
+    },
     "devDependencies":
     {
                         "proof": "0.0.36"
