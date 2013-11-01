@@ -646,11 +646,11 @@ function Strata (options) {
     }
 
     function cacheKey (page, address, key) {
-        return encacheEntry(page, address, { key: key, size: JSON.stringify(key).length });
+        return encacheEntry(page, address, { key: key, size: JSON.stringify(key).length })
     }
 
     function uncacheKey (page, address) {
-        return uncacheEntry(page, address);
+        return uncacheEntry(page, address)
     }
 
     function writeBranch (page, suffix, callback) {
@@ -2368,8 +2368,8 @@ function Strata (options) {
     }
 
     function getKey (entry) {
-        ok(entry.key);
-        return entry.key;
+        ok(entry.key)
+        return entry.key
     }
 
     return classify.call(this, create, open,
