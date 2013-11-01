@@ -784,7 +784,7 @@ function Strata (options) {
         }
     }
 
-    function checkJSONSize (page) {
+    function checkCacheSize (page) {
         var size = 0, position
         if (page.address % 2) {
             if (page.positions.length) {
@@ -811,7 +811,7 @@ function Strata (options) {
                     if (error) {
                         page.load.length = 0
                     } else {
-                        checkJSONSize(page)
+                        checkCacheSize(page)
                         delete page.load
                     }
                     load.forEach(function (callback) {
@@ -825,13 +825,13 @@ function Strata (options) {
                 }
             }
         } else {
-            checkJSONSize(page)
+            checkCacheSize(page)
             callback(null, page)
         }
     }
 
     function unlock (page) {
-        checkJSONSize(page)
+        checkCacheSize(page)
         var locks = page.locks
         locks[0].shift()
         while (locks[0].length == 0 && locks.length != 1) {
