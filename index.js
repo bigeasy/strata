@@ -124,17 +124,18 @@ function Strata (options) {
         }
         ok(!count, 'corrupt line: could not find end of line header')
         var fields = buffer.toString('utf8', 0, i - 1).split(' ')
-        var hash = checksum()
+        var hash = checksum(), body, length
         hash.update(fields[2])
         if (buffer[i - 1] == 0x20) {
-            var body = buffer.slice(i, buffer.length - 1)
+            body = buffer.slice(i, buffer.length - 1)
+            length = body.length
             hash.update(body)
         }
         ok(fields[1] == '-' || hash.digest('hex') == fields[1], 'corrupt line: invalid checksum')
         if (buffer[i - 1] == 0x20) {
             body = JSON.parse(body.toString())
         }
-        return { length: +(fields[0]), header: JSON.parse(fields[2]), body: body }
+        return { length: length, header: JSON.parse(fields[2]), body: body }
     }
 
     function filename (address, suffix) {
