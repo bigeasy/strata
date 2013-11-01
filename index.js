@@ -135,7 +135,9 @@ function Strata (options) {
         if (buffer[i - 1] == 0x20) {
             body = JSON.parse(body.toString())
         }
-        return { length: length, header: JSON.parse(fields[2]), body: body }
+        var entry = { length: length, header: JSON.parse(fields[2]), body: body }
+        ok(entry.header.every(function (n) { return typeof n == 'number' }), 'header values must be numbers')
+        return entry
     }
 
     function filename (address, suffix) {
@@ -257,6 +259,7 @@ function Strata (options) {
             length
 
         ok(options.page.position != null, 'page has not been positioned: ' + options.page.position)
+        ok(options.header.every(function (n) { return typeof n == 'number' }), 'header values must be numbers')
 
         if (options.type == 'position') {
             options.page.bookmark = { position: options.page.position }
