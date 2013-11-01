@@ -676,7 +676,7 @@ function Strata (options) {
             function write () {
                 if (addresses.length) {
                     var address = addresses.shift()
-                    var key = page.entries ? page.cache[address] : null
+                    var key = page.entries ? getKey(page.cache[address]) : null
                     page.entries++
                     var header = [ page.entries, page.entries, address ]
                     writeJSON({ fd: fd, page: page, header: header, body: key }, check(write))
@@ -803,7 +803,7 @@ function Strata (options) {
                 size += JSON.stringify(page.addresses).length
             }
             for (position in page.cache) {
-                size += JSON.stringify(page.cache[position]).length
+                size += JSON.stringify(getKey(page.cache[position])).length
             }
         }
         ok(size == page.size, 'sizes are wrong')
@@ -895,7 +895,7 @@ function Strata (options) {
                 if (page.address % 2) {
                     stash(page, mid, check(function (entry) { compare(entry.key) }))
                 } else {
-                    compare(page.cache[page.addresses[mid]])
+                    compare(getKey(page.cache[page.addresses[mid]]))
                 }
             } else {
                 unwind(callback, null, ~low)
@@ -979,7 +979,7 @@ function Strata (options) {
         function found (keys) {
             return function () {
                 return page.addresses[0] != 0 && index != 0 && keys.some(function (key) {
-                    return comparator(page.cache[page.addresses[index]],  key) == 0
+                    return comparator(getKey(page.cache[page.addresses[index]]),  key) == 0
                 })
             }
         }
@@ -1845,7 +1845,7 @@ function Strata (options) {
             pivot.descend(pivot.key(key), pivot.found(keys), check(lockPivot))
 
             function lockPivot () {
-                var found = pivot.page.cache[pivot.page.addresses[pivot.index]]
+                var found = getKey(pivot.page.cache[pivot.page.addresses[pivot.index]])
                 if (comparator(found, keys[0]) == 0) {
                     pivot.upgrade(check(atPivot))
                 } else {
@@ -2176,7 +2176,7 @@ function Strata (options) {
 
                 var keys = {}
                 cut.slice(1).forEach(function (address) {
-                    keys[address] = pages.right.page.cache[address]
+                    keys[address] = getKey(pages.right.page.cache[address])
                     uncacheKey(pages.right.page, address)
                 })
 
@@ -2220,7 +2220,7 @@ function Strata (options) {
 
                 var keys = {}
                 cut.slice(1).forEach(function (address) {
-                    keys[address] = child.page.cache[address]
+                    keys[address] = getKey(child.page.cache[address])
                     uncacheKey(child.page, address)
                 })
 
@@ -2372,6 +2372,10 @@ function Strata (options) {
                 iterator = page
             }
         }
+    }
+
+    function getKey (entry) {
+        return entry;
     }
 
     return classify.call(this, create, open,
