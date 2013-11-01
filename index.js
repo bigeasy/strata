@@ -1632,8 +1632,7 @@ function Strata (options) {
 
                 var keys = {}
                 cut.forEach(function (address) {
-                    keys[address] = getKey(split.cache[address])
-                    uncacheKey(split, address)
+                    keys[address] = getKey(uncacheKey(split, address))
                 })
 
                 splice('addresses', page, 0, 0, cut)
@@ -1709,8 +1708,7 @@ function Strata (options) {
                 var cut = splice('addresses', root, offset, length)
 
                 cut.slice(offset ? 0 : 1).forEach(function (address) {
-                    keys[address] = getKey(root.cache[address])
-                    uncacheKey(root, address)
+                    keys[address] = getKey(uncacheKey(root, address))
                 })
 
                 splice('addresses', page, 0, 0, cut)
@@ -1794,7 +1792,7 @@ function Strata (options) {
             }
 
             function rekey (entry) {
-                uncacheKey(pivot.page, pivot.page.addresses[pivot.index], entry.key)
+                uncacheKey(pivot.page, pivot.page.addresses[pivot.index])
                 cacheKey(pivot.page, pivot.page.addresses[pivot.index], entry.key)
                 callback(null, ghostly.key = entry.key)
             }
@@ -2169,8 +2167,7 @@ function Strata (options) {
 
                 var keys = {}
                 cut.slice(1).forEach(function (address) {
-                    keys[address] = getKey(pages.right.page.cache[address])
-                    uncacheKey(pages.right.page, address)
+                    keys[address] = getKey(uncacheKey(pages.right.page, address))
                 })
 
                 splice('addresses', pages.left.page, pages.left.page.addresses.length, 0, cut)
@@ -2213,8 +2210,7 @@ function Strata (options) {
 
                 var keys = {}
                 cut.slice(1).forEach(function (address) {
-                    keys[address] = getKey(child.page.cache[address])
-                    uncacheKey(child.page, address)
+                    keys[address] = getKey(uncacheKey(child.page, address))
                 })
 
                 splice('addresses', root.page, root.page.addresses.length, 0, cut)
