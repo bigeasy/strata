@@ -791,16 +791,13 @@ function Strata (options) {
                 size += JSON.stringify(page.positions).length
                 size += JSON.stringify(page.lengths).length
             }
-            for (position in page.cache) {
-                size += page.cache[position].size
-            }
         } else {
             if (page.addresses.length) {
                 size += JSON.stringify(page.addresses).length
             }
-            for (position in page.cache) {
-                size += JSON.stringify(getKey(page.cache[position])).length
-            }
+        }
+        for (position in page.cache) {
+            size += page.cache[position].size
         }
         ok(size == page.size, 'sizes are wrong')
     }
