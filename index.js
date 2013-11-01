@@ -478,7 +478,7 @@ function Strata (options) {
                             var address = header.shift()
                             splice('addresses', page, index - 1, 0, address)
                             if (index - 1) {
-                                cacheKey(page, address, entry.body, entry.length)
+                                encacheKey(page, address, entry.body, entry.length)
                             }
                         } else {
                             var cut = splice('addresses', page, ~index, 1)
@@ -651,7 +651,7 @@ function Strata (options) {
         return removals
     }
 
-    function cacheKey (page, address, key, length) {
+    function encacheKey (page, address, key, length) {
         return encacheEntry(page, address, { key: key, size: length })
     }
 
@@ -1532,7 +1532,7 @@ function Strata (options) {
 
                 var entry = page.cache[page.positions[0]]
 
-                cacheKey(penultimate.page, page.address, entry.key, entry.keySize)
+                encacheKey(penultimate.page, page.address, entry.key, entry.keySize)
 
                 replacements.push(page)
                 uncached.push(page)
@@ -1795,7 +1795,7 @@ function Strata (options) {
 
             function rekey (entry) {
                 uncacheEntry(pivot.page, pivot.page.addresses[pivot.index])
-                cacheKey(pivot.page, pivot.page.addresses[pivot.index], entry.key, entry.keySize)
+                encacheKey(pivot.page, pivot.page.addresses[pivot.index], entry.key, entry.keySize)
                 callback(null, ghostly.key = entry.key)
             }
         }
@@ -2177,7 +2177,7 @@ function Strata (options) {
                     encacheEntry(pages.left.page, address, keys[address])
                 })
                 ok(cut.length, 'cut is zero length')
-                cacheKey(pages.left.page, cut[0], key, keySize)
+                encacheKey(pages.left.page, cut[0], key, keySize)
 
                 writeBranch(pages.left.page, '.replace', validate(callback, resume))
 
