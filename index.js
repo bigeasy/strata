@@ -1161,7 +1161,6 @@ function Strata (options) {
                 function written (position, length, size) {
                     splice('positions', page, index, 0, position)
                     splice('lengths', page, index, 0, length)
-                    console.log(length, size);
                     _cacheRecord(page, position, record, size)
 
                     length = page.positions.length
