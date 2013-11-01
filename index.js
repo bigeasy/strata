@@ -1683,6 +1683,7 @@ function Strata (options) {
             }
 
             function cleanup() {
+                children.forEach(function (page) { encache(page) })
                 descents.forEach(function (descent) { unlock(descent.page) })
 
                 shouldSplitBranch(parent.page, key, callback)
