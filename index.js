@@ -117,7 +117,7 @@ function Strata (options) {
         }
     }
 
-    function readLine (buffer) {
+    function readLine (buffer, isKey) {
         for (var count = 2, i = 0, I = buffer.length; i < I && count; i++) {
             if (buffer[i] == 0x20) count--
         }
@@ -135,7 +135,7 @@ function Strata (options) {
         }
         ok(fields[1] == '-' || hash.digest('hex') == fields[1], 'corrupt line: invalid checksum')
         if (buffer[i - 1] == 0x20) {
-            body = deserialize(body.toString())
+            body = deserialize(body.toString(), isKey)
         }
         var entry = { length: length, header: JSON.parse(fields[2]), body: body }
         ok(entry.header.every(function (n) { return typeof n == 'number' }), 'header values must be numbers')
@@ -226,7 +226,7 @@ function Strata (options) {
             record: record,
             size: length,
             key: key,
-            keySize: serialize(key).length
+            keySize: serialize(key, true).length
         }
 
         return encacheEntry(page, position, entry)
@@ -276,7 +276,7 @@ function Strata (options) {
 
         var separator = ''
         if (options.body != null) {
-            var body = serialize(options.body)
+            var body = serialize(options.body, options.isKey)
             separator = ' '
             length += body.length
             hash.update(body)
@@ -460,7 +460,7 @@ function Strata (options) {
                     }
                     var position = start + offset
                     ok(length)
-                    var entry = readLine(slice.slice(offset, offset + length))
+                    var entry = readLine(slice.slice(offset, offset + length), !leaf)
                     var header = entry.header
                     ok(header.shift() == ++page.entries, 'entry count is off')
                     var index = header.shift()
@@ -538,7 +538,7 @@ function Strata (options) {
             function json (bytes, buffer) {
                 ok(bytes == length, 'incomplete read')
                 ok(buffer[length - 1] == 0x0A, 'newline expected')
-                entry = readLine(buffer)
+                entry = readLine(buffer, false)
                 fs.close(fd, check(closed))
             }
         }
@@ -682,7 +682,7 @@ function Strata (options) {
                     var key = page.entries ? getKey(page.cache[address]) : null
                     page.entries++
                     var header = [ page.entries, page.entries, address ]
-                    writeJSON({ fd: fd, page: page, header: header, body: key }, check(write))
+                    writeJSON({ fd: fd, page: page, header: header, body: key, isKey: true }, check(write))
                 } else {
                     fs.close(fd, check(closed))
                 }
