@@ -1535,9 +1535,9 @@ function Strata (options) {
                 splice('positions', split, offset, length)
                 splice('lengths', split, offset, length)
 
-                page.key = page.cache[page.positions[0]].key
+                var key = page.cache[page.positions[0]].key
 
-                cacheKey(penultimate.page, page.address, page.key)
+                cacheKey(penultimate.page, page.address, key)
 
                 replacements.push(page)
                 uncached.push(page)
