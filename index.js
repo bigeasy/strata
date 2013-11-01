@@ -44,6 +44,8 @@ function Strata (options) {
         size = 0,
         checksum,
         constructors = {},
+        serialize = options.serialize || function (object) { return new Buffer(JSON.stringify(object)) },
+        deserialize = options.deserialize || function (buffer) { return JSON.parse(buffer.toString()) },
         tracer = options.tracer || function () { arguments[2]() }
 
     checksum = (function () {
@@ -133,7 +135,7 @@ function Strata (options) {
         }
         ok(fields[1] == '-' || hash.digest('hex') == fields[1], 'corrupt line: invalid checksum')
         if (buffer[i - 1] == 0x20) {
-            body = JSON.parse(body.toString())
+            body = deserialize(body.toString())
         }
         var entry = { length: length, header: JSON.parse(fields[2]), body: body }
         ok(entry.header.every(function (n) { return typeof n == 'number' }), 'header values must be numbers')
@@ -224,7 +226,7 @@ function Strata (options) {
             record: record,
             size: length,
             key: key,
-            keySize: JSON.stringify(key).length
+            keySize: serialize(key).length
         }
 
         return encacheEntry(page, position, entry)
@@ -274,9 +276,7 @@ function Strata (options) {
 
         var separator = ''
         if (options.body != null) {
-            var stringified = JSON.stringify(options.body)
-            var body = new Buffer(Buffer.byteLength(stringified, 'utf8'))
-            body.write(stringified)
+            var body = serialize(options.body)
             separator = ' '
             length += body.length
             hash.update(body)
