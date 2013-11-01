@@ -1624,17 +1624,17 @@ function Strata (options) {
 
                 splice('addresses', parent.page, parent.index + 1, 0, page.address)
 
-                cacheKey(parent.page, page.address, getKey(split.cache[cut[0]]))
+                encacheEntry(parent.page, page.address, split.cache[cut[0]])
 
                 var keys = {}
                 cut.forEach(function (address) {
-                    keys[address] = getKey(uncacheEntry(split, address))
+                    keys[address] = uncacheEntry(split, address)
                 })
 
                 splice('addresses', page, 0, 0, cut)
 
                 cut.slice(1).forEach(function (address) {
-                    cacheKey(page, address, keys[address])
+                    encacheEntry(page, address, keys[address])
                 })
 
                 if (--pages > 1) paginate()
@@ -1704,13 +1704,13 @@ function Strata (options) {
                 var cut = splice('addresses', root, offset, length)
 
                 cut.slice(offset ? 0 : 1).forEach(function (address) {
-                    keys[address] = getKey(uncacheEntry(root, address))
+                    keys[address] = uncacheEntry(root, address)
                 })
 
                 splice('addresses', page, 0, 0, cut)
 
                 cut.slice(1).forEach(function (address) {
-                    cacheKey(page, address, keys[address])
+                    encacheEntry(page, address, keys[address])
                 })
 
                 keys[page.address] = keys[cut[0]]
@@ -1725,7 +1725,7 @@ function Strata (options) {
                 splice('addresses', root, 0, 0, children.map(function (page) { return page.address }))
 
                 root.addresses.slice(1).forEach(function (address) {
-                    cacheKey(root, address, keys[address])
+                    encacheEntry(root, address, keys[address])
                 })
 
                 children.forEach(function (page) { writeBranch(page, '.replace', check(childWritten)) })
@@ -1944,7 +1944,7 @@ function Strata (options) {
                     designation = ancestor.cache[ancestor.addresses[index]]
                     uncacheEntry(ancestor, ancestor.addresses[0])
                     uncacheEntry(pivot.page, pivot.page.addresses[pivot.index])
-                    cacheKey(pivot.page, pivot.page.addresses[pivot.index], getKey(designation))
+                    encacheEntry(pivot.page, pivot.page.addresses[pivot.index], designation)
                 } else{
                     ok(index, 'expected ancestor to be non-zero')
                     uncacheEntry(ancestor, address)
@@ -2163,12 +2163,12 @@ function Strata (options) {
 
                 var keys = {}
                 cut.slice(1).forEach(function (address) {
-                    keys[address] = getKey(uncacheEntry(pages.right.page, address))
+                    keys[address] = uncacheEntry(pages.right.page, address)
                 })
 
                 splice('addresses', pages.left.page, pages.left.page.addresses.length, 0, cut)
                 cut.slice(1).forEach(function (address) {
-                    cacheKey(pages.left.page, address, keys[address])
+                    encacheEntry(pages.left.page, address, keys[address])
                 })
                 ok(cut.length, 'cut is zero length')
                 cacheKey(pages.left.page, cut[0], key)
@@ -2206,12 +2206,12 @@ function Strata (options) {
 
                 var keys = {}
                 cut.slice(1).forEach(function (address) {
-                    keys[address] = getKey(uncacheEntry(child.page, address))
+                    keys[address] = uncacheEntry(child.page, address)
                 })
 
                 splice('addresses', root.page, root.page.addresses.length, 0, cut)
                 cut.slice(1).forEach(function  (address) {
-                    cacheKey(root.page, address, keys[address])
+                    encacheEntry(root.page, address, keys[address])
                 })
 
                 writeBranch(root.page, '.pending', check(rewriteChild))
