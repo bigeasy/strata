@@ -197,8 +197,8 @@ function abstracted (dir, lengths) {
 
 function renumber (json) {
     var addresses = Object.keys(json)
-                                                .map(function (address) { return + address })
-                                                .sort(function (a, b) { return +(a) - +(b) })
+                          .map(function (address) { return + address })
+                          .sort(function (a, b) { return +(a) - +(b) })
 
     var next = 0
     var map = {}
@@ -385,16 +385,17 @@ module.exports = function (dirname) {
         step(function () {
             fs.mkdir(tmp, 0755, step())
         }, function () {
-            return { Strata: Strata
-                          , tmp: tmp
-                          , load: load
-                          , stringify: stringify
-                          , insert: insert
-                          , serialize: serialize
-                          , gather: gather
-                          , objectify: objectify
-                          , script: script
-                          }
+            return {
+                Strata: Strata,
+                tmp: tmp,
+                load: load,
+                stringify: stringify,
+                insert: insert,
+                serialize: serialize,
+                gather: gather,
+                objectify: objectify,
+                script: script
+            }
         })
     })
 }
@@ -632,5 +633,3 @@ function script (options, callback) {
 module.exports.stringify = stringify
 module.exports.serialize = serialize
 module.exports.script = script
-
-/* vim: set sw=2 ts=2: */
