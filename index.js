@@ -319,7 +319,9 @@ function Strata (options) {
                 if (!(options.page.address % 2) || options.type == 'footer') {
                     callback(null, position, length)
                 } else {
-                    writeFooter(options.fd, options.page, function () { callback(null, position, length) })
+                    writeFooter(options.fd, options.page, function () {
+                        callback(null, position, length, body && body.length)
+                    })
                 }
             } else {
                 send()
@@ -1156,10 +1158,11 @@ function Strata (options) {
                     writeInsert(fd = $, page, index, record, check(written))
                 }
 
-                function written (position, lengths) {
+                function written (position, length, size) {
                     splice('positions', page, index, 0, position)
-                    splice('lengths', page, index, 0, lengths)
-                    _cacheRecord(page, position, record, JSON.stringify(record).length)
+                    splice('lengths', page, index, 0, length)
+                    console.log(length, size);
+                    _cacheRecord(page, position, record, size)
 
                     length = page.positions.length
                     fs.close(fd, check(close))
