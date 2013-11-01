@@ -218,7 +218,12 @@ function Strata (options) {
         var key = extractor(record)
         ok(key != null, 'null keys are forbidden')
 
-        var entry = { record: record, key: key, size: length }
+        var entry = {
+            record: record,
+            size: length,
+            key: key,
+            keySize: JSON.stringify(key).length
+        }
 
         return encacheEntry(page, position, entry)
     }
@@ -473,7 +478,7 @@ function Strata (options) {
                             var address = header.shift()
                             splice('addresses', page, index - 1, 0, address)
                             if (index - 1) {
-                                cacheKey(page, address, entry.body)
+                                cacheKey(page, address, entry.body, entry.length)
                             }
                         } else {
                             var cut = splice('addresses', page, ~index, 1)
@@ -646,8 +651,8 @@ function Strata (options) {
         return removals
     }
 
-    function cacheKey (page, address, key) {
-        return encacheEntry(page, address, { key: key, size: JSON.stringify(key).length })
+    function cacheKey (page, address, key, length) {
+        return encacheEntry(page, address, { key: key, size: length })
     }
 
     function writeBranch (page, suffix, callback) {
@@ -1525,9 +1530,9 @@ function Strata (options) {
                 splice('positions', split, offset, length)
                 splice('lengths', split, offset, length)
 
-                var key = page.cache[page.positions[0]].key
+                var entry = page.cache[page.positions[0]]
 
-                cacheKey(penultimate.page, page.address, key)
+                cacheKey(penultimate.page, page.address, entry.key, entry.keySize)
 
                 replacements.push(page)
                 uncached.push(page)
@@ -1790,7 +1795,7 @@ function Strata (options) {
 
             function rekey (entry) {
                 uncacheEntry(pivot.page, pivot.page.addresses[pivot.index])
-                cacheKey(pivot.page, pivot.page.addresses[pivot.index], entry.key)
+                cacheKey(pivot.page, pivot.page.addresses[pivot.index], entry.key, entry.keySize)
                 callback(null, ghostly.key = entry.key)
             }
         }
@@ -2143,7 +2148,7 @@ function Strata (options) {
 
                 function propagate (entry) {
                     release()
-                    mergeBranches(entry.key, choice.page.address, callback)
+                    mergeBranches(entry.key, entry.keySize, choice.page.address, callback)
                 }
             }
 
@@ -2152,7 +2157,7 @@ function Strata (options) {
             }
         }
 
-        function mergeBranches (key, address, callback) {
+        function mergeBranches (key, keySize, address, callback) {
             function stopper (descent) {
                 return descent.child(address)
             }
@@ -2172,7 +2177,7 @@ function Strata (options) {
                     encacheEntry(pages.left.page, address, keys[address])
                 })
                 ok(cut.length, 'cut is zero length')
-                cacheKey(pages.left.page, cut[0], key)
+                cacheKey(pages.left.page, cut[0], key, keySize)
 
                 writeBranch(pages.left.page, '.replace', validate(callback, resume))
 
