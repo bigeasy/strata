@@ -187,7 +187,7 @@ function Strata (options) {
         }
         var page = {
             cache: {},
-            loading: {},
+            loaders: {},
             entries: 0,
             ghosts: 0,
             positions: [],
@@ -829,13 +829,13 @@ function Strata (options) {
         }
         ok(length)
         var entry, sequester
-        if (sequester = page.loading[position]) {
+        if (sequester = page.loaders[position]) {
             sequester.share(callback)
         } else if (!(entry = page.cache[position])) {
-            sequester = page.loading[position] = new Sequester
+            sequester = page.loaders[position] = new Sequester
             sequester.exclude(function () {
                 readRecord(page, position, length, function (error, entry) {
-                    delete page.loading[position]
+                    delete page.loaders[position]
                     if (!error) {
                         delete page.cache[position]
                         var entry = _cacheRecord(page, position, entry.body, entry.length)
