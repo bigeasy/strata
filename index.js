@@ -174,6 +174,12 @@ function Strata (options) {
         magazine.get(page.address).adjustHeft(s)
     }
 
+    function createLoader (page) {
+        var sequester = new Sequester
+        sequester.exclude(function () { sequester.unlock(null, page) })
+        return sequester
+    }
+
     function createLeaf (override) {
         if (override.address == null) {
             while (!(nextAddress % 2)) nextAddress++
@@ -187,6 +193,9 @@ function Strata (options) {
             lengths: [],
             right: 0,
             sequester: new Sequester
+        }
+        if (override.loader == null) {
+            override.loader = createLoader(page)
         }
         return extend(page, override)
     }
@@ -603,6 +612,9 @@ function Strata (options) {
             penultimate: true,
             sequester: new Sequester
         }
+        if (override.loader == null) {
+            override.loader = createLoader(page)
+        }
         return extend(page, override)
     }
     constructors.branch = createBranch
@@ -764,10 +776,20 @@ function Strata (options) {
         var page, creator, locks
 
         var page = magazine.hold(address, function () {
-            return constructors[address % 2 ? 'leaf' : 'branch']({ address: address, load: [] })
+            var sequester = new Sequester
+            var page = constructors[address % 2 ? 'leaf' : 'branch']({ address: address, loader: sequester })
+            sequester.exclude(function () {
+                var loaded = sequester.unlock.bind(sequester)
+                if (page.address % 2) {
+                    readLeaf(page, loaded)
+                } else {
+                    readBranch(page, loaded)
+                }
+            })
+            return page
         }).value
 
-        page.sequester[exclusive ? 'exclude' : 'share'](function () { load(page, callback) })
+        page.sequester[exclusive ? 'exclude' : 'share'](function () { page.loader.share(callback) })
     }
 
     function checkCacheSize (page) {
@@ -819,6 +841,7 @@ function Strata (options) {
     function unlock (page) {
         checkCacheSize(page)
         page.sequester.unlock()
+        page.loader.unlock()
         magazine.get(page.address).release()
     }
 
