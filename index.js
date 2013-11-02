@@ -174,18 +174,8 @@ function Strata (options) {
         magazine.get(page.address).adjustHeft(s)
     }
 
-    function createLoader (page) {
-        var sequester = new Sequester
-        sequester.exclude(function () { sequester.unlock(null, page) })
-        return sequester
-    }
-
     function createLeaf (override) {
-        if (override.address == null) {
-            while (!(nextAddress % 2)) nextAddress++
-            override.address = nextAddress++
-        }
-        var page = {
+        return createPage({
             cache: {},
             loaders: {},
             entries: 0,
@@ -194,11 +184,7 @@ function Strata (options) {
             lengths: [],
             right: 0,
             sequester: new Sequester
-        }
-        if (override.loader == null) {
-            override.loader = createLoader(page)
-        }
-        return extend(page, override)
+        }, override, 0)
     }
 
     constructors.leaf = createLeaf
@@ -601,22 +587,25 @@ function Strata (options) {
         }
     }
 
-    function createBranch (override) {
+    function createPage (page, override, remainder) {
         if (override.address == null) {
-            while (nextAddress % 2) nextAddress++
+            while ((nextAddress % 2) == remainder) nextAddress++
             override.address = nextAddress++
         }
-        var page = {
+        if (override.loader == null) {
+            override.loader = new Sequester(null, page)
+        }
+        return extend(page, override)
+    }
+
+    function createBranch (override) {
+        return createPage({
             addresses: [],
             cache: {},
             entries: 0,
             penultimate: true,
             sequester: new Sequester
-        }
-        if (override.loader == null) {
-            override.loader = createLoader(page)
-        }
-        return extend(page, override)
+        }, override, 1)
     }
     constructors.branch = createBranch
 
