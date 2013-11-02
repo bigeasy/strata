@@ -179,15 +179,13 @@ function Strata (options) {
             override.address = nextAddress++
         }
         var page = {
-            address: -1,
             cache: {},
             entries: 0,
             locks: [[]],
             ghosts: 0,
             positions: [],
             lengths: [],
-            right: 0,
-            size: 0
+            right: 0
         }
         return extend(page, override)
     }
@@ -598,13 +596,11 @@ function Strata (options) {
             override.address = nextAddress++
         }
         var page = {
-            address: -1,
             addresses: [],
             cache: {},
             locks: [[]],
             penultimate: true,
-            entries: 0,
-            size: 0
+            entries: 0
         }
         return extend(page, override)
     }
