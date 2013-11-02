@@ -787,7 +787,6 @@ function Strata (options) {
     }
 
     function checkCacheSize (page) {
-        return
         var size = 0, position
         if (page.address % 2) {
             if (page.positions.length) {
@@ -802,7 +801,7 @@ function Strata (options) {
         for (position in page.cache) {
             size += page.cache[position].size
         }
-        ok(size == page.size, 'sizes are wrong')
+        ok(size == magazine.get(page.address)._heft, 'sizes are wrong')
     }
 
     function load (page, callback) {
