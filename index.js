@@ -29,7 +29,8 @@ function classify () {
 }
 
 function Strata (options) {
-    var directory = options.directory,
+    var Sequester = options.sequester || require('sequester'),
+        directory = options.directory,
         extractor = options.extractor || extract,
         comparator = options.comparator || compare,
         fs = options.fs || require('fs'),
@@ -181,11 +182,11 @@ function Strata (options) {
         var page = {
             cache: {},
             entries: 0,
-            locks: [[]],
             ghosts: 0,
             positions: [],
             lengths: [],
-            right: 0
+            right: 0,
+            sequester: new Sequester
         }
         return extend(page, override)
     }
@@ -598,9 +599,9 @@ function Strata (options) {
         var page = {
             addresses: [],
             cache: {},
-            locks: [[]],
+            entries: 0,
             penultimate: true,
-            entries: 0
+            sequester: new Sequester
         }
         return extend(page, override)
     }
@@ -766,20 +767,7 @@ function Strata (options) {
             return constructors[address % 2 ? 'leaf' : 'branch']({ address: address, load: [] })
         }).value
 
-        locks = page.locks
-        if (exclusive) {
-            locks.push([ callback ])
-            locks.push([])
-            if (locks[0].length == 0) {
-                locks.shift()
-                load(page, callback)
-            }
-        } else {
-            locks[locks.length - 1].push(callback)
-            if (locks.length == 1) {
-                load(page, callback)
-            }
-        }
+        page.sequester[exclusive ? 'exclude' : 'share'](function () { load(page, callback) })
     }
 
     function checkCacheSize (page) {
@@ -830,14 +818,7 @@ function Strata (options) {
 
     function unlock (page) {
         checkCacheSize(page)
-        var locks = page.locks
-        locks[0].shift()
-        while (locks[0].length == 0 && locks.length != 1) {
-            locks.shift()
-            locks[0].slice().forEach(function (callback) {
-                unwind(callback, null, page)
-            })
-        }
+        page.sequester.unlock()
         magazine.get(page.address).release()
     }
 
