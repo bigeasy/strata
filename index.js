@@ -187,6 +187,7 @@ function Strata (options) {
         }
         var page = {
             cache: {},
+            loading: {},
             entries: 0,
             ghosts: 0,
             positions: [],
@@ -827,22 +828,24 @@ function Strata (options) {
             length = page.lengths[positionOrIndex]
         }
         ok(length)
-        var stash
-        if (!(stash = page.cache[position])) {
-            page.cache[position] = stash = [ callback ]
-            readRecord(page, position, length, function (error, entry) {
-                if (!error) {
-                    delete page.cache[position]
-                    var entry = _cacheRecord(page, position, entry.body, entry.length)
-                }
-                stash.forEach(function (callback) {
-                    callback(error, entry)
+        var entry, sequester
+        if (sequester = page.loading[position]) {
+            sequester.share(callback)
+        } else if (!(entry = page.cache[position])) {
+            sequester = page.loading[position] = new Sequester
+            sequester.exclude(function () {
+                readRecord(page, position, length, function (error, entry) {
+                    delete page.loading[position]
+                    if (!error) {
+                        delete page.cache[position]
+                        var entry = _cacheRecord(page, position, entry.body, entry.length)
+                    }
+                    sequester.unlock(error, entry)
                 })
             })
-        } else if (Array.isArray(stash)) {
-            stash.push(callback)
+            stash(page, position, length, callback)
         } else {
-            callback(null, stash)
+            callback(null, entry)
         }
     }
 
