@@ -810,34 +810,6 @@ function Strata (options) {
         ok(size == magazine.get(page.address)._heft, 'sizes are wrong')
     }
 
-    function load (page, callback) {
-        if (page.load) {
-            page.load.push(callback)
-            if (page.load.length == 1) {
-                function loaded (error) {
-                    var load = page.load.slice()
-                    if (error) {
-                        page.load.length = 0
-                    } else {
-                        checkCacheSize(page)
-                        delete page.load
-                    }
-                    load.forEach(function (callback) {
-                        unwind(callback, error, page)
-                    })
-                }
-                if (page.address % 2) {
-                    readLeaf(page, loaded)
-                } else {
-                    readBranch(page, loaded)
-                }
-            }
-        } else {
-            checkCacheSize(page)
-            callback(null, page)
-        }
-    }
-
     function unlock (page) {
         checkCacheSize(page)
         page.sequester.unlock()
