@@ -8,9 +8,9 @@ require('./proof')(4, function (step, ok, equal, Strata, tmp, deepEqual,
         switch (type) {
         case 'reference':
             if (++count == 2) {
-                ok(report().cache.length > 2, 'unpurged')
+                ok(strata.size > 2, 'unpurged')
                 strata.purge(0)
-                equal(0, report().cache.length, 'purged')
+                equal(strata.size, 0, 'purged')
             }
             callback()
             break
@@ -49,6 +49,9 @@ require('./proof')(4, function (step, ok, equal, Strata, tmp, deepEqual,
         }, function (index) {
 
             cursor.remove(index, step())
+
+        }, function () {
+
             cursor.unlock()
 
         })
@@ -73,6 +76,9 @@ require('./proof')(4, function (step, ok, equal, Strata, tmp, deepEqual,
         }, function (index) {
 
             cursor.remove(index, step())
+
+        }, function () {
+
             cursor.unlock()
 
         })

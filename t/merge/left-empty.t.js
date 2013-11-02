@@ -17,6 +17,7 @@ require('./proof')(3, function (step, Strata, tmp, deepEqual, serialize, gather,
             cursor.indexOf('b', step())
         }, function (index) {
             cursor.remove(index, step())
+        }, function () {
             cursor.unlock()
         })
     }, function () {

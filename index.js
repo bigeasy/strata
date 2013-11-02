@@ -35,8 +35,8 @@ function Strata (options) {
         fs = options.fs || require('fs'),
         path = options.path || require('path'),
         ok = function (condition, message) { if (!condition) throw new Error(message) },
-        cache = {},
-        mru = { address: null },
+        cache = options.cache || (new (require('magazine'))),
+        magazine,
         nextAddress = 0,
         length = 1024,
         balancer = new Balancer(),
@@ -103,17 +103,14 @@ function Strata (options) {
         }
     }
 
-    function _size () { return size }
+    function _size () { return magazine.heft }
 
     function _nextAddress () { return nextAddress }
-
-    mru.next = mru.previous = mru
 
     function report () {
         return {
             size: size,
-            nextAddress: nextAddress,
-            cache: Object.keys(cache)
+            nextAddress: nextAddress
         }
     }
 
@@ -172,25 +169,8 @@ function Strata (options) {
         fs.unlink(filename(page.address, suffix), callback)
     }
 
-    function link (head, entry) {
-        var next = head.next
-        entry.next = next
-        next.previous = entry
-        head.next = entry
-        entry.previous = head
-        return entry
-    }
-
-    function _unlink (entry) {
-        var next = entry.next, previous = entry.previous
-        next.previous = previous
-        previous.next = next
-        return entry
-    }
-
     function heft (page, s) {
-        page.size += s
-        size += s
+        magazine.get(page.address).adjustHeft(s)
     }
 
     function createLeaf (override) {
@@ -215,7 +195,13 @@ function Strata (options) {
     constructors.leaf = createLeaf
 
     function encache (page) {
-        return cache[page.address] = link(mru, page)
+        return magazine.hold(page.address, page).value
+    }
+
+    function release () {
+        __slice.call(arguments).forEach(function (page) {
+            magazine.get(page.address).release()
+        })
     }
 
     function _cacheRecord (page, position, record, length) {
@@ -706,7 +692,9 @@ function Strata (options) {
     function create (callback) {
         var root, leaf, check = validator(callback), count = 0
 
-        stat()
+        magazine = cache.createMagazine()
+
+        stat() // todo: unnecessary
 
         function stat () {
             fs.stat(directory, check(extant))
@@ -737,12 +725,17 @@ function Strata (options) {
         }
 
         function replaced() {
-            if (--count == 0) toUserLand(callback)
+            if (--count == 0) {
+                release(root, leaf)
+                toUserLand(callback)
+            }
         }
     }
 
     function open (callback) {
         var check = validator(callback)
+
+        magazine = cache.createMagazine()
 
         fs.stat(directory, check(stat))
 
@@ -761,6 +754,10 @@ function Strata (options) {
     }
 
     function close (callback) {
+        magazine.purge(0)
+
+        ok(!magazine.heft, 'pages still held by cache')
+
         thrownByUser = null
 
         toUserLand(callback, null)
@@ -769,11 +766,9 @@ function Strata (options) {
     function lock (address, exclusive, callback) {
         var page, creator, locks
 
-        if (page = cache[address]) {
-            link(mru, _unlink(page))
-        } else {
-            page = encache(constructors[address % 2 ? 'leaf' : 'branch']({ address: address, load: [] }))
-        }
+        var page = magazine.hold(address, function () {
+            return constructors[address % 2 ? 'leaf' : 'branch']({ address: address, load: [] })
+        }).value
 
         locks = page.locks
         if (exclusive) {
@@ -792,6 +787,7 @@ function Strata (options) {
     }
 
     function checkCacheSize (page) {
+        return
         var size = 0, position
         if (page.address % 2) {
             if (page.positions.length) {
@@ -847,6 +843,7 @@ function Strata (options) {
                 unwind(callback, null, page)
             })
         }
+        magazine.get(page.address).release()
     }
 
     var _unlock = unlock
@@ -1258,7 +1255,7 @@ function Strata (options) {
                         else stash(page, 0, check(identified))
                         function identified (entry) {
                             node = { key: entry.key,
-                                              address: page.address,
+                                              address: page.address, // todo
                                               rightAddress: page.right,
                                               length: page.positions.length - page.ghosts }
                             unlock(page)
@@ -1442,7 +1439,7 @@ function Strata (options) {
             var check = validator(callback),
                 descents = [],
                 replacements = [],
-                uncached = [],
+                encached = [],
                 completed = 0,
                 penultimate, leaf, split, pages, page,
                 records, remainder, right, index, offset, length
@@ -1499,7 +1496,8 @@ function Strata (options) {
             }
 
             function shuffle () {
-                page = createLeaf({ loaded: true })
+                page = encache(createLeaf({ loaded: true }))
+                encached.push(page)
 
                 page.right = right
                 right = page.address
@@ -1540,7 +1538,6 @@ function Strata (options) {
                 encacheKey(penultimate.page, page.address, entry.key, entry.keySize)
 
                 replacements.push(page)
-                uncached.push(page)
 
                 rewriteLeaf(page, '.replace', check(replaced))
             }
@@ -1571,7 +1568,7 @@ function Strata (options) {
 
             function complete (callback) {
                 if (++completed == replacements.length) {
-                    uncached.forEach(function (page) { encache(page) } )
+                    release.apply(null, encached)
 
                     replace(penultimate.page, '.commit', check(rebalance))
                 }
@@ -1595,6 +1592,7 @@ function Strata (options) {
             var check = validator(callback),
                 descents = [],
                 children = [],
+                encached = [],
                 parent, full, split, pages,
                 records, remainder, offset
 
@@ -1624,9 +1622,10 @@ function Strata (options) {
             }
 
             function paginate () {
-                var page = createBranch({})
+                var page = encache(createBranch({}))
 
                 children.push(page)
+                encached.push(page)
 
                 var length = remainder-- > 0 ? records + 1 : records
                 var offset = split.addresses.length - length
@@ -1683,7 +1682,7 @@ function Strata (options) {
             }
 
             function cleanup() {
-                children.forEach(function (page) { encache(page) })
+                release.apply(null, encached)
                 descents.forEach(function (descent) { unlock(descent.page) })
 
                 shouldSplitBranch(parent.page, key, callback)
@@ -1706,7 +1705,7 @@ function Strata (options) {
             }
 
             function paginate () {
-                var page = createBranch({})
+                var page = encache(createBranch({}))
 
                 children.push(page)
 
@@ -1768,7 +1767,7 @@ function Strata (options) {
             }
 
             function rootCommitted () {
-                children.forEach(function (page) { encache(page) })
+                release.apply(null, children)
                 unlock(root)
                 if (root.addresses.length > options.branchSize) drainRoot(callback)
                 else callback(null)
@@ -1889,7 +1888,7 @@ function Strata (options) {
                 parents.left.index--
                 parents.left.unlocker = createSingleUnlocker(singles.left)
                 parents.left.descend(parents.left.right,
-                                                          parents.left.level(parents.right.depth),
+                                                          parents.left.level(parents.right.depth), // todo
                                                           check(atLeftParent))
             }
 
@@ -1912,7 +1911,7 @@ function Strata (options) {
                     }
                 }
 
-                if (parents.left.page.address != pivot.page.address) {
+                if (parents.left.page.address != pivot.page.address && !singles.left.length) {
                     descents.push(parents.left)
                 }
 
@@ -1975,7 +1974,7 @@ function Strata (options) {
             }
 
             function beginCommit () {
-
+// todo
                 empties = singles.right.slice()
                 rename(ancestor, '.pending', '.commit', check(unlinkEmpties))
             }
@@ -2356,20 +2355,7 @@ function Strata (options) {
         }
     }
 
-    function purge (downTo) {
-        downTo = Math.max(downTo, 0)
-        var page, iterator = mru
-        while (size > downTo && iterator.previous !== mru) {
-            page = iterator.previous
-            if (page.locks.length == 1 && page.locks[0].length == 0) {
-                size -= page.size
-                delete cache[page.address]
-                _unlink(page)
-            } else {
-                iterator = page
-            }
-        }
-    }
+    function purge (downTo) { magazine.purge(downTo) }
 
     function getKey (entry) {
         ok(entry.key)

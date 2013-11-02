@@ -19,6 +19,7 @@ require('./proof')(3, function (step, Strata, tmp, deepEqual, serialize, gather,
             cursor.indexOf('i', step())
         }, function (index) {
             cursor.remove(index, step())
+        }, function () {
             cursor.unlock()
         })
     }, function () {
@@ -32,6 +33,7 @@ require('./proof')(3, function (step, Strata, tmp, deepEqual, serialize, gather,
             cursor.indexOf('g', step())
         }, function (index) {
             cursor.remove(index, step())
+        }, function () {
             cursor.unlock()
         })
     }, function () {
@@ -45,6 +47,7 @@ require('./proof')(3, function (step, Strata, tmp, deepEqual, serialize, gather,
             cursor.indexOf('n', step())
         }, function (index) {
             cursor.remove(index, step())
+        }, function () {
             cursor.unlock()
         })
     }, function () {

@@ -18,7 +18,6 @@ require('./proof')(4, function (step, Strata, tmp, deepEqual, serialize, gather,
         }, function (index) {
             cursor.insert('b', 'b', ~index, step())
         }, function (unambiguous) {
-            cursor.unlock()
             equal(unambiguous, 0, 'unambiguous')
             cursor.indexOf('c', step())
         }, function (index) {
