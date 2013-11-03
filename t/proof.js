@@ -85,7 +85,7 @@ function gather (step, strata) {
     var records = [], page, item
     step(function () {
         records = []
-        strata.iterator(step())
+        strata.iterator(strata.left, step())
     }, function (cursor) {
         step(function (more) {
             if (!more) {

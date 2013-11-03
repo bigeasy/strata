@@ -2212,6 +2212,8 @@ function Strata (options) {
         return classify.call(this, balance, unbalanced)
     }
 
+    function left (descent) { return descent.left }
+
     function cursor (key, exclusive, callback) {
         var sought, descent, check = validator(callback)
 
@@ -2219,7 +2221,7 @@ function Strata (options) {
 
         descent = new Descent()
 
-        sought = key.length ? descent.key(key[0]) : descent.left
+        sought = (typeof key == 'function') ? key(descent) : descent.key(key)
 
         descent.descend(sought, descent.penultimate, check(penultimate))
 
@@ -2233,14 +2235,12 @@ function Strata (options) {
         }
     }
 
-    function iterator () {
-        var splat = __slice.call(arguments, 0)
-        cursor(splat, false, splat.pop())
+    function iterator (key, callback) {
+        cursor(key, false, callback)
     }
 
-    function mutator () {
-        var splat = __slice.call(arguments, 0)
-        cursor(splat, true, splat.pop())
+    function mutator (key, callback) {
+        cursor(key, true, callback)
     }
 
     function balance (callback) {
@@ -2329,6 +2329,7 @@ function Strata (options) {
                                iterator, mutator,
                                balance, purge, vivify,
                                close,
+                               left,
                                _size, _nextAddress)
 }
 
