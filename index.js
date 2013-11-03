@@ -351,7 +351,7 @@ function Strata (options) {
     }
 
     function writePositions (fd, page, callback) {
-        var header = [ ++page.entries, 0, 1, page.right, page.ghosts ]
+        var header = [ ++page.entries, 0, page.right, page.ghosts ]
         header = header.concat(page.positions).concat(page.lengths)
         writeEntry({ fd: fd, page: page, header: header, type: 'position' }, callback)
     }
@@ -359,12 +359,11 @@ function Strata (options) {
     function writeFooter (fd, page, callback) {
         ok(page.address % 2 && page.bookmark != null)
         var header = [
-            ++page.entries, 0, 0, page.bookmark.position, page.bookmark.length,
-            page.right || 0, page.positions.length - page.ghosts, page.position
+            0, page.bookmark.position, page.bookmark.length,
+            page.ghosts, page.right || 0, page.position, page.positions.length - page.ghosts
         ]
         writeEntry({ fd: fd, page: page, header: header, type: 'footer' }, validate(callback, function (position, length) {
-            page.position = header[7]
-            page.entries--
+            page.position = header[5]
             callback(null, position, length)
         }))
     }
@@ -385,8 +384,11 @@ function Strata (options) {
                 for (var i = slice.length - 2; i != -1; i--) {
                     if (slice[i] == 0x0a) {
                         var footer = readEntry(slice.slice(i + 1)).header
-                        bookmark = { position: footer[3], length: footer[4] }
-                        page.position = footer[7]
+                        ok(!footer.shift(), 'footer is supposed to be zero')
+                        bookmark = { position: footer.shift(), length: footer.shift() }
+                        page.ghosts = footer.shift()
+                        page.right = footer.shift()
+                        page.position = footer.shift()
                         ok(page.position != null, 'no page position')
                         read(new Buffer(bookmark.length), bookmark.position, check(positioned))
                         return
@@ -400,7 +402,6 @@ function Strata (options) {
 
                 page.entries = positions.shift()
                 ok(positions.shift() == 0, 'expected housekeeping type')
-                ok(positions.shift() == 1, 'expected position type')
                 page.right = positions.shift()
                 page.ghosts = positions.shift()
 
@@ -417,7 +418,6 @@ function Strata (options) {
         }
 
         function done () {
-            page.entries--
             callback(null, page)
         }
     }
@@ -426,12 +426,14 @@ function Strata (options) {
         var check = validator(callback),
             leaf = !!(page.address % 2),
             seen = {},
-            buffer = new Buffer(options.readLeafStartLength || 1024)
+            buffer = new Buffer(options.readLeafStartLength || 1024),
+            footer
 
         read(buffer, position, check(replay))
 
         function replay (slice, start) {
             for (var offset = 0, i = 0, I = slice.length; i < I; i++) {
+                ok(!footer, 'data beyond footer')
                 if (slice[i] == 0x20) {
                     var sip = slice.toString('utf8', offset, i)
                     length = parseInt(sip)
@@ -443,35 +445,39 @@ function Strata (options) {
                     ok(length)
                     var entry = readEntry(slice.slice(offset, offset + length), !leaf)
                     var header = entry.header
-                    ok(header.shift() == ++page.entries, 'entry count is off')
-                    var index = header.shift()
-                    if (leaf) {
-                        if (index > 0) {
-                            seen[position] = true
-                            splice('positions', page, index - 1, 0, position)
-                            splice('lengths', page, index - 1, 0, length)
-                            _cacheRecord(page, position, entry.body, entry.length)
-                        } else if (~index == 0 && page.address != 1) {
-                            ok(!page.ghosts, 'double ghosts')
-                            page.ghosts++
-                        } else if (index < 0) {
-                            var outgoing = splice('positions', page, -(index + 1), 1).shift()
-                            if (seen[outgoing]) uncacheEntry(page, outgoing)
-                            splice('lengths', page, -(index + 1), 1)
-                        }
-                    } else {
-                        if (index > 0) {
-                            var address = header.shift()
-                            splice('addresses', page, index - 1, 0, address)
-                            if (index - 1) {
-                                encacheKey(page, address, entry.body, entry.length)
+                    if (header[0]) {
+                        ok(header.shift() == ++page.entries, 'entry count is off')
+                        var index = header.shift()
+                        if (leaf) {
+                            if (index > 0) {
+                                seen[position] = true
+                                splice('positions', page, index - 1, 0, position)
+                                splice('lengths', page, index - 1, 0, length)
+                                _cacheRecord(page, position, entry.body, entry.length)
+                            } else if (~index == 0 && page.address != 1) {
+                                ok(!page.ghosts, 'double ghosts')
+                                page.ghosts++
+                            } else if (index < 0) {
+                                var outgoing = splice('positions', page, -(index + 1), 1).shift()
+                                if (seen[outgoing]) uncacheEntry(page, outgoing)
+                                splice('lengths', page, -(index + 1), 1)
                             }
                         } else {
-                            var cut = splice('addresses', page, ~index, 1)
-                            if (~index) {
-                                uncacheEntry(page, cut[0])
+                            if (index > 0) {
+                                var address = header.shift()
+                                splice('addresses', page, index - 1, 0, address)
+                                if (index - 1) {
+                                    encacheKey(page, address, entry.body, entry.length)
+                                }
+                            } else {
+                                var cut = splice('addresses', page, ~index, 1)
+                                if (~index) {
+                                    uncacheEntry(page, cut[0])
+                                }
                             }
                         }
+                    } else {
+                        footer = entry.header
                     }
                     i = offset = offset + length
                 }
@@ -490,7 +496,7 @@ function Strata (options) {
         }
 
         function closed () {
-            callback(null, page)
+            callback(null, page, footer)
         }
     }
 

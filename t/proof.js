@@ -157,26 +157,27 @@ function abstracted (dir, lengths) {
             position = 0
             dir[file].forEach(function (line, index) {
                 var json = line.header
-                            //console.log(require('util').inspect(dir, false, null), json, bookmark)
-                ok(index + 1 == json[0], 'entry record is wrong')
-                var length = lengths[file][index]
-                if (json[1] == 0) {
-                    if (json[2]) {
-                        if (json[3]) record.right = Math.abs(json[3])
+                if (json[0]) {
+                    console.log(json)
+                    ok(index + 1 == json[0], 'entry record is wrong')
+                    var length = lengths[file][index]
+                    if (json[1] == 0) {
+                        if (json[2]) record.right = Math.abs(json[2])
                         bookmark = { position: position, length: length }
                         record.log.push({ type: 'pos' })
+                    } else if (json[1] > 0) {
+                        record.log.push({ type: 'add', value: line.body })
                     } else {
-                        if (json[3] != bookmark.position || json[4] != bookmark.length) {
-                            console.log(require('util').inspect(dir, false, null), json, bookmark)
-                            throw new Error
-                        }
+                        record.log.push({ type: 'del', index: Math.abs(json[1]) - 1 })
                     }
-                } else if (json[1] > 0) {
-                    record.log.push({ type: 'add', value: line.body })
+                    position += length
                 } else {
-                    record.log.push({ type: 'del', index: Math.abs(json[1]) - 1 })
+                    ok(index == dir[file].length - 1, 'footer not last entry')
+                    if (json[1] != bookmark.position || json[2] != bookmark.length) {
+                        console.log(require('util').inspect(dir, false, null), json, bookmark)
+                        throw new Error
+                    }
                 }
-                position += length
             })
         } else {
             var children = []
@@ -286,7 +287,7 @@ function directivize (json) {
                 var index
                 switch (entry.type) {
                 case 'pos':
-                    record = [ count + 1, 0, 1, object.right || 0, ghosts ]
+                    record = [ count + 1, 0, object.right || 0, ghosts ]
                     record = { header: record.concat(positions).concat(lengths) }
                     break
                 case 'add':
@@ -323,7 +324,7 @@ function directivize (json) {
                 return record
             })
             directory[address].push({ header: [
-                directory[address].length + 1, 0, 0, bookmark.position, bookmark.length, object.right || 0, records, position
+                0, bookmark.position, bookmark.length, ghosts, object.right || 0, position, records
             ]})
         }
     }
