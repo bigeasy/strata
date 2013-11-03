@@ -1062,6 +1062,10 @@ function Strata (options) {
 
         function _length () { return length }
 
+        function _address () { return page.address }
+
+        function _right () { return page.right }
+
         function _exclusive () { return exclusive }
 
         classify.call(this, unlock, indexOf, get, next, _index, _offset, _length, _exclusive)
