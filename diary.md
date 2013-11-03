@@ -36,6 +36,17 @@ it ought to be able share the same thread as the balancer, it can navigate
 leaves first, to ensure they are linked correctly, then navigate the entire
 tree, ensuring that the link and balance is correct.
 
+### Cursor Creation
+
+Want to keep my stuff consistent.
+
+```
+strata.iterator('a', function (error, cursor) {})
+strata.iterator(strata.left, function (error, cursor) {})
+strata.iterator(strata.right, function (error, cursor) {})
+strata.iterator(strata.leftOf(key), function (error, cursor) {})
+```
+
 ### Unlink
 
 Maybe you use `fs.unlink` and `fs.rename`, which would save you some naming
