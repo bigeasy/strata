@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(4, function (step, tmp, Strata, ok, equal, load, objectify, say, deepEqual) {
+require('./proof')(5, function (step, tmp, Strata, ok, equal, load, objectify, say, deepEqual) {
     var fs = require('fs'), strata
 
     step(function () {
@@ -13,6 +13,8 @@ require('./proof')(4, function (step, tmp, Strata, ok, equal, load, objectify, s
         strata.mutator('a', step())
 
     }, function (cursor) {
+
+        ok(cursor.exclusive, 'exclusive')
 
         step(function () {
 

@@ -1062,7 +1062,9 @@ function Strata (options) {
 
         function _length () { return length }
 
-        classify.call(this, unlock, indexOf, get, next, _index, _offset, _length)
+        function _exclusive () { return exclusive }
+
+        classify.call(this, unlock, indexOf, get, next, _index, _offset, _length, _exclusive)
 
         if (!exclusive) return this
 
