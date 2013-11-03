@@ -879,7 +879,7 @@ function Strata (options) {
         override = override || {}
 
         var exclusive = override.exclusive || false,
-                depth = override.depth == null ? -1 : override.depth,
+                depth = override.depth == null ? -1 : override.depth, // todo
                 index = override.index == null ? 0 : override.index,
                 page = override.page || { addresses: [ 0 ] },
                 indexes = override.indexes || {},
@@ -2214,16 +2214,49 @@ function Strata (options) {
         return classify.call(this, balance, unbalanced)
     }
 
-    function left (descent) { return descent.left }
+    function left (descent, exclusive, callback) {
+        toLeaf(descent.left, descent, null, exclusive, callback)
+    }
 
-    function cursor (key, exclusive, callback) {
-        var sought, descent, check = validator(callback)
+    function right (descent, exclusive, callback) {
+        toLeaf(descent.right, descent, null, exclusive, callback)
+    }
+
+    function key(key) {
+        return function (descent, exclusive, callback) {
+            toLeaf(descent.key(key), descent, null, exclusive, callback)
+        }
+    }
+
+    function leftOf (key) {
+        return function (descent, exclusive, callback) {
+            var conditions, check = validator(callback)
+
+            thrownByUser = null
+
+            var conditions = [ descent.leaf, descent.found([key]) ]
+
+            descent.descend(descent.key(key), function () {
+                return conditions.some(function (condition) {
+                    return condition()
+                })
+            }, check(pivotOrLeaf))
+
+            function pivotOrLeaf(page, index) {
+                if (descent.page.address % 2) {
+                    toUserLand(callback, null, new Cursor(false, key, page, index))
+                } else {
+                    descent.index--
+                    toLeaf(descent.right, descent, null, exclusive, callback)
+                }
+            }
+        }
+    }
+
+    function toLeaf (sought, descent, key, exclusive, callback) {
+        var check = validator(callback)
 
         thrownByUser = null
-
-        descent = new Descent()
-
-        sought = (typeof key == 'function') ? key(descent) : descent.key(key)
 
         descent.descend(sought, descent.penultimate, check(penultimate))
 
@@ -2234,6 +2267,15 @@ function Strata (options) {
 
         function leaf (page, index) {
             toUserLand(callback, null, new Cursor(exclusive, key, page, index))
+        }
+    }
+
+    function cursor (key, exclusive, callback) {
+        var descent = new Descent
+        if  (typeof key == 'function') {
+            key(descent, exclusive, callback)
+        } else {
+            toLeaf(descent.key(key), descent, key, exclusive, callback)
         }
     }
 
@@ -2328,10 +2370,10 @@ function Strata (options) {
     }
 
     return classify.call(this, create, open,
+                               key, left, leftOf, right,
                                iterator, mutator,
                                balance, purge, vivify,
                                close,
-                               left,
                                _size, _nextAddress)
 }
 
