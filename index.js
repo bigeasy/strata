@@ -512,17 +512,7 @@ function Strata (options) {
     function readRecord (page, position, length, callback) {
         var check = validator(callback), entry
 
-        if (page.position) positioned()
-        else fs.stat(filename(page.address), check(stat))
-
-        function stat (stat) {
-            page.position = stat.size
-            positioned(stat.size)
-        }
-
-        function positioned () {
-            fs.open(filename(page.address), 'r', check(input))
-        }
+        fs.open(filename(page.address), 'r', check(input))
 
         function input (fd) {
             read()
