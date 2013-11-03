@@ -4,7 +4,7 @@ require('./proof')(4, function (step, ok, equal, Strata, tmp, deepEqual,
     say, serialize, gather, load, objectify) {
     var strata, purge, count = 0
 
-    function tracer (type, report, callback) {
+    function tracer (type, callback) {
         switch (type) {
         case 'reference':
             if (++count == 2) {

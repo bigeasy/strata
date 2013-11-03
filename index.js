@@ -47,7 +47,7 @@ function Strata (options) {
         constructors = {},
         serialize = options.serialize || function (object) { return new Buffer(JSON.stringify(object)) },
         deserialize = options.deserialize || function (buffer) { return JSON.parse(buffer.toString()) },
-        tracer = options.tracer || function () { arguments[2]() }
+        tracer = options.tracer || function () { arguments[1]() }
 
     checksum = (function () {
         if (typeof options.checksum == 'function') return options.checksum
@@ -67,12 +67,12 @@ function Strata (options) {
     })()
 
     function validator (callback) {
-        return function (forward, type, report) { return validate(callback, forward, type, report) }
+        return function (forward, type) { return validate(callback, forward, type) }
     }
 
     var thrownByUser
 
-    function validate (callback, forward, type, report) {
+    function validate (callback, forward, type) {
         ok(typeof forward == 'function', 'no forward function')
         ok(typeof callback == 'function','no callback function')
         return function (error) {
@@ -80,8 +80,8 @@ function Strata (options) {
                 toUserLand(callback, error)
             } else {
                 try {
-                    if (type && report) {
-                        tracer(type, report, validate(callback, forward))
+                    if (type) {
+                        tracer(type, validate(callback, forward))
                     } else {
                         forward.apply(null, __slice.call(arguments, 1))
                     }
@@ -107,13 +107,6 @@ function Strata (options) {
     function _size () { return magazine.heft }
 
     function _nextAddress () { return nextAddress }
-
-    function report () {
-        return {
-            size: size,
-            nextAddress: nextAddress
-        }
-    }
 
     function readEntry (buffer, isKey) {
         for (var count = 2, i = 0, I = buffer.length; i < I && count; i++) {
@@ -1204,13 +1197,6 @@ function Strata (options) {
 
         classify.call(methods, deleteGhost, splitLeaf, mergeLeaves)
 
-        function balancerReport () {
-            return extend(report(), {
-                referenced: Object.keys(referenced),
-                lengths: extend({}, lengths)
-            })
-        }
-
         function unbalanced (page, force) {
             if (force) {
                 lengths[page.address] = options.leafSize
@@ -1253,7 +1239,7 @@ function Strata (options) {
                             ordered[node.address] = node
                             if (page.ghosts)
                                 ghosts[node.address] = node
-                            check(function () { next(node) }, 'reference', balancerReport)(null)
+                            check(function () { next(node) }, 'reference')(null)
                         }
                     })
                 }
@@ -1316,7 +1302,7 @@ function Strata (options) {
                     if (addresses.length) {
                         gather()
                     } else {
-                        check(function () { plan(callback) }, 'plan', balancerReport)(null)
+                        check(function () { plan(callback) }, 'plan')(null)
                     }
                 }
             }
@@ -1546,7 +1532,7 @@ function Strata (options) {
             }
 
             function transact () {
-                writeBranch(penultimate.page, '.pending', check(commit, 'splitLeafCommit', report))
+                writeBranch(penultimate.page, '.pending', check(commit, 'splitLeafCommit'))
             }
 
             function commit () {
