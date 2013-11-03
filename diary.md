@@ -21,6 +21,7 @@
  algorithm.
  * Reassure yourself that you'll never delete the ghost of a key on the left
  most leaf page.
+ * Use no-op line to test conditions that you want to see tested in coverage.
 
 Stash as part of cursor.
 
