@@ -359,13 +359,30 @@ function Strata (options) {
     function writeFooter (fd, page, callback) {
         ok(page.address % 2 && page.bookmark != null)
         var header = [
-            0, page.bookmark.position, page.bookmark.length,
-            page.ghosts, page.right || 0, page.position, page.positions.length - page.ghosts
+            0, page.bookmark.position, page.bookmark.length, 0, // <- todo
+            page.right || 0, page.position, page.entries, page.ghosts, page.positions.length - page.ghosts
         ]
         writeEntry({ fd: fd, page: page, header: header, type: 'footer' }, validate(callback, function (position, length) {
             page.position = header[5]
             callback(null, position, length)
         }))
+    }
+
+    function readFooter (buffer) {
+        var footer = readEntry(buffer).header
+        return {
+            entry:      footer[0],
+            bookmark: {
+                position:   footer[1],
+                length:     footer[2],
+                entry:      footer[3]
+            },
+            right:      footer[4],
+            position:   footer[5],
+            entries:    footer[6],
+            ghosts:     footer[7],
+            records:    footer[8]
+        }
     }
 
     function readLeaf (page, callback) {
@@ -383,12 +400,11 @@ function Strata (options) {
             function footer (slice) {
                 for (var i = slice.length - 2; i != -1; i--) {
                     if (slice[i] == 0x0a) {
-                        var footer = readEntry(slice.slice(i + 1)).header
-                        ok(!footer.shift(), 'footer is supposed to be zero')
-                        bookmark = { position: footer.shift(), length: footer.shift() }
-                        footer.shift() // todo
-                        page.right = footer.shift()
-                        page.position = footer.shift()
+                        var footer = readFooter(slice.slice(i + 1))
+                        ok(!footer.entry, 'footer is supposed to be zero')
+                        bookmark = footer.bookmark
+                        page.right = footer.right
+                        page.position = footer.position
                         ok(page.position != null, 'no page position')
                         read(new Buffer(bookmark.length), bookmark.position, check(positioned))
                         return

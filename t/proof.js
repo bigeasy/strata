@@ -324,7 +324,7 @@ function directivize (json) {
                 return record
             })
             directory[address].push({ header: [
-                0, bookmark.position, bookmark.length, ghosts, object.right || 0, position, records
+                0, bookmark.position, bookmark.length, 0, object.right || 0, position, directory[address].length, ghosts, records
             ]})
         }
     }
