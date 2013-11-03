@@ -351,7 +351,7 @@ function Strata (options) {
     }
 
     function writePositions (fd, page, callback) {
-        var header = [ ++page.entries, 0, page.right, page.ghosts ]
+        var header = [ ++page.entries, 0, page.ghosts ]
         header = header.concat(page.positions).concat(page.lengths)
         writeEntry({ fd: fd, page: page, header: header, type: 'position' }, callback)
     }
@@ -386,7 +386,7 @@ function Strata (options) {
                         var footer = readEntry(slice.slice(i + 1)).header
                         ok(!footer.shift(), 'footer is supposed to be zero')
                         bookmark = { position: footer.shift(), length: footer.shift() }
-                        page.ghosts = footer.shift()
+                        footer.shift() // todo
                         page.right = footer.shift()
                         page.position = footer.shift()
                         ok(page.position != null, 'no page position')
@@ -402,7 +402,7 @@ function Strata (options) {
 
                 page.entries = positions.shift()
                 ok(positions.shift() == 0, 'expected housekeeping type')
-                page.right = positions.shift()
+
                 page.ghosts = positions.shift()
 
                 ok(!(positions.length % 2), 'expecting even number of positions and lengths')

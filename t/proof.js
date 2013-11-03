@@ -162,7 +162,6 @@ function abstracted (dir, lengths) {
                     ok(index + 1 == json[0], 'entry record is wrong')
                     var length = lengths[file][index]
                     if (json[1] == 0) {
-                        if (json[2]) record.right = Math.abs(json[2])
                         bookmark = { position: position, length: length }
                         record.log.push({ type: 'pos' })
                     } else if (json[1] > 0) {
@@ -173,6 +172,7 @@ function abstracted (dir, lengths) {
                     position += length
                 } else {
                     ok(index == dir[file].length - 1, 'footer not last entry')
+                    if (json[4]) record.right = Math.abs(json[4])
                     if (json[1] != bookmark.position || json[2] != bookmark.length) {
                         console.log(require('util').inspect(dir, false, null), json, bookmark)
                         throw new Error
@@ -287,7 +287,7 @@ function directivize (json) {
                 var index
                 switch (entry.type) {
                 case 'pos':
-                    record = [ count + 1, 0, object.right || 0, ghosts ]
+                    record = [ count + 1, 0, ghosts ]
                     record = { header: record.concat(positions).concat(lengths) }
                     break
                 case 'add':
