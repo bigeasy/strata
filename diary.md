@@ -136,6 +136,20 @@ the value of my plain text file format, it has not receeded as Strata has
 progressed. It is always reassuring, when things are working as poorly, when a
 test won't pass and won't to open these files and have a look.
 
+## Log Format
+
+In consdiering error handling, I'm considering extracting the log format to a
+separate project so that I can test I/O and perhaps find a way to focus on I/O
+errors. The only errors returned from Strata ought to be I/O errors and full up
+programming errors are asserted.
+
+## Errors and Corruption
+
+Corruption detection needs to be more `Error` and less `ok`. I'm asserting
+properties of a file. Maybe, I need to check the checksum. If the checksum is
+valid, then anything about the data that is invalid is an assertion. We're using
+a pretty strong checksum.
+
 ## Records and Keys
 
 I'd imagined to use Strata to create a database that stores objects and the keys
