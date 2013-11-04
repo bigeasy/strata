@@ -349,6 +349,8 @@ Except that this now means that we want to hold the pages in memory so that they
 are not flushed and those writes lost, and we want to do that independently of
 the read and write lock mechanism.
 
+## Most Lively Balance
+
 *update*: Now that I've got keys in branch pages here's what occurs to me:
 
 Currently when we split or merge we lock a branch page exclusively and block out
@@ -412,6 +414,11 @@ And then if it is out of balance, then it is out of balance.
 that we'll end up breaking tests, so we may have to create it in parallel.
 
 Oh, that's anguish, that feeling I just felt.
+
+*Inbox*:
+
+ * Play the log and use the positions array as a map to determine if the record
+   has survived deletion.
 
 ## Null Keys
 
