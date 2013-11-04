@@ -852,7 +852,19 @@ function Strata (options) {
     function _find (page, key, low, callback) {
         var mid, high = (page.addresses || page.positions).length - 1, check = validator(callback)
 
-        test()
+        if (page.address % 2) test()
+        else callback(null, find())
+
+        function find () {
+            while (low <= high) {
+                mid = low + ((high - low) >>> 1)
+                var compare = comparator(key, page.cache[page.addresses[mid]].key)
+                if (compare < 0) high = mid - 1
+                else if (compare > 0) low = mid + 1
+                else return mid
+            }
+            return ~low
+        }
 
         function test () {
             if (low <= high) {
