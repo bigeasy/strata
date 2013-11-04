@@ -349,6 +349,70 @@ Except that this now means that we want to hold the pages in memory so that they
 are not flushed and those writes lost, and we want to do that independently of
 the read and write lock mechanism.
 
+*update*: Now that I've got keys in branch pages here's what occurs to me:
+
+Currently when we split or merge we lock a branch page exclusively and block out
+a sub-tree. In that subtree we rewrite pages, performing a lot of file I/O. This
+is slow and it blocks progress of read/write descents. It is not necessary. The
+only thing that needs to be comitted to file is the change in the balance of the
+tree.
+
+Here's a mode of operation. Using shared locks, create an annotation it the leaf
+page, then create new branch pages by writing out the keys, but put them to one
+side as replacements. Now we're not really using our branch pages as journals.
+They are always whole files. We move them into place using `unlink` and
+`rename`.
+
+The rewriting is done with a shared lock, but it is not reflected in the pages
+in memory. Each branch page can hold a dummy branch page that has been
+rewritten. We then descend the tree locking the pivot exclusively, then moving
+it's dummy into place in memory and moving its rewrite into place on disk.
+
+Now we no longer care about the race conditions of the balance plan. In fact,
+the balance plan doesn't make much sense since we do things one step at a time
+anyway. We'll need to look at whether or not we want balance planning to be
+internal to Strata. We do want to have some automatic behavior though.
+
+Thus, currently, if a page looks as though it needs to split, then it is put
+into a plan for splitting. When we reach the page, we check again to see if it
+still needs split, then split and propagate the split. I say, when we decide if
+something needs to be split, this race condition is futile. It could be the case
+that in the time it took us to determine that the page needs to be split that it
+does not need to be split, but it could also be the case that the page no longer
+needs split the moment after we've split it.
+
+However, in the case of split, we can't split an empty page, or a page with only
+one element, so we may have to surrender that split.
+
+Thus, we choose to split a page, so off we go to split it. We read lock on our
+way down. We choose partitions. We then update a copy of our pages. We write out
+replacements. We write out a stub of the split page.
+
+Then we descend again, this time for locking. We assert that the partition is
+still valid, oh, but it is always valid, for even if we've since emptied that
+page, we can always keep the paritition, so no timeout. With everything locked
+exclusive, or on the way down locking exclusive, we put our copies in place,
+then we get to the root and copy the current page to a dirty file, rename it,
+and then put out stubs, plural, in place. Stubs contain position arrays, but the
+positions are in the dirty file.
+
+That was exclusive for only a moment, so we get to continue. We now write out
+replacements for the stubs, which is going to be slow and shovel a lot of bytes,
+but that's the way it goes, but it's also a shared operation.
+
+In fact, it doesn't need to lock the page at all. It can just copy the old
+legacy file to new files, reading through the positions array at was any copying
+the records over to their new files. It can then get a read lock in order to
+replay the stub but play it into the new files. Then an exclusive lock to move
+the pages over.
+
+And then if it is out of balance, then it is out of balance.
+
+**Horrible problem** is that moving away from the current balance plan means
+that we'll end up breaking tests, so we may have to create it in parallel.
+
+Oh, that's anguish, that feeling I just felt.
+
 ## Null Keys
 
 No. We've already decided that there are no duplicate keys, but we've provided a
