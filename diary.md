@@ -150,6 +150,24 @@ properties of a file. Maybe, I need to check the checksum. If the checksum is
 valid, then anything about the data that is invalid is an assertion. We're using
 a pretty strong checksum.
 
+The only opportunity to acitvely corrupt data is a failed append, probably
+because the disk is full, but all of our other operations are copies and moves.
+We can add a step to our move into place commits, where instead of unlinking the
+file to replace, we rename it with a suffix like `.outgoing`. `unlink` and
+`rename` are unlikely to fail independently of other file I/O operations, but if
+they do, if we fail to move the new file in place, we have the old file.
+
+Thus, the only real worry is the append, and that only occurs during insert or
+delete, so we can have a severity. If we have a corrupted write, if write fails,
+we raise an exception with the greatest severity. If a balance copy fails before
+commit, that is not as severe. In the midst of commit is more severe. The
+inability to read records, hmm... Is that an error? What if the checksum fails?
+
+Are descents always unlockable? What about before they obtain their first lock?
+
+How are we handling an obtained lock followed by a failed read? Who unlocks?
+Right now it propagates all the way up the stack.
+
 ## Records and Keys
 
 I'd imagined to use Strata to create a database that stores objects and the keys
