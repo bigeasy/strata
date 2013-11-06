@@ -168,6 +168,31 @@ Are descents always unlockable? What about before they obtain their first lock?
 How are we handling an obtained lock followed by a failed read? Who unlocks?
 Right now it propagates all the way up the stack.
 
+Surprised that I'm not holding locks or double releasing, which is great. At
+some point I must have put a lot of thought into this.
+
+It would be better to hold an additional lock when forking a descent so that the
+page for a descent always holds a lock. Currently, the descent takes ownership
+after it descends an initial level. This allows descent forking to work. The
+fork won't hold a lock on a page unless it descends a level. Also, to keep the
+descent algorithm simple, and to account for the initially unlocked page, we
+descend from a dummy branch page that has the root branch page it's only child
+and the index is set to the only child. I don't know which came first, the dummy
+page, or leaving the first page unlocked, but skipping unlocking on the first
+descent accounts for both cases.
+
+Our shared lock is already reentrant, obviously. Sequester needs to either
+provide for a reentrant exclusive lock, but that would mean tracking the
+"thread" with an id of some sort. If an exclusive lock is from the same "thread"
+it is acquired as a reentrant exclusive lock, otherwise it is queued to run
+after the current exclusive lock is released. Shared locks won't care about the
+"thread", but will still accept the id so that the interface is consistent.
+
+An interface that will permit incrementing the lock count that works for both
+shared and exclusive would be simpler, but we won't be able to bandy about the
+word reentrant. The concept probably requires more complexity, which we would
+have to add in order to have a problem that reentrancy could solve.
+
 ## Records and Keys
 
 I'd imagined to use Strata to create a database that stores objects and the keys
