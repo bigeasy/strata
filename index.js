@@ -698,11 +698,7 @@ function Strata (options) {
 
         magazine = cache.createMagazine()
 
-        stat() // todo: unnecessary
-
-        function stat () {
-            fs.stat(directory, check(extant))
-        }
+        fs.stat(directory, check(extant))
 
         function extant (stat) {
             ok(stat.isDirectory(), 'database ' + directory + ' is not a directory.')
