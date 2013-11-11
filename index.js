@@ -67,12 +67,12 @@ function Strata (options) {
     })()
 
     function validator (callback) {
-        return function (forward, type) { return validate(callback, forward, type) }
+        return function (forward) { return validate(callback, forward) }
     }
 
     var thrownByUser
 
-    function validate (callback, forward, type) {
+    function validate (callback, forward) {
         ok(typeof forward == 'function', 'no forward function')
         ok(typeof callback == 'function','no callback function')
         return function (error) {
@@ -80,11 +80,7 @@ function Strata (options) {
                 toUserLand(callback, error)
             } else {
                 try {
-                    if (type) {
-                        tracer(type, validate(callback, forward))
-                    } else {
-                        forward.apply(null, __slice.call(arguments, 1))
-                    }
+                    forward.apply(null, __slice.call(arguments, 1))
                 } catch (error) {
                     if (thrownByUser === error) {
                         throw error
@@ -1227,8 +1223,10 @@ function Strata (options) {
                 function nodify (next) {
                     return check(function (page) {
                         ok(page.address % 2, 'leaf page expected')
+
                         if (page.address == 1) identified({})
                         else stash(page, 0, check(identified))
+
                         function identified (entry) {
                             node = {
                                 key: entry.key,
@@ -1240,8 +1238,10 @@ function Strata (options) {
                             ordered[node.address] = node
                             if (page.ghosts)
                                 ghosts[node.address] = node
-                            check(function () { next(node) }, 'reference')(null)
+                            tracer('reference', check(traced))
                         }
+
+                        function traced () { next(node) }
                     })
                 }
 
@@ -1303,9 +1303,11 @@ function Strata (options) {
                     if (addresses.length) {
                         gather()
                     } else {
-                        check(function () { plan(callback) }, 'plan')(null)
+                        tracer('plan', check(traced))
                     }
                 }
+
+                function traced () { plan(callback) }
             }
         }
 
@@ -1533,7 +1535,11 @@ function Strata (options) {
             }
 
             function transact () {
-                writeBranch(penultimate.page, '.pending', check(commit, 'splitLeafCommit'))
+                writeBranch(penultimate.page, '.pending', check(trace))
+            }
+
+            function trace () {
+                tracer('splitLeafCommit', check(commit))
             }
 
             function commit () {
