@@ -892,12 +892,12 @@ function Strata (options) {
         override = override || {}
 
         var exclusive = override.exclusive || false,
-                depth = override.depth == null ? -1 : override.depth, // todo
-                index = override.index == null ? 0 : override.index,
-                page = override.page || { addresses: [ 0 ] },
-                indexes = override.indexes || {},
-                descent = {},
-                greater = override.greater, lesser = override.lesser
+            depth = override.depth == null ? -1 : override.depth,
+            index = override.index == null ? 0 : override.index,
+            page = override.page || { addresses: [ 0 ] },
+            indexes = override.indexes || {},
+            descent = {},
+            greater = override.greater, lesser = override.lesser
 
         function _page () { return page }
 
@@ -1230,10 +1230,12 @@ function Strata (options) {
                         if (page.address == 1) identified({})
                         else stash(page, 0, check(identified))
                         function identified (entry) {
-                            node = { key: entry.key,
-                                              address: page.address, // todo
-                                              rightAddress: page.right,
-                                              length: page.positions.length - page.ghosts }
+                            node = {
+                                key: entry.key,
+                                address: page.address,
+                                rightAddress: page.right,
+                                length: page.positions.length - page.ghosts
+                            }
                             unlock(page)
                             ordered[node.address] = node
                             if (page.ghosts)
@@ -1864,8 +1866,8 @@ function Strata (options) {
                 parents.left.index--
                 parents.left.unlocker = createSingleUnlocker(singles.left)
                 parents.left.descend(parents.left.right,
-                                                          parents.left.level(parents.right.depth), // todo
-                                                          check(atLeftParent))
+                                     parents.left.level(parents.right.depth),
+                                     check(atLeftParent))
             }
 
             function atLeftParent (callback) {
@@ -1950,7 +1952,6 @@ function Strata (options) {
             }
 
             function beginCommit () {
-// todo
                 empties = singles.right.slice()
                 rename(ancestor, '.pending', '.commit', check(unlinkEmpties))
             }
