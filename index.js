@@ -29,7 +29,7 @@ function classify () {
 }
 
 function Strata (options) {
-    var Sequester = options.sequester || require('sequester'),
+    var sequester = options.sequester || require('sequester'),
         directory = options.directory,
         extractor = options.extractor || extract,
         comparator = options.comparator || compare,
@@ -176,7 +176,7 @@ function Strata (options) {
             positions: [],
             lengths: [],
             right: 0,
-            sequester: new Sequester
+            lock: sequester.createLock()
         }, override, 0)
     }
 
@@ -598,7 +598,7 @@ function Strata (options) {
             override.address = nextAddress++
         }
         if (override.loader == null) {
-            override.loader = new Sequester(null, page)
+            override.loader = sequester.createLock(null, page)
         }
         return extend(page, override)
     }
@@ -609,7 +609,7 @@ function Strata (options) {
             cache: {},
             entries: 0,
             penultimate: true,
-            sequester: new Sequester
+            lock: sequester.createLock()
         }, override, 1)
     }
     constructors.branch = createBranch
@@ -771,10 +771,10 @@ function Strata (options) {
         var page, creator, locks
 
         var page = magazine.hold(address, function () {
-            var sequester = new Sequester
-            var page = constructors[address % 2 ? 'leaf' : 'branch']({ address: address, loader: sequester })
-            sequester.exclude(function () {
-                var loaded = sequester.unlock.bind(sequester)
+            var loader = sequester.createLock()
+            var page = constructors[address % 2 ? 'leaf' : 'branch']({ address: address, loader: loader })
+            loader.exclude(function () {
+                var loaded = loader.unlock.bind(loader)
                 if (page.address % 2) {
                     readLeaf(page, loaded)
                 } else {
@@ -784,7 +784,7 @@ function Strata (options) {
             return page
         }).value
 
-        page.sequester[exclusive ? 'exclude' : 'share'](function () { page.loader.share(callback) })
+        page.lock[exclusive ? 'exclude' : 'share'](function () { page.loader.share(callback) })
     }
 
     function checkCacheSize (page) {
@@ -807,7 +807,7 @@ function Strata (options) {
 
     function unlock (page) {
         checkCacheSize(page)
-        page.sequester.unlock()
+        page.lock.unlock()
         page.loader.unlock()
         magazine.get(page.address).release()
     }
@@ -822,19 +822,19 @@ function Strata (options) {
             length = page.lengths[positionOrIndex]
         }
         ok(length)
-        var entry, sequester
-        if (sequester = page.loaders[position]) {
-            sequester.share(callback)
+        var entry, loader
+        if (loader = page.loaders[position]) {
+            loader.share(callback)
         } else if (!(entry = page.cache[position])) {
-            sequester = page.loaders[position] = new Sequester
-            sequester.exclude(function () {
+            loader = page.loaders[position] = sequester.createLock()
+            loader.exclude(function () {
                 readRecord(page, position, length, function (error, entry) {
                     delete page.loaders[position]
                     if (!error) {
                         delete page.cache[position]
                         var entry = _cacheRecord(page, position, entry.body, entry.length)
                     }
-                    sequester.unlock(error, entry)
+                    loader.unlock(error, entry)
                 })
             })
             stash(page, position, length, callback)
