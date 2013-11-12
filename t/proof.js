@@ -158,7 +158,6 @@ function abstracted (dir, lengths) {
             dir[file].forEach(function (line, index) {
                 var json = line.header
                 if (json[0]) {
-                    console.log(json)
                     ok(index + 1 == json[0], 'entry record is wrong')
                     var length = lengths[file][index]
                     if (json[1] == 0) {
