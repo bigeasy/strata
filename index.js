@@ -750,9 +750,9 @@ function Strata (options) {
     }
 
     function close (callback) {
-        magazine.purge(0)
+        magazine.purge(-1)
 
-        ok(!magazine.heft, 'pages still held by cache')
+        ok(!magazine.count, 'pages still held by cache')
 
         thrownByUser = null
 
