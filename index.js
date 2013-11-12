@@ -179,7 +179,10 @@ function Strata (options) {
     constructors.leaf = createLeaf
 
     function encache (page) {
-        return magazine.hold(page.address, page).value
+        magazine.hold(page.address, { page: page })
+        page.lock.exclude(function () {})
+        page.lock.unlock(null, page)
+        return page
     }
 
     function release () {
@@ -593,9 +596,6 @@ function Strata (options) {
             while ((nextAddress % 2) == remainder) nextAddress++
             override.address = nextAddress++
         }
-        if (override.loader == null) {
-            override.loader = sequester.createLock(null, page)
-        }
         return extend(page, override)
     }
 
@@ -760,23 +760,35 @@ function Strata (options) {
     }
 
     function lock (address, exclusive, callback) {
-        var page, creator, locks
+        var cartridge = magazine.hold(address, {}), page = cartridge.value.page
 
-        var page = magazine.hold(address, function () {
-            var loader = sequester.createLock()
-            var page = constructors[address % 2 ? 'leaf' : 'branch']({ address: address, loader: loader })
-            loader.exclude(function () {
-                var loaded = loader.unlock.bind(loader)
+        if (!page)  {
+            page = cartridge.value.page = constructors[address % 2 ? 'leaf' : 'branch']({ address: address })
+            page.lock.exclude(function () {
                 if (page.address % 2) {
                     readLeaf(page, loaded)
                 } else {
                     readBranch(page, loaded)
                 }
+                function loaded (error) {
+                    if (error) {
+                        cartridge.value.page = null
+                        cartridge.adjustHeft(-cartridge.heft)
+                    }
+                    page.lock.unlock(error, page)
+                }
             })
-            return page
-        }).value
+        }
 
-        page.lock[exclusive ? 'exclude' : 'share'](function () { page.loader.share(callback) })
+        page.lock[exclusive ? 'exclude' : 'share'](function (error) {
+            if (error) {
+                magazine.get(page.address).release()
+                page.lock.unlock(error)
+                callback(error)
+            } else {
+                callback(null, page)
+            }
+        })
     }
 
     function checkCacheSize (page) {
@@ -799,8 +811,7 @@ function Strata (options) {
 
     function unlock (page) {
         checkCacheSize(page)
-        page.lock.unlock()
-        page.loader.unlock()
+        page.lock.unlock(null, page)
         magazine.get(page.address).release()
     }
 
