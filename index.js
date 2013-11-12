@@ -689,10 +689,22 @@ function Strata (options) {
         }
     }
 
+    function createMagazine () {
+        var magazine = cache.createMagazine()
+        var dummy = magazine.hold(-1, {
+            page: {
+                addresses: [ 0 ],
+                lock: sequester.createLock()
+            }
+        }).value.page
+        dummy.lock.share(function () {})
+        return magazine
+    }
+
     function create (callback) {
         var root, leaf, check = validator(callback), count = 0
 
-        magazine = cache.createMagazine()
+        magazine = createMagazine()
 
         fs.stat(directory, check(extant))
 
@@ -731,7 +743,7 @@ function Strata (options) {
     function open (callback) {
         var check = validator(callback)
 
-        magazine = cache.createMagazine()
+        magazine = createMagazine()
 
         fs.stat(directory, check(stat))
 
@@ -750,6 +762,13 @@ function Strata (options) {
     }
 
     function close (callback) {
+        var cartridge = magazine.get(-1), lock = cartridge.value.page.lock
+
+        lock.unlock()
+        lock.dispose()
+
+        cartridge.release()
+
         magazine.purge(-1)
 
         ok(!magazine.count, 'pages still held by cache')

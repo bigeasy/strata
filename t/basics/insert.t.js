@@ -28,8 +28,6 @@ require('./proof')(5, function (step, tmp, Strata, ok, equal, load, objectify, s
 
             equal(strata.size, 14, 'json size')
 
-            strata.close(step())
-
         })
 
     }, function () {
