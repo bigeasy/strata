@@ -794,7 +794,7 @@ function Strata (options) {
         for (position in page.cache) {
             size += page.cache[position].size
         }
-        ok(size == magazine.get(page.address)._heft, 'sizes are wrong')
+        ok(size == magazine.get(page.address).heft, 'sizes are wrong')
     }
 
     function unlock (page) {

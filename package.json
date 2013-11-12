@@ -23,7 +23,7 @@
     }],
     "dependencies":
     {
-                        "magazine": "0.0.4",
+                        "magazine": "0.0.5",
                         "sequester": "0.0.4"
     },
     "devDependencies":
