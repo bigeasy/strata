@@ -927,6 +927,7 @@ function Strata (options) {
 
         function dispose () {
             ok(!Object.keys(locks).length, 'locks outstanding')
+            locks = null
         }
 
         return classify.call(this, lock, unlock, dispose)
