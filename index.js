@@ -1469,10 +1469,8 @@ function Strata (options) {
 
         function splitLeaf (key, ghosts, callback) {
             var check = validator(callback),
-                locker = new Locker, // v- todo -v
-                descents = [],
-                replacements = [],
-                encached = [],
+                locker = new Locker,
+                descents = [], replacements = [], encached = [],
                 completed = 0,
                 penultimate, leaf, split, pages, page,
                 records, remainder, right, index, offset, length
