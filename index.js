@@ -1871,9 +1871,10 @@ function Strata (options) {
         }
 
         function mergePages (key, leftKey, stopper, merger, ghostly, callback) {
-            var check = validator(callback), locker = new Locker, // todo
-                    descents = [], singles = { left: [], right: [] }, parents = {}, pages = {},
-                    ancestor, pivot, empties, ghosted, designation
+            var check = validator(callback),
+                locker = new Locker,
+                descents = [], singles = { left: [], right: [] }, parents = {}, pages = {},
+                ancestor, pivot, empties, ghosted, designation
 
             var keys = [ key ]
             if (leftKey) keys.push(leftKey)
