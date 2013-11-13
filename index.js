@@ -1808,6 +1808,7 @@ function Strata (options) {
             function rootCommitted () {
                 release.apply(null, children)
                 locker.unlock(root)
+                locker.dispose()
                 if (root.addresses.length > options.branchSize) drainRoot(callback)
                 else callback(null)
             }
