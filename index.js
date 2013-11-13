@@ -2287,6 +2287,7 @@ function Strata (options) {
 
             function endCommit () {
                 descents.forEach(function (descent) { locker.unlock(descent.page) })
+                locker.dispose()
                 replace(root.page, '.commit', callback)
             }
         }
