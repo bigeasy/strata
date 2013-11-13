@@ -1847,7 +1847,10 @@ function Strata (options) {
         }
 
         function deleteGhost (key, callback) {
-            var locker = new Locker, descents = [], pivot, leaf, fd, check = validator(callback)
+            var check = validator(callback),
+                locker = new Locker,
+                descents = [],
+                pivot, leaf, fd
 
             descents.push(pivot = new Descent(locker))
             pivot.descend(pivot.key(key), pivot.found([key]), check(upgrade))
@@ -1868,6 +1871,7 @@ function Strata (options) {
 
             function release (key) {
                 descents.forEach(function (descent) { locker.unlock(descent.page) })
+                locker.dispose()
                 callback(null, key)
             }
         }
