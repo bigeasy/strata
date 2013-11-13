@@ -2203,6 +2203,7 @@ function Strata (options) {
 
             function release () {
                 descents.forEach(function (descent) { locker.unlock(descent.page) })
+                locker.dispose()
             }
         }
 
