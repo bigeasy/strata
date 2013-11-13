@@ -1234,8 +1234,7 @@ function Strata (options) {
     }
 
     function Balancer () {
-        var locker = new Locker,
-            lengths = {},
+        var lengths = {},
             operations = [],
             referenced = {},
             ordered = {},
@@ -1253,7 +1252,7 @@ function Strata (options) {
         }
 
         function balance (callback) {
-            var check = validator(callback), address
+            var check = validator(callback), locker = new Locker, address
 
             if (balancing) return callback(null)
 
@@ -1728,7 +1727,7 @@ function Strata (options) {
         }
 
         function drainRoot (callback) {
-            var root, pages, records, remainder,
+            var locker = new Locker, root, pages, records, remainder,
                     children = [], keys = {}, check = validator(callback)
 
             locker.lock(0, true, check(partition))
