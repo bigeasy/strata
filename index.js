@@ -2144,9 +2144,10 @@ function Strata (options) {
         }
 
         function chooseBranchesToMerge (key, address, callback) {
-            var check = validator(callback), locker = new Locker, // todo
-                    descents = [],
-                    choice, lesser, greater, center
+            var check = validator(callback),
+                locker = new Locker,
+                descents = [],
+                choice, lesser, greater, center
 
             descents.push(center = new Descent(locker))
             center.descend(center.key(key), center.address(address), check(findLeftPage))
