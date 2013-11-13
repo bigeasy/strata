@@ -1727,8 +1727,10 @@ function Strata (options) {
         }
 
         function drainRoot (callback) {
-            var locker = new Locker, root, pages, records, remainder,
-                    children = [], keys = {}, check = validator(callback)
+            var check = validator(callback),
+                locker = new Locker,
+                keys = {}, children = [],
+                root, pages, records, remainder
 
             locker.lock(0, true, check(partition))
 
