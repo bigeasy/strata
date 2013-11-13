@@ -1503,7 +1503,7 @@ function Strata (options) {
 
                 if (split.positions.length - split.ghosts <= options.leafSize) {
                     balancer.unbalanced(split, true)
-                    cleanup()
+                    cleanup() // todo: does not need to propagate split balance!
                 } else {
                     partition()
                 }
@@ -1618,6 +1618,7 @@ function Strata (options) {
 
             function cleanup() {
                 descents.forEach(function (descent) { locker.unlock(descent.page) })
+                locker.dispose()
 
                 shouldSplitBranch(penultimate.page, key, callback)
             }
