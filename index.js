@@ -2388,6 +2388,7 @@ function Strata (options) {
         function begin (page) {
             expand(page, root = page.addresses.map(record), 0, check(function () {
                 locker.unlock(page)
+                locker.dispose()
                 toUserLand(callback, null, root)
             }))
         }
@@ -2397,7 +2398,7 @@ function Strata (options) {
                 var address = pages[index].address
                 locker.lock(address, false, check(address % 2 ? leaf : branch))
             } else {
-                toUserLand(callback, null, pages)
+                callback(null, pages)
             }
 
             function branch (page) {
