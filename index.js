@@ -691,8 +691,9 @@ function Strata (options) {
 
     function createMagazine () {
         var magazine = cache.createMagazine()
-        var dummy = magazine.hold(-1, {
+        var dummy = magazine.hold(-2, {
             page: {
+                address: -2,
                 addresses: [ 0 ],
                 lock: sequester.createLock()
             }
@@ -762,7 +763,7 @@ function Strata (options) {
     }
 
     function close (callback) {
-        var cartridge = magazine.get(-1), lock = cartridge.value.page.lock
+        var cartridge = magazine.get(-2), lock = cartridge.value.page.lock
 
         lock.unlock()
         lock.dispose()
@@ -812,18 +813,20 @@ function Strata (options) {
 
     function checkCacheSize (page) {
         var size = 0, position
-        if (page.address % 2) {
-            if (page.positions.length) {
-                size += JSON.stringify(page.positions).length
-                size += JSON.stringify(page.lengths).length
+        if (page.address > -2) {
+            if (page.address % 2) {
+                if (page.positions.length) {
+                    size += JSON.stringify(page.positions).length
+                    size += JSON.stringify(page.lengths).length
+                }
+            } else {
+                if (page.addresses.length) {
+                    size += JSON.stringify(page.addresses).length
+                }
             }
-        } else {
-            if (page.addresses.length) {
-                size += JSON.stringify(page.addresses).length
+            for (position in page.cache) {
+                size += page.cache[position].size
             }
-        }
-        for (position in page.cache) {
-            size += page.cache[position].size
         }
         ok(size == magazine.get(page.address).heft, 'sizes are wrong')
     }
@@ -920,10 +923,12 @@ function Strata (options) {
         var exclusive = override.exclusive || false,
             depth = override.depth == null ? -1 : override.depth,
             index = override.index == null ? 0 : override.index,
-            page = override.page || { addresses: [ 0 ] },
+            page = override.page || magazine.hold(-2).value.page,
             indexes = override.indexes || {},
             descent = {},
             greater = override.greater, lesser = override.lesser
+
+        page.lock.share(function () {})
 
         function _page () { return page }
 
@@ -940,6 +945,8 @@ function Strata (options) {
         function _greater () { return greater }
 
         function fork () {
+            page.lock.increment()
+
             return new Descent({
                 page: page,
                 exclusive: exclusive,
@@ -954,11 +961,14 @@ function Strata (options) {
         function exclude () { exclusive = true }
 
         function upgrade (callback) {
+            console.log('here')
             unlock(page)
 
+            console.log(page.address)
             lock(page.address, exclusive = true, validate(callback, locked))
 
             function locked (locked) {
+                console.log('there')
                 page = locked
                 callback(null)
             }
@@ -998,8 +1008,7 @@ function Strata (options) {
         var unlocking = false
 
         function unlocker (parent) {
-            if (unlocking) unlock(parent)
-            unlocking = true
+            unlock(parent)
         }
 
         function unlocker_ ($unlocker) { unlocker = $unlocker }
@@ -1874,22 +1883,25 @@ function Strata (options) {
 
             function createSingleUnlocker (singles) {
                 ok(singles != null, 'null singles')
+                        console.log('here')
                 return function (parent, child) {
                     if (child.addresses.length == 1) {
+                        console.log('here')
                         if (singles.length == 0) singles.push(parent)
                         singles.push(child)
                     } else if (singles.length) {
-                        if (singles[0].address == pivot.page.address) singles.shift()
+                        //if (singles[0].address == pivot.page.address) singles.shift()
                         singles.forEach(unlock)
                         singles.length = 0
-                    } else if (parent.address != pivot.page.address) {
+                    } else { //if (parent.address != pivot.page.address) {
                         unlock(parent)
                     }
                 }
             }
 
             function atPivot () {
-
+// todo
+                console.log('here')
                 parents.right = pivot.fork()
 
                 parents.right.unlocker = createSingleUnlocker(singles.right)
