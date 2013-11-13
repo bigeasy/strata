@@ -1915,11 +1915,8 @@ function Strata (options) {
             }
 
             function atPivot () {
-
                 parents.right = pivot.fork()
-
                 parents.right.unlocker = createSingleUnlocker(singles.right)
-
                 parents.right.descend(parents.right.key(key), stopper(parents.right), check(atRightParent))
             }
 
