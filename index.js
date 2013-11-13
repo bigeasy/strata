@@ -1721,6 +1721,7 @@ function Strata (options) {
             function cleanup() {
                 release.apply(null, encached)
                 descents.forEach(function (descent) { locker.unlock(descent.page) })
+                locker.dispose()
 
                 shouldSplitBranch(parent.page, key, callback)
             }
