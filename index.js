@@ -1354,6 +1354,7 @@ function Strata (options) {
                     if (addresses.length) {
                         gather()
                     } else {
+                        locker.dispose()
                         tracer('plan', check(traced))
                     }
                 }
