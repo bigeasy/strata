@@ -1113,6 +1113,7 @@ function Strata (options) {
 
         function unlock () {
             locker.unlock(page)
+            locker.dispose()
         }
 
         function _index () { return index }
