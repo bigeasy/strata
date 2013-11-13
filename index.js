@@ -1975,7 +1975,7 @@ function Strata (options) {
                 if (dirty) {
                     renameRightPageToMerge()
                 } else {
-                    release(callback)()
+                    release(callback)() // todo: why generate a callback? why not just call?
                 }
             }
 
@@ -2046,6 +2046,7 @@ function Strata (options) {
                     descents.forEach(function (descent) { locker.unlock(descent.page) })
                     singles.right.forEach(function (page) { locker.unlock(page) })
                     singles.left.forEach(function (page) { locker.unlock(page) })
+                    locker.dispose()
                     next()
                 }
             }
