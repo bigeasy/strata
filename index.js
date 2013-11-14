@@ -901,18 +901,20 @@ function Strata (options) {
 
         function checkCacheSize (page) {
             var size = 0, position
-            if (page.address % 2) {
-                if (page.positions.length) {
-                    size += JSON.stringify(page.positions).length
-                    size += JSON.stringify(page.lengths).length
+            if (page.address != -2) {
+                if (page.address % 2) {
+                    if (page.positions.length) {
+                        size += JSON.stringify(page.positions).length
+                        size += JSON.stringify(page.lengths).length
+                    }
+                } else {
+                    if (page.addresses.length) {
+                        size += JSON.stringify(page.addresses).length
+                    }
                 }
-            } else {
-                if (page.addresses.length) {
-                    size += JSON.stringify(page.addresses).length
+                for (position in page.cache) {
+                    size += page.cache[position].size
                 }
-            }
-            for (position in page.cache) {
-                size += page.cache[position].size
             }
             ok(size == magazine.get(page.address).heft, 'sizes are wrong')
         }
