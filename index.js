@@ -866,6 +866,8 @@ function Strata (options) {
         function lock (address, exclusive, callback) {
             var cartridge = magazine.hold(address, {}), page = cartridge.value.page
 
+            ok(!locks[address], 'address already locked by this locker')
+
             if (!page)  {
                 page = cartridge.value.page = constructors[address % 2 ? 'leaf' : 'branch']({ address: address })
                 locks[page.address] = page.queue.createLock()
@@ -928,12 +930,17 @@ function Strata (options) {
             magazine.get(page.address).release()
         }
 
+        function increment (page) {
+            locks[page.address].increment()
+            magazine.hold(page.address)
+        }
+
         function dispose () {
             ok(!Object.keys(locks).length, 'locks outstanding')
             locks = null
         }
 
-        return classify.call(this, lock, unlock, dispose)
+        return classify.call(this, lock, increment, unlock, dispose)
     }
 
     function Descent (locker, override) {
@@ -942,10 +949,21 @@ function Strata (options) {
         var exclusive = override.exclusive || false,
             depth = override.depth == null ? -1 : override.depth,
             index = override.index == null ? 0 : override.index,
-            page = override.page || { addresses: [ 0 ] },
+            page = override.page,
             indexes = override.indexes || {},
             descent = {},
-            greater = override.greater, lesser = override.lesser
+            greater = override.greater, lesser = override.lesser,
+            called
+
+        if (!page) {
+            locker.lock(-2, false, function (error, $page) {
+                ok(!error, 'impossible error')
+                page = $page
+            })
+            ok(page, 'dummy page not in cache')
+        } else {
+            locker.increment(page)
+        }
 
         function _locker () { return locker }
 
@@ -971,6 +989,12 @@ function Strata (options) {
                 index: index,
                 indexes: extend({}, indexes)
             })
+        }
+
+        function dispose () {
+            if (greater) locker.unlock(greater.dispose())
+            if (lesser) locker.unlock(lesser.dispose())
+            return page
         }
 
         function exclude () { exclusive = true }
@@ -1017,11 +1041,8 @@ function Strata (options) {
             return function () { return level == depth }
         }
 
-        var unlocking = false
-
         function unlocker (parent) {
-            if (unlocking) locker.unlock(parent)
-            unlocking = true
+            locker.unlock(parent)
         }
 
         function unlocker_ ($unlocker) { unlocker = $unlocker }
@@ -1067,7 +1088,7 @@ function Strata (options) {
             }
         }
 
-        return classify.call(this, descend, fork, exclude, upgrade,
+        return classify.call(this, descend, fork, exclude, upgrade, dispose,
                                    key, left, right,
                                    found, address, child, penultimate, leaf, level,
                                    _locker, _page, _depth, _index, index_, _indexes, _lesser, _greater,
@@ -1911,10 +1932,9 @@ function Strata (options) {
                         if (singles.length == 0) singles.push(parent)
                         singles.push(child)
                     } else if (singles.length) {
-                        if (singles[0].address == pivot.page.address) singles.shift()
                         singles.forEach(function (page) { locker.unlock(page) })
                         singles.length = 0
-                    } else if (parent.address != pivot.page.address) {
+                    } else {
                         locker.unlock(parent)
                     }
                 }
@@ -1937,12 +1957,10 @@ function Strata (options) {
 
             function atLeftParent (callback) {
                 if (singles.right.length) {
-                    ancestor = singles.right.shift()
+                    ancestor = singles.right[0]
                 } else {
                     ancestor = parents.right.page
-                    if (parents.right.page.address != pivot.page.address) {
-                        descents.push(parents.right)
-                    }
+                    descents.push(parents.right)
                 }
 
                 if (leftKey && !ghosted) {
@@ -1954,7 +1972,7 @@ function Strata (options) {
                     }
                 }
 
-                if (parents.left.page.address != pivot.page.address && !singles.left.length) {
+                if (!singles.left.length) {
                     descents.push(parents.left)
                 }
 
@@ -2195,7 +2213,6 @@ function Strata (options) {
                     descents.push(designator = choice.fork())
                     designator.descend(designator.left, designator.leaf, check(designate))
                 } else {
-                    console.log('not', lesser, greater)
                     release()
                     callback(null)
                 }
