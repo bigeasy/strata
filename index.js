@@ -968,8 +968,6 @@ function Strata (options) {
                 page: page,
                 exclusive: exclusive,
                 depth: depth,
-                greater: greater,
-                lesser: lesser,
                 index: index,
                 indexes: extend({}, indexes)
             })
@@ -1038,12 +1036,10 @@ function Strata (options) {
                     unwind(callback, null, page, index)
                 } else {
                     if (index + 1 < page.addresses.length) {
-                        greater = fork()
-                        greater.index++
+                        greater = page.address
                     }
                     if (index > 0) {
-                        lesser = fork()
-                        lesser.index--
+                        lesser = page.address
                     }
                     locker.lock(page.addresses[index], exclusive, check(locked))
                 }
@@ -2160,19 +2156,27 @@ function Strata (options) {
             descents.push(center = new Descent(locker))
             center.descend(center.key(key), center.address(address), check(findLeftPage))
 
+            function goToPage (descent, address, direction, next) {
+                descents.push(descent)
+                descent.descend(descent.key(key), descent.address(address), check(goToSibling))
+
+                function goToSibling () {
+                    descent.index += direction == 'left' ? 1 : -1
+                    descent.descend(descent[direction], descent.level(center.depth), check(next))
+                }
+            }
+
             function findLeftPage () {
-                if (lesser = center.lesser) {
-                    descents.push(lesser)
-                    lesser.descend(lesser.right, lesser.level(center.depth), check(findRightPage))
+                if (center.lesser != null) {
+                    goToPage(lesser = new Descent(locker), center.lesser, 'right', findRightPage)
                 } else {
                     findRightPage()
                 }
             }
 
             function findRightPage () {
-                if (greater = center.greater) {
-                    descents.push(greater)
-                    greater.descend(greater.left, greater.level(center.depth), check(choose))
+                if (center.greater != null) {
+                    goToPage(greater = new Descent(locker), center.greater, 'left', choose)
                 } else {
                     choose()
                 }
@@ -2191,6 +2195,7 @@ function Strata (options) {
                     descents.push(designator = choice.fork())
                     designator.descend(designator.left, designator.leaf, check(designate))
                 } else {
+                    console.log('not', lesser, greater)
                     release()
                     callback(null)
                 }
