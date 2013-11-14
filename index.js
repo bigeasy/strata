@@ -692,8 +692,9 @@ function Strata (options) {
 
     function createMagazine () {
         var magazine = cache.createMagazine()
-        var dummy = magazine.hold(-1, {
+        var dummy = magazine.hold(-2, {
             page: {
+                address: -2,
                 addresses: [ 0 ],
                 queue: sequester.createQueue()
             }
@@ -764,7 +765,7 @@ function Strata (options) {
     }
 
     function close (callback) {
-        var cartridge = magazine.get(-1), lock = cartridge.value.page.lock
+        var cartridge = magazine.get(-2), lock = cartridge.value.page.lock
 
         lock.unlock()
         // todo
@@ -772,7 +773,7 @@ function Strata (options) {
 
         cartridge.release()
 
-        magazine.purge(-1)
+        magazine.purge(-2)
 
         ok(!magazine.count, 'pages still held by cache')
 
