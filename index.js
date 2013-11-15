@@ -53,7 +53,7 @@ function Strata (options) {
         if (typeof options.checksum == 'function') return options.checksum
         var algorithm
         switch (algorithm = options.checksum || 'sha1') {
-        case 'none':
+        case 'none': // todo: let user provide?
             return function () {
                 return {
                     update: function () {},
@@ -67,21 +67,23 @@ function Strata (options) {
     })()
 
     function validator (callback) {
-        return function (forward) { return validate(callback, forward) }
+        return function (forward, janitor) { return validate(callback, forward, janitor) }
     }
 
     var thrownByUser
 
-    function validate (callback, forward) {
+    function validate (callback, forward, janitor) {
         ok(typeof forward == 'function', 'no forward function')
         ok(typeof callback == 'function','no callback function')
         return function (error) {
             if (error) {
+                if (janitor) janitor()
                 toUserLand(callback, error)
             } else {
                 try {
                     forward.apply(null, __slice.call(arguments, 1))
                 } catch (error) {
+                    if (janitor) janitor()
                     if (thrownByUser === error) {
                         throw error
                     }
@@ -2351,7 +2353,7 @@ function Strata (options) {
 
             function pivotOrLeaf(page, index) {
                 if (descent.page.address % 2) {
-                    toUserLand(callback, null, new Cursor(descent.locker, false, key, page, index))
+                    callback(null, new Cursor(descent.locker, false, key, page, index))
                 } else {
                     descent.index--
                     toLeaf(descent.right, descent, null, exclusive, callback)
@@ -2373,16 +2375,21 @@ function Strata (options) {
         }
 
         function leaf (page, index) {
-            toUserLand(callback, null, new Cursor(descent.locker, exclusive, key, page, index))
+            callback(null, new Cursor(descent.locker, exclusive, key, page, index))
         }
     }
 
     function cursor (key, exclusive, callback) {
-        var descent = new Descent(new Locker)
+        var descent = new Descent(new Locker),
+            check = validator(callback, function () { descent.locker.unlock(descent.page) })
         if  (typeof key == 'function') {
-            key(descent, exclusive, callback)
+            key(descent, exclusive, check(done))
         } else {
-            toLeaf(descent.key(key), descent, key, exclusive, callback)
+            toLeaf(descent.key(key), descent, key, exclusive, check(done))
+        }
+
+        function done (cursor) {
+            toUserLand(callback, null, cursor)
         }
     }
 
