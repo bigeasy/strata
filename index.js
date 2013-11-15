@@ -1807,6 +1807,7 @@ function Strata (options) {
                 else paginated()
             }
 
+            var unwritten, pending
             function paginated () {
                 children.reverse()
 
@@ -1816,34 +1817,34 @@ function Strata (options) {
                     encacheEntry(root, address, keys[address])
                 })
 
-                children.forEach(function (page) { writeBranch(page, '.replace', check(childWritten)) })
+                unwritten = children.slice()
+                pending = children.slice()
+                writeChild()
             }
 
-            var childrenWritten = 0
-
-            function childWritten () {
-                if (++childrenWritten == children.length) {
-                    writeBranch(root, '.pending', check(rootWritten))
-                }
+            function writeChild () {
+                if (unwritten.length) writeBranch(unwritten.shift(), '.replace', check(writeChild))
+                else writeRoot()
             }
 
-            function rootWritten () {
+            function writeRoot () {
+                writeBranch(root, '.pending', check(commit))
+            }
+
+            function commit () {
                 rename(root, '.pending', '.commit', check(committing))
             }
 
             function committing () {
-                children.forEach(function (page) { replace(page, '.replace', check(childCommitted)) })
+                if (pending.length) replace(pending.shift(), '.replace', check(committing))
+                else committed()
             }
 
-            var childrenCommitted = 0
-
-            function childCommitted (callback) {
-                if (++childrenCommitted == children.length) {
-                    replace(root, '.commit', check(rootCommitted))
-                }
+            function committed () {
+                replace(root, '.commit', check(complete))
             }
 
-            function rootCommitted () {
+            function complete () {
                 release.apply(null, children)
                 locker.unlock(root)
                 locker.dispose()
