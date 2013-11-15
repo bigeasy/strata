@@ -1635,15 +1635,13 @@ function Strata (options) {
             }
 
             function persist () {
-                replacements.forEach(function (page) { replace(page, '.replace', check(complete)) })
+                if (replacements.length) replace(replacements.shift(), '.replace', check(persist))
+                else complete()
             }
 
-            function complete (callback) {
-                if (++completed == replacements.length) {
-                    release.apply(null, encached)
-
-                    replace(penultimate.page, '.commit', check(rebalance))
-                }
+            function complete () {
+                release.apply(null, encached)
+                replace(penultimate.page, '.commit', check(rebalance))
             }
 
             function rebalance () {
