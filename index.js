@@ -1505,8 +1505,8 @@ function Strata (options) {
         }
 
         function splitLeaf (key, ghosts, callback) {
-            var check = validator(callback),
-                locker = new Locker,
+            var locker = new Locker,
+                check = validator(callback, release),
                 descents = [], replacements = [], encached = [],
                 completed = 0,
                 penultimate, leaf, split, pages, page,
@@ -1540,7 +1540,8 @@ function Strata (options) {
 
                 if (split.positions.length - split.ghosts <= options.leafSize) {
                     balancer.unbalanced(split, true)
-                    cleanup() // todo: does not need to propagate split balance!
+                    release()
+                    callback(null)
                 } else {
                     partition()
                 }
@@ -1640,7 +1641,6 @@ function Strata (options) {
             }
 
             function complete () {
-                encached.forEach(function (page) { locker.unlock(page) })
                 replace(penultimate.page, '.commit', check(rebalance))
             }
 
@@ -1648,14 +1648,16 @@ function Strata (options) {
                 balancer.unbalanced(leaf.page, true)
                 balancer.unbalanced(page, true)
 
-                cleanup()
+                release()
+
+                shouldSplitBranch(penultimate.page, key, callback)
             }
 
-            function cleanup() {
+            function release () {
+                encached.forEach(function (page) { locker.unlock(page) })
                 descents.forEach(function (descent) { locker.unlock(descent.page) })
                 locker.dispose()
 
-                shouldSplitBranch(penultimate.page, key, callback)
             }
         }
 
