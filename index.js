@@ -2425,11 +2425,15 @@ function Strata (options) {
         }
 
         function begin (page) {
-            expand(page, root = page.addresses.map(record), 0, check(function () {
+            expand(page, root = page.addresses.map(record), 0, validate(callback, function () {
+                release()
+                toUserLand(callback, null, root)
+            }, release))
+
+            function release () {
                 locker.unlock(page)
                 locker.dispose()
-                toUserLand(callback, null, root)
-            }))
+            }
         }
 
         function expand (parent, pages, index, callback) {
@@ -2451,12 +2455,16 @@ function Strata (options) {
                 }
 
                 function keyed () {
-                    expand(page, pages[index].children, 0, check(expanded))
+                    expand(page, pages[index].children, 0, validate(callback, expanded, release))
                 }
 
                 function expanded () {
-                    locker.unlock(page)
+                    release()
                     expand(parent, pages, index + 1, callback)
+                }
+
+                function release () {
+                    locker.unlock(page)
                 }
             }
 
@@ -2468,15 +2476,19 @@ function Strata (options) {
 
                 function get (recordIndex) {
                     if (recordIndex < page.positions.length) {
-                        stash(page, recordIndex, check(push))
+                        stash(page, recordIndex, validate(callback, push, release))
                     } else {
-                        locker.unlock(page)
+                        release()
                         expand(parent, pages, index + 1, callback)
                     }
 
                     function push (entry) {
                         pages[index].children.push(entry.record)
                         get(recordIndex + 1)
+                    }
+
+                    function release () {
+                        locker.unlock(page)
                     }
                 }
             }
