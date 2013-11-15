@@ -1662,7 +1662,7 @@ function Strata (options) {
         }
 
         function splitBranch (address, key, callback) {
-            var check = validator(callback),
+            var check = validator(callback, release),
                 locker = new Locker,
                 descents = [],
                 children = [],
@@ -1752,15 +1752,18 @@ function Strata (options) {
             }
 
             function committed () {
-                replace(parent.page, '.commit', check(cleanup))
+                replace(parent.page, '.commit', check(complete))
             }
 
-            function cleanup() {
+            function complete () {
+                release()
+                shouldSplitBranch(parent.page, key, callback)
+            }
+
+            function release () {
                 encached.forEach(function (page) { locker.unlock(page) })
                 descents.forEach(function (descent) { locker.unlock(descent.page) })
                 locker.dispose()
-
-                shouldSplitBranch(parent.page, key, callback)
             }
         }
 
