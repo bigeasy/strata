@@ -1725,34 +1725,34 @@ function Strata (options) {
                 else paginated()
             }
 
+            var unwritten, pending
             function paginated () {
                 children.unshift(full.page)
-
-                children.forEach(function (page) { writeBranch(page, '.replace', check(childWritten)) })
+                unwritten = children.slice()
+                pending = children.slice()
+                writeChild()
             }
 
-            var childrenWritten = 0
-
-            function childWritten () {
-                if (++childrenWritten == children.length) {
-                    writeBranch(parent.page, '.pending', check(rootWritten))
-                }
+            function writeChild () {
+                if (unwritten.length) writeBranch(unwritten.shift(), '.replace', check(writeChild))
+                else writeParent()
             }
 
-            function rootWritten () {
+            function writeParent () {
+                writeBranch(parent.page, '.pending', check(commit))
+            }
+
+            function commit () {
                 rename(parent.page, '.pending', '.commit', check(committing))
             }
 
             function committing () {
-                children.forEach(function (page) { replace(page, '.replace', check(childCommitted)) })
+                if (pending.length) replace(pending.shift(), '.replace', check(committing))
+                else committed()
             }
 
-            var childrenCommitted = 0
-
-            function childCommitted (callback) {
-                if (++childrenCommitted == children.length) {
-                    replace(parent.page, '.commit', check(cleanup))
-                }
+            function committed () {
+                replace(parent.page, '.commit', check(cleanup))
             }
 
             function cleanup() {
