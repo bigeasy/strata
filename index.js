@@ -710,7 +710,7 @@ function Strata (options) {
     }
 
     function create (callback) {
-        var root, leaf, check = validator(callback), count = 0
+        var check = validator(callback), locker = new Locker, count = 0, root, leaf
 
         magazine = createMagazine()
 
@@ -725,26 +725,30 @@ function Strata (options) {
             ok(!files.filter(function (f) { return ! /^\./.test(f) }).length,
                   'database ' + directory + ' is not empty.')
 
-            root = encache(createBranch({ penultimate: true }))
-            leaf = encache(createLeaf({}))
+            root = locker.encache(createBranch({ penultimate: true }))
+            leaf = locker.encache(createLeaf({}))
             splice('addresses', root, 0, 0, leaf.address)
 
-            writeBranch(root, '.replace', check(written))
-            rewriteLeaf(leaf, '.replace', check(written))
+            writeBranch(root, '.replace', check(branchWritten))
         }
 
-        function written () {
-            if (++count == 2) {
-                replace(leaf, '.replace', check(replaced))
-                replace(root, '.replace', check(replaced))
-            }
+        function branchWritten () {
+            rewriteLeaf(leaf, '.replace', check(leafWritten))
         }
 
-        function replaced() {
-            if (--count == 0) {
-                release(root, leaf)
-                toUserLand(callback)
-            }
+        function leafWritten () {
+            replace(root, '.replace', check(branchReplaced))
+        }
+
+        function branchReplaced () {
+            replace(leaf, '.replace', check(leafReplaced))
+        }
+
+        function leafReplaced() {
+            locker.unlock(root)
+            locker.unlock(leaf)
+            locker.dispose()
+            toUserLand(callback)
         }
     }
 
@@ -906,6 +910,13 @@ function Strata (options) {
             })
         }
 
+        function encache (page) {
+            magazine.hold(page.address, { page: page })
+            locks[page.address] = page.queue.createLock()
+            locks[page.address].exclude(function () {})
+            return page
+        }
+
         function checkCacheSize (page) {
             var size = 0, position
             if (page.address != -2) {
@@ -945,7 +956,7 @@ function Strata (options) {
             locks = null
         }
 
-        return classify.call(this, lock, increment, unlock, dispose)
+        return classify.call(this, lock, encache, increment, unlock, dispose)
     }
 
     function Descent (locker, override) {
