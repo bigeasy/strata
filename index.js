@@ -1696,7 +1696,7 @@ function Strata (options) {
             }
 
             function paginate () {
-                var page = encache(createBranch({}))
+                var page = locker.encache(createBranch({}))
 
                 children.push(page)
                 encached.push(page)
@@ -1756,7 +1756,7 @@ function Strata (options) {
             }
 
             function cleanup() {
-                release.apply(null, encached)
+                encached.forEach(function (page) { locker.unlock(page) })
                 descents.forEach(function (descent) { locker.unlock(descent.page) })
                 locker.dispose()
 
