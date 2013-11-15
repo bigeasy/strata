@@ -1785,7 +1785,7 @@ function Strata (options) {
             }
 
             function paginate () {
-                var page = encache(createBranch({}))
+                var page = locker.encache(createBranch({}))
 
                 children.push(page)
 
@@ -1848,7 +1848,7 @@ function Strata (options) {
             }
 
             function complete () {
-                release.apply(null, children)
+                children.forEach(function (page) { locker.unlock(page) })
                 locker.unlock(root)
                 locker.dispose()
                 if (root.addresses.length > options.branchSize) drainRoot(callback)
