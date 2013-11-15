@@ -1564,7 +1564,7 @@ function Strata (options) {
             }
 
             function shuffle () {
-                page = encache(createLeaf({ loaded: true }))
+                page = locker.encache(createLeaf({ loaded: true }))
                 encached.push(page)
 
                 page.right = right
@@ -1640,7 +1640,7 @@ function Strata (options) {
             }
 
             function complete () {
-                release.apply(null, encached)
+                encached.forEach(function (page) { locker.unlock(page) })
                 replace(penultimate.page, '.commit', check(rebalance))
             }
 
