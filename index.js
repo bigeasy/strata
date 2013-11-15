@@ -47,7 +47,7 @@ function Strata (options) {
         constructors = {},
         serialize = options.serialize || function (object) { return new Buffer(JSON.stringify(object)) },
         deserialize = options.deserialize || function (buffer) { return JSON.parse(buffer.toString()) },
-        tracer = options.tracer || function () { arguments[1]() }
+        tracer = options.tracer || function () { arguments[2]() }
 
     checksum = (function () {
         if (typeof options.checksum == 'function') return options.checksum
@@ -1312,7 +1312,7 @@ function Strata (options) {
                             ordered[node.address] = node
                             if (page.ghosts)
                                 ghosts[node.address] = node
-                            tracer('reference', check(traced))
+                            tracer('reference', {}, check(traced))
                         }
 
                         function traced () { next(node) }
@@ -1378,7 +1378,7 @@ function Strata (options) {
                         gather()
                     } else {
                         locker.dispose()
-                        tracer('plan', check(traced))
+                        tracer('plan', {}, check(traced))
                     }
                 }
 
@@ -1613,7 +1613,7 @@ function Strata (options) {
             }
 
             function trace () {
-                tracer('splitLeafCommit', check(commit))
+                tracer('splitLeafCommit', {}, check(commit))
             }
 
             function commit () {

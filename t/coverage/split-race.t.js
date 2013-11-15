@@ -4,7 +4,7 @@ require('./proof')(2, function (step, tmp, Strata, serialize, load, objectify, g
     say, die, cadence) {
     var fs = require('fs'), strata, records = [], count = 0
 
-    function tracer (type, callback) {
+    function tracer (type, object, callback) {
         switch (type) {
         case 'plan':
             if (!count++) {
