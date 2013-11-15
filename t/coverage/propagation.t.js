@@ -13,6 +13,7 @@ require('./proof')(1, function (step, Strata, equal, tmp) {
                         throw new Error('propagated')
                 })
         } catch (e) {
+        // todo: dedent
                 equal(e.message, 'propagated', 'propagated error')
 
                 strata.close(step())

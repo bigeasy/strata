@@ -66,8 +66,8 @@ function Strata (options) {
         }
     })()
 
-    function validator (callback) {
-        return function (forward, janitor) { return validate(callback, forward, janitor) }
+    function validator (callback, janitor) {
+        return function (forward) { return validate(callback, forward, janitor) }
     }
 
     var thrownByUser
@@ -83,10 +83,10 @@ function Strata (options) {
                 try {
                     forward.apply(null, __slice.call(arguments, 1))
                 } catch (error) {
-                    if (janitor) janitor()
                     if (thrownByUser === error) {
                         throw error
                     }
+                    if (janitor) janitor()
                     toUserLand(callback, error)
                 }
             }
@@ -517,8 +517,9 @@ function Strata (options) {
         fs.open(filename(page.address), 'r', check(input))
 
         function input (fd) {
-            read()
+            tracer('readRecord', { page: page }, check(read))
 
+            // todo: use `io`.
             function read () {
                 fs.read(fd, new Buffer(length), 0, length, position, check(json))
             }
@@ -2381,7 +2382,10 @@ function Strata (options) {
 
     function cursor (key, exclusive, callback) {
         var descent = new Descent(new Locker),
-            check = validator(callback, function () { descent.locker.unlock(descent.page) })
+            check = validator(callback, function () {
+                descent.locker.unlock(descent.page)
+                descent.locker.dispose()
+            })
         if  (typeof key == 'function') {
             key(descent, exclusive, check(done))
         } else {
