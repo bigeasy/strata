@@ -278,6 +278,7 @@ function Strata (options) {
 
         if (options.type == 'position') {
             options.page.bookmark.length = length
+            options.page.bookmark.entry = entry[0]
         }
 
         position = options.page.position
@@ -354,7 +355,7 @@ function Strata (options) {
     function writeFooter (fd, page, callback) {
         ok(page.address % 2 && page.bookmark != null)
         var header = [
-            0, page.bookmark.position, page.bookmark.length, 0, // <- todo
+            0, page.bookmark.position, page.bookmark.length, page.bookmark.entry,
             page.right || 0, page.position, page.entries, page.ghosts, page.positions.length - page.ghosts
         ]
         writeEntry({ fd: fd, page: page, header: header, type: 'footer' }, validate(callback, function (position, length) {
@@ -412,6 +413,7 @@ function Strata (options) {
                 var positions = readEntry(slice.slice(0, bookmark.length)).header
 
                 page.entries = positions.shift()
+                ok(page.entries == bookmark.entry, 'position entry number incorrect')
                 ok(positions.shift() == 0, 'expected housekeeping type')
 
                 page.ghosts = positions.shift()
