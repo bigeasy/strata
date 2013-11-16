@@ -881,10 +881,10 @@ function Strata (options) {
                 locks[page.address] = page.queue.createLock()
             }
 
-            tracer('lock', { address: address, exclusive: exclusive }, check(traced))
+            locks[page.address][exclusive ? 'exclude' : 'share'](check(trace))
 
-            function traced (error) {
-                locks[page.address][exclusive ? 'exclude' : 'share'](check(complete))
+            function trace () {
+                tracer('lock', { address: address, exclusive: exclusive }, check(complete))
             }
 
             function complete () {
@@ -1000,11 +1000,20 @@ function Strata (options) {
         function upgrade (callback) {
             locker.unlock(page)
 
-            locker.lock(page.address, exclusive = true, validate(callback, locked))
+            locker.lock(page.address, exclusive = true, validate(callback, locked, failed))
 
             function locked (locked) {
+                console.log({ upgraded: locked.address })
                 page = locked
                 callback(null)
+            }
+
+            function failed () {
+                locker.lock(-2, false, function (error, locked) {
+                    ok(!error, 'impossible error')
+                    page = locked
+                })
+                ok(page, 'dummy page not in cache')
             }
         }
 
