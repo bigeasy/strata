@@ -468,12 +468,12 @@ function Strata (options) {
                                 if (index - 1) {
                                     encacheKey(page, address, entry.body, entry.length)
                                 }
-                            } else {
+                            } /* else {
                                 var cut = splice('addresses', page, ~index, 1)
                                 if (~index) {
                                     uncacheEntry(page, cut[0])
                                 }
-                            }
+                            } */
                         }
                     } else {
                         footer = entry.header
