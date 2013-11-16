@@ -1299,7 +1299,7 @@ function Strata (options) {
                         ok(page.address % 2, 'leaf page expected')
 
                         if (page.address == 1) identified({})
-                        else stash(page, 0, check(identified))
+                        else stash(page, 0, validate(callback, identified, unlock))
 
                         function identified (entry) {
                             node = {
@@ -1308,7 +1308,7 @@ function Strata (options) {
                                 rightAddress: page.right,
                                 length: page.positions.length - page.ghosts
                             }
-                            locker.unlock(page)
+                            unlock()
                             ordered[node.address] = node
                             if (page.ghosts)
                                 ghosts[node.address] = node
@@ -1316,6 +1316,8 @@ function Strata (options) {
                         }
 
                         function traced () { next(node) }
+
+                        function unlock () { locker.unlock(page) }
                     })
                 }
 
@@ -1334,13 +1336,13 @@ function Strata (options) {
 
                     function goToLeaf () {
                         descent.index--
-                        descent.descend(descent.right, descent.leaf, check(checkLists))
+                        descent.descend(descent.right, descent.leaf, validate(callback, checkLists, unlock))
                     }
 
                     function checkLists () {
                         var left
                         if (left = ordered[descent.page.address]) {
-                            locker.unlock(descent.page)
+                            unlock()
                             attach(left)
                         } else {
                             nodify(attach)(null, descent.page)
@@ -1352,6 +1354,10 @@ function Strata (options) {
                         node.left = left
 
                         rightSibling(node)
+                    }
+
+                    function unlock () {
+                       locker.unlock(descent.page)
                     }
                 }
 
