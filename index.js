@@ -1006,7 +1006,6 @@ function Strata (options) {
             locker.lock(page.address, exclusive = true, validate(callback, locked, failed))
 
             function locked (locked) {
-                console.log({ upgraded: locked.address })
                 page = locked
                 callback(null)
             }
