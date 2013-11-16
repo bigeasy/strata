@@ -67,7 +67,7 @@ function Strata (options) {
     })()
 
     function validator (callback, janitor) {
-        return function (forward) { return validate(callback, forward, janitor) }
+        return function (forward, janitor2) { return validate(callback, forward, janitor2 || janitor) }
     }
 
     var thrownByUser
@@ -1250,8 +1250,8 @@ function Strata (options) {
 
             fs.open(filename(page.address), 'r+', 0644, check(opened))
 
-            function opened ($) {
-                writeDelete(fd = $, page, index, check(written))
+            function opened (opened) {
+                writeDelete(fd = opened, page, index, check(written, close))
             }
 
             function written () {
@@ -1263,11 +1263,15 @@ function Strata (options) {
                     splice('positions', page, index, 1)
                     splice('lengths', page, index, 1)
                 }
-                fs.close(fd, check(closed))
+                close()
             }
 
-            function closed () {
-                toUserLand(callback, null)
+            function close (writeError) {
+                fs.close(fd, check(complete, complete))
+
+                function complete (closeError) {
+                    toUserLand(callback, writeError || closeError)
+                }
             }
         }
 
