@@ -1177,16 +1177,13 @@ function Strata (options) {
             }
 
             unambiguous = index < page.positions.length
-
             unambiguous = unambiguous || searchKey.length && comparator(searchKey[0], key) == 0
-
             unambiguous = unambiguous || ! page.right
 
-            if (unambiguous) insert ()
+            if (unambiguous) insert()
             else ambiguity()
 
             function ambiguity () {
-
                 if (rightLeafKey) {
                     compare()
                 } else {
@@ -1194,12 +1191,16 @@ function Strata (options) {
                 }
 
                 function load (rightLeafPage) {
-                    stash(rightLeafPage, 0, check(designated))
+                    stash(rightLeafPage, 0, validate(callback, designated, release))
 
                     function designated (entry) {
                         rightLeafKey = entry.key
-                        locker.unlock(rightLeafPage)
+                        release()
                         compare()
+                    }
+
+                    function release () {
+                        locker.unlock(rightLeafPage)
                     }
                 }
 
@@ -1216,8 +1217,8 @@ function Strata (options) {
 
                 fs.open(filename(page.address), 'r+', 0644, check(write))
 
-                function write ($) {
-                    writeInsert(fd = $, page, index, record, check(written))
+                function write (opened) {
+                    writeInsert(fd = opened, page, index, record, validate(callback, written, close))
                 }
 
                 function written (position, length, size) {
@@ -1226,11 +1227,16 @@ function Strata (options) {
                     _cacheRecord(page, position, record, size)
 
                     length = page.positions.length
-                    fs.close(fd, check(close))
+
+                    close()
                 }
 
-                function close () {
-                    toUserLand(callback, null, 0)
+                function close (writeError) {
+                    fs.close(fd, validate(callback, complete, complete))
+
+                    function complete (closeError) {
+                        toUserLand(callback, writeError || closeError, 0)
+                    }
                 }
             }
         }
