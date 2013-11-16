@@ -193,6 +193,19 @@ shared and exclusive would be simpler, but we won't be able to bandy about the
 word reentrant. The concept probably requires more complexity, which we would
 have to add in order to have a problem that reentrancy could solve.
 
+This will work or the program will fail. This needs to be documented in
+Sequester, Srata and Locket; that you can't throw an exception from a callback
+and expect it to propagate. They don't. We don't want to swallow errors, but
+when we unlock, and invoke other descents, and possibly have user code raise
+exceptions, it is very difficult to test that the tree's state will be
+preserved.
+
+Sensing that I'm up against a ledge with this. I'm not interested in
+collaborating with users who don't yet understand the limits of try/catch in
+node. For an initial release, it is enough that Strata is able to recover from
+any form of I/O error and leave the tree in memory, it's cache and it's locks,
+in a consistent state.
+
 ## Records and Keys
 
 I'd imagined to use Strata to create a database that stores objects and the keys
