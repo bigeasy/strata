@@ -77,7 +77,7 @@ function Strata (options) {
         ok(typeof callback == 'function','no callback function')
         return function (error) {
             if (error) {
-                if (janitor) janitor()
+                if (janitor) janitor(error)
                 toUserLand(callback, error)
             } else {
                 try {
@@ -86,7 +86,7 @@ function Strata (options) {
                     if (thrownByUser === error) {
                         throw error
                     }
-                    if (janitor) janitor()
+                    if (janitor) janitor(error)
                     toUserLand(callback, error)
                 }
             }
@@ -859,7 +859,8 @@ function Strata (options) {
         var locks ={}
 
         function lock (address, exclusive, callback) {
-            var cartridge = magazine.hold(address, {}), page = cartridge.value.page
+            var check = validator(callback, release),
+                cartridge = magazine.hold(address, {}), page = cartridge.value.page
 
             ok(!locks[address], 'address already locked by this locker')
 
@@ -884,16 +885,21 @@ function Strata (options) {
                 locks[page.address] = page.queue.createLock()
             }
 
-            locks[page.address][exclusive ? 'exclude' : 'share'](function (error) {
-                if (error) {
-                    magazine.get(page.address).release()
-                    locks[page.address].unlock(error)
-                    delete locks[page.address]
-                    callback(error)
-                } else {
-                    callback(null, page)
-                }
-            })
+            tracer('lock', { address: address, exclusive: exclusive }, check(traced))
+
+            function traced (error) {
+                locks[page.address][exclusive ? 'exclude' : 'share'](check(complete))
+            }
+
+            function complete () {
+                callback(null, page)
+            }
+
+            function release (error) {
+                magazine.get(page.address).release()
+                locks[page.address].unlock(error)
+                delete locks[page.address]
+            }
         }
 
         function encache (page) {
