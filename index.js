@@ -1930,7 +1930,7 @@ function Strata (options) {
         }
 
         function mergePages (key, leftKey, stopper, merger, ghostly, callback) {
-            var check = validator(callback),
+            var check = validator(callback, release),
                 locker = new Locker,
                 descents = [], singles = { left: [], right: [] }, parents = {}, pages = {},
                 ancestor, pivot, empties, ghosted, designation
@@ -1992,7 +1992,6 @@ function Strata (options) {
                     ancestor = singles.right[0]
                 } else {
                     ancestor = parents.right.page
-                    descents.push(parents.right)
                 }
 
                 if (leftKey && !ghosted) {
@@ -2002,10 +2001,6 @@ function Strata (options) {
                         ghosted = { page: parents.left.page, index: parents.left.index }
                         ok(parents.left.index == parents.left.indexes[parents.left.page.address], 'TODO: ok to replace the above')
                     }
-                }
-
-                if (!singles.left.length) {
-                    descents.push(parents.left)
                 }
 
                 descents.push(pages.left = parents.left.fork())
@@ -2025,7 +2020,8 @@ function Strata (options) {
                 if (dirty) {
                     renameRightPageToMerge()
                 } else {
-                    release(callback)() // todo: why generate a callback? why not just call?
+                    release()
+                    callback()
                 }
             }
 
@@ -2088,20 +2084,11 @@ function Strata (options) {
             }
 
             function endCommit () {
-                replace(ancestor, '.commit', check(release(propagate)))
-            }
-
-            function release (next) {
-                return function () {
-                    descents.forEach(function (descent) { locker.unlock(descent.page) })
-                    singles.right.forEach(function (page) { locker.unlock(page) })
-                    singles.left.forEach(function (page) { locker.unlock(page) })
-                    locker.dispose()
-                    next()
-                }
+                replace(ancestor, '.commit', check(propagate))
             }
 
             function propagate () {
+                release()
                 if (ancestor.address == 0) {
                     if (ancestor.addresses.length == 1 && !(ancestor.addresses[0] % 2)) {
                         fillRoot(callback)
@@ -2111,6 +2098,18 @@ function Strata (options) {
                 } else {
                     chooseBranchesToMerge(designation.key, ancestor.address, callback)
                 }
+            }
+
+            function release () {
+                descents.forEach(function (descent) { locker.unlock(descent.page) })
+                ! [ 'left', 'right' ].forEach(function (direction) {
+                    if (singles[direction].length) {
+                        singles[direction].forEach(function (page) { locker.unlock(page) })
+                    } else {
+                        locker.unlock(parents[direction].page)
+                    }
+                })
+                locker.dispose()
             }
         }
 
