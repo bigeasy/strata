@@ -2089,6 +2089,7 @@ function Strata (options) {
 
             function propagate () {
                 release()
+
                 if (ancestor.address == 0) {
                     if (ancestor.addresses.length == 1 && !(ancestor.addresses[0] % 2)) {
                         fillRoot(callback)
