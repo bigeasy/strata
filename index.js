@@ -1103,7 +1103,7 @@ function Strata (options) {
             offset = index < 0 ? ~ index : index
 
         function get (index, callback) {
-            stash(page, index, validator(callback)(unstashed))
+            stash(page, index, validate(callback, unstashed))
             function unstashed (entry) { toUserLand(callback, null, entry.record) }
         }
 
@@ -1754,15 +1754,15 @@ function Strata (options) {
         }
 
         function drainRoot (callback) {
-            var check = validator(callback),
+            var check = validator(callback, release),
                 locker = new Locker,
                 keys = {}, children = [],
                 root, pages, records, remainder
 
             locker.lock(0, true, check(partition))
 
-            function partition ($root) {
-                root = $root
+            function partition (locked) {
+                root = locked
                 pages = Math.ceil(root.addresses.length / options.branchSize)
                 records = Math.floor(root.addresses.length / pages)
                 remainder = root.addresses.length % pages
@@ -1834,11 +1834,15 @@ function Strata (options) {
             }
 
             function complete () {
-                children.forEach(function (page) { locker.unlock(page) })
-                locker.unlock(root)
-                locker.dispose()
+                release()
                 if (root.addresses.length > options.branchSize) drainRoot(callback)
                 else callback(null)
+            }
+
+            function release () {
+                children.forEach(function (page) { locker.unlock(page) })
+                if (root) locker.unlock(root)
+                locker.dispose()
             }
         }
 
