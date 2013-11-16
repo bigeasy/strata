@@ -832,11 +832,7 @@ function Strata (options) {
         function test () {
             if (low <= high) {
                 mid = low + ((high - low) >>> 1)
-                if (page.address % 2) {
-                    stash(page, mid, check(function (entry) { compare(entry.key) }))
-                } else {
-                    compare(page.cache[page.addresses[mid]].key)
-                }
+                stash(page, mid, check(function (entry) { compare(entry.key) }))
             } else {
                 unwind(callback, null, ~low)
             }
