@@ -2351,72 +2351,74 @@ function Strata (options) {
         return classify.call(this, balance, unbalanced)
     }
 
-    function left (descent, exclusive, callback) {
-        toLeaf(descent.left, descent, null, exclusive, callback)
+    function left (descents, exclusive, callback) {
+        toLeaf(descents[0].left, descents, null, exclusive, callback)
     }
 
-    function right (descent, exclusive, callback) {
-        toLeaf(descent.right, descent, null, exclusive, callback)
+    function right (descents, exclusive, callback) {
+        toLeaf(descents[0].right, descents, null, exclusive, callback)
     }
 
     function key(key) {
-        return function (descent, exclusive, callback) {
-            toLeaf(descent.key(key), descent, null, exclusive, callback)
+        return function (descents, exclusive, callback) {
+            toLeaf(descents[0].key(key), descents, null, exclusive, callback)
         }
     }
 
     function leftOf (key) {
-        return function (descent, exclusive, callback) {
+        return function (descents, exclusive, callback) {
             var conditions, check = validator(callback)
 
             thrownByUser = null
 
-            var conditions = [ descent.leaf, descent.found([key]) ]
+            var conditions = [ descents[0].leaf, descents[0].found([key]) ]
 
-            descent.descend(descent.key(key), function () {
+            descents[0].descend(descents[0].key(key), function () {
                 return conditions.some(function (condition) {
                     return condition()
                 })
             }, check(pivotOrLeaf))
 
             function pivotOrLeaf(page, index) {
-                if (descent.page.address % 2) {
-                    callback(null, new Cursor([ descent ], false, key))
+                if (descents[0].page.address % 2) {
+                    callback(null, new Cursor(descents, false, key))
                 } else {
-                    descent.index--
-                    toLeaf(descent.right, descent, null, exclusive, callback)
+                    descents[0].index--
+                    toLeaf(descents[0].right, descents, null, exclusive, callback)
                 }
             }
         }
     }
 
-    function toLeaf (sought, descent, key, exclusive, callback) {
+    function toLeaf (sought, descents, key, exclusive, callback) {
         var check = validator(callback)
 
         thrownByUser = null
 
-        descent.descend(sought, descent.penultimate, check(penultimate))
+        descents[0].descend(sought, descents[0].penultimate, check(penultimate))
 
         function penultimate() {
-            if (exclusive) descent.exclude()
-            descent.descend(sought, descent.leaf, check(leaf))
+            if (exclusive) descents[0].exclude()
+            descents[0].descend(sought, descents[0].leaf, check(leaf))
         }
 
         function leaf (page, index) {
-            callback(null, new Cursor([ descent ], exclusive, key))
+            callback(null, new Cursor(descents, exclusive, key))
         }
     }
 
     function cursor (key, exclusive, callback) {
-        var descent = new Descent(new Locker),
+        var descents = [ new Descent(new Locker) ],
             check = validator(callback, function () {
-                descent.locker.unlock(descent.page)
-                descent.locker.dispose()
+                if (descents.length) {
+                    descents[0].locker.unlock(descents[0].page)
+                    descents[0].locker.dispose()
+                }
             })
         if  (typeof key == 'function') {
-            key(descent, exclusive, check(done))
+            key(descents, exclusive, check(done))
         } else {
-            toLeaf(descent.key(key), descent, key, exclusive, check(done))
+            toLeaf(descents[0].key(key), descents, key, exclusive, check(done))
         }
 
         function done (cursor) {
