@@ -1102,10 +1102,15 @@ function Strata (options) {
                                    unlocker_)
     }
 
-    function Cursor (locker, exclusive, searchKey, page, index) {
-        var rightLeafKey = null,
+    function Cursor (descents, exclusive, searchKey) {
+        var locker = descents[0].locker,
+            page = descents[0].page,
+            rightLeafKey = null,
             length = page.positions.length,
+            index = descents[0].index,
             offset = index < 0 ? ~ index : index
+
+        descents.shift()
 
         function get (index, callback) {
             stash(page, index, validate(callback, unstashed))
@@ -2376,7 +2381,7 @@ function Strata (options) {
 
             function pivotOrLeaf(page, index) {
                 if (descent.page.address % 2) {
-                    callback(null, new Cursor(descent.locker, false, key, page, index))
+                    callback(null, new Cursor([ descent ], false, key))
                 } else {
                     descent.index--
                     toLeaf(descent.right, descent, null, exclusive, callback)
@@ -2398,7 +2403,7 @@ function Strata (options) {
         }
 
         function leaf (page, index) {
-            callback(null, new Cursor(descent.locker, exclusive, key, page, index))
+            callback(null, new Cursor([ descent ], exclusive, key))
         }
     }
 
