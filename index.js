@@ -1784,13 +1784,13 @@ function Strata (options) {
         function drainRoot (callback) {
             var check = validator(callback, release),
                 locker = new Locker,
-                keys = {}, children = [],
+                keys = {}, children = [], locks = [],
                 root, pages, records, remainder
 
             locker.lock(0, true, check(partition))
 
             function partition (locked) {
-                root = locked
+                locks.push(root = locked)
                 pages = Math.ceil(root.addresses.length / options.branchSize)
                 records = Math.floor(root.addresses.length / pages)
                 remainder = root.addresses.length % pages
@@ -1869,7 +1869,7 @@ function Strata (options) {
 
             function release () {
                 children.forEach(function (page) { locker.unlock(page) })
-                if (root) locker.unlock(root)
+                locks.forEach(function (page) { locker.unlock(root) })
                 locker.dispose()
             }
         }
