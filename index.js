@@ -83,10 +83,10 @@ function Strata (options) {
                 try {
                     forward.apply(null, __slice.call(arguments, 1))
                 } catch (error) {
+                    if (janitor) janitor(error)
                     if (thrownByUser === error) {
                         throw error
                     }
-                    if (janitor) janitor(error)
                     toUserLand(callback, error)
                 }
             }
@@ -856,7 +856,7 @@ function Strata (options) {
 
         function lock (address, exclusive, callback) {
             var check = validator(callback, release),
-                cartridge = magazine.hold(address, {}), page = cartridge.value.page
+                cartridge = magazine.hold(address, {}), page = cartridge.value.page, locked
 
             ok(!locks[address], 'address already locked by this locker')
 
@@ -888,13 +888,16 @@ function Strata (options) {
             }
 
             function complete () {
+                locked = true
                 callback(null, page)
             }
 
             function release (error) {
-                magazine.get(page.address).release()
-                locks[page.address].unlock(error)
-                delete locks[page.address]
+                if (!locked) {
+                    magazine.get(page.address).release()
+                    locks[page.address].unlock(error)
+                    delete locks[page.address]
+                }
             }
         }
 
