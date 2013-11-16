@@ -2186,7 +2186,7 @@ function Strata (options) {
         }
 
         function chooseBranchesToMerge (key, address, callback) {
-            var check = validator(callback),
+            var check = validator(callback, release),
                 locker = new Locker,
                 descents = [],
                 choice, lesser, greater, center
