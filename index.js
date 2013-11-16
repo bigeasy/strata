@@ -2042,7 +2042,7 @@ function Strata (options) {
                     uncacheEntry(ancestor, address)
                 }
 
-                empties = singles.right.slice()
+                empties = singles.right.slice(1)
                 writeBranch(ancestor, '.pending', check(rewriteEmpties))
             }
 
@@ -2055,7 +2055,7 @@ function Strata (options) {
             }
 
             function beginCommit () {
-                empties = singles.right.slice()
+                empties = singles.right.slice(1)
                 rename(ancestor, '.pending', '.commit', check(unlinkEmpties))
             }
 
