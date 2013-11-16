@@ -657,7 +657,7 @@ function Strata (options) {
             function write () {
                 if (addresses.length) {
                     var address = addresses.shift()
-                    var key = page.entries ? getKey(page.cache[address]) : null
+                    var key = page.entries ? page.cache[address].key : null
                     page.entries++
                     var header = [ page.entries, page.entries, address ]
                     writeEntry({ fd: fd, page: page, header: header, body: key, isKey: true }, check(write))
@@ -835,7 +835,7 @@ function Strata (options) {
                 if (page.address % 2) {
                     stash(page, mid, check(function (entry) { compare(entry.key) }))
                 } else {
-                    compare(getKey(page.cache[page.addresses[mid]]))
+                    compare(page.cache[page.addresses[mid]].key)
                 }
             } else {
                 unwind(callback, null, ~low)
@@ -1026,7 +1026,7 @@ function Strata (options) {
         function found (keys) {
             return function () {
                 return page.addresses[0] != 0 && index != 0 && keys.some(function (key) {
-                    return comparator(getKey(page.cache[page.addresses[index]]),  key) == 0
+                    return comparator(page.cache[page.addresses[index]].key,  key) == 0
                 })
             }
         }
@@ -1930,7 +1930,7 @@ function Strata (options) {
             pivot.descend(pivot.key(key), pivot.found(keys), check(lockPivot))
 
             function lockPivot () {
-                var found = getKey(pivot.page.cache[pivot.page.addresses[pivot.index]])
+                var found = pivot.page.cache[pivot.page.addresses[pivot.index]].key
                 if (comparator(found, keys[0]) == 0) {
                     pivot.upgrade(check(atPivot))
                 } else {
@@ -2097,7 +2097,7 @@ function Strata (options) {
                         callback(null)
                     }
                 } else {
-                    chooseBranchesToMerge(getKey(designation), ancestor.address, callback)
+                    chooseBranchesToMerge(designation.key, ancestor.address, callback)
                 }
             }
         }
@@ -2461,7 +2461,7 @@ function Strata (options) {
 
             function branch (page) {
                 pages[index].children = page.addresses.map(record)
-                if (index) designated(getKey(parent.cache[parent.addresses[index]]))
+                if (index) designated(parent.cache[parent.addresses[index]].key)
                 else keyed()
 
                 function designated (key) {
@@ -2511,11 +2511,6 @@ function Strata (options) {
     }
 
     function purge (downTo) { magazine.purge(downTo) }
-
-    function getKey (entry) {
-        ok(entry.key)
-        return entry.key
-    }
 
     return classify.call(this, create, open,
                                key, left, leftOf, right,
