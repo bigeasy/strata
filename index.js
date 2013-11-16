@@ -180,20 +180,6 @@ function Strata (options) {
 
     constructors.leaf = createLeaf
 
-    function encache (page) {
-        magazine.hold(page.address, { page: page })
-        var lock = page.queue.createLock()
-        lock.exclude(function () {})
-        lock.unlock(null, page)
-        return page
-    }
-
-    function release () {
-        __slice.call(arguments).forEach(function (page) {
-            magazine.get(page.address).release()
-        })
-    }
-
     function _cacheRecord (page, position, record, length) {
         var key = extractor(record)
         ok(key != null, 'null keys are forbidden')
