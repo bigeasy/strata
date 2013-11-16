@@ -999,12 +999,6 @@ function Strata (options) {
             })
         }
 
-        function dispose () {
-            if (greater) locker.unlock(greater.dispose())
-            if (lesser) locker.unlock(lesser.dispose())
-            return page
-        }
-
         function exclude () { exclusive = true }
 
         function upgrade (callback) {
@@ -1096,7 +1090,7 @@ function Strata (options) {
             }
         }
 
-        return classify.call(this, descend, fork, exclude, upgrade, dispose,
+        return classify.call(this, descend, fork, exclude, upgrade,
                                    key, left, right,
                                    found, address, child, penultimate, leaf, level,
                                    _locker, _page, _depth, _index, index_, _indexes, _lesser, _greater,
