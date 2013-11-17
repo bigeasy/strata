@@ -54,7 +54,7 @@ function Strata (options) {
         if (typeof options.checksum == 'function') return options.checksum
         var algorithm
         switch (algorithm = options.checksum || 'sha1') {
-        case 'none': // todo: let user provide?
+        case 'none':
             return function () {
                 return {
                     update: function () {},
