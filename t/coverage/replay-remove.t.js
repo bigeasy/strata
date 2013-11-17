@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-// Asserts that log replay will skip over the positions array.
+// Asserts that log replay will add and remove a record.
 
 require('./proof')(1, function (step, tmp, Strata, deepEqual, say, gather) {
     var fs = require('fs'), strata
@@ -12,16 +12,18 @@ require('./proof')(1, function (step, tmp, Strata, deepEqual, say, gather) {
     }, function (cursor) {
         step(function () {
             cursor.insert('a', 'a', ~ cursor.index, step())
+        }, function (inserted) {
+            cursor.remove(0, step())
         }, function () {
             cursor.unlock()
         })
     }, function () {
         gather(step, strata)
     }, function (records) {
-        deepEqual(records, [ 'a' ], 'written')
+        deepEqual(records, [], 'empty')
         strata.close(step())
     }, function () {
-        strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3, replay: true })
+        strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
         strata.open(step())
     }, function () {
         strata.iterator('a', step())

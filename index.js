@@ -350,8 +350,17 @@ function Strata (options) {
         }))
     }
 
-    function readFooter (buffer) {
-        var footer = readEntry(buffer).header
+    function readHeader (entry) {
+        var header = entry.header
+        return {
+            entry:      header[0],
+            index:      header[1],
+            address:    header[2]
+        }
+    }
+
+    function readFooter (entry) {
+        var footer = entry.header
         return {
             entry:      footer[0],
             bookmark: {
@@ -373,16 +382,26 @@ function Strata (options) {
             bookmark,
             check = validator(callback)
 
-        io('read', filename(page.address), check(opened))
+        if (options.replay) {
+            io('read', filename(page.address), check(forward))
+        } else {
+            io('read', filename(page.address), check(backward))
+        }
 
-        function opened (fd, stat, read) {
+        function forward (fd, stat, read) {
+            page.entries = 0
+            page.ghosts = 0
+            replay(fd, stat, read, page, 0, check(done))
+        }
+
+        function backward (fd, stat, read) {
             var buffer = new Buffer(options.readLeafStartLength || 1024)
             read(buffer, Math.max(0, stat.size - buffer.length), check(footer))
 
             function footer (slice) {
                 for (var i = slice.length - 2; i != -1; i--) {
                     if (slice[i] == 0x0a) {
-                        var footer = readFooter(slice.slice(i + 1))
+                        var footer = readFooter(readEntry(slice.slice(i + 1)))
                         ok(!footer.entry, 'footer is supposed to be zero')
                         bookmark = footer.bookmark
                         page.right = footer.right
@@ -443,10 +462,10 @@ function Strata (options) {
                     var position = start + offset
                     ok(length)
                     var entry = readEntry(slice.slice(offset, offset + length), !leaf)
-                    var header = entry.header
-                    if (header[0]) {
-                        ok(header.shift() == ++page.entries, 'entry count is off')
-                        var index = header.shift()
+                    var header = readHeader(entry)
+                    if (header.entry) {
+                        ok(header.entry == ++page.entries, 'entry count is off')
+                        var index = header.index
                         if (leaf) {
                             if (index > 0) {
                                 seen[position] = true
@@ -460,10 +479,16 @@ function Strata (options) {
                                 var outgoing = splice('positions', page, -(index + 1), 1).shift()
                                 if (seen[outgoing]) uncacheEntry(page, outgoing)
                                 splice('lengths', page, -(index + 1), 1)
+                            } else {
+                                page.bookmark = {
+                                    position: position,
+                                    length: length,
+                                    entry: header.entry
+                                }
                             }
                         } else {
                             /* if (index > 0) { */
-                                var address = header.shift()
+                                var address = header.address
                                 splice('addresses', page, index - 1, 0, address)
                                 if (index - 1) {
                                     encacheKey(page, address, entry.body, entry.length)
@@ -476,7 +501,9 @@ function Strata (options) {
                             } */
                         }
                     } else {
-                        footer = entry.header
+                        footer = readFooter(entry)
+                        page.position = position
+                        page.right = footer.right
                     }
                     i = offset = offset + length
                 }
