@@ -37,6 +37,7 @@ function Strata (options) {
         path = options.path || require('path'),
         ok = function (condition, message) { if (!condition) throw new Error(message) },
         cache = options.cache || (new (require('magazine'))),
+        thrownByUser,
         magazine,
         nextAddress = 0,
         length = 1024,
@@ -69,8 +70,6 @@ function Strata (options) {
     function validator (callback, janitor) {
         return function (forward, janitor2) { return validate(callback, forward, janitor2 || janitor) }
     }
-
-    var thrownByUser
 
     function validate (callback, forward, janitor) {
         ok(typeof forward == 'function', 'no forward function')
