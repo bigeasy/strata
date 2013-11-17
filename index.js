@@ -462,13 +462,13 @@ function Strata (options) {
                                 splice('lengths', page, -(index + 1), 1)
                             }
                         } else {
-                            if (index > 0) {
+                            /* if (index > 0) { */
                                 var address = header.shift()
                                 splice('addresses', page, index - 1, 0, address)
                                 if (index - 1) {
                                     encacheKey(page, address, entry.body, entry.length)
                                 }
-                            } /* else {
+                            /* } else {
                                 var cut = splice('addresses', page, ~index, 1)
                                 if (~index) {
                                     uncacheEntry(page, cut[0])
