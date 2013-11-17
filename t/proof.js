@@ -504,8 +504,8 @@ function script (options, callback) {
             else step(null)
         }, function (cursor) {
             action.values.shift()
-            if (cursor.index >= 0) step(function () {
-                cursor.remove(cursor.index, step())
+            step(function () {
+                if (cursor.index >= 0) cursor.remove(cursor.index, step())
             }, function () {
                 cursor.unlock()
             })
