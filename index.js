@@ -528,20 +528,22 @@ function Strata (options) {
     function readRecord (page, position, length, callback) {
         var check = validator(callback), entry
 
-        fs.open(filename(page.address), 'r', check(input))
+        io('read', filename(page.address), check(input))
 
-        function input (fd) {
-            tracer('readRecord', { page: page }, check(read))
+        function input (fd, stat, read) {
+            tracer('readRecord', { page: page }, check(record))
 
-            // todo: use `io`.
-            function read () {
-                fs.read(fd, new Buffer(length), 0, length, position, check(json))
+            function record () {
+                read(new Buffer(length), position, check(json))
             }
 
-            function json (bytes, buffer) {
-                ok(bytes == length, 'incomplete read')
+            function json (buffer) {
                 ok(buffer[length - 1] == 0x0A, 'newline expected')
                 entry = readEntry(buffer, false)
+                close()
+            }
+
+            function close () {
                 fs.close(fd, check(closed))
             }
         }
