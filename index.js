@@ -455,7 +455,7 @@ function Strata (options) {
             buffer = new Buffer(options.readLeafStartLength || 1024),
             footer
 
-        read(buffer, position, check(replay))
+        read(buffer, position, check(replay, close))
 
         function replay (slice, start) {
             for (var offset = 0, i = 0, I = slice.length; i < I; i++) {
@@ -520,17 +520,21 @@ function Strata (options) {
             if (start + buffer.length < stat.size) {
                 if (offset == 0) {
                     buffer = new Buffer(buffer.length * 2)
-                    read(buffer, start, check(replay))
+                    read(buffer, start, check(replay, close))
                 } else {
-                    read(buffer, start + offset, check(replay))
+                    read(buffer, start + offset, check(replay, close))
                 }
             } else {
-                fs.close(fd, check(closed))
+                close()
             }
         }
 
-        function closed () {
-            callback(null, page, footer)
+        function close (replayError) {
+            fs.close(fd, check(closed, closed))
+
+            function closed (closeError) {
+                callback(replayError || closeError, page, footer)
+            }
         }
     }
 
