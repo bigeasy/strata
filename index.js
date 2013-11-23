@@ -547,7 +547,7 @@ function Strata (options) {
             tracer('readRecord', { page: page }, check(record))
 
             function record () {
-                read(new Buffer(length), position, check(json))
+                read(new Buffer(length), position, check(json, close))
             }
 
             function json (buffer) {
@@ -556,13 +556,13 @@ function Strata (options) {
                 close()
             }
 
-            function close () {
+            function close (readError) {
                 fs.close(fd, check(closed))
-            }
-        }
 
-        function closed() {
-            callback(null, entry)
+                function closed (closeError) {
+                    callback(readError || closeError, entry)
+                }
+            }
         }
     }
 
