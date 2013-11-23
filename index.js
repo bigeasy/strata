@@ -74,21 +74,30 @@ function Strata (options) {
     function validate (callback, forward, janitor) {
         ok(typeof forward == 'function', 'no forward function')
         ok(typeof callback == 'function','no callback function')
+
         return function (error) {
             if (error) {
-                if (janitor) janitor(error)
-                toUserLand(callback, error)
+                cleanup(error)
             } else {
                 try {
                     forward.apply(null, __slice.call(arguments, 1))
                 } catch (error) {
-                    if (janitor) janitor(error)
-                    if (thrownByUser === error) {
-                        throw error
-                    }
-                    toUserLand(callback, error)
+                    cleanup(error)
                 }
             }
+        }
+
+        function cleanup (error) {
+            if (janitor) {
+                janitor(error)
+                if (janitor.length) return
+            }
+
+            if (thrownByUser === error) {
+                throw error
+            }
+
+            toUserLand(callback, error)
         }
     }
 
@@ -926,6 +935,7 @@ function Strata (options) {
                     locks[page.address].unlock(error)
                     delete locks[page.address]
                 }
+                callback(error)
             }
         }
 
