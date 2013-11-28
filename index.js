@@ -132,7 +132,7 @@ function Strata (options) {
         }
         ok(fields[1] == '-' || hash.digest('hex') == fields[1], 'corrupt line: invalid checksum')
         if (buffer[i - 1] == 0x20) {
-            body = deserialize(body.toString(), isKey)
+            body = deserialize(body, isKey)
         }
         var entry = { length: length, header: JSON.parse(fields[2]), body: body }
         ok(entry.header.every(function (n) { return typeof n == 'number' }), 'header values must be numbers')
