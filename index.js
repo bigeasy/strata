@@ -1158,7 +1158,7 @@ function Strata (options) {
 
         function get (index, callback) {
             stash(page, index, validate(callback, unstashed))
-            function unstashed (entry) { toUserLand(callback, null, entry.record) }
+            function unstashed (entry) { toUserLand(callback, null, entry.record, entry.key) }
         }
 
         function next (callback) {
