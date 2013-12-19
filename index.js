@@ -1199,6 +1199,8 @@ function Strata (options) {
 
         function _length () { return length }
 
+        function _ghosts () { return page.ghosts }
+
         function _address () { return page.address }
 
         function _right () { return page.right }

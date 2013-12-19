@@ -11,7 +11,8 @@ require('./proof')(4, function (step, Strata, tmp, serialize, equal) {
     }, function (cursor) {
         step(function () {
             equal(cursor.index, 0, 'found')
-            equal(cursor.offset, 0, 'found')
+            equal(cursor.offset, 0, 'offset')
+            equal(cursor.ghosts, 0, 'ghosts')
             equal(cursor.length, 1, 'length')
             cursor.get(cursor.index, step())
         }, function (record) {
