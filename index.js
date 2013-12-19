@@ -1208,7 +1208,7 @@ function Strata (options) {
         function _exclusive () { return exclusive }
 
         classify.call(this, unlock, indexOf, get, next,
-                            _index, _offset, _length, _address, _right, _exclusive)
+                            _index, _offset, _length, _ghosts, _address, _right, _exclusive)
 
         if (!exclusive) return this
 
