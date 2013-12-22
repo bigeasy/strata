@@ -332,7 +332,7 @@ function directivize (json) {
 }
 
 function deltree (directory, callback) {
-    var files, count = 0
+    var files, count = -1
 
     readdir()
 
@@ -362,18 +362,13 @@ function deltree (directory, callback) {
         fs.stat(file, check(callback, inspect))
 
         function inspect ($1) {
-            if ((stat = $1).isDirectory()) deltree(file, check(callback, unlink))
-            else unlink()
-        }
-
-        function unlink () {
-            if (stat.isDirectory()) fs.rmdir(file, check(callback, deleted))
+            if ((stat = $1).isDirectory()) deltree(file, check(callback, deleted))
             else fs.unlink(file, check(callback, deleted))
         }
     }
 
     function deleted () {
-        if (++count > files.length) fs.rmdir(directory, callback)
+        if (++count == files.length) fs.rmdir(directory, callback)
     }
 }
 
