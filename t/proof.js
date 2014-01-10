@@ -568,7 +568,7 @@ function script (options, callback) {
             var action = queue.shift()
             actions[action.type](action, function (error) {
                 if (error) callback(error)
-                else process.nextTick(function () {
+                else setImmediate(function () {
                     consume(callback)
                 })
             })
@@ -619,7 +619,7 @@ function script (options, callback) {
             step(function (action) {
                 actions[action.type](action, step())
             }, function () {
-                process.nextTick(step())
+                setImmediate(step())
             })(queue)
         })
     })(callback)
