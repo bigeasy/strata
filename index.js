@@ -849,7 +849,7 @@ function Strata (options) {
 
     function unwind (callback) {
         var vargs = __slice.call(arguments, 1)
-        if (options.nextTick) process.nextTick(function () { callback.apply(null, vargs) })
+        if (options.nextTick) setImmediate(function () { callback.apply(null, vargs) })
         else callback.apply(null, vargs)
     }
 
