@@ -32,8 +32,8 @@
     },
     "licenses":
     [{
-                        "type": "MIT",
-                        "url": "http://github.com/bigeasy/strata/raw/master/LICENSE"
+                        "type": "LGPL-3.0",
+                        "url": "http://github.com/bigeasy/strata/raw/master/COPYING.LESSER"
     }],
     "scripts":
     {
