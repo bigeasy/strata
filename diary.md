@@ -248,6 +248,8 @@ leaf will get the best compression imaginable; slow but efficient.
  * Since I'm already doing negative and positive inside strata, why don't I use
    even and odd? That would be consistent with the file system, one
    representation everywhere.
+ * Can't I write the distance between additions and subtractions and general
+   dirtiness into the footer of the page?
 
 ## Delayed Writes
 
