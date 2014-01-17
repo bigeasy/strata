@@ -32,8 +32,8 @@
     },
     "licenses":
     [{
-                        "type": "GNU Affero GPL 3.0",
-                        "url": "http://github.com/bigeasy/strata/raw/master/COPYING"
+                        "type": "MIT",
+                        "url": "http://github.com/bigeasy/strata/raw/master/LICENSE"
     }],
     "scripts":
     {
