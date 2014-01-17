@@ -1,6 +1,6 @@
 {
     "name":             "b-tree",
-    "version":          "0.0.13",
+    "version":          "0.0.14",
     "author":           "Alan Gutierrez <alan@prettyrobots.com>",
     "description":      "Evented I/O B-tree in pure JavaScript for Node.js.",
     "keywords":
