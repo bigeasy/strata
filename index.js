@@ -838,12 +838,12 @@ function Strata (options) {
                         delete page.cache[position]
                         var entry = _cacheRecord(page, position, entry.body, entry.length)
                     }
-                    loader.unlock(error, entry)
+                    loader.unlock(error, entry, length)
                 })
             })
             stash(page, position, length, callback)
         } else {
-            callback(null, entry)
+            callback(null, entry, length)
         }
     }
 
@@ -1157,8 +1157,9 @@ function Strata (options) {
         descents.shift()
 
         function get (index, callback) {
-            stash(page, index, validate(callback, unstashed))
-            function unstashed (entry) { toUserLand(callback, null, entry.record, entry.key) }
+            stash(page, index, validate(callback, function (entry, size) {
+                toUserLand(callback, null, entry.record, entry.key, size)
+            }))
         }
 
         function next (callback) {

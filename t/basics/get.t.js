@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 var fs = require('fs'), strata
-require('./proof')(8, function (serialize, tmp, equal, step, Strata, ok) {
+require('./proof')(9, function (serialize, tmp, equal, step, Strata, ok) {
     step(function () {
 
         serialize(__dirname + '/fixtures/get.json', tmp, step())
@@ -27,11 +27,12 @@ require('./proof')(8, function (serialize, tmp, equal, step, Strata, ok) {
 
             cursor.get(cursor.offset, step())
 
-        }, function (record, key) {
+        }, function (record, key, size) {
 
             equal(record, 'a', 'get record')
             equal(key, 'a', 'get key')
             equal(strata.size, 14, 'json size after read')
+            equal(size, 54, 'record size')
 
             cursor.unlock()
 
