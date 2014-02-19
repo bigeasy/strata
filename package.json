@@ -7,7 +7,6 @@
     [
                         "btree", "database", "json", "b-tree", "leveldb", "levelup"
     ],
-    "url":              "http://bigeasy.github.com/strata",
     "homepage":         "https://github.com/bigeasy/strata",
     "bugs":             "https://github.com/bigeasy/strata/issues",
     "repository":
