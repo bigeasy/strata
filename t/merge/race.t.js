@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 
 require('./proof')(2, function (step, tmp, Strata, serialize, load, objectify, gather, deepEqual,
-    say, die, cadence) {
-    var fs = require('fs'), strata, records = [], count = 0, insert
+    say, dience) {
+    var fs = require('fs'), cadence = require('cadence'),
+        strata, records = [], count = 0, insert
 
     function tracer (type, object, callback) {
         switch (type) {

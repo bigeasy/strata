@@ -1,6 +1,7 @@
 var fs = require('fs'),
     path = require('path'),
     crypto = require('crypto'),
+    cadence = require('cadence'),
     Strata = require('..'),
     ok = require('assert').ok
 
@@ -439,7 +440,6 @@ function pretty (json) {
 function script (options, callback) {
     var strata = new Strata({ directory: options.directory, branchSize: 3, leafSize: 3 })
     var queue = [{ type: 'create' }]
-    var cadence = options.cadence
 
     var actions = {}
 
