@@ -85,7 +85,6 @@ function insert (step, strata, values) {
 function gather (step, strata) {
     var records = [], page, item
     step(function () {
-        records = []
         strata.iterator(strata.left, step())
     }, function (cursor) {
         step(function (more) {
