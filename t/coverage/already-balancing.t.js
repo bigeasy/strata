@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (step, tmp, serialize, deepEqual, Strata, gather) {
+require('./proof')(2, function (step, tmp, serialize, equal, deepEqual, Strata, gather) {
     var strata
     step(function () {
         serialize(__dirname + '/../basics/fixtures/split.before.json', tmp, step())
@@ -17,7 +17,11 @@ require('./proof')(1, function (step, tmp, serialize, deepEqual, Strata, gather)
         })
     }, function () {
         strata.balance(step())
-        strata.balance(step())
+        step([function () {
+            strata.balance(step())
+        }, function (_, error) {
+            equal(error.message, 'already balancing', 'error')
+        }])
     }, function () {
         gather(step, strata)
     }, function (records) {

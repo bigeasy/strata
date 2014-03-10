@@ -1344,7 +1344,7 @@ function Strata (options) {
         function balance (callback) {
             var check = validator(callback), locker = new Locker, address
 
-            if (balancing) return callback(null)
+            ok(!balancing, 'already balancing')
 
             var addresses = Object.keys(lengths)
             if (addresses.length == 0) {
