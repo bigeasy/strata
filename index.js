@@ -1348,7 +1348,7 @@ function Strata (options) {
 
             var addresses = Object.keys(lengths)
             if (addresses.length == 0) {
-                callback(null)
+                callback(null, true)
             } else {
                 balancer = new Balancer()
                 balancing = true
@@ -1545,7 +1545,7 @@ function Strata (options) {
                     methods[operation.method].apply(this, operation.parameters.concat(check(shift)))
                 } else {
                     balancing = false
-                    callback(null)
+                    callback(null, false)
                 }
             }
             shift()
