@@ -131,14 +131,14 @@ This is fantastic. Do it.
 
 I'd given a lot of thought to how to pack a binary file format, because that's
 what binary makes you think. Somehow, coming back to Strata after a ways away,
-I'm becoming better at seeing the trade-offs inherient in programming. I can see
-the value of my plain text file format, it has not receeded as Strata has
+I'm becoming better at seeing the trade-offs inherent in programming. I can see
+the value of my plain text file format, it has not receded as Strata has
 progressed. It is always reassuring, when things are working as poorly, when a
 test won't pass and won't to open these files and have a look.
 
 ## Log Format
 
-In consdiering error handling, I'm considering extracting the log format to a
+In considering error handling, I'm considering extracting the log format to a
 separate project so that I can test I/O and perhaps find a way to focus on I/O
 errors. The only errors returned from Strata ought to be I/O errors and full up
 programming errors are asserted.
@@ -150,7 +150,7 @@ properties of a file. Maybe, I need to check the checksum. If the checksum is
 valid, then anything about the data that is invalid is an assertion. We're using
 a pretty strong checksum.
 
-The only opportunity to acitvely corrupt data is a failed append, probably
+The only opportunity to actively corrupt data is a failed append, probably
 because the disk is full, but all of our other operations are copies and moves.
 We can add a step to our move into place commits, where instead of unlinking the
 file to replace, we rename it with a suffix like `.outgoing`. `unlink` and
