@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 var fs = require('fs'), strata
-require('./proof')(5, function (Strata, equal, deepEqual, say, tmp, step, ok, load, objectify) {
+require('./proof')(5, function (Strata, assert, say, tmp, step, load, objectify) {
     step(function () {
 
         fs.writeFile(tmp + '/.ignore', '', 'utf8', step())
@@ -13,12 +13,12 @@ require('./proof')(5, function (Strata, equal, deepEqual, say, tmp, step, ok, lo
 
     }, function () {
 
-        equal(strata.size, 3, 'json size')
+        assert(strata.size, 3, 'json size')
         strata.close(step())
 
     }, function () {
 
-        ok(1, 'created')
+        assert(1, 'created')
         objectify(tmp, step())
         load(__dirname + '/fixtures/create.after.json', step())
 
@@ -27,7 +27,7 @@ require('./proof')(5, function (Strata, equal, deepEqual, say, tmp, step, ok, lo
         say(actual)
         say(expected)
 
-        deepEqual(actual, expected, 'written')
+        assert(actual, expected, 'written')
 
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
         strata.open(step())
@@ -38,12 +38,12 @@ require('./proof')(5, function (Strata, equal, deepEqual, say, tmp, step, ok, lo
 
     }, function (cursor) {
 
-        equal(cursor.length - cursor.offset, 0, 'empty')
+        assert(cursor.length - cursor.offset, 0, 'empty')
 
         cursor.unlock()
 
         strata.purge(0)
-        equal(strata.size, 0, 'purged')
+        assert(strata.size, 0, 'purged')
 
         strata.close(step())
     })

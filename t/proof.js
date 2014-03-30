@@ -12,7 +12,7 @@ function check (callback, forward) {
     }
 }
 
-function objectify (directory, callback) {
+function vivify (directory, callback) {
     var files, dir = {}, lengths = {}, count = 0
 
     fs.readdir(directory, check(callback, list))
@@ -54,7 +54,7 @@ function objectify (directory, callback) {
 // todo: pretty print should be in here, so I can use it from stratify and the
 // stringify utility.
 function stringify (directory, callback) {
-    objectify(directory, check(callback, segments))
+    vivify(directory, check(callback, segments))
 
     function segments (segments) {
         callback(null, JSON.stringify(segments, null, 2))
@@ -388,7 +388,8 @@ module.exports = function (dirname) {
                 insert: insert,
                 serialize: serialize,
                 gather: gather,
-                objectify: objectify,
+                vivify: vivify,
+                objectify: vivify,
                 script: script
             }
         })
@@ -555,7 +556,7 @@ function script (options, callback) {
 
     actions.fixture = cadence(function (step, action) {
         step(function () {
-            objectify(options.directory, step())
+            vivify(options.directory, step())
             load(action.file, step())
         }, function (actual, expected) {
             options.deepEqual(actual, expected, action.file)
