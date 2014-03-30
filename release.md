@@ -1,5 +1,6 @@
 ### Issue by Issue
 
+ * Upgrade Proof to 0.0.45. #350.
  * Release version 0.0.17. #343.
  * Upgrade Proof to 0.0.44. #342.
  * Upgrade Proof to 0.0.43. #341.
