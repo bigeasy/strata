@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 var fs = require('fs'), strata
-require('./proof')(5, function (Strata, assert, say, tmp, step, load, objectify) {
+require('./proof')(5, function (Strata, assert, say, tmp, step, load, vivify) {
     step(function () {
 
         fs.writeFile(tmp + '/.ignore', '', 'utf8', step())
@@ -19,7 +19,7 @@ require('./proof')(5, function (Strata, assert, say, tmp, step, load, objectify)
     }, function () {
 
         assert(1, 'created')
-        objectify(tmp, step())
+        vivify(tmp, step())
         load(__dirname + '/fixtures/create.after.json', step())
 
     }, function (actual, expected) {
