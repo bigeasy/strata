@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-var fs = require('fs')
+
 require('./proof')(3, function (Strata, step, tmp,  load, objectify, serialize, gather, deepEqual) {
     var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
     step(function () {
