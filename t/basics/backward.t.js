@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(5, function (Strata, tmp, serialize, equal, ok, step) {
+require('./proof')(5, function (Strata, tmp, serialize, assert, step) {
     var fs = require ('fs'), strata, right
     step(function () {
         serialize(__dirname + '/fixtures/merge.before.json', tmp, step())
@@ -10,23 +10,23 @@ require('./proof')(5, function (Strata, tmp, serialize, equal, ok, step) {
     }, function () {
         strata.mutator(strata.leftOf('c'), step())
     }, function (cursor) {
-        ok(cursor.exclusive, 'exclusive')
+        assert(cursor.exclusive, 'exclusive')
         right = cursor.right
         step(function () {
             cursor.get(0, step())
         }, function (got) {
-            equal(got, 'a', 'go left')
+            assert(got, 'a', 'go left')
             cursor.unlock()
         })
     }, function () {
         strata.mutator(strata.leftOf('d'), step())
     }, function (cursor) {
-        equal(cursor.address, right, 'address and right')
-        ok(!cursor.exclusive, 'shared')
+        assert(cursor.address, right, 'address and right')
+        assert(!cursor.exclusive, 'shared')
         step(function () {
             cursor.get(0, step())
         }, function (got) {
-            equal(got, 'c', 'go left missing')
+            assert(got, 'c', 'go left missing')
             cursor.unlock()
         })
     }, function () {
