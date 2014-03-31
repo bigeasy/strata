@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(5, function (step, Strata, tmp, load, objectify, assert, say) {
+require('./proof')(5, function (step, Strata, tmp, load, vivify, assert, say) {
     var strata
     step(function () {
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
@@ -17,7 +17,7 @@ require('./proof')(5, function (step, Strata, tmp, load, objectify, assert, say)
             assert(strata.size, 14, 'json size')
         })
     }, function () {
-        objectify(tmp, step())
+        vivify(tmp, step())
         load(__dirname + '/fixtures/insert.json', step())
     }, function (actual, expected) {
         say(expected)
