@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(3, function (step, Strata, tmp, load, objectify, serialize, deepEqual, gather, say) {
+require('./proof')(3, function (step, Strata, tmp, load, objectify, serialize, gather, assert, say) {
     var strata
     step(function () {
         serialize(__dirname + '/fixtures/merge.before.json', tmp, step())
@@ -18,7 +18,7 @@ require('./proof')(3, function (step, Strata, tmp, load, objectify, serialize, d
         })
     }, function (records) {
         step(function () {
-            deepEqual(records, [ 'a', 'c', 'd' ], 'records')
+            assert(records, [ 'a', 'c', 'd' ], 'records')
             strata.balance(step())
         }, function () {
             objectify(tmp, step())
@@ -27,11 +27,11 @@ require('./proof')(3, function (step, Strata, tmp, load, objectify, serialize, d
             say(expected)
             say(actual)
 
-            deepEqual(actual, expected, 'merge')
+            assert(actual, expected, 'merge')
         }, function () {
             gather(step, strata)
         }, function (records) {
-            deepEqual(records, [ 'a', 'c', 'd' ], 'records')
+            assert(records, [ 'a', 'c', 'd' ], 'records')
             strata.balance(step())
         })
     })
