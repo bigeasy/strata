@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(5, function (step, Strata, tmp, load, objectify, ok, equal, deepEqual, say) {
+require('./proof')(5, function (step, Strata, tmp, load, objectify, assert, say) {
     var strata
     step(function () {
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
@@ -8,13 +8,13 @@ require('./proof')(5, function (step, Strata, tmp, load, objectify, ok, equal, d
     }, function () {
         strata.mutator('a', step())
     }, function (cursor) {
-        ok(cursor.exclusive, 'exclusive')
+        assert(cursor.exclusive, 'exclusive')
         step(function () {
             cursor.insert('a', 'a', ~ cursor.index, step())
         }, function (inserted) {
-            equal(inserted, 0, 'inserted')
+            assert(inserted, 0, 'inserted')
             cursor.unlock()
-            equal(strata.size, 14, 'json size')
+            assert(strata.size, 14, 'json size')
         })
     }, function () {
         objectify(tmp, step())
@@ -23,12 +23,12 @@ require('./proof')(5, function (step, Strata, tmp, load, objectify, ok, equal, d
         say(expected)
         say(actual)
 
-        deepEqual(actual, expected, 'insert')
+        assert(actual, expected, 'insert')
 
         say(expected.segment00000001)
 
         strata.purge(0)
-        deepEqual(strata.size, 0, 'purged')
+        assert(strata.size, 0, 'purged')
 
         strata.close(step())
     })
