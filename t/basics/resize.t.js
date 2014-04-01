@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (step, tmp, serialize, equal, load, Strata) {
-    var fs = require('fs'), strata, records = []
-
+require('./proof')(1, function (step, Strata, tmp, serialize, equal) {
+    var strata
     step(function () {
         serialize(__dirname + '/fixtures/resize.before.json', tmp, step())
     }, function () {
@@ -17,7 +16,7 @@ require('./proof')(1, function (step, tmp, serialize, equal, load, Strata) {
             equal(got, 'b', 'loaded')
             cursor.unlock()
         })
-    }, function (records) {
+    }, function () {
         strata.close(step())
     })
 })
