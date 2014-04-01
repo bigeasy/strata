@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(2, function (step, Strata, tmp, load, serialize, objectify, gather, deepEqual) {
+require('./proof')(2, function (step, Strata, tmp, load, serialize, objectify, gather, assert) {
     var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
     step(function () {
         serialize(__dirname + '/fixtures/balancer-cached-right.json', tmp, step())
@@ -25,12 +25,12 @@ require('./proof')(2, function (step, Strata, tmp, load, serialize, objectify, g
     }, function () {
         gather(step, strata)
     }, function (records) {
-        deepEqual(records, [  'b', 'c', 'd',  'e' ], 'records')
+        assert(records, [  'b', 'c', 'd',  'e' ], 'records')
         strata.balance(step())
     }, function () {
         gather(step, strata)
     }, function (records) {
-        deepEqual(records, [  'b', 'c', 'd',  'e' ], 'merged')
+        assert(records, [  'b', 'c', 'd',  'e' ], 'merged')
     }, function() {
         strata.close(step())
     })
