@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(2, function (step, tmp, serialize, equal, deepEqual, Strata, gather) {
+require('./proof')(2, function (step, Strata, tmp, serialize, gather, equal, deepEqual) {
     var strata
     step(function () {
         serialize(__dirname + '/../basics/fixtures/split.before.json', tmp, step())
