@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(2, function (step, Strata, tmp, equal) {
+require('./proof')(2, function (step, Strata, tmp, assert) {
     var strata
     step(function () {
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
@@ -11,7 +11,7 @@ require('./proof')(2, function (step, Strata, tmp, equal) {
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
         strata.open(step())
     }, function () {
-        equal(strata.size, 0, 'json size')
-        equal(strata.nextAddress, 2, 'next address')
+        assert(strata.size, 0, 'json size')
+        assert(strata.nextAddress, 2, 'next address')
     })
 })
