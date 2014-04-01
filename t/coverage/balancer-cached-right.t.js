@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(2, function (step, Strata, tmp, load, serialize, objectify, gather, assert) {
+require('./proof')(2, function (step, Strata, tmp, serialize, gather, assert) {
     var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
     step(function () {
         serialize(__dirname + '/fixtures/balancer-cached-right.json', tmp, step())
