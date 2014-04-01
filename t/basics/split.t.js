@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(3, function (step, Strata, tmp, load, serialize, objectify, gather, assert, say) {
+require('./proof')(3, function (step, Strata, tmp, load, serialize, vivify, gather, assert, say) {
     var strata
     step(function () {
         serialize(__dirname + '/fixtures/split.before.json', tmp, step())
@@ -21,7 +21,7 @@ require('./proof')(3, function (step, Strata, tmp, load, serialize, objectify, g
     }, function () {
         strata.balance(step())
     }, function () {
-        objectify(tmp, step())
+        vivify(tmp, step())
         load(__dirname + '/fixtures/split.after.json', step())
     }, function(actual, expected) {
         say(actual)
