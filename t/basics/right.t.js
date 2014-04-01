@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-require('./proof')(2, function (Strata, tmp, serialize, equal, ok, step) {
-    var fs = require ('fs'), strata
+require('./proof')(2, function (step, Strata, tmp, serialize, equal, ok) {
+    var strata
     step(function () {
         serialize(__dirname + '/fixtures/merge.before.json', tmp, step())
     }, function () {
