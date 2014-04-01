@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (step, Strata, tmp, equal) {
+require('./proof')(1, function (step, Strata, tmp, assert) {
     var strata
     step(function () {
         strata = new Strata({
@@ -32,7 +32,7 @@ require('./proof')(1, function (step, Strata, tmp, equal) {
         step(function () {
             cursor.get(cursor.index, step())
         }, function (got) {
-            equal(got, 'a', 'inserted binary')
+            assert(got, 'a', 'inserted binary')
             cursor.unlock()
         })
     }, function () {
