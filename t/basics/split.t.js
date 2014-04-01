@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(3, function (step, Strata, tmp, load, serialize, objectify, gather, deepEqual, say) {
+require('./proof')(3, function (step, Strata, tmp, load, serialize, objectify, gather, assert, say) {
     var strata
     step(function () {
         serialize(__dirname + '/fixtures/split.before.json', tmp, step())
@@ -17,7 +17,7 @@ require('./proof')(3, function (step, Strata, tmp, load, serialize, objectify, g
             gather(step, strata)
         })
     }, function (records) {
-        deepEqual(records, [ 'a', 'b', 'c', 'd' ], 'records')
+        assert(records, [ 'a', 'b', 'c', 'd' ], 'records')
     }, function () {
         strata.balance(step())
     }, function () {
@@ -27,10 +27,10 @@ require('./proof')(3, function (step, Strata, tmp, load, serialize, objectify, g
         say(actual)
         say(expected)
 
-        deepEqual(actual, expected, 'split')
+        assert(actual, expected, 'split')
 
         strata.purge(0)
-        deepEqual(strata.size, 0, 'purged')
+        assert(strata.size, 0, 'purged')
 
         strata.close(step())
     })
