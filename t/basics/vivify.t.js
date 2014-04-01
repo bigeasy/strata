@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (step, Strata, tmp, serialize, deepEqual, say) {
+require('./proof')(1, function (step, Strata, tmp, serialize, assert, say) {
     var strata
     step(function () {
         serialize(__dirname + '/fixtures/vivify.json', tmp, step())
@@ -11,7 +11,7 @@ require('./proof')(1, function (step, Strata, tmp, serialize, deepEqual, say) {
         strata.vivify(step())
     }, function (result) {
         console.log(require('util').inspect(result, false, null))
-        deepEqual(result,
+        assert(result,
           [ { address: 22,
               children:
                [ { address: 1, children: [ 'a', 'b' ], ghosts: 0 },
