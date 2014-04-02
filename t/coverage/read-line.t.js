@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(2, function (step, Strata, deepEqual, tmp, insert, load, objectify, equal) {
+require('./proof')(2, function (step, Strata, tmp, equal) {
     var fs = require('fs'), strata
     step(function () {
         fs.writeFile(tmp + '/0', '6 x_x\n', 'utf8', step())
