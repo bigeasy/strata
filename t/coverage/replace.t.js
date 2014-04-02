@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (step, Strata, deepEqual, tmp, insert, load, objectify, equal, serialize) {
-    function forward (name) { return function () { return fs[name].apply(fs, arguments) } }
-
+require('./proof')(1, function (step, Strata, tmp, insert, serialize, deepEqual, equal) {
+    function forward (name) {
+        return function () { return fs[name].apply(fs, arguments) }
+    }
     var fs = require('fs'), path = require('path'), proxy = {}
     for (var x in fs) {
         if (x[0] != '_') proxy[x] = forward(x)
@@ -13,7 +14,6 @@ require('./proof')(1, function (step, Strata, deepEqual, tmp, insert, load, obje
         callback(error)
     }
     var strata = new Strata({ directory: tmp, fs: proxy, leafSize: 3 })
-
     step(function () {
         serialize(__dirname + '/../basics/fixtures/split.before.json', tmp, step())
     }, function () {
