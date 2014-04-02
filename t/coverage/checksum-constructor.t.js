@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (step, Strata, tmp, load, objectify, equal, deepEqual, ok, say) {
+require('./proof')(1, function (step, Strata, tmp, load, objectify, assert, say) {
     var fs = require('fs'), crypto = require('crypto'), strata
     step(function () {
         fs.writeFile(tmp + '/.ignore', '', 'utf8', step())
@@ -20,7 +20,7 @@ require('./proof')(1, function (step, Strata, tmp, load, objectify, equal, deepE
     }, function () {
         strata.iterator('a', step())
     }, function (cursor) {
-        equal(cursor.length - cursor.offset, 0, 'empty')
+        assert(cursor.length - cursor.offset, 0, 'empty')
         cursor.unlock()
         strata.close(step())
     })
