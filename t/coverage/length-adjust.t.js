@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (step, tmp, Strata, equal, gather) {
-    var fs = require('fs'), strata, value = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTU'
+require('./proof')(1, function (step, Strata, tmp, gather, equal) {
+    var strata, value = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTU'
     step(function () {
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
         strata.create(step())
