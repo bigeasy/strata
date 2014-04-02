@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (step, Strata, tmp, serialize, gather, deepEqual) {
+require('./proof')(1, function (step, Strata, tmp, serialize, gather, assert) {
     var strata = new Strata({
         directory: tmp,
         branchSize: 3,
@@ -14,7 +14,7 @@ require('./proof')(1, function (step, Strata, tmp, serialize, gather, deepEqual)
     }, function () {
         gather(step, strata)
     }, function (records) {
-        deepEqual(records, [ 'a', 'c', 'd' ], 'records')
+        assert(records, [ 'a', 'c', 'd' ], 'records')
     }, function () {
         strata.close(step())
     })
