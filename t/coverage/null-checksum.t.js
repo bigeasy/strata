@@ -1,9 +1,8 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (step, Strata, equal, ok, tmp) {
+require('./proof')(1, function (step, Strata, tmp, equal) {
     var fs = require('fs'), path = require('path')
     var strata = new Strata({ directory: tmp, checksum: 'none' })
-
     step(function () {
         strata.create(step())
     }, function () {
