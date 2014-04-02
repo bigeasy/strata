@@ -1,8 +1,12 @@
 #!/usr/bin/env node
 
 require('./proof')(1, function (step, Strata, tmp, serialize, equal) {
-    var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3, tracer: tracer }), path = require('path')
-
+    var path = require('path'), strata = new Strata({
+        directory: tmp,
+        leafSize: 3,
+        branchSize: 3,
+        tracer: tracer
+    })
     function tracer (type, object, callback) {
         if (type == 'readRecord') {
             callback(new Error('bogus error'))
@@ -10,7 +14,6 @@ require('./proof')(1, function (step, Strata, tmp, serialize, equal) {
             callback()
         }
     }
-
     step(function () {
         serialize(path.join(__dirname, '/fixtures/split-race.before.json'), tmp, step())
     }, function () {
