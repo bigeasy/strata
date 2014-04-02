@@ -2,7 +2,7 @@
 
 // Asserts that log replay will add and remove a record.
 
-require('./proof')(1, function (step, Strata, tmp, gather, deepEqual, say) {
+require('./proof')(1, function (step, Strata, tmp, gather, assert, say) {
     var strata
     step(function () {
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
@@ -20,7 +20,7 @@ require('./proof')(1, function (step, Strata, tmp, gather, deepEqual, say) {
     }, function () {
         gather(step, strata)
     }, function (records) {
-        deepEqual(records, [], 'empty')
+        assert(records, [], 'empty')
         strata.close(step())
     }, function () {
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
