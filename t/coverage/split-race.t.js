@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(2, function (step, Strata, tmp, serialize, load, objectify, gather, deepEqual) {
+require('./proof')(2, function (step, Strata, tmp, serialize, load, objectify, gather, assert) {
     var cadence = require('cadence'),
         strata, count = 0
 
@@ -49,7 +49,7 @@ require('./proof')(2, function (step, Strata, tmp, serialize, load, objectify, g
             gather(step, strata)
         })
     }, function (records) {
-        deepEqual(records, [ 'a', 'b', 'c', 'd', 'e', 'f' ], 'records')
+        assert(records, [ 'a', 'b', 'c', 'd', 'e', 'f' ], 'records')
     }, function () {
         strata.balance(step())
     }, function () {
@@ -58,7 +58,7 @@ require('./proof')(2, function (step, Strata, tmp, serialize, load, objectify, g
         objectify(tmp, step())
         load(__dirname + '/fixtures/split-race.after.json', step())
     }, function(actual, expected) {
-        deepEqual(actual, expected, 'split')
+        assert(actual, expected, 'split')
         strata.close(step())
     })
 })
