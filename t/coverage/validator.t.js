@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(2, function (Strata, equal, ok, tmp) {
+require('./proof')(2, function (Strata, tmp, equal, ok) {
     var strata = new Strata({ directory: __filename })
 
     strata.create(function (error) {
