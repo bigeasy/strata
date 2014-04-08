@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
-require('./proof')(2, function (Strata, tmp, equal, ok) {
+require('./proof')(2, function (Strata, tmp, assert) {
     var strata = new Strata({ directory: __filename })
 
     strata.create(function (error) {
-        ok(/is not a directory.$/.test(error.message), 'thrown')
+        assert(/is not a directory.$/.test(error.message), 'thrown')
     })
 
     strata = new Strata({  directory: tmp, fs: {
@@ -12,6 +12,6 @@ require('./proof')(2, function (Strata, tmp, equal, ok) {
     }})
 
     strata.create(function (error) {
-        equal(error.message, 'errored', 'called back')
+        assert(error.message, 'errored', 'called back')
     })
 })
