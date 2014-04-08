@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(2, function (step, Strata, tmp, serialize, load, objectify, gather, assert) {
+require('./proof')(2, function (step, Strata, tmp, serialize, load, vivify, gather, assert) {
     var cadence = require('cadence'),
         strata, count = 0
 
@@ -55,7 +55,7 @@ require('./proof')(2, function (step, Strata, tmp, serialize, load, objectify, g
     }, function () {
         strata.balance(step())
     }, function () {
-        objectify(tmp, step())
+        vivify(tmp, step())
         load(__dirname + '/fixtures/split-race.after.json', step())
     }, function(actual, expected) {
         assert(actual, expected, 'split')
