@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (step, tmp, Strata, serialize, equal) {
-    var fs = require('fs'), strata, records = [], count = 0
+require('./proof')(1, function (step, Strata, tmp, serialize, equal) {
+    var strata
 
     function tracer (type, object, callback) {
         switch (type) {
