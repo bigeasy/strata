@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (step, Strata, tmp, load, serialize, objectify, insert, assert, say) {
+require('./proof')(1, function (step, Strata, tmp, load, serialize, vivify, insert, assert, say) {
     function forward (name) { return function () { return fs[name].apply(fs, arguments) } }
 
     var fs = require('fs'), path = require('path'), proxy = {}
@@ -28,7 +28,7 @@ require('./proof')(1, function (step, Strata, tmp, load, serialize, objectify, i
     }, function () {
         strata.close(step())
     }, function () {
-        objectify(tmp, step())
+        vivify(tmp, step())
         load(__dirname + '/fixtures/write.after.json', step())
     }, function (actual, expected) {
         say(actual)
