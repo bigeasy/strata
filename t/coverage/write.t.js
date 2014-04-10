@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (step, Strata, tmp, load, serialize, objectify, insert, deepEqual, equal, say) {
+require('./proof')(1, function (step, Strata, tmp, load, serialize, objectify, insert, assert, say) {
     function forward (name) { return function () { return fs[name].apply(fs, arguments) } }
 
     var fs = require('fs'), path = require('path'), proxy = {}
@@ -33,6 +33,6 @@ require('./proof')(1, function (step, Strata, tmp, load, serialize, objectify, i
     }, function (actual, expected) {
         say(actual)
         say(expected)
-        deepEqual(actual, expected, 'written')
+        assert(actual, expected, 'written')
     })
 })
