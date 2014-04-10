@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (step, Strata, deepEqual, tmp, insert,
-        load, objectify, equal, serialize, say) {
+require('./proof')(1, function (step, Strata, tmp, load, serialize, objectify, insert, deepEqual, equal, say) {
     function forward (name) { return function () { return fs[name].apply(fs, arguments) } }
 
     var fs = require('fs'), path = require('path'), proxy = {}
