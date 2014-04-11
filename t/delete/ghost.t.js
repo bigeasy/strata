@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 
-require('./proof')(5, function (step, Strata,
-    tmp, deepEqual, serialize, gather, load, objectify, say, equal) {
-    var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 }), fs = require('fs')
+require('./proof')(5, function (step, Strata, tmp, load, serialize, objectify, gather, equal, deepEqual, say) {
+    var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
     step(function () {
         serialize(__dirname + '/fixtures/delete.json', tmp, step())
     }, function () {
@@ -29,9 +28,7 @@ require('./proof')(5, function (step, Strata,
     }, function (actual, expected) {
         say(expected)
         say(actual)
-
         deepEqual(actual, expected, 'directory')
-
         strata.close(step())
     }, function () {
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
