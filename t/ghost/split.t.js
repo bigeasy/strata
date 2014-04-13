@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(4, function (step, Strata, tmp, load, serialize, vivify, gather, deepEqual) {
+require('./proof')(4, function (step, Strata, tmp, load, serialize, vivify, gather, assert) {
     var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
     step(function () {
         serialize(__dirname + '/fixtures/split.before.json', tmp, step())
@@ -24,20 +24,20 @@ require('./proof')(4, function (step, Strata, tmp, load, serialize, vivify, gath
             gather(step, strata)
         })
     }, function (records) {
-        deepEqual(records, [ 'a', 'b', 'c', 'e', 'f', 'g', 'h' ], 'records')
+        assert(records, [ 'a', 'b', 'c', 'e', 'f', 'g', 'h' ], 'records')
         vivify(tmp, step())
         load(__dirname + '/fixtures/split.after.json', step())
     }, function (actual, expected) {
-        deepEqual(actual, expected, 'after tree')
+        assert(actual, expected, 'after tree')
         strata.balance(step())
     }, function () {
         gather(step, strata)
     }, function (records) {
-        deepEqual(records, [ 'a', 'b', 'c', 'e', 'f', 'g', 'h' ], 'balanced records')
+        assert(records, [ 'a', 'b', 'c', 'e', 'f', 'g', 'h' ], 'balanced records')
         vivify(tmp, step())
         load(__dirname + '/fixtures/split.balanced.json', step())
     }, function (actual, expected) {
-        deepEqual(actual, expected, 'after balance')
+        assert(actual, expected, 'after balance')
         strata.close(step())
     })
 })
