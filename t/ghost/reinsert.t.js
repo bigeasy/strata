@@ -30,7 +30,7 @@ require('./proof')(4, function (step, Strata, tmp, load, serialize, vivify, gath
         gather(step, strata)
     }, function (records) {
         assert(records, [ 'a', 'b', 'c', 'd', 'e', 'f' ], 'balanced records')
-        objectify(tmp, step())
+        vivify(tmp, step())
         load(__dirname + '/fixtures/reinsert.balanced.json', step())
     }, function (actual, expected) {
         assert(actual, expected, 'balanced tree')
