@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(3, function (step, Strata, tmp, load, serialize, gather, objectify, deepEqual) {
+require('./proof')(3, function (step, Strata, tmp, load, serialize, gather, objectify, assert) {
     var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
     step(function () {
         serialize(__dirname + '/fixtures/exorcise.before.json', tmp, step())
@@ -17,16 +17,16 @@ require('./proof')(3, function (step, Strata, tmp, load, serialize, gather, obje
     }, function() {
         gather(step, strata)
     }, function (records) {
-        deepEqual(records, [ 'a', 'b', 'd', 'e', 'f', 'g' ], 'records')
+        assert(records, [ 'a', 'b', 'd', 'e', 'f', 'g' ], 'records')
         strata.balance(step())
     }, function () {
         gather(step, strata)
     }, function (records) {
-        deepEqual(records, [ 'a', 'b', 'd', 'e', 'f', 'g' ], 'merged')
+        assert(records, [ 'a', 'b', 'd', 'e', 'f', 'g' ], 'merged')
         objectify(tmp, step())
         load(__dirname + '/fixtures/exorcise.after.json', step())
     }, function (actual, expected) {
-        deepEqual(actual, expected, 'after')
+        assert(actual, expected, 'after')
         strata.close(step())
     })
 })
