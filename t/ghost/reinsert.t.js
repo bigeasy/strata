@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(4, function (step, Strata, tmp, load, serialize, objectify, gather, deepEqual) {
+require('./proof')(4, function (step, Strata, tmp, load, serialize, objectify, gather, assert) {
     var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
     step(function () {
         serialize(__dirname + '/fixtures/reinsert.before.json', tmp, step())
@@ -20,20 +20,20 @@ require('./proof')(4, function (step, Strata, tmp, load, serialize, objectify, g
             gather(step, strata)
         })
     }, function (records) {
-        deepEqual(records, [ 'a', 'b', 'c', 'd', 'e', 'f' ], 'records')
+        assert(records, [ 'a', 'b', 'c', 'd', 'e', 'f' ], 'records')
         objectify(tmp, step())
         load(__dirname + '/fixtures/reinsert.after.json', step())
     }, function (actual, expected) {
-        deepEqual(actual, expected, 'after tree')
+        assert(actual, expected, 'after tree')
         strata.balance(step())
     }, function () {
         gather(step, strata)
     }, function (records) {
-        deepEqual(records, [ 'a', 'b', 'c', 'd', 'e', 'f' ], 'balanced records')
+        assert(records, [ 'a', 'b', 'c', 'd', 'e', 'f' ], 'balanced records')
         objectify(tmp, step())
         load(__dirname + '/fixtures/reinsert.balanced.json', step())
     }, function (actual, expected) {
-        deepEqual(actual, expected, 'balanced tree')
+        assert(actual, expected, 'balanced tree')
         strata.close(step())
     })
 })
