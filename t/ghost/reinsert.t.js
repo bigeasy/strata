@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(4, function (step, Strata, tmp, load, serialize, objectify, gather, assert) {
+require('./proof')(4, function (step, Strata, tmp, load, serialize, vivify, gather, assert) {
     var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
     step(function () {
         serialize(__dirname + '/fixtures/reinsert.before.json', tmp, step())
@@ -21,7 +21,7 @@ require('./proof')(4, function (step, Strata, tmp, load, serialize, objectify, g
         })
     }, function (records) {
         assert(records, [ 'a', 'b', 'c', 'd', 'e', 'f' ], 'records')
-        objectify(tmp, step())
+        vivify(tmp, step())
         load(__dirname + '/fixtures/reinsert.after.json', step())
     }, function (actual, expected) {
         assert(actual, expected, 'after tree')
