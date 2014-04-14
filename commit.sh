@@ -19,7 +19,7 @@ case "$1" in
         git commit -a -m 'Tidy `'$file'`.'$'\n\nSee #351.'
         ;;
     assert)
-        echo "assert file: $file"
+        git commit -a -m 'Use `assert` in `'$name'`.'$'\n\nSee #351.'
         ;;
     vivify)
         git commit -a -m 'Use `vivify` in `'$name'`.'$'\n\nSee #352.'
