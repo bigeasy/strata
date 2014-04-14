@@ -220,15 +220,8 @@ function Strata (options) {
         return entry
     }
 
-    function writeEntry (options, callback) {
-        var check = validator(callback),
-            offset = 0,
-            entry,
-            buffer,
-            json,
-            line,
-            position,
-            length
+    function cookEntry (options, author) {
+        var entry, buffer, json, line, length
 
         ok(options.page.position != null, 'page has not been positioned: ' + options.page.position)
         ok(options.header.every(function (n) { return typeof n == 'number' }), 'header values must be numbers')
@@ -275,29 +268,37 @@ function Strata (options) {
             options.page.bookmark.entry = entry[0]
         }
 
-        position = options.page.position
+        author(buffer, body, options.page.position, length)
+    }
 
-        send()
+    function writeEntry (options, callback) {
 
-        function send () {
-            fs.write(options.fd, buffer, offset, buffer.length - offset, options.page.position, check(sent))
-        }
+        cookEntry(options, function (buffer, body, position,length) {
+            var check = validator(callback),
+                offset = 0
 
-        function sent(written) {
-            options.page.position += written
-            offset += written
-            if (offset == buffer.length) {
-                if (!(options.page.address % 2) || options.type == 'footer') {
-                    callback(null, position, length)
-                } else {
-                    writeFooter(options.fd, options.page, function () {
-                        callback(null, position, length, body && body.length)
-                    })
-                }
-            } else {
-                send()
+            send()
+
+            function send () {
+                fs.write(options.fd, buffer, offset, buffer.length - offset, options.page.position, check(sent))
             }
-        }
+
+            function sent(written) {
+                options.page.position += written
+                offset += written
+                if (offset == buffer.length) {
+                    if (!(options.page.address % 2) || options.type == 'footer') {
+                        callback(null, position, length)
+                    } else {
+                        writeFooter(options.fd, options.page, function () {
+                            callback(null, position, length, body && body.length)
+                        })
+                    }
+                } else {
+                    send()
+                }
+            }
+        })
     }
 
     function writeInsert (fd, page, index, record, callback) {
