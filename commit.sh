@@ -12,6 +12,7 @@ files=$(git ls-files -m | wc -l | tr -d ' ')
 [ "$files" -ne 1 ] && abend "only one modified file at a time please"
 
 file=$(git ls-files -m)
+node "$file" || abend "test is now failing"
 name=$(basename $file)
 
 case "$1" in
