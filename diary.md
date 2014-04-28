@@ -428,7 +428,7 @@ the read and write lock mechanism.
 Currently when we split or merge we lock a branch page exclusively and block out
 a sub-tree. In that subtree we rewrite pages, performing a lot of file I/O. This
 is slow and it blocks progress of read/write descents. It is not necessary. The
-only thing that needs to be comitted to file is the change in the balance of the
+only thing that needs to be committed to file is the change in the balance of the
 tree.
 
 Here's a mode of operation. Using shared locks, create an annotation it the leaf
