@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(5, function (step, Strata, tmp, serialize, equal, deepEqual) {
+require('./proof')(5, function (step, Strata, tmp, serialize, assert) {
     var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 }), records = []
     step(function () {
         serialize(__dirname + '/fixtures/two.json', tmp, step())
@@ -10,17 +10,17 @@ require('./proof')(5, function (step, Strata, tmp, serialize, equal, deepEqual) 
         strata.iterator('a', step())
     }, function (cursor) {
         step(function () {
-            equal(cursor.index, 0, 'found')
-            equal(cursor.offset, 0, 'found')
-            equal(cursor.length, 2, 'length')
+            assert(cursor.index, 0, 'found')
+            assert(cursor.offset, 0, 'found')
+            assert(cursor.length, 2, 'length')
             cursor.get(cursor.index, step())
         }, function (record) {
             records.push(record)
-            equal(cursor.index, 0, 'same index')
+            assert(cursor.index, 0, 'same index')
             cursor.get(cursor.index + 1, step())
         }, function (record) {
             records.push(record)
-            deepEqual(records, [ 'a', 'b' ], 'records')
+            assert(records, [ 'a', 'b' ], 'records')
             cursor.unlock()
             strata.close(step())
         })
