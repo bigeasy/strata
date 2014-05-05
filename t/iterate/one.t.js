@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(5, function (step, Strata, tmp, serialize, equal) {
+require('./proof')(5, function (step, Strata, tmp, serialize, assert) {
     var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
     step(function () {
         serialize(__dirname + '/fixtures/one.json', tmp, step())
@@ -10,13 +10,13 @@ require('./proof')(5, function (step, Strata, tmp, serialize, equal) {
         strata.iterator('a', step())
     }, function (cursor) {
         step(function () {
-            equal(cursor.index, 0, 'found')
-            equal(cursor.offset, 0, 'offset')
-            equal(cursor.ghosts, 0, 'ghosts')
-            equal(cursor.length, 1, 'length')
+            assert(cursor.index, 0, 'found')
+            assert(cursor.offset, 0, 'offset')
+            assert(cursor.ghosts, 0, 'ghosts')
+            assert(cursor.length, 1, 'length')
             cursor.get(cursor.index, step())
         }, function (record) {
-            equal(record, 'a', 'records')
+            assert(record, 'a', 'records')
             cursor.unlock()
             strata.close(step())
         })
