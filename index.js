@@ -356,6 +356,34 @@ function Strata (options) {
         })
     }
 
+    function writeEntry3 (options, callback) {
+        cookEntry(options, function (buffer, body, position,length) {
+            var check = validator(callback),
+                offset = 0
+
+            send()
+
+            function send () {
+                fs.write(options.fd, buffer, offset, buffer.length - offset, options.page.position, check(sent))
+            }
+
+            function sent(written) {
+                options.page.position += written
+                offset += written
+                if (offset == buffer.length) {
+                    callback(null, position, length, body && body.length)
+                } else {
+                    send()
+                }
+            }
+        })
+    }
+
+    function writeInsert2 (fd, page, index, record, callback) {
+        var header = [ ++page.entries, index + 1 ]
+        writeEntry3({ fd: fd, page: page, header: header, body: record }, callback)
+    }
+
     function writeInsert (fd, page, index, record, callback) {
         var header = [ ++page.entries, index + 1 ]
         writeEntry({ fd: fd, page: page, header: header, body: record }, callback)
@@ -432,6 +460,18 @@ function Strata (options) {
                 callback(null, position, length)
             }
         })
+    }
+
+    function writeFooter3 (fd, page, callback) {
+        ok(page.address % 2 && page.bookmark != null)
+        var header = [
+            0, page.bookmark.position, page.bookmark.length, page.bookmark.entry,
+            page.right || 0, page.position, page.entries, page.ghosts, page.positions.length - page.ghosts
+        ]
+        writeEntry3({ fd: fd, page: page, header: header, type: 'footer' }, validate(callback, function (position, length) {
+            page.position = header[5]
+            callback(null, position, length)
+        }))
     }
 
     function readHeader (entry) {
@@ -1339,17 +1379,21 @@ function Strata (options) {
                 fs.open(filename(page.address), 'r+', 0644, check(write))
 
                 function write (opened) {
-                    writeInsert(fd = opened, page, index, record, validate(callback, written, close))
+                    writeInsert2(fd = opened, page, index, record, validate(callback, inserted, close))
                 }
 
-                function written (position, length, size) {
-                    splice('positions', page, index, 0, position)
-                    splice('lengths', page, index, 0, length)
-                    _cacheRecord(page, position, record, size)
+                function inserted (position, length, size) {
+                    writeFooter3(fd, page, check(written))
 
-                    length = page.positions.length
+                    function written () {
+                        splice('positions', page, index, 0, position)
+                        splice('lengths', page, index, 0, length)
+                        _cacheRecord(page, position, record, size)
 
-                    close()
+                        length = page.positions.length
+
+                        close()
+                    }
                 }
 
                 function close (writeError) {
