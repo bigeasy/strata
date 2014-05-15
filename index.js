@@ -424,6 +424,12 @@ function Strata (options) {
         }
     }
 
+    function writePositions2 (fd, page, callback) {
+        var header = [ ++page.entries, 0, page.ghosts ]
+        header = header.concat(page.positions).concat(page.lengths)
+        writeEntry3({ fd: fd, page: page, header: header, type: 'position' }, callback)
+    }
+
     function writePositions (fd, page, callback) {
         var header = [ ++page.entries, 0, page.ghosts ]
         header = header.concat(page.positions).concat(page.lengths)
@@ -699,13 +705,13 @@ function Strata (options) {
             positions = splice('positions', page, 0, page.positions.length)
             lengths = splice('lengths', page, 0, page.lengths.length)
 
-            writePositions(fd, page, check(iterate))
+            writePositions2(fd, page, check(iterate))
         }
 
         function iterate () {
             if (positions.length) rewrite()
             else if (page.positions.length) append()
-            else close()
+            else footer()
         }
 
         function rewrite () {
@@ -715,7 +721,7 @@ function Strata (options) {
 
             function stashed ($) {
                 uncacheEntry(page, position)
-                writeInsert(fd, page, index++, (entry = $).record, check(written))
+                writeInsert2(fd, page, index++, (entry = $).record, check(written))
             }
 
             function written (position, length) {
@@ -732,7 +738,12 @@ function Strata (options) {
                 entry = cache[position]
                 encacheEntry(page, position, entry)
             }
-            writePositions(fd, page, check(close))
+            writePositions2(fd, page, check(footer))
+        }
+
+        function footer () {
+            console.log('here')
+            writeFooter3(fd, page, check(close))
         }
 
         function close() {
