@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 
-require('./proof')(4, function (step, Strata, tmp, serialize, load, objectify, gather, ok, equal, deepEqual) {
+require('./proof')(4, function (step, Strata, tmp, serialize, load, objectify, gather, assert) {
     var strata, count = 0
 
     function tracer (type, object, callback) {
         switch (type) {
         case 'reference':
             if (++count == 2) {
-                ok(strata.size > 2, 'unpurged')
+                assert(strata.size > 2, 'unpurged')
                 strata.purge(0)
-                equal(strata.size, 0, 'purged')
+                assert(strata.size, 0, 'purged')
             }
             callback()
             break
@@ -54,13 +54,13 @@ require('./proof')(4, function (step, Strata, tmp, serialize, load, objectify, g
     }, function () {
         gather(step, strata)
     }, function (records) {
-        deepEqual(records, [ 'a', 'b', 'c', 'd',  'f', 'j', 'k', 'l', 'm', 'n' ], 'records')
+        assert(records, [ 'a', 'b', 'c', 'd',  'f', 'j', 'k', 'l', 'm', 'n' ], 'records')
         strata.balance(step())
     }, function () {
         objectify(tmp, step())
         load(__dirname + '/fixtures/tree.after.json', step())
     }, function (actual, expected) {
-        deepEqual(actual, expected, 'merge')
+        assert(actual, expected, 'merge')
         strata.close(step())
     })
 })
