@@ -742,7 +742,6 @@ function Strata (options) {
         }
 
         function footer () {
-            console.log('here')
             writeFooter3(fd, page, check(close))
         }
 
