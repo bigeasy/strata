@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(4, function (step, Strata, tmp, serialize, load, objectify, gather, assert) {
+require('./proof')(4, function (step, Strata, tmp, serialize, load, vivify, gather, assert) {
     var strata, count = 0
 
     function tracer (type, object, callback) {
@@ -57,7 +57,7 @@ require('./proof')(4, function (step, Strata, tmp, serialize, load, objectify, g
         assert(records, [ 'a', 'b', 'c', 'd',  'f', 'j', 'k', 'l', 'm', 'n' ], 'records')
         strata.balance(step())
     }, function () {
-        objectify(tmp, step())
+        vivify(tmp, step())
         load(__dirname + '/fixtures/tree.after.json', step())
     }, function (actual, expected) {
         assert(actual, expected, 'merge')
