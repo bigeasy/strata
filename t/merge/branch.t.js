@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(3, function (step, Strata, tmp, serialize, gather, load, objectify, deepEqual) {
+require('./proof')(3, function (step, Strata, tmp, serialize, gather, load, objectify, assert) {
     var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
     step(function () {
         serialize(__dirname + '/fixtures/branch.before.json', tmp, step())
@@ -23,17 +23,17 @@ require('./proof')(3, function (step, Strata, tmp, serialize, gather, load, obje
     }, function () {
         gather(step, strata)
     }, function (records) {
-        deepEqual(records, [ 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'j', 'k', 'l', 'm', 'n' ], 'records')
+        assert(records, [ 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'j', 'k', 'l', 'm', 'n' ], 'records')
         strata.balance(step())
     }, function () {
         objectify(tmp, step())
         load(__dirname + '/fixtures/branch.after.json', step())
     }, function (actual, expected) {
-        deepEqual(actual, expected, 'merge')
+        assert(actual, expected, 'merge')
     }, function () {
         gather(step, strata)
     }, function (records) {
-        deepEqual(records, [ 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'j', 'k', 'l', 'm', 'n' ], 'merged')
+        assert(records, [ 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'j', 'k', 'l', 'm', 'n' ], 'merged')
     }, function() {
         strata.close(step())
     })
