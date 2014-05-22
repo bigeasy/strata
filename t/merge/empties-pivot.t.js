@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (step, Strata, tmp, load, serialize, objectify, deepEqual) {
+require('./proof')(1, function (step, Strata, tmp, load, serialize, objectify, assert) {
     var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
     step(function () {
         serialize(__dirname + '/fixtures/empties-pivot.before.json', tmp, step())
@@ -22,7 +22,7 @@ require('./proof')(1, function (step, Strata, tmp, load, serialize, objectify, d
         objectify(tmp, step())
         load(__dirname + '/fixtures/empties-pivot.after.json', step())
     }, function (actual, expected) {
-        deepEqual(actual, expected, 'after')
+        assert(actual, expected, 'after')
         strata.close(step())
     })
 })
