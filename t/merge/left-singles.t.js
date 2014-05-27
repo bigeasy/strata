@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (step, Strata, tmp, load, serialize, vivify, gather, deepEqual) {
+require('./proof')(1, function (step, Strata, tmp, load, serialize, vivify, gather, assert) {
     var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
     step(function () {
         serialize(__dirname + '/fixtures/left-singles.before.json', tmp, step())
@@ -36,7 +36,7 @@ require('./proof')(1, function (step, Strata, tmp, load, serialize, vivify, gath
         vivify(tmp, step())
         load(__dirname + '/fixtures/left-singles.after.json', step())
     }, function (actual, expected) {
-        deepEqual(actual, expected, 'merged')
+        assert(actual, expected, 'merged')
     }, function () {
         strata.close(step())
     })
