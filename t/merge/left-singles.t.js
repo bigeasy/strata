@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (step, Strata, tmp, deepEqual, serialize, gather, load, objectify, say) {
-    var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 }), fs = require('fs')
+require('./proof')(1, function (step, Strata, tmp, load, serialize, objectify, gather, say, deepEqual) {
+    var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
     step(function () {
         serialize(__dirname + '/fixtures/left-singles.before.json', tmp, step())
     }, function () {
