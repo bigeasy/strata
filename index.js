@@ -308,6 +308,19 @@ function Strata (options) {
         author(buffer, body, options.page.position, length)
     }
 
+    function writeEntry4 (options, callback) {
+        cookEntry(options, function (buffer, body, position, length) {
+            var check = validator(callback), transcript = options.transcript
+
+            transcript.write(buffer, check(sent))
+
+            function sent () {
+                options.page.position += length
+                callback(null, position, length, body && body.length)
+            }
+        })
+    }
+
     function writeEntry2 (options, callback) {
         cookEntry(options, function (buffer, body, position, length) {
             var check = validator(callback), transcript = options.transcript
@@ -377,6 +390,11 @@ function Strata (options) {
                 }
             }
         })
+    }
+
+    function writeInsert3 (transcript, page, index, record, callback) {
+        var header = [ ++page.entries, index + 1 ]
+        writeEntry4({ transcript: transcript, page: page, header: header, body: record }, callback)
     }
 
     function writeInsert2 (fd, page, index, record, callback) {
@@ -465,6 +483,23 @@ function Strata (options) {
         ]
         writeEntry3({ fd: fd, page: page, header: header, type: 'footer' }, validate(callback, function (position, length) {
             page.position = header[5]
+            callback(null, position, length)
+        }))
+    }
+
+    function writeFooter4 (transcript, page, callback) {
+        ok(page.address % 2 && page.bookmark != null)
+        var header = [
+            0, page.bookmark.position, page.bookmark.length, page.bookmark.entry,
+            page.right || 0, page.position, page.entries, page.ghosts, page.positions.length - page.ghosts
+        ]
+        writeEntry4({
+            transcript: transcript,
+            page: page,
+            header: header,
+            type: 'footer'
+        }, validate(callback, function (position, length) {
+            page.position = header[5] // todo: can't we use `position`?
             callback(null, position, length)
         }))
     }
@@ -1371,18 +1406,16 @@ function Strata (options) {
             }
 
             function insert () {
-                var fd
+                var transcript
 
                 balancer.unbalanced(page)
 
-                fs.open(filename(page.address), 'r+', 0644, check(write))
+                transcript = new Transcript(filename(page.address), page.position)
 
-                function write (opened) {
-                    writeInsert2(fd = opened, page, index, record, validate(callback, inserted, close))
-                }
+                writeInsert3(transcript, page, index, record, check(inserted, close))
 
                 function inserted (position, length, size) {
-                    writeFooter3(fd, page, check(written))
+                    writeFooter4(transcript, page, check(written)) // todo: else close
 
                     function written () {
                         splice('positions', page, index, 0, position)
@@ -1396,7 +1429,7 @@ function Strata (options) {
                 }
 
                 function close (writeError) {
-                    fs.close(fd, validate(callback, complete, complete))
+                    transcript.close(validate(callback, complete, complete))
 
                     function complete (closeError) {
                         toUserLand(callback, writeError || closeError, 0)
