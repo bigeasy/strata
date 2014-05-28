@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(2, function (step, tmp, Strata, load, serialize, objectify, deepEqual) {
+require('./proof')(2, function (step, tmp, Strata, load, serialize, objectify, assert) {
     var cadence = require('cadence'), strata, insert
 
     function tracer (type, object, callback) {
@@ -43,7 +43,7 @@ require('./proof')(2, function (step, tmp, Strata, load, serialize, objectify, d
         objectify(tmp, step())
         load(__dirname + '/fixtures/race-left.after.json', step())
     }, function(actual, expected) {
-        deepEqual(actual, expected, 'race left')
+        assert(actual, expected, 'race left')
         strata.close(step())
     }, function () {
         serialize(__dirname + '/fixtures/race.before.json', tmp, step())
@@ -65,7 +65,7 @@ require('./proof')(2, function (step, tmp, Strata, load, serialize, objectify, d
         objectify(tmp, step())
         load(__dirname + '/fixtures/race-right.after.json', step())
     }, function(actual, expected) {
-        deepEqual(actual, expected, 'race right')
+        assert(actual, expected, 'race right')
         strata.close(step())
     })
 })
