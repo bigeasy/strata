@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(4, function (step, Strata, tmp, load, serialize, objectify, gather, say, equal, deepEqual) {
+require('./proof')(4, function (step, Strata, tmp, load, serialize, objectify, gather, say, assert) {
     var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
     step(function () {
         serialize(__dirname + '/fixtures/merge.before.json', tmp, step())
@@ -12,25 +12,25 @@ require('./proof')(4, function (step, Strata, tmp, load, serialize, objectify, g
         step(function () {
             cursor.remove(cursor.index, step())
         }, function () {
-            equal(cursor.index, 0, 'unghostable')
+            assert(cursor.index, 0, 'unghostable')
             cursor.unlock()
         })
     }, function () {
         gather(step, strata)
     }, function (records) {
-        deepEqual(records, [ 'b', 'c', 'd' ], 'records')
+        assert(records, [ 'b', 'c', 'd' ], 'records')
         strata.balance(step())
     }, function () {
         gather(step, strata)
     }, function (records) {
-        deepEqual(records, [ 'b', 'c', 'd' ], 'merged')
+        assert(records, [ 'b', 'c', 'd' ], 'merged')
         objectify(tmp, step())
         load(__dirname + '/fixtures/left-most-unghostable.after.json', step())
     }, function (actual, expected) {
         say(expected)
         say(actual)
 
-        deepEqual(actual, expected, 'after')
+        assert(actual, expected, 'after')
         strata.close(step())
     })
 })
