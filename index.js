@@ -321,25 +321,6 @@ function Strata (options) {
         })
     }
 
-    function writeEntry2 (options, callback) {
-        cookEntry(options, function (buffer, body, position, length) {
-            var check = validator(callback), transcript = options.transcript
-
-            transcript.write(buffer, check(sent))
-
-            function sent () {
-                options.page.position += length
-                if (!(options.page.address % 2) || options.type == 'footer') {
-                    callback(null, position, length)
-                } else {
-                    writeFooter2(options.transcript, options.page, function () {
-                        callback(null, position, length, body && body.length)
-                    })
-                }
-            }
-        })
-    }
-
     function writeEntry (options, callback) {
         cookEntry(options, function (buffer, body, position,length) {
             var check = validator(callback),
@@ -404,7 +385,7 @@ function Strata (options) {
 
     function writeDelete (transcript, page, index, callback) {
         var header = [ ++page.entries, -(index + 1) ]
-        writeEntry2({ transcript: transcript, page: page, header: header }, callback)
+        writeEntry4({ transcript: transcript, page: page, header: header }, callback)
     }
 
     function io (direction, filename, callback) {
@@ -1447,7 +1428,11 @@ function Strata (options) {
 
             transcript = new Transcript(filename(page.address), page.position)
 
-            writeDelete(transcript, page, index, check(written, close))
+            writeDelete(transcript, page, index, check(deleted, close))
+
+            function deleted () {
+                writeFooter4(transcript, page, check(written, close))
+            }
 
             function written () {
                 if (ghost) {
