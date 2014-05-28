@@ -223,38 +223,62 @@ function Strata (options) {
 
     var cadence = require('cadence')
 
-    function Abender (error) {
-        this._error = error
-    }
-
-    Abender.prototype.write = Abender.prototype.once = Abender.prototype.end = function () {
-        throw this._error
-    }
-
-    function Transcript (file, position) {
+    function Transcript (file, flags, position) {
         this._file = file
         this._position = position
         this._stream = fs.createWriteStream(this._file, {
-            flags: 'r+',
+            flags: flags,
             mode: 0644,
             start: this._position
-        }).once('error', function (error) {
-            this._stream = new Abender(error)
+        }).once('open', function (error) {
+            this._opened = true
         }.bind(this))
     }
 
+    Transcript.prototype.ready = cadence(function (step) {
+        step(function () {
+            if (!this._opened) {
+                this._stream.once('open', step(-1))
+                this._stream.once('error', step(Error))
+            }
+        }, function () {
+            this._stream.removeAllListeners('error')
+            this._stream.on('error', function (error) {
+                this._error = error
+            }.bind(this))
+        })
+    })
+
+    Transcript.prototype._checkError = function () {
+        if (this._error) {
+            var error = this._error
+            this._error = new Error('already errored')
+            throw error
+        }
+    }
+
     Transcript.prototype.write = cadence(function (step, buffer) {
-        if (!this._stream.write(buffer)) {
+        this._checkError()
+        if (!this._stream.write(buffer)) { // <- does this 'error' if `true`?
             step(function () {
                 this._stream.once('drain', step(-1))
+                this._stream.once('error', step(Error))
             }, function () {
-                this.write(buffer, step())
+                this._stream.removeAllListeners('error')
             })
         }
     })
 
     Transcript.prototype.close = cadence(function (step) {
-        this._stream.end(step())
+        step(function () {
+            this._checkError() // <- would `error` be here?
+            this._stream.removeAllListeners('error')
+            this._stream.end(step())
+            this._stream.once('error', step(Error)) // <- will this called?
+        }, function () {
+            this._stream.removeAllListeners('error')
+            this._error = new Error('closed')
+        })
     })
 
     function cookEntry (options, author) {
@@ -813,7 +837,8 @@ function Strata (options) {
     function writeBranch (page, suffix, callback) {
         var check = validator(callback),
             addresses = page.addresses.slice(),
-            keys = addresses.map(function (address, index) { return page.cache[address] })
+            keys = addresses.map(function (address, index) { return page.cache[address] }),
+            transcript
 
         ok(keys[0] === (void(0)), 'first key is null')
         ok(keys.slice(1).every(function (key) { return key != null }), 'null keys')
@@ -821,21 +846,23 @@ function Strata (options) {
         page.entries = 0
         page.position = 0
 
-        fs.open(filename(page.address, suffix), 'w', 0644, check(opened))
+        transcript = new Transcript(filename(page.address, suffix), 'w', 0)
 
-        function opened (fd) {
+        transcript.ready(check(ready))
+
+        function ready () {
             write()
+        }
 
-            function write () {
-                if (addresses.length) {
-                    var address = addresses.shift()
-                    var key = page.entries ? page.cache[address].key : null
-                    page.entries++
-                    var header = [ page.entries, page.entries, address ]
-                    writeEntry({ fd: fd, page: page, header: header, body: key, isKey: true }, check(write))
-                } else {
-                    fs.close(fd, check(closed))
-                }
+        function write () {
+            if (addresses.length) {
+                var address = addresses.shift()
+                var key = page.entries ? page.cache[address].key : null
+                page.entries++
+                var header = [ page.entries, page.entries, address ]
+                writeEntry4({ transcript: transcript, page: page, header: header, body: key, isKey: true }, check(write))
+            } else {
+                transcript.close(check(closed))
             }
         }
 
@@ -1391,9 +1418,13 @@ function Strata (options) {
 
                 balancer.unbalanced(page)
 
-                transcript = new Transcript(filename(page.address), page.position)
+                transcript = new Transcript(filename(page.address), 'r+', page.position)
 
-                writeInsert3(transcript, page, index, record, check(inserted, close))
+                transcript.ready(check(ready))
+
+                function ready () {
+                    writeInsert3(transcript, page, index, record, check(inserted, close))
+                }
 
                 function inserted (position, length, size) {
                     writeFooter4(transcript, page, check(written)) // todo: else close
@@ -1426,9 +1457,13 @@ function Strata (options) {
 
             balancer.unbalanced(page)
 
-            transcript = new Transcript(filename(page.address), page.position)
+            transcript = new Transcript(filename(page.address), 'r+', page.position)
 
-            writeDelete(transcript, page, index, check(deleted, close))
+            transcript.ready(check(ready))
+
+            function ready () {
+                writeDelete(transcript, page, index, check(deleted, close))
+            }
 
             function deleted () {
                 writeFooter4(transcript, page, check(written, close))
