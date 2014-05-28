@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (step, Strata, tmp, serialize, load, vivify, assert) {
+require('./proof')(1, function (step, Strata, tmp, load, serialize, vivify, assert) {
     var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
     step(function () {
         serialize(__dirname + '/fixtures/empties-non-pivot.before.json', tmp, step())
