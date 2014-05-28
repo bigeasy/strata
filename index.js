@@ -425,7 +425,7 @@ function Strata (options) {
         writeEntry3({ fd: fd, page: page, header: header, type: 'position' }, callback)
     }
 
-    function writePositions (fd, page, callback) {
+    function _writePositions (fd, page, callback) {
         var header = [ ++page.entries, 0, page.ghosts ]
         header = header.concat(page.positions).concat(page.lengths)
         writeEntry({ fd: fd, page: page, header: header, type: 'position' }, callback)
@@ -2055,8 +2055,13 @@ function Strata (options) {
             fs.open(filename(ghostly.address), 'r+', 0644, check(leafOpened))
 
             function leafOpened (fd) {
-                writePositions(fd, ghostly, check(written))
+                writePositions2(fd, ghostly, check(positioned))
 
+                function positioned () {
+                    writeFooter3(fd, ghostly, check(written))
+                }
+
+                // todo: close on failure.
                 function written () {
                     fs.close(fd, check(closed))
                 }
