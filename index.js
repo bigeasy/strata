@@ -402,11 +402,6 @@ function Strata (options) {
         writeEntry4({ transcript: transcript, page: page, header: header, body: record }, callback)
     }
 
-    function writeInsert2 (fd, page, index, record, callback) {
-        var header = [ ++page.entries, index + 1 ]
-        writeEntry3({ fd: fd, page: page, header: header, body: record }, callback)
-    }
-
     function writeDelete (transcript, page, index, callback) {
         var header = [ ++page.entries, -(index + 1) ]
         writeEntry4({ transcript: transcript, page: page, header: header }, callback)
