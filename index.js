@@ -443,7 +443,7 @@ function Strata (options) {
         writeEntry4({ transcript: transcript, page: page, header: header, type: 'position' }, callback)
     }
 
-    function writeFooter4 (transcript, page, callback) {
+    function writeFooter (transcript, page, callback) {
         ok(page.address % 2 && page.bookmark != null)
         var header = [
             0, page.bookmark.position, page.bookmark.length, page.bookmark.entry,
@@ -722,7 +722,7 @@ function Strata (options) {
         }
 
         function footer () {
-            writeFooter4(transcript, page, check(close))
+            writeFooter(transcript, page, check(close))
         }
 
         function close() {
@@ -1378,7 +1378,7 @@ function Strata (options) {
                 }
 
                 function inserted (position, length, size) {
-                    writeFooter4(transcript, page, check(written)) // todo: else close
+                    writeFooter(transcript, page, check(written)) // todo: else close
 
                     function written () {
                         splice('positions', page, index, 0, position)
@@ -1417,7 +1417,7 @@ function Strata (options) {
             }
 
             function deleted () {
-                writeFooter4(transcript, page, check(written, close))
+                writeFooter(transcript, page, check(written, close))
             }
 
             function written () {
@@ -2058,7 +2058,7 @@ function Strata (options) {
                 writePositions(transcript, ghostly, check(positioned))
 
                 function positioned () {
-                    writeFooter4(transcript, ghostly, check(written))
+                    writeFooter(transcript, ghostly, check(written))
                 }
 
                 // todo: close on failure.
