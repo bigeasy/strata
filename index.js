@@ -448,50 +448,6 @@ function Strata (options) {
         writeEntry4({ transcript: transcript, page: page, header: header, type: 'position' }, callback)
     }
 
-    function writeFooter (fd, page, callback) {
-        ok(page.address % 2 && page.bookmark != null)
-        var header = [
-            0, page.bookmark.position, page.bookmark.length, page.bookmark.entry,
-            page.right || 0, page.position, page.entries, page.ghosts, page.positions.length - page.ghosts
-        ]
-        writeEntry({ fd: fd, page: page, header: header, type: 'footer' }, validate(callback, function (position, length) {
-            page.position = header[5]
-            callback(null, position, length)
-        }))
-    }
-
-    function writeFooter2 (transcript, page, callback) {
-        ok(page.address % 2 && page.bookmark != null)
-        var header = [
-            0, page.bookmark.position, page.bookmark.length, page.bookmark.entry,
-            page.right || 0, page.position, page.entries, page.ghosts, page.positions.length - page.ghosts
-        ]
-        cookEntry({
-            page: page,
-            header: header,
-            type: 'footer'
-        }, function (buffer, body, position, length) {
-            var check = validator(callback)
-            transcript.write(buffer, check(sent))
-            function sent () {
-//                page.position = header[5]
-                callback(null, position, length)
-            }
-        })
-    }
-
-    function writeFooter3 (fd, page, callback) {
-        ok(page.address % 2 && page.bookmark != null)
-        var header = [
-            0, page.bookmark.position, page.bookmark.length, page.bookmark.entry,
-            page.right || 0, page.position, page.entries, page.ghosts, page.positions.length - page.ghosts
-        ]
-        writeEntry3({ fd: fd, page: page, header: header, type: 'footer' }, validate(callback, function (position, length) {
-            page.position = header[5]
-            callback(null, position, length)
-        }))
-    }
-
     function writeFooter4 (transcript, page, callback) {
         ok(page.address % 2 && page.bookmark != null)
         var header = [
