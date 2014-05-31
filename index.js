@@ -442,16 +442,10 @@ function Strata (options) {
         }
     }
 
-    function writePositions2 (transcript, page, callback) {
+    function writePositions (transcript, page, callback) {
         var header = [ ++page.entries, 0, page.ghosts ]
         header = header.concat(page.positions).concat(page.lengths)
         writeEntry4({ transcript: transcript, page: page, header: header, type: 'position' }, callback)
-    }
-
-    function writePositions (fd, page, callback) {
-        var header = [ ++page.entries, 0, page.ghosts ]
-        header = header.concat(page.positions).concat(page.lengths)
-        writeEntry3({ fd: fd, page: page, header: header, type: 'position' }, callback)
     }
 
     function writeFooter (fd, page, callback) {
@@ -740,7 +734,7 @@ function Strata (options) {
             positions = splice('positions', page, 0, page.positions.length)
             lengths = splice('lengths', page, 0, page.lengths.length)
 
-            writePositions2(transcript, page, check(iterate))
+            writePositions(transcript, page, check(iterate))
         }
 
         function iterate () {
@@ -773,7 +767,7 @@ function Strata (options) {
                 entry = cache[position]
                 encacheEntry(page, position, entry)
             }
-            writePositions2(transcript, page, check(footer))
+            writePositions(transcript, page, check(footer))
         }
 
         function footer () {
@@ -2110,7 +2104,7 @@ function Strata (options) {
             transcript.ready(check(leafOpened))
 
             function leafOpened () {
-                writePositions2(transcript, ghostly, check(positioned))
+                writePositions(transcript, ghostly, check(positioned))
 
                 function positioned () {
                     writeFooter4(transcript, ghostly, check(written))
