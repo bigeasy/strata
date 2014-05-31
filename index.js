@@ -727,20 +727,20 @@ function Strata (options) {
         var check = validator(callback),
             cache = {},
             index = 0,
-            fd, positions, lengths
+            transcript, positions, lengths
 
-        fs.open(filename(page.address, suffix), 'w', 0644, check(opened))
+        transcript = new Transcript(filename(page.address, suffix), 'w', 0)
 
-        function opened ($1) {
-            fd = $1
+        transcript.ready(check(opened))
 
+        function opened () {
             page.position = 0
             page.entries = 0
 
             positions = splice('positions', page, 0, page.positions.length)
             lengths = splice('lengths', page, 0, page.lengths.length)
 
-            writePositions(fd, page, check(iterate))
+            writePositions2(transcript, page, check(iterate))
         }
 
         function iterate () {
@@ -756,7 +756,7 @@ function Strata (options) {
 
             function stashed ($) {
                 uncacheEntry(page, position)
-                writeInsert2(fd, page, index++, (entry = $).record, check(written))
+                writeInsert3(transcript, page, index++, (entry = $).record, check(written))
             }
 
             function written (position, length) {
@@ -773,15 +773,15 @@ function Strata (options) {
                 entry = cache[position]
                 encacheEntry(page, position, entry)
             }
-            writePositions(fd, page, check(footer))
+            writePositions2(transcript, page, check(footer))
         }
 
         function footer () {
-            writeFooter3(fd, page, check(close))
+            writeFooter4(transcript, page, check(close))
         }
 
         function close() {
-            fs.close(fd, callback)
+            transcript.close(callback)
         }
     }
 
