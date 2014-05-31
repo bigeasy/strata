@@ -442,6 +442,12 @@ function Strata (options) {
         }
     }
 
+    function writePositions2 (transcript, page, callback) {
+        var header = [ ++page.entries, 0, page.ghosts ]
+        header = header.concat(page.positions).concat(page.lengths)
+        writeEntry4({ transcript: transcript, page: page, header: header, type: 'position' }, callback)
+    }
+
     function writePositions (fd, page, callback) {
         var header = [ ++page.entries, 0, page.ghosts ]
         header = header.concat(page.positions).concat(page.lengths)
@@ -2090,7 +2096,7 @@ function Strata (options) {
         }
 
         function exorcise (pivot, ghostly, corporal, callback) {
-            var fd, check = validator(callback)
+            var transcript, check = validator(callback)
 
             ok(ghostly.ghosts, 'no ghosts')
             ok(corporal.positions.length - corporal.ghosts > 0, 'no replacement')
@@ -2099,18 +2105,20 @@ function Strata (options) {
             splice('lengths', ghostly, 0, 1)
             ghostly.ghosts = 0
 
-            fs.open(filename(ghostly.address), 'r+', 0644, check(leafOpened))
+            transcript = new Transcript(filename(ghostly.address), 'r+', ghostly.position)
 
-            function leafOpened (fd) {
-                writePositions(fd, ghostly, check(positioned))
+            transcript.ready(check(leafOpened))
+
+            function leafOpened () {
+                writePositions2(transcript, ghostly, check(positioned))
 
                 function positioned () {
-                    writeFooter3(fd, ghostly, check(written))
+                    writeFooter4(transcript, ghostly, check(written))
                 }
 
                 // todo: close on failure.
                 function written () {
-                    fs.close(fd, check(closed))
+                    transcript.close(check(closed))
                 }
 
                 function closed () {
