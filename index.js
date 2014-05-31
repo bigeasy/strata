@@ -397,7 +397,7 @@ function Strata (options) {
         })
     }
 
-    function writeInsert3 (transcript, page, index, record, callback) {
+    function writeInsert (transcript, page, index, record, callback) {
         var header = [ ++page.entries, index + 1 ]
         writeEntry4({ transcript: transcript, page: page, header: header, body: record }, callback)
     }
@@ -701,7 +701,7 @@ function Strata (options) {
 
             function stashed ($) {
                 uncacheEntry(page, position)
-                writeInsert3(transcript, page, index++, (entry = $).record, check(written))
+                writeInsert(transcript, page, index++, (entry = $).record, check(written))
             }
 
             function written (position, length) {
@@ -1374,7 +1374,7 @@ function Strata (options) {
                 transcript.ready(check(ready))
 
                 function ready () {
-                    writeInsert3(transcript, page, index, record, check(inserted, close))
+                    writeInsert(transcript, page, index, record, check(inserted, close))
                 }
 
                 function inserted (position, length, size) {
