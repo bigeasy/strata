@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(3, function (step, Strata, tmp, load, serialize, objectify, gather, say, assert) {
+require('./proof')(3, function (step, Strata, tmp, load, serialize, vivify, gather, say, assert) {
     var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
     step(function () {
         serialize(__dirname + '/fixtures/merge.before.json', tmp, step())
@@ -27,7 +27,7 @@ require('./proof')(3, function (step, Strata, tmp, load, serialize, objectify, g
 
         strata.balance(step())
     }, function () {
-        objectify(tmp, step())
+        vivify(tmp, step())
         load(__dirname + '/fixtures/right-empty.after.json', step())
     }, function (actual, expected) {
         say(expected)
