@@ -23,7 +23,8 @@
     "dependencies":
     {
                         "magazine": "0.0.9",
-                        "sequester": "0.0.8"
+                        "sequester": "0.0.8",
+                        "transcript": "0.0.1"
     },
     "devDependencies":
     {
