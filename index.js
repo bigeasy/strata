@@ -287,58 +287,6 @@ function Strata (options) {
         })
     }
 
-    function writeEntry (options, callback) {
-        cookEntry(options, function (buffer, body, position,length) {
-            var check = validator(callback),
-                offset = 0
-
-            send()
-
-            function send () {
-                fs.write(options.fd, buffer, offset, buffer.length - offset, options.page.position, check(sent))
-            }
-
-            function sent(written) {
-                options.page.position += written
-                offset += written
-                if (offset == buffer.length) {
-                    if (!(options.page.address % 2) || options.type == 'footer') {
-                        callback(null, position, length)
-                    } else {
-                        writeFooter(options.fd, options.page, function () {
-                            callback(null, position, length, body && body.length)
-                        })
-                    }
-                } else {
-                    send()
-                }
-            }
-        })
-    }
-
-    function writeEntry3 (options, callback) {
-        cookEntry(options, function (buffer, body, position,length) {
-            var check = validator(callback),
-                offset = 0
-
-            send()
-
-            function send () {
-                fs.write(options.fd, buffer, offset, buffer.length - offset, options.page.position, check(sent))
-            }
-
-            function sent(written) {
-                options.page.position += written
-                offset += written
-                if (offset == buffer.length) {
-                    callback(null, position, length, body && body.length)
-                } else {
-                    send()
-                }
-            }
-        })
-    }
-
     function writeInsert (transcript, page, index, record, callback) {
         var header = [ ++page.entries, index + 1 ]
         writeEntry4({ transcript: transcript, page: page, header: header, body: record }, callback)
