@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(2, function (step, tmp, Strata, load, serialize, vivify, assert) {
+require('./proof')(2, function (step, Strata, tmp, load, serialize, vivify, assert) {
     var cadence = require('cadence'), strata, insert
 
     function tracer (type, object, callback) {
