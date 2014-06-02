@@ -2,7 +2,7 @@
 
 Error.stackTraceLimit = Infinity
 
-require('./proof')(3, function (step, Strata, tmp, load, serialize, objectify, gather, deepEqual) {
+require('./proof')(3, function (step, Strata, tmp, load, serialize, objectify, gather, assert) {
     var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
     step(function () {
         serialize(__dirname + '/fixtures/branch.before.json', tmp, step())
@@ -53,7 +53,7 @@ require('./proof')(3, function (step, Strata, tmp, load, serialize, objectify, g
     }, function () {
         gather(step, strata)
     }, function (records) {
-        deepEqual(records, [ 'a', 'b', 'c', 'd',  'f', 'j', 'k', 'l' ], 'records')
+        assert(records, [ 'a', 'b', 'c', 'd',  'f', 'j', 'k', 'l' ], 'records')
         strata.balance(step())
     }, function () {
         strata.balance(step())
@@ -61,11 +61,11 @@ require('./proof')(3, function (step, Strata, tmp, load, serialize, objectify, g
         objectify(tmp, step())
         load(__dirname + '/fixtures/root-fill.after.json', step())
     }, function (actual, expected) {
-        deepEqual(actual, expected, 'merge')
+        assert(actual, expected, 'merge')
     }, function () {
         gather(step, strata)
     }, function (records) {
-        deepEqual(records, [ 'a', 'b', 'c', 'd', 'f', 'j', 'k', 'l' ], 'merged')
+        assert(records, [ 'a', 'b', 'c', 'd', 'f', 'j', 'k', 'l' ], 'merged')
     }, function() {
         strata.close(step())
     })
