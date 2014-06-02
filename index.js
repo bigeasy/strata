@@ -274,7 +274,7 @@ function Strata (options) {
         author(buffer, body, options.page.position, length)
     }
 
-    function writeEntry4 (options, callback) {
+    function writeEntry (options, callback) {
         cookEntry(options, function (buffer, body, position, length) {
             var check = validator(callback), transcript = options.transcript
 
@@ -289,12 +289,12 @@ function Strata (options) {
 
     function writeInsert (transcript, page, index, record, callback) {
         var header = [ ++page.entries, index + 1 ]
-        writeEntry4({ transcript: transcript, page: page, header: header, body: record }, callback)
+        writeEntry({ transcript: transcript, page: page, header: header, body: record }, callback)
     }
 
     function writeDelete (transcript, page, index, callback) {
         var header = [ ++page.entries, -(index + 1) ]
-        writeEntry4({ transcript: transcript, page: page, header: header }, callback)
+        writeEntry({ transcript: transcript, page: page, header: header }, callback)
     }
 
     function io (direction, filename, callback) {
@@ -330,7 +330,7 @@ function Strata (options) {
     function writePositions (transcript, page, callback) {
         var header = [ ++page.entries, 0, page.ghosts ]
         header = header.concat(page.positions).concat(page.lengths)
-        writeEntry4({ transcript: transcript, page: page, header: header, type: 'position' }, callback)
+        writeEntry({ transcript: transcript, page: page, header: header, type: 'position' }, callback)
     }
 
     function writeFooter (transcript, page, callback) {
@@ -339,7 +339,7 @@ function Strata (options) {
             0, page.bookmark.position, page.bookmark.length, page.bookmark.entry,
             page.right || 0, page.position, page.entries, page.ghosts, page.positions.length - page.ghosts
         ]
-        writeEntry4({
+        writeEntry({
             transcript: transcript,
             page: page,
             header: header,
@@ -701,7 +701,7 @@ function Strata (options) {
                 var key = page.entries ? page.cache[address].key : null
                 page.entries++
                 var header = [ page.entries, page.entries, address ]
-                writeEntry4({ transcript: transcript, page: page, header: header, body: key, isKey: true }, check(write))
+                writeEntry({ transcript: transcript, page: page, header: header, body: key, isKey: true }, check(write))
             } else {
                 transcript.close(check(closed))
             }
