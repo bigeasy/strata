@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (step, Strata, tmp, load, serialize, objectify, gather, deepEqual) {
+require('./proof')(1, function (step, Strata, tmp, load, serialize, objectify, gather, assert) {
     var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
     step(function () {
         serialize(__dirname + '/fixtures/unlocker.before.json', tmp, step())
@@ -20,7 +20,7 @@ require('./proof')(1, function (step, Strata, tmp, load, serialize, objectify, g
         objectify(tmp, step())
         load(__dirname + '/fixtures/unlocker.after.json', step())
     }, function (actual, expected) {
-        deepEqual(actual, expected, 'balanced')
+        assert(actual, expected, 'balanced')
         strata.close(step())
     })
 })
