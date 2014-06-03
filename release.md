@@ -1,5 +1,6 @@
 ### Issue by Issue
 
+ * Upgrade Cadence to 0.0.37. #360.
  * Split footer out of insert and delete. #356.
  * Extract file I/O to a separate module. #355.
  * Extract record formatting to own function. #354.
