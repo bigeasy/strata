@@ -194,7 +194,7 @@ word reentrant. The concept probably requires more complexity, which we would
 have to add in order to have a problem that reentrancy could solve.
 
 This will work or the program will fail. This needs to be documented in
-Sequester, Srata and Locket; that you can't throw an exception from a callback
+Sequester, Strata and Locket; that you can't throw an exception from a callback
 and expect it to propagate. They don't. We don't want to swallow errors, but
 when we unlock, and invoke other descents, and possibly have user code raise
 exceptions, it is very difficult to test that the tree's state will be
@@ -319,12 +319,12 @@ In fact, if I am going this route, why don't I simply write out the key over and
 over again?
 
 *update*: Still bothers me, the girth, but if I'm vacuuming frequently, it won't
-be sucha bother, will it? If vacuum turns out to be something that is done
+be such a bother, will it? If vacuum turns out to be something that is done
 regularly, then investing in the rewind will not have been worth it.
 
 But, I'm starting to not like append only, because it only protects against a
 certain type of error that could be caught by testing. It starts to feel like
-type saftey, a talisman against corruption, one more thing that we do that make
+type safety, a talisman against corruption, one more thing that we do that make
 it impossible, impossible I say! to corrupt files because we're only ever
 appending and the operating system will protect us from ourselves.
 
@@ -393,7 +393,7 @@ there could be a directory that has a file for each plan in the balance, and as
 the balance is performed, a file is removed, the files are ordered by a numeric
 name.
 
-This is possible because we've made the balance thread of executation seprate
+This is possible because we've made the balance thread of execution separate
 and it's goal is not to be lightening fast, but to be lightening fast about
 holding exclusive locks. If the update to the branch pages is done with an
 append to a file, then that is faster than copying the entire file, or at least
@@ -410,11 +410,11 @@ log that says to come back and complete the split, you add an entry to the merge
 log to come back and rewrite branch page the way it is rewritten now.
 
 Until it is rewritten inserts get appended to the old page file, but inserted
-into the correct in memory page object. A rewerite needs to hold a read only
-lock on all the split pages, to copy them, but it can do it in two steps, once
-for each page, then again holding all pages to check to see if anything changed,
+into the correct in memory page object. A rewrite needs to hold a read only lock
+on all the split pages, to copy them, but it can do it in two steps, once for
+each page, then again holding all pages to check to see if anything changed,
 maybe even having some queue of operations to check, instead of having to go
-back and try to descern the differences, simply an array, that if present
+back and try to discern the differences, simply an array, that if present
 gathers up writes.
 
 Except that this now means that we want to hold the pages in memory so that they
@@ -464,7 +464,7 @@ replacements. We write out a stub of the split page.
 
 Then we descend again, this time for locking. We assert that the partition is
 still valid, oh, but it is always valid, for even if we've since emptied that
-page, we can always keep the paritition, so no timeout. With everything locked
+page, we can always keep the partition, so no timeout. With everything locked
 exclusive, or on the way down locking exclusive, we put our copies in place,
 then we get to the root and copy the current page to a dirty file, rename it,
 and then put out stubs, plural, in place. Stubs contain position arrays, but the
