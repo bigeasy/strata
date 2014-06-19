@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (step, Strata, tmp, insert, serialize, equal) {
+require('./proof')(1, function (step, Strata, tmp, serialize, insert, equal) {
     function forward (name) {
         return function () { return fs[name].apply(fs, arguments) }
     }
