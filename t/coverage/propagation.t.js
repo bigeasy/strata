@@ -1,4 +1,4 @@
-require('./proof')(1, function (step, Strata, equal, tmp) {
+require('./proof')(1, function (step, Strata, tmp, equal) {
     var strata
     step(function () {
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
