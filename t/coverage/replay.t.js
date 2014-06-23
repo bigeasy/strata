@@ -2,7 +2,7 @@
 
 // Asserts that log replay will skip over the positions array.
 
-require('./proof')(1, function (step, Strata, tmp, gather, deepEqual, say) {
+require('./proof')(1, function (step, Strata, tmp, gather, assert, say) {
     var strata
     step(function () {
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
@@ -18,7 +18,7 @@ require('./proof')(1, function (step, Strata, tmp, gather, deepEqual, say) {
     }, function () {
         gather(step, strata)
     }, function (records) {
-        deepEqual(records, [ 'a' ], 'written')
+        assert(records, [ 'a' ], 'written')
         strata.close(step())
     }, function () {
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3, replay: true })
