@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(4, function (step, Strata, tmp, deepEqual, serialize, gather, load, objectify) {
+require('./proof')(4, function (step, Strata, tmp, load, serialize, objectify, gather, deepEqual) {
     var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 }), fs = require('fs')
     step(function () {
         serialize(__dirname + '/fixtures/root-drain.before.json', tmp, step())
