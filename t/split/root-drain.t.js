@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(4, function (step, Strata, tmp, load, serialize, objectify, gather, deepEqual) {
+require('./proof')(4, function (step, Strata, tmp, load, serialize, objectify, gather, assert) {
     var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 }), fs = require('fs')
     step(function () {
         serialize(__dirname + '/fixtures/root-drain.before.json', tmp, step())
@@ -17,15 +17,15 @@ require('./proof')(4, function (step, Strata, tmp, load, serialize, objectify, g
     }, function () {
         gather(step, strata)
     }, function (records) {
-        deepEqual(records, [ 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j' ], 'records')
+        assert(records, [ 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j' ], 'records')
         strata.balance(step())
     }, function () {
         objectify(tmp, step())
         load(__dirname + '/fixtures/root-drain.after.json', step())
     }, function (actual, expected) {
-        deepEqual(actual, expected, 'split')
+        assert(actual, expected, 'split')
         strata.purge(0)
-        deepEqual(strata.size, 0, 'purged completely')
+        assert(strata.size, 0, 'purged completely')
         strata.close(step())
     }, function () {
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
@@ -33,7 +33,7 @@ require('./proof')(4, function (step, Strata, tmp, load, serialize, objectify, g
     }, function () {
         gather(step, strata)
     }, function (records) {
-        deepEqual(records, [ 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j' ], 'records')
+        assert(records, [ 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j' ], 'records')
         strata.close(step())
     })
 })
