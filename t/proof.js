@@ -389,7 +389,6 @@ module.exports = function (dirname) {
                 serialize: serialize,
                 gather: gather,
                 vivify: vivify,
-                objectify: vivify,
                 script: script
             }
         })
