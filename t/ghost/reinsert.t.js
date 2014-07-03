@@ -17,7 +17,7 @@ require('./proof')(4, function (step, Strata, tmp, load, serialize, vivify, gath
             cursor.insert('d', 'd', ~index, step())
         }, function () {
             cursor.unlock()
-            gather(step, strata)
+            gather(strata, step())
         })
     }, function (records) {
         assert(records, [ 'a', 'b', 'c', 'd', 'e', 'f' ], 'records')
@@ -27,7 +27,7 @@ require('./proof')(4, function (step, Strata, tmp, load, serialize, vivify, gath
         assert(actual, expected, 'after tree')
         strata.balance(step())
     }, function () {
-        gather(step, strata)
+        gather(strata, step())
     }, function (records) {
         assert(records, [ 'a', 'b', 'c', 'd', 'e', 'f' ], 'balanced records')
         vivify(tmp, step())

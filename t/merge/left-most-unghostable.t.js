@@ -16,12 +16,12 @@ require('./proof')(4, function (step, Strata, tmp, load, serialize, vivify, gath
             cursor.unlock()
         })
     }, function () {
-        gather(step, strata)
+        gather(strata, step())
     }, function (records) {
         assert(records, [ 'b', 'c', 'd' ], 'records')
         strata.balance(step())
     }, function () {
-        gather(step, strata)
+        gather(strata, step())
     }, function (records) {
         assert(records, [ 'b', 'c', 'd' ], 'merged')
         vivify(tmp, step())

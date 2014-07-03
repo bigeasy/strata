@@ -15,7 +15,7 @@ require('./proof')(4, function (step, Strata, tmp, load, serialize, vivify, gath
             cursor.unlock()
         })
     }, function () {
-        gather(step, strata)
+        gather(strata, step())
     }, function (records) {
         assert(records, [ 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n' ], 'records')
         strata.balance(step())
@@ -31,7 +31,7 @@ require('./proof')(4, function (step, Strata, tmp, load, serialize, vivify, gath
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
         strata.open(step())
     }, function () {
-        gather(step, strata)
+        gather(strata, step())
     }, function (records) {
         assert(records, [ 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n' ], 'records')
         strata.close(step())

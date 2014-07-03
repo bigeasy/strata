@@ -7,7 +7,7 @@ require('./proof')(4, function (step, Strata, tmp, serialize, gather, assert) {
     }, function () {
         strata.open(step())
     }, function () {
-        gather(step, strata)
+        gather(strata, step())
     }, function (records) {
         assert(records, [ 'a', 'd', 'f', 'g', 'h', 'i', 'l', 'm', 'n' ], 'records')
     }, function () {
@@ -17,7 +17,7 @@ require('./proof')(4, function (step, Strata, tmp, serialize, gather, assert) {
             cursor.remove(cursor.index, step())
         }, function () {
             cursor.unlock()
-            gather(step, strata)
+            gather(strata, step())
         })
     }, function (records) {
         assert(records, [ 'a', 'd', 'f', 'h', 'i', 'l', 'm', 'n' ], 'records after delete')
@@ -29,7 +29,7 @@ require('./proof')(4, function (step, Strata, tmp, serialize, gather, assert) {
             assert(unambiguous, 0, 'unambiguous')
             cursor.unlock()
         }, function () {
-            gather(step, strata)
+            gather(strata, step())
         })
     }, function (records) {
         assert(records, [ 'a', 'd', 'f', 'h', 'i', 'j', 'l', 'm', 'n' ], 'records after insert')

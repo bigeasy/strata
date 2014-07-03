@@ -17,7 +17,7 @@ require('./proof')(1, function (step, Strata, tmp, gather, assert) {
                 b.insert('b', 'b', ~ b.index, step())
             }, function () {
                 b.unlock()
-                gather(step, strata)
+                gather(strata, step())
             })
         })
     }, function (records) {

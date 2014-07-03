@@ -14,7 +14,7 @@ require('./proof')(4, function (step, Strata, tmp, serialize, gather, assert) {
         assert(cursor.length, 3, 'length')
         cursor.unlock()
     }, function () {
-        gather(step, strata)
+        gather(strata, step())
     }, function (records) {
         assert(records, [ 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i' ], 'records')
     }, function() {

@@ -7,7 +7,7 @@ require('./proof')(5, function (step, Strata, tmp, load, serialize, vivify, gath
     }, function () {
         strata.open(step())
     }, function () {
-        gather(step, strata)
+        gather(strata, step())
     }, function (records) {
         assert(records, [ 'a', 'b', 'c', 'd' ], 'records')
     }, function () {
@@ -19,7 +19,7 @@ require('./proof')(5, function (step, Strata, tmp, load, serialize, vivify, gath
             cursor.remove(i, step())
         }, function () {
             cursor.unlock()
-            gather(step, strata)
+            gather(strata, step())
         })
     }, function (records) {
         assert(records, [ 'a', 'b', 'd' ], 'deleted')
@@ -43,7 +43,7 @@ require('./proof')(5, function (step, Strata, tmp, load, serialize, vivify, gath
             cursor.unlock()
         })
     }, function () {
-        gather(step, strata)
+        gather(strata, step())
     }, function (records) {
         assert(records, [ 'a', 'b', 'd' ], 'reopened')
         strata.close(step())

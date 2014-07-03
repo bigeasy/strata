@@ -17,13 +17,13 @@ require('./proof')(3, function (step, Strata, tmp, load, serialize, vivify, gath
             cursor.remove(index, step())
         }, function () {
             cursor.unlock()
-            gather(step, strata)
+            gather(strata, step())
         })
     }, function (records) {
         assert(records, [ 'a', 'b', 'c', 'e', 'f', 'g' ], 'records')
         strata.balance(step())
     }, function () {
-        gather(step, strata)
+        gather(strata, step())
     }, function (records) {
         assert(records, [ 'a', 'b', 'c', 'e', 'f', 'g' ], 'balanced')
         vivify(tmp, step())

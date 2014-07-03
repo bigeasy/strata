@@ -18,7 +18,7 @@ require('./proof')(1, function (step, Strata, tmp, gather, assert, say) {
             cursor.unlock()
         })
     }, function () {
-        gather(step, strata)
+        gather(strata, step())
     }, function (records) {
         assert(records, [], 'empty')
         strata.close(step())

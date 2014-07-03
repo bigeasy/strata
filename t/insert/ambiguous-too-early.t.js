@@ -7,7 +7,7 @@ require('./proof')(3, function (step, Strata, tmp, serialize, gather, assert) {
     }, function () {
         strata.open(step())
     }, function () {
-        gather(step, strata)
+        gather(strata, step())
     }, function (records) {
         assert(records, [ 'a', 'd', 'f', 'g', 'h', 'i', 'l', 'm', 'n' ], 'records')
     }, function () {
@@ -28,7 +28,7 @@ require('./proof')(3, function (step, Strata, tmp, serialize, gather, assert) {
             }
         })(1)
     }, function () {
-        gather(step, strata)
+        gather(strata, step())
     }, function (records) {
         assert(records, [ 'a', 'd', 'f', 'g', 'h', 'i', 'l', 'm', 'n', 'z' ], 'records after insert')
     }, function() {

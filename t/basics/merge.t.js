@@ -14,7 +14,7 @@ require('./proof')(3, function (step, Strata, tmp, load, serialize, vivify, gath
             cursor.remove(cursor.index, step())
         }, function () {
             cursor.unlock()
-            gather(step, strata)
+            gather(strata, step())
         })
     }, function (records) {
         step(function () {
@@ -29,7 +29,7 @@ require('./proof')(3, function (step, Strata, tmp, load, serialize, vivify, gath
 
             assert(actual, expected, 'merge')
         }, function () {
-            gather(step, strata)
+            gather(strata, step())
         }, function (records) {
             assert(records, [ 'a', 'c', 'd' ], 'records')
             strata.balance(step())

@@ -23,7 +23,7 @@ require('./proof')(2, function (step, Strata, tmp, serialize, gather, assert) {
             assert(error.message, 'already balancing', 'error')
         }])
     }, function () {
-        gather(step, strata)
+        gather(strata, step())
     }, function (records) {
         assert(records, [ 'a', 'b', 'c', 'd' ], 'records')
     }, function() {

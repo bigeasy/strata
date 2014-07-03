@@ -23,7 +23,7 @@ require('./proof')(2, function (step, Strata, tmp, load, serialize, vivify, gath
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
         strata.open(step())
     }, function () {
-        gather(step, strata)
+        gather(strata, step())
     }, function (records) {
         assert(records, [ 'a', 'b', 'c' ], 'records')
     }, function() {

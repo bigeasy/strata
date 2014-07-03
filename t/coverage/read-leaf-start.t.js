@@ -12,7 +12,7 @@ require('./proof')(1, function (step, Strata, tmp, serialize, gather, assert) {
     }, function () {
         strata.open(step())
     }, function () {
-        gather(step, strata)
+        gather(strata, step())
     }, function (records) {
         assert(records, [ 'a', 'c', 'd' ], 'records')
     }, function () {

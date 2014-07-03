@@ -82,8 +82,9 @@ function insert (step, strata, values) {
     })
 }
 
-function gather (step, strata) {
+var gather = cadence(function (step, strata) {
     var records = [], page, item
+    if (typeof strata == 'function') throw new Error
     step(function () {
         strata.iterator(strata.left, step())
     }, function (cursor) {
@@ -106,7 +107,7 @@ function gather (step, strata) {
             }
         })(null, true)
     })
-}
+})
 
 function serialize (segments, directory, callback) {
     if (typeof segments == 'string') load(segments, check(callback, write))

@@ -7,12 +7,12 @@ require('./proof')(3, function (step, Strata, tmp, load, serialize, vivify, gath
     }, function () {
         strata.open(step())
     }, function () {
-        gather(step, strata)
+        gather(strata, step())
     }, function (records) {
         assert(records, [ 'a', 'c', 'd', 'e', 'f', 'g', 'h' ], 'records')
         strata.balance(step())
     }, function () {
-        gather(step, strata)
+        gather(strata, step())
     }, function (records) {
         assert(records, [ 'a', 'c', 'd', 'e', 'f', 'g', 'h' ], 'records after balance')
 

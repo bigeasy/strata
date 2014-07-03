@@ -23,12 +23,12 @@ require('./proof')(2, function (step, Strata, tmp, serialize, gather, assert) {
             cursor.unlock()
         })
     }, function () {
-        gather(step, strata)
+        gather(strata, step())
     }, function (records) {
         assert(records, [  'b', 'c', 'd',  'e' ], 'records')
         strata.balance(step())
     }, function () {
-        gather(step, strata)
+        gather(strata, step())
     }, function (records) {
         assert(records, [  'b', 'c', 'd',  'e' ], 'merged')
     }, function() {

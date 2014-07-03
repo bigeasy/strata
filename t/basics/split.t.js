@@ -14,7 +14,7 @@ require('./proof')(3, function (step, Strata, tmp, load, serialize, vivify, gath
             cursor.insert('b', 'b', ~ cursor.index, step())
         }, function () {
             cursor.unlock()
-            gather(step, strata)
+            gather(strata, step())
         })
     }, function (records) {
         assert(records, [ 'a', 'b', 'c', 'd' ], 'records')

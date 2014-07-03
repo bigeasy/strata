@@ -19,7 +19,7 @@ require('./proof')(1, function (step, Strata, tmp, gather, equal) {
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
         strata.open(step())
     }, function () {
-        gather(step, strata)
+        gather(strata, step())
     }, function (records) {
         equal(records[0], value, 'done')
         strata.close(step())
