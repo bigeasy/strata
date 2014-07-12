@@ -559,7 +559,7 @@ function script (options, callback) {
             vivify(options.directory, step())
             load(action.file, step())
         }, function (actual, expected) {
-            options.deepEqual(actual, expected, action.file)
+            options.assert(actual, expected, action.file)
         })
     })
 
