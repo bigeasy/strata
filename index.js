@@ -1,4 +1,4 @@
-var Transcript = require('transcript')
+var Staccato = require('staccato')
 
 function extend(to, from) {
     for (var key in from) to[key] = from[key]
@@ -276,9 +276,9 @@ function Strata (options) {
 
     function writeEntry (options, callback) {
         cookEntry(options, function (buffer, body, position, length) {
-            var check = validator(callback), transcript = options.transcript
+            var check = validator(callback), staccato = options.staccato
 
-            transcript.write(buffer, check(sent))
+            staccato.write(buffer, check(sent))
 
             function sent () {
                 options.page.position += length
@@ -287,14 +287,14 @@ function Strata (options) {
         })
     }
 
-    function writeInsert (transcript, page, index, record, callback) {
+    function writeInsert (staccato, page, index, record, callback) {
         var header = [ ++page.entries, index + 1 ]
-        writeEntry({ transcript: transcript, page: page, header: header, body: record }, callback)
+        writeEntry({ staccato: staccato, page: page, header: header, body: record }, callback)
     }
 
-    function writeDelete (transcript, page, index, callback) {
+    function writeDelete (staccato, page, index, callback) {
         var header = [ ++page.entries, -(index + 1) ]
-        writeEntry({ transcript: transcript, page: page, header: header }, callback)
+        writeEntry({ staccato: staccato, page: page, header: header }, callback)
     }
 
     function io (direction, filename, callback) {
@@ -327,20 +327,20 @@ function Strata (options) {
         }
     }
 
-    function writePositions (transcript, page, callback) {
+    function writePositions (staccato, page, callback) {
         var header = [ ++page.entries, 0, page.ghosts ]
         header = header.concat(page.positions).concat(page.lengths)
-        writeEntry({ transcript: transcript, page: page, header: header, type: 'position' }, callback)
+        writeEntry({ staccato: staccato, page: page, header: header, type: 'position' }, callback)
     }
 
-    function writeFooter (transcript, page, callback) {
+    function writeFooter (staccato, page, callback) {
         ok(page.address % 2 && page.bookmark != null)
         var header = [
             0, page.bookmark.position, page.bookmark.length, page.bookmark.entry,
             page.right || 0, page.position, page.entries, page.ghosts, page.positions.length - page.ghosts
         ]
         writeEntry({
-            transcript: transcript,
+            staccato: staccato,
             page: page,
             header: header,
             type: 'footer'
@@ -562,11 +562,11 @@ function Strata (options) {
         var check = validator(callback),
             cache = {},
             index = 0,
-            transcript, positions, lengths
+            staccato, positions, lengths
 
-        transcript = new Transcript(filename(page.address, suffix), 'w', 0)
+        staccato = new Staccato(filename(page.address, suffix), 'w', 0)
 
-        transcript.ready(check(opened))
+        staccato.ready(check(opened))
 
         function opened () {
             page.position = 0
@@ -575,7 +575,7 @@ function Strata (options) {
             positions = splice('positions', page, 0, page.positions.length)
             lengths = splice('lengths', page, 0, page.lengths.length)
 
-            writePositions(transcript, page, check(iterate))
+            writePositions(staccato, page, check(iterate))
         }
 
         function iterate () {
@@ -591,7 +591,7 @@ function Strata (options) {
 
             function stashed ($) {
                 uncacheEntry(page, position)
-                writeInsert(transcript, page, index++, (entry = $).record, check(written))
+                writeInsert(staccato, page, index++, (entry = $).record, check(written))
             }
 
             function written (position, length) {
@@ -608,15 +608,15 @@ function Strata (options) {
                 entry = cache[position]
                 encacheEntry(page, position, entry)
             }
-            writePositions(transcript, page, check(footer))
+            writePositions(staccato, page, check(footer))
         }
 
         function footer () {
-            writeFooter(transcript, page, check(close))
+            writeFooter(staccato, page, check(close))
         }
 
         function close() {
-            transcript.close(callback)
+            staccato.close(callback)
         }
     }
 
@@ -679,7 +679,7 @@ function Strata (options) {
         var check = validator(callback),
             addresses = page.addresses.slice(),
             keys = addresses.map(function (address, index) { return page.cache[address] }),
-            transcript
+            staccato
 
         ok(keys[0] === (void(0)), 'first key is null')
         ok(keys.slice(1).every(function (key) { return key != null }), 'null keys')
@@ -687,9 +687,9 @@ function Strata (options) {
         page.entries = 0
         page.position = 0
 
-        transcript = new Transcript(filename(page.address, suffix), 'w', 0)
+        staccato = new Staccato(filename(page.address, suffix), 'w', 0)
 
-        transcript.ready(check(ready))
+        staccato.ready(check(ready))
 
         function ready () {
             write()
@@ -701,9 +701,9 @@ function Strata (options) {
                 var key = page.entries ? page.cache[address].key : null
                 page.entries++
                 var header = [ page.entries, page.entries, address ]
-                writeEntry({ transcript: transcript, page: page, header: header, body: key, isKey: true }, check(write))
+                writeEntry({ staccato: staccato, page: page, header: header, body: key, isKey: true }, check(write))
             } else {
-                transcript.close(check(closed))
+                staccato.close(check(closed))
             }
         }
 
@@ -1255,20 +1255,20 @@ function Strata (options) {
             }
 
             function insert () {
-                var transcript
+                var staccato
 
                 balancer.unbalanced(page)
 
-                transcript = new Transcript(filename(page.address), 'r+', page.position)
+                staccato = new Staccato(filename(page.address), 'r+', page.position)
 
-                transcript.ready(check(ready))
+                staccato.ready(check(ready))
 
                 function ready () {
-                    writeInsert(transcript, page, index, record, check(inserted, close))
+                    writeInsert(staccato, page, index, record, check(inserted, close))
                 }
 
                 function inserted (position, length, size) {
-                    writeFooter(transcript, page, check(written)) // todo: else close
+                    writeFooter(staccato, page, check(written)) // todo: else close
 
                     function written () {
                         splice('positions', page, index, 0, position)
@@ -1282,7 +1282,7 @@ function Strata (options) {
                 }
 
                 function close (writeError) {
-                    transcript.close(validate(callback, complete, complete))
+                    staccato.close(validate(callback, complete, complete))
 
                     function complete (closeError) {
                         toUserLand(callback, writeError || closeError, 0)
@@ -1294,20 +1294,20 @@ function Strata (options) {
         function remove (index, callback) {
             var ghost = page.address != 1 && index == 0,
                 check = validator(callback),
-                transcript
+                staccato
 
             balancer.unbalanced(page)
 
-            transcript = new Transcript(filename(page.address), 'r+', page.position)
+            staccato = new Staccato(filename(page.address), 'r+', page.position)
 
-            transcript.ready(check(ready))
+            staccato.ready(check(ready))
 
             function ready () {
-                writeDelete(transcript, page, index, check(deleted, close))
+                writeDelete(staccato, page, index, check(deleted, close))
             }
 
             function deleted () {
-                writeFooter(transcript, page, check(written, close))
+                writeFooter(staccato, page, check(written, close))
             }
 
             function written () {
@@ -1323,7 +1323,7 @@ function Strata (options) {
             }
 
             function close (writeError) {
-                transcript.close(check(complete, complete))
+                staccato.close(check(complete, complete))
 
                 function complete (closeError) {
                     toUserLand(callback, writeError || closeError)
@@ -1931,7 +1931,7 @@ function Strata (options) {
         }
 
         function exorcise (pivot, ghostly, corporal, callback) {
-            var transcript, check = validator(callback)
+            var staccato, check = validator(callback)
 
             ok(ghostly.ghosts, 'no ghosts')
             ok(corporal.positions.length - corporal.ghosts > 0, 'no replacement')
@@ -1940,20 +1940,20 @@ function Strata (options) {
             splice('lengths', ghostly, 0, 1)
             ghostly.ghosts = 0
 
-            transcript = new Transcript(filename(ghostly.address), 'r+', ghostly.position)
+            staccato = new Staccato(filename(ghostly.address), 'r+', ghostly.position)
 
-            transcript.ready(check(leafOpened))
+            staccato.ready(check(leafOpened))
 
             function leafOpened () {
-                writePositions(transcript, ghostly, check(positioned))
+                writePositions(staccato, ghostly, check(positioned))
 
                 function positioned () {
-                    writeFooter(transcript, ghostly, check(written))
+                    writeFooter(staccato, ghostly, check(written))
                 }
 
                 // todo: close on failure.
                 function written () {
-                    transcript.close(check(closed))
+                    staccato.close(check(closed))
                 }
 
                 function closed () {
