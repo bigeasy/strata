@@ -52,6 +52,14 @@ function Strata (options) {
         deserialize = options.deserialize || function (buffer) { return JSON.parse(buffer.toString()) },
         tracer = options.tracer || function () { arguments[2]() }
 
+    function createStaccato (file, flags, start) {
+        return new Staccato(fs.createWriteStream(file, {
+            flags: flags,
+            mode: 0644,
+            start: start
+        }), true)
+    }
+
     checksum = (function () {
         if (typeof options.checksum == 'function') return options.checksum
         var algorithm
@@ -564,7 +572,7 @@ function Strata (options) {
             index = 0,
             staccato, positions, lengths
 
-        staccato = new Staccato(filename(page.address, suffix), 'w', 0)
+        staccato = createStaccato(filename(page.address, suffix), 'w', 0)
 
         staccato.ready(check(opened))
 
@@ -687,7 +695,7 @@ function Strata (options) {
         page.entries = 0
         page.position = 0
 
-        staccato = new Staccato(filename(page.address, suffix), 'w', 0)
+        staccato = createStaccato(filename(page.address, suffix), 'w', 0)
 
         staccato.ready(check(ready))
 
@@ -1259,7 +1267,7 @@ function Strata (options) {
 
                 balancer.unbalanced(page)
 
-                staccato = new Staccato(filename(page.address), 'r+', page.position)
+                staccato = createStaccato(filename(page.address), 'r+', page.position)
 
                 staccato.ready(check(ready))
 
@@ -1298,7 +1306,7 @@ function Strata (options) {
 
             balancer.unbalanced(page)
 
-            staccato = new Staccato(filename(page.address), 'r+', page.position)
+            staccato = createStaccato(filename(page.address), 'r+', page.position)
 
             staccato.ready(check(ready))
 
@@ -1940,7 +1948,7 @@ function Strata (options) {
             splice('lengths', ghostly, 0, 1)
             ghostly.ghosts = 0
 
-            staccato = new Staccato(filename(ghostly.address), 'r+', ghostly.position)
+            staccato = createStaccato(filename(ghostly.address), 'r+', ghostly.position)
 
             staccato.ready(check(leafOpened))
 
