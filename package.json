@@ -24,7 +24,8 @@
     {
                         "magazine": "0.0.9",
                         "sequester": "0.0.8",
-                        "staccato": "0.0.1"
+                        "staccato": "0.0.1",
+                        "journalist": "0.0.0"
     },
     "devDependencies":
     {
