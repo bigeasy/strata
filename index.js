@@ -353,7 +353,7 @@ function Strata (options) {
             header: header,
             type: 'footer'
         }, validate(callback, function (position, length) {
-            page.position = header[5] // todo: can't we use `position`?
+            page.position = position
             callback(null, position, length)
         }))
     }
