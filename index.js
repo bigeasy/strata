@@ -1,4 +1,6 @@
-var Staccato = require('staccato')
+var Cache = require('magazine'),
+    Staccato = require('staccato'),
+    Journalist = require('journalist')
 
 function extend(to, from) {
     for (var key in from) to[key] = from[key]
@@ -38,7 +40,7 @@ function Strata (options) {
         fs = options.fs || require('fs'),
         path = options.path || require('path'),
         ok = function (condition, message) { if (!condition) throw new Error(message) },
-        cache = options.cache || (new (require('magazine'))),
+        cache = options.cache || (new Cache),
         thrownByUser,
         magazine,
         nextAddress = 0,
@@ -48,6 +50,18 @@ function Strata (options) {
         size = 0,
         checksum,
         constructors = {},
+        journalist = new Journalist({
+            count: options.fileHandleCount || 64,
+            stage: options.writeStage || 'entry',
+            cache: options.jouralistCache || (new Cache),
+            closer: writeFooter2
+        }),
+        createJournal = (options.writeStage == 'tree' ? (function () {
+            var journal = journalist.createJournal()
+            return function () { return journal }
+        })() : function () {
+            return journalist.createJournal()
+        }),
         serialize = options.serialize || function (object) { return new Buffer(JSON.stringify(object)) },
         deserialize = options.deserialize || function (buffer) { return JSON.parse(buffer.toString()) },
         tracer = options.tracer || function () { arguments[2]() }
@@ -282,6 +296,19 @@ function Strata (options) {
         author(buffer, body, options.page.position, length)
     }
 
+    function writeEntry2 (options, callback) {
+        cookEntry(options, function (buffer, body, position, length) {
+            var check = validator(callback)
+
+            options.out.write(buffer, check(sent))
+
+            function sent () {
+                options.page.position += length
+                callback(null, position, length, body && body.length)
+            }
+        })
+    }
+
     function writeEntry (options, callback) {
         cookEntry(options, function (buffer, body, position, length) {
             var check = validator(callback), staccato = options.staccato
@@ -298,6 +325,11 @@ function Strata (options) {
     function writeInsert (staccato, page, index, record, callback) {
         var header = [ ++page.entries, index + 1 ]
         writeEntry({ staccato: staccato, page: page, header: header, body: record }, callback)
+    }
+
+    function writeInsert2 (out, page, index, record, callback) {
+        var header = [ ++page.entries, index + 1 ]
+        writeEntry2({ out: out, page: page, header: header, body: record }, callback)
     }
 
     function writeDelete (staccato, page, index, callback) {
@@ -339,6 +371,23 @@ function Strata (options) {
         var header = [ ++page.entries, 0, page.ghosts ]
         header = header.concat(page.positions).concat(page.lengths)
         writeEntry({ staccato: staccato, page: page, header: header, type: 'position' }, callback)
+    }
+
+    function writeFooter2 (out, position, page, callback) {
+        ok(page.address % 2 && page.bookmark != null)
+        var header = [
+            0, page.bookmark.position, page.bookmark.length, page.bookmark.entry,
+            page.right || 0, page.position, page.entries, page.ghosts, page.positions.length - page.ghosts
+        ]
+        writeEntry2({
+            out: out,
+            page: page,
+            header: header,
+            type: 'footer'
+        }, validate(callback, function (position, length) {
+            page.position = header[5] // todo: can't we use `position`?
+            callback(null, position, length)
+        }))
     }
 
     function writeFooter (staccato, page, callback) {
@@ -782,6 +831,7 @@ function Strata (options) {
             locker.unlock(root)
             locker.unlock(leaf)
             locker.dispose()
+            console.log('here')
             toUserLand(callback)
         }
     }
@@ -1153,7 +1203,7 @@ function Strata (options) {
                                    unlocker_)
     }
 
-    function Cursor (descents, exclusive, searchKey) {
+    function Cursor (journal, descents, exclusive, searchKey) {
         var locker = descents[0].locker,
             page = descents[0].page,
             rightLeafKey = null,
@@ -1263,22 +1313,16 @@ function Strata (options) {
             }
 
             function insert () {
-                var staccato
+                var entry
 
                 balancer.unbalanced(page)
 
-                staccato = createStaccato(filename(page.address), 'r+', page.position)
+                journal.open(filename(page.address), page.position, page, check(ready))
 
-                staccato.ready(check(ready))
+                function ready (entry) {
+                    writeInsert(entry, page, index, record, check(inserted, close))
 
-                function ready () {
-                    writeInsert(staccato, page, index, record, check(inserted, close))
-                }
-
-                function inserted (position, length, size) {
-                    writeFooter(staccato, page, check(written)) // todo: else close
-
-                    function written () {
+                    function inserted (position, length, size) {
                         splice('positions', page, index, 0, position)
                         splice('lengths', page, index, 0, length)
                         _cacheRecord(page, position, record, size)
@@ -1287,13 +1331,11 @@ function Strata (options) {
 
                         close()
                     }
-                }
 
-                function close (writeError) {
-                    staccato.close(validate(callback, complete, complete))
-
-                    function complete (closeError) {
-                        toUserLand(callback, writeError || closeError, 0)
+                    function close (writeError) {
+                        entry.close('entry', function (closeError) {
+                            toUserLand(callback, writeError || closeError, 0)
+                        })
                     }
                 }
             }
@@ -2464,7 +2506,7 @@ function Strata (options) {
 
             function pivotOrLeaf(page, index) {
                 if (descents[0].page.address % 2) {
-                    callback(null, new Cursor(descents, false, key))
+                    callback(null, new Cursor(createJournal(), descents, false, key))
                 } else {
                     descents[0].index--
                     toLeaf(descents[0].right, descents, null, exclusive, callback)
@@ -2486,7 +2528,7 @@ function Strata (options) {
         }
 
         function leaf (page, index) {
-            callback(null, new Cursor(descents, exclusive, key))
+            callback(null, new Cursor(createJournal(), descents, exclusive, key))
         }
     }
 
