@@ -332,9 +332,9 @@ function Strata (options) {
         writeEntry2({ out: out, page: page, header: header, body: record }, callback)
     }
 
-    function writeDelete (staccato, page, index, callback) {
+    function writeDelete (out, page, index, callback) {
         var header = [ ++page.entries, -(index + 1) ]
-        writeEntry({ staccato: staccato, page: page, header: header }, callback)
+        writeEntry2({ out: out, page: page, header: header }, callback)
     }
 
     function io (direction, filename, callback) {
@@ -1348,35 +1348,27 @@ function Strata (options) {
 
             balancer.unbalanced(page)
 
-            staccato = createStaccato(filename(page.address), 'r+', page.position)
+            journal.open(filename(page.address), page.position, page, check(ready))
 
-            staccato.ready(check(ready))
+            function ready (entry) {
+                writeDelete(entry, page, index, check(written, close))
 
-            function ready () {
-                writeDelete(staccato, page, index, check(deleted, close))
-            }
-
-            function deleted () {
-                writeFooter(staccato, page, check(written, close))
-            }
-
-            function written () {
-                if (ghost) {
-                    page.ghosts++
-                    offset || offset++
-                } else {
-                    uncacheEntry(page, page.positions[index])
-                    splice('positions', page, index, 1)
-                    splice('lengths', page, index, 1)
+                function written () {
+                    if (ghost) {
+                        page.ghosts++
+                        offset || offset++
+                    } else {
+                        uncacheEntry(page, page.positions[index])
+                        splice('positions', page, index, 1)
+                        splice('lengths', page, index, 1)
+                    }
+                    close()
                 }
-                close()
-            }
 
-            function close (writeError) {
-                staccato.close(check(complete, complete))
-
-                function complete (closeError) {
-                    toUserLand(callback, writeError || closeError)
+                function close (writeError) {
+                    entry.close('entry', function (closeError) {
+                        toUserLand(callback, writeError || closeError)
+                    })
                 }
             }
         }
