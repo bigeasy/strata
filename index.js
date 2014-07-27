@@ -367,6 +367,12 @@ function Strata (options) {
         }
     }
 
+    function writePositions2 (output, page, callback) {
+        var header = [ ++page.entries, 0, page.ghosts ]
+        header = header.concat(page.positions).concat(page.lengths)
+        writeEntry2({ out: output, page: page, header: header, type: 'position' }, callback)
+    }
+
     function writePositions (staccato, page, callback) {
         var header = [ ++page.entries, 0, page.ghosts ]
         header = header.concat(page.positions).concat(page.lengths)
@@ -1382,7 +1388,8 @@ function Strata (options) {
             referenced = {},
             ordered = {},
             ghosts = {},
-            methods = {}
+            methods = {},
+            journal
 
         classify.call(methods, deleteGhost, splitLeaf, mergeLeaves)
 
@@ -1404,6 +1411,7 @@ function Strata (options) {
                 callback(null, true)
             } else {
                 balancer = new Balancer()
+                journal = createJournal()
                 balancing = true
                 gather()
             }
@@ -1541,7 +1549,10 @@ function Strata (options) {
                 node = ordered[address]
                 difference = node.length - length
                 if (difference > 0 && node.length > options.leafSize) {
-                    operations.unshift({  method: 'splitLeaf', parameters: [ node.key, ghosts[node.address] ] })
+                    operations.unshift({
+                        method: 'splitLeaf',
+                        parameters: [ journal, node.key, ghosts[node.address] ]
+                    })
                     delete ghosts[node.address]
                     unlink(node)
                 }
@@ -1572,7 +1583,7 @@ function Strata (options) {
                     ok(!node.right.right, 'merge pair still linked to sibling')
                     operations.unshift({
                         method: 'mergeLeaves',
-                        parameters: [ node.right.key, node.key, lengths, !!ghosts[node.address] ]
+                        parameters: [ journal, node.right.key, node.key, lengths, !!ghosts[node.address] ]
                     })
                     delete ghosts[node.address]
                     delete ghosts[node.right.address]
@@ -1583,14 +1594,14 @@ function Strata (options) {
                 node = ghosts[address]
                 if (node.length) operations.unshift({
                     method: 'deleteGhost',
-                    parameters: [ node.key ]
+                    parameters: [ journal, node.key ]
                 })
             }
 
-            operate(callback)
+            operate(journal, callback)
         }
 
-        function operate (callback) {
+        function operate (journal, callback) {
             var check = validator(callback), address
             function shift () {
                 var operation = operations.shift()
@@ -1616,7 +1627,7 @@ function Strata (options) {
             }
         }
 
-        function splitLeaf (key, ghosts, callback) {
+        function splitLeaf (journal, key, ghosts, callback) {
             var locker = new Locker,
                 check = validator(callback, release),
                 descents = [], replacements = [], encached = [],
@@ -1624,7 +1635,7 @@ function Strata (options) {
                 penultimate, leaf, split, pages, page,
                 records, remainder, right, index, offset, length
 
-            if (ghosts) deleteGhost(key, check(exorcised))
+            if (ghosts) deleteGhost(journal, key, check(exorcised))
             else penultimate()
 
             function exorcised (rekey) {
@@ -1972,7 +1983,7 @@ function Strata (options) {
             }
         }
 
-        function exorcise (pivot, ghostly, corporal, callback) {
+        function exorcise (journal, pivot, ghostly, corporal, callback) {
             var staccato, check = validator(callback)
 
             ok(ghostly.ghosts, 'no ghosts')
@@ -1982,25 +1993,19 @@ function Strata (options) {
             splice('lengths', ghostly, 0, 1)
             ghostly.ghosts = 0
 
-            staccato = createStaccato(filename(ghostly.address), 'r+', ghostly.position)
+            journal.open(filename(ghostly.address), ghostly.position, ghostly, check(opened))
 
-            staccato.ready(check(leafOpened))
-
-            function leafOpened () {
-                writePositions(staccato, ghostly, check(positioned))
-
-                function positioned () {
-                    writeFooter(staccato, ghostly, check(written))
-                }
+            function opened (output) {
+                writePositions2(output, ghostly, check(written))
 
                 // todo: close on failure.
                 function written () {
-                    staccato.close(check(closed))
+                    output.close('entry', check(closed))
                 }
+            }
 
-                function closed () {
-                    stash(corporal, corporal.ghosts, check(rekey))
-                }
+            function closed () {
+                stash(corporal, corporal.ghosts, check(rekey))
             }
 
             function rekey (entry) {
@@ -2010,7 +2015,7 @@ function Strata (options) {
             }
         }
 
-        function deleteGhost (key, callback) {
+        function deleteGhost (journal, key, callback) {
             var check = validator(callback, release),
                 locker = new Locker,
                 descents = [],
@@ -2030,7 +2035,7 @@ function Strata (options) {
             }
 
             function shift () {
-                exorcise(pivot, leaf.page, leaf.page, check(complete))
+                exorcise(journal, pivot, leaf.page, leaf.page, check(complete))
             }
 
             function complete (key) {
@@ -2229,7 +2234,7 @@ function Strata (options) {
             }
         }
 
-        function mergeLeaves (key, leftKey, unbalanced, ghostly, callback) {
+        function mergeLeaves (journal, key, leftKey, unbalanced, ghostly, callback) {
             function stopper (descent) { return descent.penultimate }
 
             function merger (leaves, ghosted, callback) {
@@ -2261,9 +2266,9 @@ function Strata (options) {
                 function deleteGhost () {
                     if (ghostly && left + right) {
                         if (left) {
-                            exorcise(ghosted, leaves.left.page, leaves.left.page, check(merge))
+                            exorcise(journal, ghosted, leaves.left.page, leaves.left.page, check(merge))
                         } else {
-                            exorcise(ghosted, leaves.left.page, leaves.right.page, check(merge))
+                            exorcise(journal, ghosted, leaves.left.page, leaves.right.page, check(merge))
                         }
                     } else {
                         merge()
