@@ -621,30 +621,30 @@ function Strata (options) {
         }
     }
 
-    function rewriteLeaf (page, suffix, callback) {
+    function rewriteLeaf (journal, page, suffix, callback) {
         var check = validator(callback),
             cache = {},
             index = 0,
-            staccato, positions, lengths
+            output, positions, lengths
 
-        staccato = createStaccato(filename(page.address, suffix), 'w', 0)
+        journal.open(filename(page.address, suffix), 0, page, check(opened))
 
-        staccato.ready(check(opened))
+        function opened ($output) {
+            output = $output
 
-        function opened () {
             page.position = 0
             page.entries = 0
 
             positions = splice('positions', page, 0, page.positions.length)
             lengths = splice('lengths', page, 0, page.lengths.length)
 
-            writePositions(staccato, page, check(iterate))
+            writePositions2(output, page, check(iterate))
         }
 
         function iterate () {
             if (positions.length) rewrite()
             else if (page.positions.length) append()
-            else footer()
+            else close()
         }
 
         function rewrite () {
@@ -654,7 +654,7 @@ function Strata (options) {
 
             function stashed ($) {
                 uncacheEntry(page, position)
-                writeInsert(staccato, page, index++, (entry = $).record, check(written))
+                writeInsert2(output, page, index++, (entry = $).record, check(written))
             }
 
             function written (position, length) {
@@ -671,15 +671,11 @@ function Strata (options) {
                 entry = cache[position]
                 encacheEntry(page, position, entry)
             }
-            writePositions(staccato, page, check(footer))
-        }
-
-        function footer () {
-            writeFooter(staccato, page, check(close))
+            writePositions2(output, page, check(close))
         }
 
         function close() {
-            staccato.close(callback)
+            output.close('entry', callback)
         }
     }
 
@@ -799,9 +795,11 @@ function Strata (options) {
     }
 
     function create (callback) {
-        var check = validator(callback), locker = new Locker, count = 0, root, leaf
+        var check = validator(callback), locker = new Locker, count = 0, root, leaf, journal
 
         magazine = createMagazine()
+
+        journal = createJournal()
 
         fs.stat(directory, check(extant))
 
@@ -822,7 +820,7 @@ function Strata (options) {
         }
 
         function branchWritten () {
-            rewriteLeaf(leaf, '.replace', check(leafWritten))
+            rewriteLeaf(journal, leaf, '.replace', check(leafWritten))
         }
 
         function leafWritten () {
@@ -834,6 +832,10 @@ function Strata (options) {
         }
 
         function leafReplaced() {
+            journal.close('leaf', check(closed))
+        }
+
+        function closed () {
             locker.unlock(root)
             locker.unlock(leaf)
             locker.dispose()
@@ -1730,7 +1732,7 @@ function Strata (options) {
 
                 replacements.push(page)
 
-                rewriteLeaf(page, '.replace', check(replaced))
+                rewriteLeaf(journal, page, '.replace', check(replaced))
             }
 
             function replaced () {
@@ -1740,7 +1742,7 @@ function Strata (options) {
             function paginated () {
                 split.right = right
 
-                rewriteLeaf(split, '.replace', check(transact))
+                rewriteLeaf(journal, split, '.replace', check(transact))
 
                 replacements.push(split)
             }
@@ -2305,7 +2307,7 @@ function Strata (options) {
                     splice('positions', leaves.right.page, 0, leaves.right.page.positions.length)
                     splice('lengths', leaves.right.page, 0, leaves.right.page.lengths.length)
 
-                    rewriteLeaf(leaves.left.page, '.replace', check(resume))
+                    rewriteLeaf(journal, leaves.left.page, '.replace', check(resume))
                 }
 
                 function resume () {
