@@ -231,6 +231,33 @@ an error, so I need to do something else, like `scram` the file.
 Errors need to become events, what are they? Cannot read, cannot write and
 cannot replace. Cannot write matters if I'm inserted, deleting or exorcising.
 
+Here's a thought, now that I have a cache of open file handles, why not have a
+`scram` method in Journalist, it would take a stage and scram all the open files
+on that page. This can be done once on exit of balance operations.
+
+The `scram` method can also accept a callback, have a closer of sorts, or
+provide an interator, or no, hmm...
+
+Thinking iterator, but a callback will do, that can iterate over all of the open
+file handles and call the callback with the resolved file name and the extra
+data that is provided at close. For Strata, this is the page, so the page can be
+marked as, hmm...
+
+Okay, so no, we're only interested in pages that had write failures, so we do
+need to catch that error and mark our page at the time of write or close.
+
+The reality of it is that we're going to need to have some control outside of
+the tree. The tree writes are atomic. We can't be shutting down the writes
+within the tree itself. There needs to be a queue outside the tree. Yes, balance
+is a big operation, but we stop when something goes wrong, put the rest into the
+next balancer.
+
+Each operation then, needs to also undo itself, if we cannot move a rewrite
+forward, for example. If we can't replace or remove files, then the tree is
+hopelessly corrupt and the writing needs to stop.
+
+A full disk is the most likely issue, though.
+
 ## Records and Keys
 
 I'd imagined to use Strata to create a database that stores objects and the keys
