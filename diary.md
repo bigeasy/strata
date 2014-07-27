@@ -206,6 +206,31 @@ node. For an initial release, it is enough that Strata is able to recover from
 any form of I/O error and leave the tree in memory, it's cache and it's locks,
 in a consistent state.
 
+### More Errors
+
+Trying to think of how to handle a failed write. What are the recoverable cases?
+How do you deal with a full disk, for example?
+
+Offhand, I'd say that you give up on the balance, and any changes like the ones
+above, any in-memory changes, you dispose of, so rather than set it back, you
+remove the page from the cache on error, then it can be reread, which ought to
+be interesting, because their might be a truncated last line or some such.
+
+In that case, we'd want some way of marking the page as broken, dirty, and not
+writing to it. Makes me wonder what other databases do when problems arrise.
+
+For now, I just need to get an error to come up and out of Strata and someplace
+where someone can email it to me, where I can begin to see the possible failure
+states. I'm sure that if a disk is full, and you're collecting data, then people
+are not going to be able to make progress, their programs can't make progress
+anyway.
+
+Also, with Journalist, I'm not able to `close` because I'll write a footer onto
+an error, so I need to do something else, like `scram` the file.
+
+Errors need to become events, what are they? Cannot read, cannot write and
+cannot replace. Cannot write matters if I'm inserted, deleting or exorcising.
+
 ## Records and Keys
 
 I'd imagined to use Strata to create a database that stores objects and the keys
