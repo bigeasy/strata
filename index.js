@@ -837,7 +837,6 @@ function Strata (options) {
             locker.unlock(root)
             locker.unlock(leaf)
             locker.dispose()
-            console.log('here')
             toUserLand(callback)
         }
     }
