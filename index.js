@@ -50,17 +50,22 @@ function Strata (options) {
         size = 0,
         checksum,
         constructors = {},
-        journalist = new Journalist({
-            count: options.fileHandleCount || 64,
-            stage: options.writeStage || 'entry',
-            cache: options.jouralistCache || (new Cache),
-            closer: writeFooter2
-        }),
+        journalist = {
+            inner: new Journalist({
+                stage: 'entry'
+            }),
+            outer: new Journalist({
+                count: options.fileHandleCount || 64,
+                stage: options.writeStage || 'entry',
+                cache: options.jouralistCache || (new Cache),
+                closer: writeFooter2
+            })
+        },
         createJournal = (options.writeStage == 'tree' ? (function () {
-            var journal = journalist.createJournal()
+            var journal = journalist.outer.createJournal()
             return function () { return journal }
         })() : function () {
-            return journalist.createJournal()
+            return journalist.outer.createJournal()
         }),
         serialize = options.serialize || function (object) { return new Buffer(JSON.stringify(object)) },
         deserialize = options.deserialize || function (buffer) { return JSON.parse(buffer.toString()) },
