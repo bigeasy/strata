@@ -71,14 +71,6 @@ function Strata (options) {
         deserialize = options.deserialize || function (buffer) { return JSON.parse(buffer.toString()) },
         tracer = options.tracer || function () { arguments[2]() }
 
-    function createStaccato (file, flags, start) {
-        return new Staccato(fs.createWriteStream(file, {
-            flags: flags,
-            mode: 0644,
-            start: start
-        }), true)
-    }
-
     checksum = (function () {
         if (typeof options.checksum == 'function') return options.checksum
         var algorithm
