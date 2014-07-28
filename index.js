@@ -742,6 +742,7 @@ function Strata (options) {
     function writeBranch (page, suffix, callback) {
         var check = validator(callback),
             addresses = page.addresses.slice(),
+            journal = journalist.inner.createJournal(),
             keys = addresses.map(function (address, index) { return page.cache[address] }),
             staccato
 
@@ -751,24 +752,27 @@ function Strata (options) {
         page.entries = 0
         page.position = 0
 
-        staccato = createStaccato(filename(page.address, suffix), 'w', 0)
+        journal.open(filename(page.address, suffix), 0, page, check(opened))
 
-        staccato.ready(check(ready))
-
-        function ready () {
-            write()
-        }
-
-        function write () {
-            if (addresses.length) {
-                var address = addresses.shift()
-                var key = page.entries ? page.cache[address].key : null
-                page.entries++
-                var header = [ page.entries, page.entries, address ]
-                writeEntry({ staccato: staccato, page: page, header: header, body: key, isKey: true }, check(write))
-            } else {
-                staccato.close(check(closed))
+        function opened (output) {
+            function write () {
+                if (addresses.length) {
+                    var address = addresses.shift()
+                    var key = page.entries ? page.cache[address].key : null
+                    page.entries++
+                    var header = [ page.entries, page.entries, address ]
+                    writeEntry2({
+                        out: output,
+                        page: page,
+                        header: header,
+                        body: key,
+                        isKey: true
+                    }, check(write))
+                } else {
+                    output.close('entry', check(closed))
+                }
             }
+            write()
         }
 
         function closed () {
