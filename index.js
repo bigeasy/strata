@@ -624,7 +624,7 @@ function Strata (options) {
             index = 0,
             output, positions, lengths
 
-        journal.open(filename(page.address, suffix), 0, page, check(opened))
+        journal.open(filename(page.address, suffix), 0, page).ready(check(opened))
 
         function opened ($output) {
             output = $output
@@ -744,7 +744,7 @@ function Strata (options) {
         page.entries = 0
         page.position = 0
 
-        journal.open(filename(page.address, suffix), 0, page, check(opened))
+        journal.open(filename(page.address, suffix), 0, page).ready(check(opened))
 
         function opened (output) {
             function write () {
@@ -1325,7 +1325,7 @@ function Strata (options) {
 
                 balancer.unbalanced(page)
 
-                journal.open(filename(page.address), page.position, page, check(ready))
+                journal.open(filename(page.address), page.position, page).ready(check(ready))
 
                 function ready (entry) {
                     writeInsert(entry, page, index, record, check(inserted, close))
@@ -1356,7 +1356,7 @@ function Strata (options) {
 
             balancer.unbalanced(page)
 
-            journal.open(filename(page.address), page.position, page, check(ready))
+            journal.open(filename(page.address), page.position, page).ready(check(ready))
 
             function ready (entry) {
                 writeDelete(entry, page, index, check(written, close))
@@ -1995,7 +1995,7 @@ function Strata (options) {
             splice('lengths', ghostly, 0, 1)
             ghostly.ghosts = 0
 
-            journal.open(filename(ghostly.address), ghostly.position, ghostly, check(opened))
+            journal.open(filename(ghostly.address), ghostly.position, ghostly).ready(check(opened))
 
             function opened (output) {
                 writePositions2(output, ghostly, check(written))
