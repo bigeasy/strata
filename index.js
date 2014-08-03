@@ -1353,32 +1353,33 @@ function Strata (options) {
         function remove (index, callback) {
             var ghost = page.address != 1 && index == 0,
                 check = validator(callback),
-                staccato
+                entry
 
             balancer.unbalanced(page)
 
-            journal.open(filename(page.address), page.position, page).ready(check(ready))
+            entry = journal.open(filename(page.address), page.position, page)
+            entry.ready(check(ready))
 
-            function ready (entry) {
+            function ready () {
                 writeDelete(entry, page, index, check(written, close))
+            }
 
-                function written () {
-                    if (ghost) {
-                        page.ghosts++
-                        offset || offset++
-                    } else {
-                        uncacheEntry(page, page.positions[index])
-                        splice('positions', page, index, 1)
-                        splice('lengths', page, index, 1)
-                    }
-                    close()
+            function written () {
+                if (ghost) {
+                    page.ghosts++
+                    offset || offset++
+                } else {
+                    uncacheEntry(page, page.positions[index])
+                    splice('positions', page, index, 1)
+                    splice('lengths', page, index, 1)
                 }
+                close()
+            }
 
-                function close (writeError) {
-                    entry.close('entry', function (closeError) {
-                        toUserLand(callback, writeError || closeError)
-                    })
-                }
+            function close (writeError) {
+                entry.close('entry', function (closeError) {
+                    toUserLand(callback, writeError || closeError)
+                })
             }
         }
 
