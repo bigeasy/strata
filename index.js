@@ -1325,26 +1325,27 @@ function Strata (options) {
 
                 balancer.unbalanced(page)
 
-                journal.open(filename(page.address), page.position, page).ready(check(ready))
+                entry = journal.open(filename(page.address), page.position, page)
+                entry.ready(check(ready))
 
-                function ready (entry) {
+                function ready () {
                     writeInsert(entry, page, index, record, check(inserted, close))
+                }
 
-                    function inserted (position, length, size) {
-                        splice('positions', page, index, 0, position)
-                        splice('lengths', page, index, 0, length)
-                        _cacheRecord(page, position, record, size)
+                function inserted (position, length, size) {
+                    splice('positions', page, index, 0, position)
+                    splice('lengths', page, index, 0, length)
+                    _cacheRecord(page, position, record, size)
 
-                        length = page.positions.length
+                    length = page.positions.length
 
-                        close()
-                    }
+                    close()
+                }
 
-                    function close (writeError) {
-                        entry.close('entry', function (closeError) {
-                            toUserLand(callback, writeError || closeError, 0)
-                        })
-                    }
+                function close (writeError) {
+                    entry.close('entry', function (closeError) {
+                        toUserLand(callback, writeError || closeError, 0)
+                    })
                 }
             }
         }
