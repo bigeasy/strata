@@ -1549,7 +1549,7 @@ function Strata (options) {
                 if (difference > 0 && node.length > options.leafSize) {
                     operations.unshift({
                         method: 'splitLeaf',
-                        parameters: [ journal, node.key, ghosts[node.address] ]
+                        parameters: [ node.key, ghosts[node.address] ]
                     })
                     delete ghosts[node.address]
                     unlink(node)
@@ -1625,7 +1625,7 @@ function Strata (options) {
             }
         }
 
-        function splitLeaf (journal, key, ghosts, callback) {
+        function splitLeaf (key, ghosts, callback) {
             var locker = new Locker,
                 check = validator(callback, release),
                 descents = [], replacements = [], encached = [],
