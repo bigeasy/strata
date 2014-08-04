@@ -51,7 +51,7 @@ function Strata (options) {
         checksum,
         constructors = {},
         journalist = {
-            inner: new Journalist({
+            branch: new Journalist({
                 stage: 'entry'
             }),
             leaf: new Journalist({
@@ -737,9 +737,8 @@ function Strata (options) {
     function writeBranch (page, suffix, callback) {
         var check = validator(callback),
             addresses = page.addresses.slice(),
-            journal = journalist.inner.createJournal(),
             keys = addresses.map(function (address, index) { return page.cache[address] }),
-            staccato
+            out
 
         ok(keys[0] === (void(0)), 'first key is null')
         ok(keys.slice(1).every(function (key) { return key != null }), 'null keys')
@@ -747,27 +746,25 @@ function Strata (options) {
         page.entries = 0
         page.position = 0
 
-        journal.open(filename(page.address, suffix), 0, page).ready(check(opened))
+        out = journalist.branch.createJournal().open(filename(page.address, suffix), 0, page)
+        out.ready(check(write))
 
-        function opened (output) {
-            function write () {
-                if (addresses.length) {
-                    var address = addresses.shift()
-                    var key = page.entries ? page.cache[address].key : null
-                    page.entries++
-                    var header = [ page.entries, page.entries, address ]
-                    writeEntry2({
-                        out: output,
-                        page: page,
-                        header: header,
-                        body: key,
-                        isKey: true
-                    }, check(write))
-                } else {
-                    output.close('entry', check(closed))
-                }
+        function write () {
+            if (addresses.length) {
+                var address = addresses.shift()
+                var key = page.entries ? page.cache[address].key : null
+                page.entries++
+                var header = [ page.entries, page.entries, address ]
+                writeEntry2({
+                    out: out,
+                    page: page,
+                    header: header,
+                    body: key,
+                    isKey: true
+                }, check(write))
+            } else {
+                out.close('entry', check(closed))
             }
-            write()
         }
 
         function closed () {
@@ -803,7 +800,7 @@ function Strata (options) {
 
         magazine = createMagazine()
 
-        journal = journalist.inner.createJournal()
+        journal = journalist.branch.createJournal()
 
         fs.stat(directory, check(extant))
 
