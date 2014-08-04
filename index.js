@@ -1988,7 +1988,7 @@ function Strata (options) {
         }
 
         function exorcise (journal, pivot, ghostly, corporal, callback) {
-            var staccato, check = validator(callback)
+            var entry, check = validator(callback)
 
             ok(ghostly.ghosts, 'no ghosts')
             ok(corporal.positions.length - corporal.ghosts > 0, 'no replacement')
@@ -1997,15 +1997,16 @@ function Strata (options) {
             splice('lengths', ghostly, 0, 1)
             ghostly.ghosts = 0
 
-            journal.open(filename(ghostly.address), ghostly.position, ghostly).ready(check(opened))
+            entry = journal.open(filename(ghostly.address), ghostly.position, ghostly)
+            entry.ready(check(opened))
 
-            function opened (output) {
-                writePositions2(output, ghostly, check(written))
+            function opened () {
+                writePositions2(entry, ghostly, check(written))
+            }
 
-                // todo: close on failure.
-                function written () {
-                    output.close('entry', check(closed))
-                }
+            // todo: close on failure.
+            function written () {
+                entry.close('entry', check(closed))
             }
 
             function closed () {
