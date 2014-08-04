@@ -1386,8 +1386,7 @@ function Strata (options) {
             referenced = {},
             ordered = {},
             ghosts = {},
-            methods = {},
-            journal
+            methods = {}
 
         classify.call(methods, deleteGhost, splitLeaf, mergeLeaves)
 
@@ -1409,7 +1408,6 @@ function Strata (options) {
                 callback(null, true)
             } else {
                 balancer = new Balancer()
-                journal = createJournal()
                 balancing = true
                 gather()
             }
@@ -1592,14 +1590,14 @@ function Strata (options) {
                 node = ghosts[address]
                 if (node.length) operations.unshift({
                     method: 'deleteGhost',
-                    parameters: [ journal, node.key ]
+                    parameters: [ node.key ]
                 })
             }
 
-            operate(journal, callback)
+            operate(callback)
         }
 
-        function operate (journal, callback) {
+        function operate (callback) {
             var check = validator(callback), address
             function shift () {
                 var operation = operations.shift()
@@ -1633,7 +1631,7 @@ function Strata (options) {
                 penultimate, leaf, split, pages, page,
                 records, remainder, right, index, offset, length
 
-            if (ghosts) deleteGhost(journal, key, check(exorcised))
+            if (ghosts) deleteGhost(key, check(exorcised))
             else penultimate()
 
             function exorcised (rekey) {
@@ -1981,7 +1979,7 @@ function Strata (options) {
             }
         }
 
-        function exorcise (journal, pivot, ghostly, corporal, callback) {
+        function exorcise (pivot, ghostly, corporal, callback) {
             var entry, check = validator(callback)
 
             ok(ghostly.ghosts, 'no ghosts')
@@ -1991,7 +1989,7 @@ function Strata (options) {
             splice('lengths', ghostly, 0, 1)
             ghostly.ghosts = 0
 
-            entry = journal.open(filename(ghostly.address), ghostly.position, ghostly)
+            entry = journalist.leaf.createJournal().open(filename(ghostly.address), ghostly.position, ghostly)
             entry.ready(check(opened))
 
             function opened () {
@@ -2014,7 +2012,7 @@ function Strata (options) {
             }
         }
 
-        function deleteGhost (journal, key, callback) {
+        function deleteGhost (key, callback) {
             var check = validator(callback, release),
                 locker = new Locker,
                 descents = [],
@@ -2034,7 +2032,7 @@ function Strata (options) {
             }
 
             function shift () {
-                exorcise(journal, pivot, leaf.page, leaf.page, check(complete))
+                exorcise(pivot, leaf.page, leaf.page, check(complete))
             }
 
             function complete (key) {
@@ -2265,9 +2263,9 @@ function Strata (options) {
                 function deleteGhost () {
                     if (ghostly && left + right) {
                         if (left) {
-                            exorcise(journal, ghosted, leaves.left.page, leaves.left.page, check(merge))
+                            exorcise(ghosted, leaves.left.page, leaves.left.page, check(merge))
                         } else {
-                            exorcise(journal, ghosted, leaves.left.page, leaves.right.page, check(merge))
+                            exorcise(ghosted, leaves.left.page, leaves.right.page, check(merge))
                         }
                     } else {
                         merge()
