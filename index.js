@@ -54,6 +54,10 @@ function Strata (options) {
             inner: new Journalist({
                 stage: 'entry'
             }),
+            leaf: new Journalist({
+                stage: 'entry',
+                closer: writeFooter2
+            }),
             outer: new Journalist({
                 count: options.fileHandleCount || 64,
                 stage: options.writeStage || 'entry',
@@ -622,20 +626,19 @@ function Strata (options) {
         var check = validator(callback),
             cache = {},
             index = 0,
-            output, positions, lengths
+            out, positions, lengths
 
-        journal.open(filename(page.address, suffix), 0, page).ready(check(opened))
+        out = journalist.leaf.createJournal().open(filename(page.address, suffix), 0, page)
+        out.ready(check(opened))
 
-        function opened ($output) {
-            output = $output
-
+        function opened () {
             page.position = 0
             page.entries = 0
 
             positions = splice('positions', page, 0, page.positions.length)
             lengths = splice('lengths', page, 0, page.lengths.length)
 
-            writePositions2(output, page, check(iterate))
+            writePositions2(out, page, check(iterate))
         }
 
         function iterate () {
@@ -651,7 +654,7 @@ function Strata (options) {
 
             function stashed ($) {
                 uncacheEntry(page, position)
-                writeInsert2(output, page, index++, (entry = $).record, check(written))
+                writeInsert2(out, page, index++, (entry = $).record, check(written))
             }
 
             function written (position, length) {
@@ -668,11 +671,11 @@ function Strata (options) {
                 entry = cache[position]
                 encacheEntry(page, position, entry)
             }
-            writePositions2(output, page, check(close))
+            writePositions2(out, page, check(close))
         }
 
         function close() {
-            output.close('entry', callback)
+            out.close('entry', callback)
         }
     }
 
@@ -800,7 +803,7 @@ function Strata (options) {
 
         magazine = createMagazine()
 
-        journal = createJournal()
+        journal = journalist.inner.createJournal()
 
         fs.stat(directory, check(extant))
 
