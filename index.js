@@ -622,7 +622,7 @@ function Strata (options) {
         }
     }
 
-    function rewriteLeaf (journal, page, suffix, callback) {
+    function rewriteLeaf (page, suffix, callback) {
         var check = validator(callback),
             cache = {},
             index = 0,
@@ -800,8 +800,6 @@ function Strata (options) {
 
         magazine = createMagazine()
 
-        journal = journalist.branch.createJournal()
-
         fs.stat(directory, check(extant))
 
         function extant (stat) {
@@ -821,7 +819,7 @@ function Strata (options) {
         }
 
         function branchWritten () {
-            rewriteLeaf(journal, leaf, '.replace', check(leafWritten))
+            rewriteLeaf(leaf, '.replace', check(leafWritten))
         }
 
         function leafWritten () {
@@ -833,10 +831,6 @@ function Strata (options) {
         }
 
         function leafReplaced() {
-            journal.close('leaf', check(closed))
-        }
-
-        function closed () {
             locker.unlock(root)
             locker.unlock(leaf)
             locker.dispose()
@@ -1735,7 +1729,7 @@ function Strata (options) {
 
                 replacements.push(page)
 
-                rewriteLeaf(journal, page, '.replace', check(replaced))
+                rewriteLeaf(page, '.replace', check(replaced))
             }
 
             function replaced () {
@@ -1745,7 +1739,7 @@ function Strata (options) {
             function paginated () {
                 split.right = right
 
-                rewriteLeaf(journal, split, '.replace', check(transact))
+                rewriteLeaf(split, '.replace', check(transact))
 
                 replacements.push(split)
             }
@@ -2311,7 +2305,7 @@ function Strata (options) {
                     splice('positions', leaves.right.page, 0, leaves.right.page.positions.length)
                     splice('lengths', leaves.right.page, 0, leaves.right.page.lengths.length)
 
-                    rewriteLeaf(journal, leaves.left.page, '.replace', check(resume))
+                    rewriteLeaf(leaves.left.page, '.replace', check(resume))
                 }
 
                 function resume () {
