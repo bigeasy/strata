@@ -50,26 +50,24 @@ function Strata (options) {
         size = 0,
         checksum,
         constructors = {},
-        journalist = {
-            branch: new Journalist({
-                stage: 'entry'
-            }),
+        journal = {
+            branch: new Journalist({ stage: 'entry' }).createJournal(),
             leaf: new Journalist({
                 stage: 'entry',
                 closer: writeFooter2
-            }),
-            outer: new Journalist({
-                count: options.fileHandleCount || 64,
-                stage: options.writeStage || 'entry',
-                cache: options.jouralistCache || (new Cache),
-                closer: writeFooter2
-            })
+            }).createJournal()
         },
+        journalist = new Journalist({
+            count: options.fileHandleCount || 64,
+            stage: options.writeStage || 'entry',
+            cache: options.jouralistCache || (new Cache),
+            closer: writeFooter2
+        }),
         createJournal = (options.writeStage == 'tree' ? (function () {
-            var journal = journalist.outer.createJournal()
+            var journal = journalist.createJournal()
             return function () { return journal }
         })() : function () {
-            return journalist.outer.createJournal()
+            return journalist.createJournal()
         }),
         serialize = options.serialize || function (object) { return new Buffer(JSON.stringify(object)) },
         deserialize = options.deserialize || function (buffer) { return JSON.parse(buffer.toString()) },
@@ -628,7 +626,7 @@ function Strata (options) {
             index = 0,
             out, positions, lengths
 
-        out = journalist.leaf.createJournal().open(filename(page.address, suffix), 0, page)
+        out = journal.leaf.open(filename(page.address, suffix), 0, page)
         out.ready(check(opened))
 
         function opened () {
@@ -746,7 +744,7 @@ function Strata (options) {
         page.entries = 0
         page.position = 0
 
-        out = journalist.branch.createJournal().open(filename(page.address, suffix), 0, page)
+        out = journal.branch.open(filename(page.address, suffix), 0, page)
         out.ready(check(write))
 
         function write () {
@@ -1989,7 +1987,7 @@ function Strata (options) {
             splice('lengths', ghostly, 0, 1)
             ghostly.ghosts = 0
 
-            entry = journalist.leaf.createJournal().open(filename(ghostly.address), ghostly.position, ghostly)
+            entry = journal.leaf.open(filename(ghostly.address), ghostly.position, ghostly)
             entry.ready(check(opened))
 
             function opened () {
