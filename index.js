@@ -1581,7 +1581,7 @@ function Strata (options) {
                     ok(!node.right.right, 'merge pair still linked to sibling')
                     operations.unshift({
                         method: 'mergeLeaves',
-                        parameters: [ journal, node.right.key, node.key, lengths, !!ghosts[node.address] ]
+                        parameters: [ node.right.key, node.key, lengths, !!ghosts[node.address] ]
                     })
                     delete ghosts[node.address]
                     delete ghosts[node.right.address]
@@ -2233,7 +2233,7 @@ function Strata (options) {
             }
         }
 
-        function mergeLeaves (journal, key, leftKey, unbalanced, ghostly, callback) {
+        function mergeLeaves (key, leftKey, unbalanced, ghostly, callback) {
             function stopper (descent) { return descent.penultimate }
 
             function merger (leaves, ghosted, callback) {
