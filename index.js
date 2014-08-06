@@ -54,14 +54,14 @@ function Strata (options) {
             branch: new Journalist({ stage: 'entry' }).createJournal(),
             leaf: new Journalist({
                 stage: 'entry',
-                closer: writeFooter2
+                closer: writeFooter
             }).createJournal()
         },
         journalist = new Journalist({
             count: options.fileHandleCount || 64,
             stage: options.writeStage || 'entry',
             cache: options.jouralistCache || (new Cache),
-            closer: writeFooter2
+            closer: writeFooter
         }),
         createJournal = (options.writeStage == 'tree' ? (function () {
             var journal = journalist.createJournal()
@@ -295,7 +295,7 @@ function Strata (options) {
         author(buffer, body, options.page.position, length)
     }
 
-    function writeEntry2 (options, callback) {
+    function writeEntry (options, callback) {
         cookEntry(options, function (buffer, body, position, length) {
             var check = validator(callback)
 
@@ -308,32 +308,14 @@ function Strata (options) {
         })
     }
 
-    function writeEntry (options, callback) {
-        cookEntry(options, function (buffer, body, position, length) {
-            var check = validator(callback), staccato = options.staccato
-
-            staccato.write(buffer, check(sent))
-
-            function sent () {
-                options.page.position += length
-                callback(null, position, length, body && body.length)
-            }
-        })
-    }
-
-    function writeInsert (staccato, page, index, record, callback) {
+    function writeInsert (out, page, index, record, callback) {
         var header = [ ++page.entries, index + 1 ]
-        writeEntry({ staccato: staccato, page: page, header: header, body: record }, callback)
-    }
-
-    function writeInsert2 (out, page, index, record, callback) {
-        var header = [ ++page.entries, index + 1 ]
-        writeEntry2({ out: out, page: page, header: header, body: record }, callback)
+        writeEntry({ out: out, page: page, header: header, body: record }, callback)
     }
 
     function writeDelete (out, page, index, callback) {
         var header = [ ++page.entries, -(index + 1) ]
-        writeEntry2({ out: out, page: page, header: header }, callback)
+        writeEntry({ out: out, page: page, header: header }, callback)
     }
 
     function io (direction, filename, callback) {
@@ -366,48 +348,25 @@ function Strata (options) {
         }
     }
 
-    function writePositions2 (output, page, callback) {
+    function writePositions (output, page, callback) {
         var header = [ ++page.entries, 0, page.ghosts ]
         header = header.concat(page.positions).concat(page.lengths)
-        writeEntry2({ out: output, page: page, header: header, type: 'position' }, callback)
+        writeEntry({ out: output, page: page, header: header, type: 'position' }, callback)
     }
 
-    function writePositions (staccato, page, callback) {
-        var header = [ ++page.entries, 0, page.ghosts ]
-        header = header.concat(page.positions).concat(page.lengths)
-        writeEntry({ staccato: staccato, page: page, header: header, type: 'position' }, callback)
-    }
-
-    function writeFooter2 (out, position, page, callback) {
-        ok(page.address % 2 && page.bookmark != null)
-        var header = [
-            0, page.bookmark.position, page.bookmark.length, page.bookmark.entry,
-            page.right || 0, page.position, page.entries, page.ghosts, page.positions.length - page.ghosts
-        ]
-        writeEntry2({
-            out: out,
-            page: page,
-            header: header,
-            type: 'footer'
-        }, validate(callback, function (position, length) {
-            page.position = header[5] // todo: can't we use `position`?
-            callback(null, position, length)
-        }))
-    }
-
-    function writeFooter (staccato, page, callback) {
+    function writeFooter (out, position, page, callback) {
         ok(page.address % 2 && page.bookmark != null)
         var header = [
             0, page.bookmark.position, page.bookmark.length, page.bookmark.entry,
             page.right || 0, page.position, page.entries, page.ghosts, page.positions.length - page.ghosts
         ]
         writeEntry({
-            staccato: staccato,
+            out: out,
             page: page,
             header: header,
             type: 'footer'
         }, validate(callback, function (position, length) {
-            page.position = position
+            page.position = header[5] // todo: can't we use `position`?
             callback(null, position, length)
         }))
     }
@@ -636,7 +595,7 @@ function Strata (options) {
             positions = splice('positions', page, 0, page.positions.length)
             lengths = splice('lengths', page, 0, page.lengths.length)
 
-            writePositions2(out, page, check(iterate))
+            writePositions(out, page, check(iterate))
         }
 
         function iterate () {
@@ -652,7 +611,7 @@ function Strata (options) {
 
             function stashed ($) {
                 uncacheEntry(page, position)
-                writeInsert2(out, page, index++, (entry = $).record, check(written))
+                writeInsert(out, page, index++, (entry = $).record, check(written))
             }
 
             function written (position, length) {
@@ -669,7 +628,7 @@ function Strata (options) {
                 entry = cache[position]
                 encacheEntry(page, position, entry)
             }
-            writePositions2(out, page, check(close))
+            writePositions(out, page, check(close))
         }
 
         function close() {
@@ -753,7 +712,7 @@ function Strata (options) {
                 var key = page.entries ? page.cache[address].key : null
                 page.entries++
                 var header = [ page.entries, page.entries, address ]
-                writeEntry2({
+                writeEntry({
                     out: out,
                     page: page,
                     header: header,
@@ -1991,7 +1950,7 @@ function Strata (options) {
             entry.ready(check(opened))
 
             function opened () {
-                writePositions2(entry, ghostly, check(written))
+                writePositions(entry, ghostly, check(written))
             }
 
             // todo: close on failure.
