@@ -1,5 +1,4 @@
 var Cache = require('magazine'),
-    Staccato = require('staccato'),
     Journalist = require('journalist')
 
 function extend(to, from) {
@@ -653,6 +652,7 @@ function Strata (options) {
             queue: sequester.createQueue()
         }, override, 1)
     }
+
     constructors.branch = createBranch
 
     function splice (collection, page, offset, length, insert) {
