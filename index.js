@@ -243,7 +243,7 @@ function Strata (options) {
         return entry
     }
 
-    function cookEntry (options, author) {
+    function writeEntry (options, callback) {
         var entry, buffer, json, line, length
 
         ok(options.page.position != null, 'page has not been positioned: ' + options.page.position)
@@ -291,20 +291,14 @@ function Strata (options) {
             options.page.bookmark.entry = entry[0]
         }
 
-        author(buffer, body, options.page.position, length)
-    }
+        var position = options.page.position
 
-    function writeEntry (options, callback) {
-        cookEntry(options, function (buffer, body, position, length) {
-            var check = validator(callback)
+        options.out.write(buffer, validate(callback, sent))
 
-            options.out.write(buffer, check(sent))
-
-            function sent () {
-                options.page.position += length
-                callback(null, position, length, body && body.length)
-            }
-        })
+        function sent () {
+            options.page.position += length
+            callback(null, position, length, body && body.length)
+        }
     }
 
     function writeInsert (out, page, index, record, callback) {
