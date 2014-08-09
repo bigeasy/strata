@@ -820,7 +820,12 @@ function Strata (options) {
 
             cartridge.release()
 
-            magazine.purge(-2)
+            var purge = magazine.purge()
+            while (purge.cartridge) {
+                purge.cartridge.remove()
+                purge.next()
+            }
+            purge.release()
 
             ok(!magazine.count, 'pages still held by cache')
 
