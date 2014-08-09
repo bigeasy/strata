@@ -18,7 +18,7 @@ require('./proof')(1, function (step, Strata, tmp, load, serialize, vivify, gath
         }, function (index) {
             cursor.remove(index, step())
         }, function () {
-            cursor.unlock()
+            cursor.unlock(step())
         })
     }, function () {
         strata.mutator('bw', step())
@@ -28,7 +28,7 @@ require('./proof')(1, function (step, Strata, tmp, load, serialize, vivify, gath
         }, function (index) {
             cursor.remove(index, step())
         }, function () {
-            cursor.unlock()
+            cursor.unlock(step())
         })
     }, function () {
         strata.balance(step())

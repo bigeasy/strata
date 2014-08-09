@@ -13,7 +13,7 @@ require('./proof')(1, function (step, Strata, tmp, serialize, assert) {
         step(function () {
             cursor.get(cursor.offset, step())
         }, function (got) {
-            cursor.unlock()
+            cursor.unlock(step())
             assert(got, 'a', 'got')
         })
     }, function () {

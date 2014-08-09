@@ -21,7 +21,8 @@ require('./proof')(1, function (step, Strata, tmp, assert) {
         strata.iterator('a', step())
     }, function (cursor) {
         assert(cursor.length - cursor.offset, 0, 'empty')
-        cursor.unlock()
+        cursor.unlock(step())
+    }, function () {
         strata.close(step())
     })
 })

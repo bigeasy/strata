@@ -13,7 +13,7 @@ require('./proof')(2, function (step, Strata, tmp, load, serialize, vivify, asse
                     step(function () {
                         cursor.insert(insert, insert, ~cursor.index, step())
                     }, function () {
-                        cursor.unlock()
+                        cursor.unlock(step())
                     })
                 })
             })(callback)
@@ -34,7 +34,7 @@ require('./proof')(2, function (step, Strata, tmp, load, serialize, vivify, asse
         step(function () {
             cursor.remove(cursor.index, step())
         }, function () {
-            cursor.unlock()
+            cursor.unlock(step())
         })
     }, function () {
         insert = 'b'
@@ -56,7 +56,7 @@ require('./proof')(2, function (step, Strata, tmp, load, serialize, vivify, asse
         step(function () {
             cursor.remove(cursor.index, step())
         }, function () {
-            cursor.unlock()
+            cursor.unlock(step())
         })
     }, function () {
         insert = 'd'

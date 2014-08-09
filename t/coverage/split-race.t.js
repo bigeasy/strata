@@ -23,7 +23,7 @@ require('./proof')(2, function (step, Strata, tmp, load, serialize, vivify, gath
                         }, function (index) {
                             cursor.remove(index, step())
                         }, function () {
-                            cursor.unlock()
+                            cursor.unlock(step())
                         })
                     })
                 })(callback)
@@ -45,7 +45,8 @@ require('./proof')(2, function (step, Strata, tmp, load, serialize, vivify, gath
         step(function () {
             cursor.insert('d', 'd', ~ cursor.index, step())
         }, function () {
-            cursor.unlock()
+            cursor.unlock(step())
+        }, function () {
             gather(strata, step())
         })
     }, function (records) {

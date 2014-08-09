@@ -15,13 +15,13 @@ require('./proof')(2, function (step, Strata, tmp, serialize, ok) {
             first.get(first.offset, step())
         }, function (value) {
             ok(value, 'h', 'first')
-            first.unlock()
+            first.unlock(step())
         })
         step(function () {
             second.get(second.offset, step())
         }, function (value) {
             ok(value, 'h', 'second')
-            second.unlock()
+            second.unlock(step())
         })
     }, function() {
         strata.close(step())

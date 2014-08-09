@@ -12,7 +12,7 @@ require('./proof')(2, function (step, Strata, tmp, load, serialize, vivify, gath
         step(function () {
             cursor.insert('b', 'b', ~ cursor.index,  step())
         }, function () {
-            cursor.unlock()
+            cursor.unlock(step())
             vivify(tmp, step())
             load(__dirname + '/fixtures/between.after.json', step())
         })

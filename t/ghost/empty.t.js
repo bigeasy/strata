@@ -12,7 +12,7 @@ require('./proof')(1, function (step, Strata, tmp, load, serialize, vivify, asse
         step(function () {
             cursor.remove(cursor.index, step())
         }, function () {
-            cursor.unlock()
+            cursor.unlock(step())
         })
     }, function () {
         strata.mutator('f', step())
@@ -20,7 +20,7 @@ require('./proof')(1, function (step, Strata, tmp, load, serialize, vivify, asse
         step(function () {
             cursor.remove(cursor.index, step())
         }, function () {
-            cursor.unlock()
+            cursor.unlock(step())
         })
     }, function () {
         strata.mutator('i', step())
@@ -28,7 +28,7 @@ require('./proof')(1, function (step, Strata, tmp, load, serialize, vivify, asse
         step(function () {
             cursor.remove(cursor.index, step())
         }, function () {
-            cursor.unlock()
+            cursor.unlock(step())
         })
     }, function () {
         strata.balance(step())

@@ -26,7 +26,7 @@ require('./proof')(1, function (step, Strata, tmp, serialize, equal) {
         step(function () {
             cursor.insert('d', 'd', ~ cursor.index, step())
         }, function () {
-            cursor.unlock()
+            cursor.unlock(step())
         })
     }, [function (records) {
         strata.balance(step())

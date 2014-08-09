@@ -24,7 +24,7 @@ require('./proof')(3, function (step, Strata, tmp, serialize, gather, assert) {
                 cursor.next(step(page(), 0))
             } else {
                 assert(ambiguity, [ 0, 1, 1, 1 ], 'unambiguous')
-                cursor.unlock()
+                cursor.unlock(step())
             }
         })(1)
     }, function () {

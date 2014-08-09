@@ -6,7 +6,7 @@ require('./proof')(1, function (step, Strata, tmp, equal) {
     }, function () {
         try {
             strata.iterator('a', function (error, cursor) {
-                cursor.unlock()
+                cursor.unlock(function () {})
                 throw new Error('propagated')
             })
         } catch (e) {

@@ -13,7 +13,7 @@ require('./proof')(2, function (step, Strata, tmp, serialize, gather, assert) {
         step(function () {
             cursor.insert('b', 'b', ~ cursor.index, step())
         }, function () {
-            cursor.unlock()
+            cursor.unlock(step())
         })
     }, function () {
         strata.balance(step())

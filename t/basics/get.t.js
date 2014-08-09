@@ -22,8 +22,8 @@ require('./proof')(9, function (step, Strata, tmp, serialize, assert) {
             assert(strata.size, 14, 'json size after read')
             assert(size, 54, 'record size')
 
-            cursor.unlock()
-
+            cursor.unlock(step())
+        }, function () {
             strata.purge(0)
             assert(strata.size, 0, 'page')
 

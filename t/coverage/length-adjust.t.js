@@ -11,7 +11,7 @@ require('./proof')(1, function (step, Strata, tmp, gather, equal) {
         step(function () {
             cursor.insert(value, value, ~ cursor.index, step())
         }, function (inserted) {
-            cursor.unlock()
+            cursor.unlock(step())
         })
     }, function () {
         strata.close(step())

@@ -15,7 +15,7 @@ require('./proof')(1, function (step, Strata, tmp, gather, assert, say) {
         }, function (inserted) {
             cursor.remove(0, step())
         }, function () {
-            cursor.unlock()
+            cursor.unlock(step())
         })
     }, function () {
         gather(strata, step())
@@ -28,6 +28,6 @@ require('./proof')(1, function (step, Strata, tmp, gather, assert, say) {
     }, function () {
         strata.iterator('a', step())
     }, function (cursor) {
-        cursor.unlock()
+        cursor.unlock(step())
     })
 })

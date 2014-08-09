@@ -15,7 +15,7 @@ require('./proof')(1, function (step, Strata, tmp, assert) {
         step(function () {
             cursor.insert('a', 'a', ~ cursor.index, step())
         }, function (inserted) {
-            cursor.unlock()
+            cursor.unlock(step())
         })
     }, function () {
         strata.close(step())
@@ -33,7 +33,7 @@ require('./proof')(1, function (step, Strata, tmp, assert) {
             cursor.get(cursor.index, step())
         }, function (got) {
             assert(got, 'a', 'inserted binary')
-            cursor.unlock()
+            cursor.unlock(step())
         })
     }, function () {
         strata.close(step())

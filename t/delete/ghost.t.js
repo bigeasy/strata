@@ -18,7 +18,8 @@ require('./proof')(5, function (step, Strata, tmp, load, serialize, vivify, gath
         }, function (i) {
             cursor.remove(i, step())
         }, function () {
-            cursor.unlock()
+            cursor.unlock(step())
+        }, function () {
             gather(strata, step())
         })
     }, function (records) {
@@ -40,7 +41,7 @@ require('./proof')(5, function (step, Strata, tmp, load, serialize, vivify, gath
             cursor.next(step())
         }, function (next) {
             assert(cursor.offset, 1, 'ghosted')
-            cursor.unlock()
+            cursor.unlock(step())
         })
     }, function () {
         gather(strata, step())

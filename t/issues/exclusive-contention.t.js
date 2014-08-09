@@ -11,12 +11,13 @@ require('./proof')(1, function (step, Strata, tmp, gather, assert) {
             a.insert('a', 'a', ~ a.index, step())
         }, function () {
             strata.mutator('b', step())
-            a.unlock()
+            a.unlock(step())
         }, function (b) {
             step(function () {
                 b.insert('b', 'b', ~ b.index, step())
             }, function () {
-                b.unlock()
+                b.unlock(step())
+            }, function () {
                 gather(strata, step())
             })
         })

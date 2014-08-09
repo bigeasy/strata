@@ -18,7 +18,7 @@ require('./proof')(3, function (step, Strata, tmp,  serialize, gather, assert) {
         }, function (i) {
             cursor.remove(i, step())
         }, function () {
-            cursor.unlock()
+            cursor.unlock(step())
         })
     }, function () {
         gather(strata, step())

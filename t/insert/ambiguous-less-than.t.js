@@ -18,7 +18,7 @@ require('./proof')(3, function (step, Strata, tmp, serialize, gather, assert) {
         }, function (index) {
             cursor.insert('b', 'b', ~index, step())
         }, function (unambiguous) {
-            cursor.unlock()
+            cursor.unlock(step())
             assert(unambiguous, -1, 'unambiguous')
         }, function () {
             gather(strata, step())

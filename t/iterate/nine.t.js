@@ -12,7 +12,7 @@ require('./proof')(4, function (step, Strata, tmp, serialize, gather, assert) {
         assert(cursor.index, 0, 'index')
         assert(cursor.offset, 0, 'offset')
         assert(cursor.length, 3, 'length')
-        cursor.unlock()
+        cursor.unlock(step())
     }, function () {
         gather(strata, step())
     }, function (records) {

@@ -13,7 +13,7 @@ require('./proof')(4, function (step, Strata, tmp, load, serialize, vivify, gath
             cursor.remove(cursor.index, step())
         }, function () {
             assert(cursor.index, 0, 'unghostable')
-            cursor.unlock()
+            cursor.unlock(step())
         })
     }, function () {
         gather(strata, step())

@@ -12,7 +12,7 @@ require('./proof')(2, function (step, Strata, tmp, serialize, gather, assert) {
         step(function () {
             cursor.insert('e', 'e', ~ cursor.index, step())
         }, function () {
-            cursor.unlock()
+            cursor.unlock(step())
         })
     }, function () {
         strata.mutator('a', step())
@@ -20,7 +20,7 @@ require('./proof')(2, function (step, Strata, tmp, serialize, gather, assert) {
         step(function () {
             cursor.remove(cursor.index, step())
         }, function () {
-            cursor.unlock()
+            cursor.unlock(step())
         })
     }, function () {
         gather(strata, step())

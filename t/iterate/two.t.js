@@ -21,7 +21,8 @@ require('./proof')(5, function (step, Strata, tmp, serialize, assert) {
         }, function (record) {
             records.push(record)
             assert(records, [ 'a', 'b' ], 'records')
-            cursor.unlock()
+            cursor.unlock(step())
+        }, function () {
             strata.close(step())
         })
     })

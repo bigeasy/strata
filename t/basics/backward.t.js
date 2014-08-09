@@ -16,7 +16,7 @@ require('./proof')(5, function (step, Strata, tmp, serialize, assert) {
             cursor.get(0, step())
         }, function (got) {
             assert(got, 'a', 'go left')
-            cursor.unlock()
+            cursor.unlock(step())
         })
     }, function () {
         strata.mutator(strata.leftOf('d'), step())
@@ -27,7 +27,7 @@ require('./proof')(5, function (step, Strata, tmp, serialize, assert) {
             cursor.get(0, step())
         }, function (got) {
             assert(got, 'c', 'go left missing')
-            cursor.unlock()
+            cursor.unlock(step())
         })
     }, function () {
         strata.close(step())

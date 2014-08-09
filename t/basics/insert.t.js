@@ -13,7 +13,8 @@ require('./proof')(5, function (step, Strata, tmp, load, vivify, assert, say) {
             cursor.insert('a', 'a', ~ cursor.index, step())
         }, function (inserted) {
             assert(inserted, 0, 'inserted')
-            cursor.unlock()
+            cursor.unlock(step())
+        }, function () {
             assert(strata.size, 14, 'json size')
         })
     }, function () {

@@ -27,8 +27,8 @@ require('./proof')(5, function (step, Strata, tmp, load, vivify, assert, say) {
     }, function (cursor) {
         assert(cursor.length - cursor.offset, 0, 'empty')
 
-        cursor.unlock()
-
+        cursor.unlock(step())
+    }, function () {
         strata.purge(0)
         assert(strata.size, 0, 'purged')
 

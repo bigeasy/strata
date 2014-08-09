@@ -19,7 +19,8 @@ require('./proof')(1, function (step, Strata, tmp, serialize, equal) {
             cursor.get(cursor.offset, step())
         }, function (got) {
             equal(got, 'a', 'get')
-            cursor.unlock()
+            cursor.unlock(step())
+        }, function () {
             strata.close(step())
         })
     })

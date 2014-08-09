@@ -35,7 +35,7 @@ require('./proof')(4, function (step, Strata, tmp, serialize, load, vivify, gath
         }, function (index) {
             cursor.remove(index, step())
         }, function () {
-            cursor.unlock()
+            cursor.unlock(step())
         })
     }, function () {
         strata.mutator('e', step())
@@ -49,7 +49,7 @@ require('./proof')(4, function (step, Strata, tmp, serialize, load, vivify, gath
         }, function (index) {
             cursor.remove(index, step())
         }, function () {
-            cursor.unlock()
+            cursor.unlock(step())
         })
     }, function () {
         gather(strata, step())

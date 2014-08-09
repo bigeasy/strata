@@ -77,7 +77,7 @@ function insert (step, strata, values) {
         step(function () {
             cursor.insert(values[0], values[0], ~ cursor.index, step())
         }, function () {
-            cursor.unlock()
+            cursor.unlock(step())
         })
     })
 }
@@ -88,10 +88,14 @@ var gather = cadence(function (step, strata) {
     step(function () {
         strata.iterator(strata.left, step())
     }, function (cursor) {
-        step(function (more) {
+        var loop = step(function (more) {
             if (!more) {
-                cursor.unlock()
-                step(null, records)
+                step(function () {
+                    cursor.unlock(step())
+                }, function () {
+                    // todo: fix in cadence!
+                    return [ loop, [ records ] ]
+                })
             } else {
                 step(function () {
                     step(function (index) {
@@ -477,7 +481,7 @@ function script (options, callback) {
         step(function () {
             strata.mutator(action.values[0], step())
         }, function (cursor) {
-            step(function () {
+            var loop = step(function () {
                 cursor.indexOf(action.values[0], step())
             }, function (index) {
                 ok(index < 0)
@@ -485,8 +489,11 @@ function script (options, callback) {
                 action.values.shift()
             }, function () {
                 if (!action.values.length) {
-                        cursor.unlock()
-                        step(null)
+                    step(function () {
+                        cursor.unlock(step())
+                    }, function () {
+                        return [ loop ]
+                    })
                 }
             })()
         })
@@ -502,7 +509,7 @@ function script (options, callback) {
             step(function () {
                 if (cursor.index >= 0) cursor.remove(cursor.index, step())
             }, function () {
-                cursor.unlock()
+                cursor.unlock(step())
             })
         })()
     })

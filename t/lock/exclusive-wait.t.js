@@ -11,13 +11,13 @@ require('./proof')(1, function (step, Strata, tmp, serialize, ok) {
         strata.iterator('h', step())
     }, function (cursor) {
         strata.mutator('h', step())
-        cursor.unlock()
+        cursor.unlock(step())
     }, function (cursor) {
         step(function () {
             cursor.get(cursor.offset, step())
         }, function (value) {
             ok(value, 'h', 'got')
-            cursor.unlock()
+            cursor.unlock(step())
         })
     }, function() {
         strata.close(step())
