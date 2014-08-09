@@ -1284,8 +1284,12 @@ function Strata (options) {
 
                 balancer.unbalanced(page)
 
-                entry = journal.open(filename(page.address), page.position, page)
-                entry.ready(check(ready))
+                journalist.purge(check(open))
+
+                function open () {
+                    entry = journal.open(filename(page.address), page.position, page)
+                    entry.ready(check(ready))
+                }
 
                 function ready () {
                     writeInsert(entry, page, index, record, check(inserted, close))
@@ -1316,8 +1320,12 @@ function Strata (options) {
 
             balancer.unbalanced(page)
 
-            entry = journal.open(filename(page.address), page.position, page)
-            entry.ready(check(ready))
+            journalist.purge(check(open))
+
+            function open () {
+                entry = journal.open(filename(page.address), page.position, page)
+                entry.ready(check(ready))
+            }
 
             function ready () {
                 writeDelete(entry, page, index, check(written, close))
