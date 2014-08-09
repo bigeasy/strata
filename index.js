@@ -1201,9 +1201,14 @@ function Strata (options) {
 
         function unlock (callback) {
             ok(callback, 'unlock now requires a callback')
-            locker.unlock(page)
-            locker.dispose()
-            callback()
+
+            journal.close('leaf', validate(callback, unlock))
+
+            function unlock () {
+                locker.unlock(page)
+                locker.dispose()
+                callback()
+            }
         }
 
         function _index () { return index }
