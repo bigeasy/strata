@@ -2606,7 +2606,14 @@ function Strata (options) {
         }
     }
 
-    function purge (downTo) { magazine.purge(downTo) }
+    function purge (downTo) {
+        var purge = magazine.purge()
+        while (purge.cartridge && magazine.heft > downTo) {
+            purge.cartridge.remove()
+            purge.next()
+        }
+        purge.release()
+    }
 
     return classify.call(this, create, open,
                                key, left, leftOf, right,
