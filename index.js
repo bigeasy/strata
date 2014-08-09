@@ -813,19 +813,21 @@ function Strata (options) {
     function close (callback) {
         var cartridge = magazine.get(-2), lock = cartridge.value.page.lock
 
-        lock.unlock()
-        // todo
-        lock.dispose()
+        createJournal().close('tree', validate(callback, function () {
+            lock.unlock()
+            // todo
+            lock.dispose()
 
-        cartridge.release()
+            cartridge.release()
 
-        magazine.purge(-2)
+            magazine.purge(-2)
 
-        ok(!magazine.count, 'pages still held by cache')
+            ok(!magazine.count, 'pages still held by cache')
 
-        thrownByUser = null
+            thrownByUser = null
 
-        toUserLand(callback, null)
+            toUserLand(callback, null)
+        }))
     }
 
     function stash (page, positionOrIndex, length, callback) {
