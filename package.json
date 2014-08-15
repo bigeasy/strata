@@ -28,7 +28,7 @@
     },
     "devDependencies":
     {
-                        "proof": "0.0.45",
+                        "proof": "0.0.46",
                         "cadence": "0.0.38"
     },
     "licenses":
