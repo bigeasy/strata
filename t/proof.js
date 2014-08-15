@@ -93,8 +93,7 @@ var gather = cadence(function (step, strata) {
                 step(function () {
                     cursor.unlock(step())
                 }, function () {
-                    // todo: fix in cadence!
-                    return [ loop, [ records ] ]
+                    return [ loop, records ]
                 })
             } else {
                 step(function () {

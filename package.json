@@ -24,13 +24,12 @@
     {
                         "magazine": "0.0.12",
                         "sequester": "0.0.8",
-                        "staccato": "0.0.1",
                         "journalist": "0.0.4"
     },
     "devDependencies":
     {
                         "proof": "0.0.45",
-                        "cadence": "0.0.37"
+                        "cadence": "0.0.38"
     },
     "licenses":
     [{
