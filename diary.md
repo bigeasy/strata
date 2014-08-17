@@ -236,7 +236,7 @@ Here's a thought, now that I have a cache of open file handles, why not have a
 on that page. This can be done once on exit of balance operations.
 
 The `scram` method can also accept a callback, have a closer of sorts, or
-provide an interator, or no, hmm...
+provide an iterator, or no, hmm...
 
 Thinking iterator, but a callback will do, that can iterate over all of the open
 file handles and call the callback with the resolved file name and the extra
