@@ -1604,7 +1604,7 @@ function Strata (options) {
                 penultimate, leaf, split, pages, page,
                 records, remainder, right, index, offset, length
 
-            if (ghosts) deleteGhost(key, check(exorcised))
+            if (key != null && ghosts) deleteGhost(key, check(exorcised))
             else penultimate()
 
             function exorcised (rekey) {
@@ -1615,7 +1615,8 @@ function Strata (options) {
             function penultimate () {
                 descents.push(penultimate = new Descent(locker))
 
-                penultimate.descend(penultimate.key(key), penultimate.penultimate, check(upgrade))
+                penultimate.descend(key == null ? penultimate.left : penultimate.key(key),
+                                    penultimate.penultimate, check(upgrade))
             }
 
             function upgrade () {
@@ -1624,7 +1625,7 @@ function Strata (options) {
 
             function fork () {
                 descents.push(leaf = penultimate.fork())
-                leaf.descend(leaf.key(key), leaf.leaf, check(dirty))
+                leaf.descend(key == null ? leaf.left : leaf.key(key), leaf.leaf, check(dirty))
             }
 
             function dirty () {
@@ -1764,7 +1765,7 @@ function Strata (options) {
 
             descents.push(parent = new Descent(locker))
 
-            parent.descend(parent.key(key), parent.child(address), check(upgrade))
+            parent.descend(key == null ? parent.left : parent.key(key), parent.child(address), check(upgrade))
 
             function upgrade () {
                 parent.upgrade(check(fork))
@@ -1772,7 +1773,7 @@ function Strata (options) {
 
             function fork () {
                 descents.push(full = parent.fork())
-                full.descend(full.key(key), full.level(full.depth + 1), check(partition))
+                full.descend(key == null ? full.left : full.key(key), full.level(full.depth + 1), check(partition))
             }
 
             function partition () {
