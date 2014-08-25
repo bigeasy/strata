@@ -1,0 +1,213 @@
+{
+  "0": {
+    "children": [
+      20,
+      18
+    ]
+  },
+  "1": {
+    "log": [
+      {
+        "type": "pos"
+      },
+      {
+        "type": "add",
+        "value": "a"
+      },
+      {
+        "type": "add",
+        "value": "b"
+      },
+      {
+        "type": "pos"
+      }
+    ],
+    "right": 15,
+    "order": [
+      "a",
+      "b"
+    ]
+  },
+  "3": {
+    "log": [
+      {
+        "type": "pos"
+      },
+      {
+        "type": "add",
+        "value": "j"
+      },
+      {
+        "type": "add",
+        "value": "k"
+      },
+      {
+        "type": "pos"
+      }
+    ],
+    "right": 13,
+    "order": [
+      "j",
+      "k"
+    ]
+  },
+  "5": {
+    "log": [
+      {
+        "type": "pos"
+      },
+      {
+        "type": "add",
+        "value": "g"
+      },
+      {
+        "type": "add",
+        "value": "h"
+      },
+      {
+        "type": "add",
+        "value": "i"
+      },
+      {
+        "type": "pos"
+      }
+    ],
+    "right": 3,
+    "order": [
+      "g",
+      "h",
+      "i"
+    ]
+  },
+  "7": {
+    "log": [
+      {
+        "type": "pos"
+      },
+      {
+        "type": "add",
+        "value": "e"
+      },
+      {
+        "type": "add",
+        "value": "f"
+      },
+      {
+        "type": "pos"
+      }
+    ],
+    "right": 5,
+    "order": [
+      "e",
+      "f"
+    ]
+  },
+  "8": {
+    "children": [
+      3
+    ]
+  },
+  "10": {
+    "children": [
+      1,
+      15
+    ]
+  },
+  "11": {
+    "log": [
+      {
+        "type": "pos"
+      },
+      {
+        "type": "add",
+        "value": "n"
+      },
+      {
+        "type": "add",
+        "value": "o"
+      },
+      {
+        "type": "add",
+        "value": "p"
+      },
+      {
+        "type": "pos"
+      }
+    ],
+    "order": [
+      "n",
+      "o",
+      "p"
+    ]
+  },
+  "13": {
+    "log": [
+      {
+        "type": "pos"
+      },
+      {
+        "type": "add",
+        "value": "l"
+      },
+      {
+        "type": "add",
+        "value": "m"
+      },
+      {
+        "type": "pos"
+      }
+    ],
+    "right": 11,
+    "order": [
+      "l",
+      "m"
+    ]
+  },
+  "14": {
+    "children": [
+      13,
+      11
+    ]
+  },
+  "15": {
+    "log": [
+      {
+        "type": "pos"
+      },
+      {
+        "type": "add",
+        "value": "c"
+      },
+      {
+        "type": "add",
+        "value": "d"
+      },
+      {
+        "type": "pos"
+      }
+    ],
+    "right": 7,
+    "order": [
+      "c",
+      "d"
+    ]
+  },
+  "16": {
+    "children": [
+      7,
+      5
+    ]
+  },
+  "18": {
+    "children": [
+      8,
+      14
+    ]
+  },
+  "20": {
+    "children": [
+      10,
+      16
+    ]
+  }
+}

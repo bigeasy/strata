@@ -1520,7 +1520,7 @@ function Strata (options) {
                 if (difference > 0 && node.length > options.leafSize) {
                     operations.unshift({
                         method: 'splitLeaf',
-                        parameters: [ node.key, ghosts[node.address] ]
+                        parameters: [ node.address, node.key, ghosts[node.address] ]
                     })
                     delete ghosts[node.address]
                     unlink(node)
@@ -1596,7 +1596,7 @@ function Strata (options) {
             }
         }
 
-        function splitLeaf (key, ghosts, callback) {
+        function splitLeaf (address, key, ghosts, callback) {
             var locker = new Locker,
                 check = validator(callback, release),
                 descents = [], replacements = [], encached = [],
@@ -1604,7 +1604,7 @@ function Strata (options) {
                 penultimate, leaf, split, pages, page,
                 records, remainder, right, index, offset, length
 
-            if (key != null && ghosts) deleteGhost(key, check(exorcised))
+            if (address != 1 && ghosts) deleteGhost(key, check(exorcised))
             else penultimate()
 
             function exorcised (rekey) {
@@ -1615,7 +1615,7 @@ function Strata (options) {
             function penultimate () {
                 descents.push(penultimate = new Descent(locker))
 
-                penultimate.descend(key == null ? penultimate.left : penultimate.key(key),
+                penultimate.descend(address == 1 ? penultimate.left : penultimate.key(key),
                                     penultimate.penultimate, check(upgrade))
             }
 
@@ -1625,7 +1625,7 @@ function Strata (options) {
 
             function fork () {
                 descents.push(leaf = penultimate.fork())
-                leaf.descend(key == null ? leaf.left : leaf.key(key), leaf.leaf, check(dirty))
+                leaf.descend(address == 1 ? leaf.left : leaf.key(key), leaf.leaf, check(dirty))
             }
 
             function dirty () {
@@ -1743,7 +1743,8 @@ function Strata (options) {
 
                 release()
 
-                shouldSplitBranch(penultimate.page, key, callback)
+                var partition = encached[0].cache[encached[0].positions[0]].key
+                shouldSplitBranch(penultimate.page, partition, callback)
             }
 
             function release () {
@@ -1765,7 +1766,7 @@ function Strata (options) {
 
             descents.push(parent = new Descent(locker))
 
-            parent.descend(key == null ? parent.left : parent.key(key), parent.child(address), check(upgrade))
+            parent.descend(parent.key(key), parent.child(address), check(upgrade))
 
             function upgrade () {
                 parent.upgrade(check(fork))
@@ -1773,7 +1774,7 @@ function Strata (options) {
 
             function fork () {
                 descents.push(full = parent.fork())
-                full.descend(key == null ? full.left : full.key(key), full.level(full.depth + 1), check(partition))
+                full.descend(full.key(key), full.level(full.depth + 1), check(partition))
             }
 
             function partition () {
