@@ -1675,8 +1675,7 @@ function Strata (options) {
             })
         })
 
-        classify.call(methods, deleteGhost, mergeLeaves)
-        methods.splitLeaf = splitLeaf
+        classify.call(methods,mergeLeaves)
 
         function splitBranch (address, key, callback) {
             var check = validator(callback, release),
@@ -1904,39 +1903,28 @@ function Strata (options) {
             })
         })
 
-        function deleteGhost (key, callback) {
-            var check = validator(callback, release),
-                locker = new Locker,
+        var deleteGhost = cadence(function (step, key) {
+            var locker = new Locker,
                 descents = [],
                 pivot, leaf, fd
-
-            descents.push(pivot = new Descent(locker))
-            pivot.descend(pivot.key(key), pivot.found([key]), check(upgrade))
-
-            function upgrade () {
-                pivot.upgrade(check(descendLeaf))
-            }
-
-            function descendLeaf () {
-                descents.push(leaf = pivot.fork())
-
-                leaf.descend(leaf.key(key), leaf.leaf, check(shift))
-            }
-
-            function shift () {
-                exorcise(pivot, leaf.page, leaf.page, check(complete))
-            }
-
-            function complete (key) {
-                release()
-                callback(null, key)
-            }
-
-            function release () {
+            step([function () {
                 descents.forEach(function (descent) { locker.unlock(descent.page) })
                 locker.dispose()
-            }
-        }
+            }], function () {
+                descents.push(pivot = new Descent(locker))
+                pivot.descend(pivot.key(key), pivot.found([key]), step())
+            }, function () {
+                pivot.upgrade(step())
+            }, function () {
+                descents.push(leaf = pivot.fork())
+
+                leaf.descend(leaf.key(key), leaf.leaf, step())
+            }, function () {
+                exorcise(pivot, leaf.page, leaf.page, step())
+            })
+        })
+        methods.splitLeaf = splitLeaf
+        methods.deleteGhost = deleteGhost
 
         function mergePages (key, leftKey, stopper, merger, ghostly, callback) {
             var check = validator(callback, release),
