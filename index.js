@@ -1877,8 +1877,8 @@ function Strata (options) {
             }
         }
 
-        function exorcise (pivot, ghostly, corporal, callback) {
-            var entry, check = validator(callback)
+        var exorcise = cadence(function (step, pivot, ghostly, corporal) {
+            var entry
 
             ok(ghostly.ghosts, 'no ghosts')
             ok(corporal.positions.length - corporal.ghosts > 0, 'no replacement')
@@ -1887,28 +1887,22 @@ function Strata (options) {
             splice('lengths', ghostly, 0, 1)
             ghostly.ghosts = 0
 
-            entry = journal.leaf.open(filename(ghostly.address), ghostly.position, ghostly)
-            entry.ready(check(opened))
-
-            function opened () {
-                writePositions(entry, ghostly, check(written))
-            }
-
+            step(function () {
+                entry = journal.leaf.open(filename(ghostly.address), ghostly.position, ghostly)
+                entry.ready(step())
+            }, function () {
+                writePositions(entry, ghostly, step())
+            }, function () {
             // todo: close on failure.
-            function written () {
-                entry.close('entry', check(closed))
-            }
-
-            function closed () {
-                stash(corporal, corporal.ghosts, check(rekey))
-            }
-
-            function rekey (entry) {
+                entry.close('entry', step())
+            }, function () {
+                stash(corporal, corporal.ghosts, step())
+            }, function (entry) {
                 uncacheEntry(pivot.page, pivot.page.addresses[pivot.index])
                 encacheKey(pivot.page, pivot.page.addresses[pivot.index], entry.key, entry.keySize)
-                callback(null, ghostly.key = entry.key)
-            }
-        }
+                return [ ghostly.key = entry.key ]
+            })
+        })
 
         function deleteGhost (key, callback) {
             var check = validator(callback, release),
