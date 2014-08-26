@@ -1677,111 +1677,83 @@ function Strata (options) {
 
         classify.call(methods,mergeLeaves)
 
-        function splitBranch (address, key, callback) {
-            var check = validator(callback, release),
-                locker = new Locker,
+        var splitBranch = cadence(function (step, address, key) {
+            var locker = new Locker,
                 descents = [],
                 children = [],
                 encached = [],
                 parent, full, split, pages,
-                records, remainder, offset
+                records, remainder, offset,
+                unwritten, pending
 
-            descents.push(parent = new Descent(locker))
+            step(function () {
+                step([function () {
+                    encached.forEach(function (page) { locker.unlock(page) })
+                    descents.forEach(function (descent) { locker.unlock(descent.page) })
+                    locker.dispose()
+                }], function () {
+                    descents.push(parent = new Descent(locker))
+                    parent.descend(parent.key(key), parent.child(address), step())
+                }, function () {
+                    parent.upgrade(step())
+                }, function () {
+                    descents.push(full = parent.fork())
+                    full.descend(full.key(key), full.level(full.depth + 1), step())
+                }, function () {
+                    split = full.page
 
-            parent.descend(parent.key(key), parent.child(address), check(upgrade))
+                    pages = Math.ceil(split.addresses.length / options.branchSize)
+                    records = Math.floor(split.addresses.length / pages)
+                    remainder = split.addresses.length % pages
 
-            function upgrade () {
-                parent.upgrade(check(fork))
-            }
+                    offset = split.addresses.length
 
-            function fork () {
-                descents.push(full = parent.fork())
-                full.descend(full.key(key), full.level(full.depth + 1), check(partition))
-            }
+                    for (var i = 0; i < pages - 1; i++ ) {
+                        var page = locker.encache(createBranch({}))
 
-            function partition () {
-                split = full.page
+                        children.push(page)
+                        encached.push(page)
 
-                pages = Math.ceil(split.addresses.length / options.branchSize)
-                records = Math.floor(split.addresses.length / pages)
-                remainder = split.addresses.length % pages
+                        var length = remainder-- > 0 ? records + 1 : records
+                        var offset = split.addresses.length - length
 
-                offset = split.addresses.length
+                        var cut = splice('addresses', split, offset, length)
 
-                paginate()
-            }
+                        splice('addresses', parent.page, parent.index + 1, 0, page.address)
 
-            function paginate () {
-                var page = locker.encache(createBranch({}))
+                        encacheEntry(parent.page, page.address, split.cache[cut[0]])
 
-                children.push(page)
-                encached.push(page)
+                        var keys = {}
+                        cut.forEach(function (address) {
+                            keys[address] = uncacheEntry(split, address)
+                        })
 
-                var length = remainder-- > 0 ? records + 1 : records
-                var offset = split.addresses.length - length
+                        splice('addresses', page, 0, 0, cut)
 
-                var cut = splice('addresses', split, offset, length)
-
-                splice('addresses', parent.page, parent.index + 1, 0, page.address)
-
-                encacheEntry(parent.page, page.address, split.cache[cut[0]])
-
-                var keys = {}
-                cut.forEach(function (address) {
-                    keys[address] = uncacheEntry(split, address)
+                        cut.slice(1).forEach(function (address) {
+                            encacheEntry(page, address, keys[address])
+                        })
+                    }
+                }, function () {
+                    children.unshift(full.page)
+                    step(function (page) {
+                        writeBranch(page, '.replace', step())
+                    })(children)
+                }, function () {
+                    writeBranch(parent.page, '.pending', step())
+                }, function () {
+                    rename(parent.page, '.pending', '.commit', step())
+                }, function () {
+                    step(function (page) {
+                        replace(page, '.replace', step())
+                    })(children)
+                }, function () {
+                    replace(parent.page, '.commit', step())
                 })
-
-                splice('addresses', page, 0, 0, cut)
-
-                cut.slice(1).forEach(function (address) {
-                    encacheEntry(page, address, keys[address])
-                })
-
-                if (--pages > 1) paginate()
-                else paginated()
-            }
-
-            var unwritten, pending
-            function paginated () {
-                children.unshift(full.page)
-                unwritten = children.slice()
-                pending = children.slice()
-                writeChild()
-            }
-
-            function writeChild () {
-                if (unwritten.length) writeBranch(unwritten.shift(), '.replace', check(writeChild))
-                else writeParent()
-            }
-
-            function writeParent () {
-                writeBranch(parent.page, '.pending', check(commit))
-            }
-
-            function commit () {
-                rename(parent.page, '.pending', '.commit', check(committing))
-            }
-
-            function committing () {
-                if (pending.length) replace(pending.shift(), '.replace', check(committing))
-                else committed()
-            }
-
-            function committed () {
-                replace(parent.page, '.commit', check(complete))
-            }
-
-            function complete () {
-                release()
-                shouldSplitBranch(parent.page, key, callback)
-            }
-
-            function release () {
-                encached.forEach(function (page) { locker.unlock(page) })
-                descents.forEach(function (descent) { locker.unlock(descent.page) })
-                locker.dispose()
-            }
-        }
+            }, function () {
+                shouldSplitBranch(parent.page, key, step())
+            })
+        })
 
         function drainRoot (callback) {
             var check = validator(callback, release),
