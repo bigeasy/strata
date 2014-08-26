@@ -1,5 +1,6 @@
 var Cache = require('magazine'),
-    Journalist = require('journalist')
+    Journalist = require('journalist'),
+    Rescue = require('rescue')
 
 function extend(to, from) {
     for (var key in from) to[key] = from[key]
@@ -70,7 +71,8 @@ function Strata (options) {
         }),
         serialize = options.serialize || function (object) { return new Buffer(JSON.stringify(object)) },
         deserialize = options.deserialize || function (buffer) { return JSON.parse(buffer.toString()) },
-        tracer = options.tracer || function () { arguments[2]() }
+        tracer = options.tracer || function () { arguments[2]() },
+        rescue = new Rescue
 
     checksum = (function () {
         if (typeof options.checksum == 'function') return options.checksum
@@ -94,42 +96,7 @@ function Strata (options) {
     }
 
     function validate (callback, forward, janitor) {
-        ok(typeof forward == 'function', 'no forward function')
-        ok(typeof callback == 'function','no callback function')
-
-        return function (error) {
-            if (error) {
-                cleanup(error)
-            } else {
-                try {
-                    forward.apply(null, __slice.call(arguments, 1))
-                } catch (error) {
-                    cleanup(error)
-                }
-            }
-        }
-
-        function cleanup (error) {
-            if (janitor) {
-                janitor(error)
-                if (janitor.length) return
-            }
-
-            if (thrownByUser === error) {
-                throw error
-            }
-
-            toUserLand(callback, error)
-        }
-    }
-
-    function toUserLand (callback) {
-        try {
-            callback.apply(null, __slice.call(arguments, 1))
-        } catch (error) {
-            thrownByUser = error
-            throw error
-        }
+        return rescue.validate(callback, forward, janitor)
     }
 
     function _size () { return magazine.heft }
@@ -785,7 +752,7 @@ function Strata (options) {
             locker.unlock(root)
             locker.unlock(leaf)
             locker.dispose()
-            toUserLand(callback)
+            rescue.callback(callback)
         }
     }
 
@@ -806,7 +773,7 @@ function Strata (options) {
                     nextAddress = Math.max(+(file) + 1, nextAddress)
                 }
             })
-            toUserLand(callback, null)
+            rescue.callback(callback, null)
         }
     }
 
@@ -831,7 +798,7 @@ function Strata (options) {
 
             thrownByUser = null
 
-            toUserLand(callback, null)
+            rescue.callback(callback, null)
         }))
     }
 
@@ -1175,7 +1142,7 @@ function Strata (options) {
 
         function get (index, callback) {
             stash(page, index, validate(callback, function (entry, size) {
-                toUserLand(callback, null, entry.record, entry.key, size)
+                rescue.callback(callback, null, entry.record, entry.key, size)
             }))
         }
 
@@ -1187,7 +1154,7 @@ function Strata (options) {
             if (page.right) {
                 locker.lock(page.right, exclusive, validate(callback, locked))
             } else {
-                toUserLand(callback, null, false)
+                rescue.callback(callback, null, false)
             }
 
             function locked (next) {
@@ -1198,7 +1165,7 @@ function Strata (options) {
                 offset = page.ghosts
                 length = page.positions.length
 
-                toUserLand(callback, null, true)
+                rescue.callback(callback, null, true)
             }
         }
 
@@ -1241,7 +1208,7 @@ function Strata (options) {
             var check = validator(callback), unambiguous
 
             if (index == 0 && page.address != 1) {
-                toUserLand(callback, null, -1)
+                rescue.callback(callback, null, -1)
                 return
             }
 
@@ -1275,7 +1242,7 @@ function Strata (options) {
 
                 function compare () {
                     if (comparator(key, rightLeafKey) < 0) insert()
-                    else toUserLand(callback, null, +1)
+                    else rescue.callback(callback, null, +1)
                 }
             }
 
@@ -1307,7 +1274,7 @@ function Strata (options) {
 
                 function close (writeError) {
                     entry.close('entry', function (closeError) {
-                        toUserLand(callback, writeError || closeError, 0)
+                        rescue.callback(callback, writeError || closeError, 0)
                     })
                 }
             }
@@ -1345,7 +1312,7 @@ function Strata (options) {
 
             function close (writeError) {
                 entry.close('entry', function (closeError) {
-                    toUserLand(callback, writeError || closeError)
+                    rescue.callback(callback, writeError || closeError)
                 })
             }
         }
@@ -2516,7 +2483,7 @@ function Strata (options) {
         }
 
         function done (cursor) {
-            toUserLand(callback, null, cursor)
+            rescue.callback(callback, null, cursor)
         }
     }
 
@@ -2532,7 +2499,7 @@ function Strata (options) {
         balancer.balance(validate(callback, end))
 
         function end () {
-            toUserLand(callback)
+            rescue.callback(callback)
         }
     }
 
@@ -2548,7 +2515,7 @@ function Strata (options) {
         function begin (page) {
             expand(page, root = page.addresses.map(record), 0, validate(callback, function () {
                 release()
-                toUserLand(callback, null, root)
+                rescue.callback(callback, null, root)
             }, release))
 
             function release () {

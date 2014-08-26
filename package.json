@@ -24,7 +24,8 @@
     {
                         "magazine": "0.0.12",
                         "sequester": "0.0.8",
-                        "journalist": "0.0.4"
+                        "journalist": "0.0.4",
+                        "rescue": "0.0.1"
     },
     "devDependencies":
     {
