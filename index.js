@@ -1,6 +1,7 @@
 var Cache = require('magazine'),
     Journalist = require('journalist'),
-    Rescue = require('rescue')
+    Rescue = require('rescue'),
+    cadence = require('cadence')
 
 function extend(to, from) {
     for (var key in from) to[key] = from[key]
@@ -1328,8 +1329,6 @@ function Strata (options) {
             ghosts = {},
             methods = {}
 
-        classify.call(methods, deleteGhost, splitLeaf, mergeLeaves)
-
         function unbalanced (page, force) {
             if (force) {
                 lengths[page.address] = options.leafSize
@@ -1563,164 +1562,121 @@ function Strata (options) {
             }
         }
 
-        function splitLeaf (address, key, ghosts, callback) {
+        var splitLeaf = cadence(function (step, address, key, ghosts) {
             var locker = new Locker,
-                check = validator(callback, release),
                 descents = [], replacements = [], encached = [],
                 completed = 0,
                 penultimate, leaf, split, pages, page,
                 records, remainder, right, index, offset, length
 
-            if (address != 1 && ghosts) deleteGhost(key, check(exorcised))
-            else penultimate()
+            step(function () {
+                step([function () {
+                    encached.forEach(function (page) { locker.unlock(page) })
+                    descents.forEach(function (descent) { locker.unlock(descent.page) })
+                    locker.dispose()
+                }], function () {
+                    if (address != 1 && ghosts) step(function () {
+                        deleteGhost(key, step())
+                    }, function (rekey) {
+                        key = rekey
+                    })
+                }, function () {
+                    descents.push(penultimate = new Descent(locker))
 
-            function exorcised (rekey) {
-                key = rekey
-                penultimate()
-            }
+                    penultimate.descend(address == 1 ? penultimate.left : penultimate.key(key),
+                                        penultimate.penultimate, step())
+                }, function () {
+                    penultimate.upgrade(step())
+                }, function () {
+                    descents.push(leaf = penultimate.fork())
+                    leaf.descend(address == 1 ? leaf.left : leaf.key(key), leaf.leaf, step())
+                }, function () {
+                    split = leaf.page
+                    if (split.positions.length - split.ghosts <= options.leafSize) {
+                        balancer.unbalanced(split, true)
+                        step(null)
+                    }
+                }, function () {
+                    pages = Math.ceil(split.positions.length / options.leafSize)
+                    records = Math.floor(split.positions.length / pages)
+                    remainder = split.positions.length % pages
 
-            function penultimate () {
-                descents.push(penultimate = new Descent(locker))
+                    right = split.right
 
-                penultimate.descend(address == 1 ? penultimate.left : penultimate.key(key),
-                                    penultimate.penultimate, check(upgrade))
-            }
+                    offset = split.positions.length
 
-            function upgrade () {
-                penultimate.upgrade(check(fork))
-            }
+                    step(function () {
+                        page = locker.encache(createLeaf({ loaded: true }))
+                        encached.push(page)
 
-            function fork () {
-                descents.push(leaf = penultimate.fork())
-                leaf.descend(address == 1 ? leaf.left : leaf.key(key), leaf.leaf, check(dirty))
-            }
+                        page.right = right
+                        right = page.address
 
-            function dirty () {
-                split = leaf.page
+                        splice('addresses', penultimate.page, penultimate.index + 1, 0, page.address)
 
-                if (split.positions.length - split.ghosts <= options.leafSize) {
-                    balancer.unbalanced(split, true)
-                    release()
-                    callback(null)
-                } else {
-                    partition()
-                }
-            }
+                        length = remainder-- > 0 ? records + 1 : records
+                        offset = split.positions.length - length
+                        index = offset
 
-            function partition () {
-                pages = Math.ceil(split.positions.length / options.leafSize)
-                records = Math.floor(split.positions.length / pages)
-                remainder = split.positions.length % pages
 
-                right = split.right
+                        step(function () {
+                            var position = split.positions[index]
 
-                offset = split.positions.length
+                            ok(index < split.positions.length)
 
-                paginate()
-            }
+                            step(function () {
+                                stash(split, index, step())
+                            }, function (entry) {
+                                uncacheEntry(split, position)
+                                splice('positions', page, page.positions.length, 0, position)
+                                splice('lengths', page, page.lengths.length, 0, split.lengths[index])
+                                encacheEntry(page, position, entry)
+                                index++
+                            })
+                        })(length)
+                    }, function () {
+                        splice('positions', split, offset, length)
+                        splice('lengths', split, offset, length)
 
-            function paginate () {
-                if (--pages) shuffle()
-                else paginated()
-            }
+                        var entry = page.cache[page.positions[0]]
 
-            function shuffle () {
-                page = locker.encache(createLeaf({ loaded: true }))
-                encached.push(page)
+                        encacheKey(penultimate.page, page.address, entry.key, entry.keySize)
 
-                page.right = right
-                right = page.address
+                        replacements.push(page)
 
-                splice('addresses', penultimate.page, penultimate.index + 1, 0, page.address)
+                        rewriteLeaf(page, '.replace', step())
+                    })(pages - 1)
+                }, function () {
+                    split.right = right
 
-                length = remainder-- > 0 ? records + 1 : records
-                offset = split.positions.length - length
-                index = offset
+                    replacements.push(split)
 
-                copy()
-            }
+                    rewriteLeaf(split, '.replace', step())
+                }, function () {
+                    writeBranch(penultimate.page, '.pending', step())
+                }, function () {
+                    tracer('splitLeafCommit', {}, step())
+                }, function () {
+                    rename(penultimate.page, '.pending', '.commit', step())
+                }, function () {
+                    step(function (page) {
+                        replace(page, '.replace', step())
+                    })(replacements)
+                }, function () {
+                    replace(penultimate.page, '.commit', step())
+                }, function () {
+                    balancer.unbalanced(leaf.page, true)
+                    balancer.unbalanced(page, true)
+                    return [ encached[0].cache[encached[0].positions[0]].key ]
+                })
+            }, function (partition) {
+                            console.log('called')
+                shouldSplitBranch(penultimate.page, partition, step())
+            })
+        })
 
-            function copy () {
-                var position = split.positions[index]
-
-                ok(index < split.positions.length)
-
-                stash(split, index, check(uncache))
-
-                function uncache (entry) {
-                    uncacheEntry(split, position)
-                    splice('positions', page, page.positions.length, 0, position)
-                    splice('lengths', page, page.lengths.length, 0, split.lengths[index])
-                    encacheEntry(page, position, entry)
-                    index++
-                    if (index < offset + length) copy()
-                    else copied()
-                }
-            }
-
-            function copied() {
-                splice('positions', split, offset, length)
-                splice('lengths', split, offset, length)
-
-                var entry = page.cache[page.positions[0]]
-
-                encacheKey(penultimate.page, page.address, entry.key, entry.keySize)
-
-                replacements.push(page)
-
-                rewriteLeaf(page, '.replace', check(replaced))
-            }
-
-            function replaced () {
-                paginate()
-            }
-
-            function paginated () {
-                split.right = right
-
-                rewriteLeaf(split, '.replace', check(transact))
-
-                replacements.push(split)
-            }
-
-            function transact () {
-                writeBranch(penultimate.page, '.pending', check(trace))
-            }
-
-            function trace () {
-                tracer('splitLeafCommit', {}, check(commit))
-            }
-
-            function commit () {
-                rename(penultimate.page, '.pending', '.commit', check(persist))
-            }
-
-            function persist () {
-                if (replacements.length) replace(replacements.shift(), '.replace', check(persist))
-                else complete()
-            }
-
-            function complete () {
-                replace(penultimate.page, '.commit', check(rebalance))
-            }
-
-            function rebalance () {
-                balancer.unbalanced(leaf.page, true)
-                balancer.unbalanced(page, true)
-
-                release()
-
-                var partition = encached[0].cache[encached[0].positions[0]].key
-                shouldSplitBranch(penultimate.page, partition, callback)
-            }
-
-            function release () {
-                encached.forEach(function (page) { locker.unlock(page) })
-                descents.forEach(function (descent) { locker.unlock(descent.page) })
-                locker.dispose()
-
-            }
-        }
+        classify.call(methods, deleteGhost, mergeLeaves)
+        methods.splitLeaf = splitLeaf
 
         function splitBranch (address, key, callback) {
             var check = validator(callback, release),

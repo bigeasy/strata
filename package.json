@@ -25,12 +25,12 @@
                         "magazine": "0.0.12",
                         "sequester": "0.0.8",
                         "journalist": "0.0.4",
+                        "cadence": "0.0.38",
                         "rescue": "0.0.1"
     },
     "devDependencies":
     {
-                        "proof": "0.0.46",
-                        "cadence": "0.0.38"
+                        "proof": "0.0.46"
     },
     "licenses":
     [{
