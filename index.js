@@ -1536,19 +1536,16 @@ function Strata (options) {
             operate(callback)
         }
 
-        function operate (callback) {
-            var check = validator(callback), address
-            function shift () {
-                var operation = operations.shift()
-                if (operation) {
-                    methods[operation.method].apply(this, operation.parameters.concat(check(shift)))
-                } else {
-                    balancing = false
-                    callback(null, false)
-                }
-            }
-            shift()
-        }
+        var operate = cadence(function (step) {
+            step(function () {
+                step(function (operation) {
+                    methods[operation.method].apply(this, operation.parameters.concat(step()))
+                })(operations)
+            }, function () {
+                balancing = false
+                return false
+            })
+        })
 
         function shouldSplitBranch (branch, key, callback) {
             if (branch.addresses.length > options.branchSize) {
