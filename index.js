@@ -1337,6 +1337,32 @@ function Strata (options) {
             }
         }
 
+        var _nodify = cadence(function (step, page) {
+            step(function () {
+                ok(page.address % 2, 'leaf page expected')
+
+                if (page.address == 1) return [{}]
+                else stash(page, 0, step())
+            }, function (entry) {
+                var node
+                step(function () {
+                    node = {
+                        key: entry.key,
+                        address: page.address,
+                        rightAddress: page.right,
+                        length: page.positions.length - page.ghosts
+                    }
+                    ordered[node.address] = node
+                    if (page.ghosts) {
+                        ghosts[node.address] = node
+                    }
+                    tracer('reference', {}, step())
+                }, function () {
+                    return [ node ]
+                })
+            })
+        })
+
         function balance (callback) {
             var check = validator(callback), locker = new Locker, address
 
@@ -1355,7 +1381,20 @@ function Strata (options) {
                 var address = +(addresses.shift()), length = lengths[address], right, node
 
                 if (node = ordered[address]) checkMerge(node)
-                else locker.lock(address, false, nodify(checkMerge))
+                else locker.lock(address, false, check(createNode))
+
+                function createNode (page) {
+                    _nodify(page, validate(callback, created, unlock))
+
+                    function created (node) {
+                        unlock()
+                        checkMerge(node)
+                    }
+
+                    function unlock () {
+                        locker.unlock(page)
+                    }
+                }
 
                 function nodify (next) {
                     return check(function (page) {
