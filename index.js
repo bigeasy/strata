@@ -1337,8 +1337,10 @@ function Strata (options) {
             }
         }
 
-        var _nodify = cadence(function (step, page) {
-            step(function () {
+        var _nodify = cadence(function (step, locker, page) {
+            step([function () {
+                locker.unlock(page)
+            }], function () {
                 ok(page.address % 2, 'leaf page expected')
 
                 if (page.address == 1) return [{}]
@@ -1384,16 +1386,7 @@ function Strata (options) {
                 else locker.lock(address, false, check(createNode))
 
                 function createNode (page) {
-                    _nodify(page, validate(callback, created, unlock))
-
-                    function created (node) {
-                        unlock()
-                        checkMerge(node)
-                    }
-
-                    function unlock () {
-                        locker.unlock(page)
-                    }
+                    _nodify(locker, page, check(checkMerge))
                 }
 
                 function nodify (next) {
