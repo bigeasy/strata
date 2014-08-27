@@ -1392,33 +1392,6 @@ function Strata (options) {
                     _nodify(locker, page, check(checkMerge))
                 }
 
-                function nodify (next) {
-                    return check(function (page) {
-                        ok(page.address % 2, 'leaf page expected')
-
-                        if (page.address == 1) identified({})
-                        else stash(page, 0, validate(callback, identified, unlock))
-
-                        function identified (entry) {
-                            node = {
-                                key: entry.key,
-                                address: page.address,
-                                rightAddress: page.right,
-                                length: page.positions.length - page.ghosts
-                            }
-                            unlock()
-                            ordered[node.address] = node
-                            if (page.ghosts)
-                                ghosts[node.address] = node
-                            tracer('reference', {}, check(traced))
-                        }
-
-                        function traced () { next(node) }
-
-                        function unlock () { locker.unlock(page) }
-                    })
-                }
-
                 function checkMerge(node) {
                     if (node.length - length < 0) {
                         if (node.address != 1 && ! node.left) leftSibling(node)
@@ -1464,9 +1437,13 @@ function Strata (options) {
 
                     if (!node.right && node.rightAddress)  {
                         if (right = ordered[node.rightAddress]) attach(right)
-                        else locker.lock(node.rightAddress, false, nodify(attach))
+                        else locker.lock(node.rightAddress, false, check(createNode))
                     } else {
                         next()
+                    }
+
+                    function createNode (page) {
+                        _nodify(locker, page, check(attach))
                     }
 
                     function attach (right) {
