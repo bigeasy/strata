@@ -1371,6 +1371,53 @@ function Strata (options) {
         function balance (callback) {
             var check = validator(callback), locker = new Locker, address
 
+            var _gather = cadence(function (step, address, length) {
+                var right, node
+                step(function () {
+                    if (node = ordered[address]) {
+                        return [ node ]
+                    } else {
+                        step(function () {
+                            locker.lock(address, false, step())
+                        }, function (page) {
+                            _nodify(locker, page, step())
+                        })
+                    }
+                }, function (node) {
+                    if (!(node.length - length < 0)) return
+                    if (node.address != 1 && ! node.left) step(function () {
+                        var descent = new Descent(locker)
+                        step(function () {
+                            descent.descend(descent.key(node.key), descent.found([node.key]), step())
+                        }, function () {
+                            descent.index--
+                            descent.descend(descent.right, descent.leaf, step())
+                        }, function () {
+                            if (left = ordered[descent.page.address]) {
+                                locker.unlock(descent.page)
+                                return [ left ]
+                            } else {
+                                _nodify(locker, descent.page, step())
+                            }
+                        }, function (left) {
+                            left.right = node
+                            node.left = left
+                        })
+                    })
+                    if (!node.right && node.rightAddress) step(function () {
+                        if (right = ordered[node.rightAddress]) return [ right ]
+                        else step(function () {
+                            locker.lock(node.rightAddress, false, step())
+                        }, function (page) {
+                            _nodify(locker, page, step())
+                        })
+                    }, function (right) {
+                        node.right = right
+                        right.left = node
+                    })
+                })
+            })
+
             ok(!balancing, 'already balancing')
 
             var addresses = Object.keys(lengths)
@@ -1385,74 +1432,7 @@ function Strata (options) {
             function gather () {
                 var address = +(addresses.shift()), length = lengths[address], right, node
 
-                if (node = ordered[address]) checkMerge(node)
-                else locker.lock(address, false, check(createNode))
-
-                function createNode (page) {
-                    _nodify(locker, page, check(checkMerge))
-                }
-
-                function checkMerge(node) {
-                    if (node.length - length < 0) {
-                        if (node.address != 1 && ! node.left) leftSibling(node)
-                        else rightSibling(node)
-                    } else {
-                        next()
-                    }
-                }
-
-                function leftSibling (node) {
-                    var descent = new Descent(locker)
-                    descent.descend(descent.key(node.key), descent.found([node.key]), check(goToLeaf))
-
-                    function goToLeaf () {
-                        descent.index--
-                        descent.descend(descent.right, descent.leaf, validate(callback, checkLists, unlock))
-                    }
-
-                    function checkLists () {
-                        var left
-                        if (left = ordered[descent.page.address]) {
-                            locker.unlock(descent.page)
-                            attach(left)
-                        } else {
-                            _nodify(locker, descent.page, check(attach))
-                        }
-                    }
-
-                    function attach (left) {
-                        left.right = node
-                        node.left = left
-
-                        rightSibling(node)
-                    }
-
-                    function unlock () {
-                       locker.unlock(descent.page)
-                    }
-                }
-
-                function rightSibling (node) {
-                    var right
-
-                    if (!node.right && node.rightAddress)  {
-                        if (right = ordered[node.rightAddress]) attach(right)
-                        else locker.lock(node.rightAddress, false, check(createNode))
-                    } else {
-                        next()
-                    }
-
-                    function createNode (page) {
-                        _nodify(locker, page, check(attach))
-                    }
-
-                    function attach (right) {
-                        node.right = right
-                        right.left = node
-
-                        next()
-                    }
-                }
+                _gather(address, length, check(next))
 
                 function next () {
                     if (addresses.length) {
