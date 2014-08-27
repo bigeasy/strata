@@ -1883,6 +1883,52 @@ function Strata (options) {
 
             var _merge = cadence(function (step) {
                 step(function () {
+                    descents.push(pivot = new Descent(locker))
+                    pivot.descend(pivot.key(key), pivot.found(keys), step())
+                }, function () {
+                    var found = pivot.page.cache[pivot.page.addresses[pivot.index]].key
+                    if (comparator(found, keys[0]) == 0) {
+                        pivot.upgrade(step())
+                    } else {
+                        step(function () { // left above right
+                            pivot.upgrade(step())
+                        }, function () {
+                            ghosted = { page: pivot.page, index: pivot.index }
+                            descents.push(pivot = pivot.fork())
+                            keys.pop()
+                            pivot.descend(pivot.key(key), pivot.found(keys), step())
+                        })
+                    }
+                }, function () {
+                    parents.right = pivot.fork()
+                    parents.right.unlocker = createSingleUnlocker(singles.right)
+                    parents.right.descend(parents.right.key(key), stopper(parents.right), step())
+                }, function () {
+                    parents.left = pivot.fork()
+                    parents.left.index--
+                    parents.left.unlocker = createSingleUnlocker(singles.left)
+                    parents.left.descend(parents.left.right,
+                                         parents.left.level(parents.right.depth),
+                                         step())
+                }, function () {
+                    if (singles.right.length) {
+                        ancestor = singles.right[0]
+                    } else {
+                        ancestor = parents.right.page
+                    }
+
+                    if (leftKey && !ghosted) {
+                        if (singles.left.length) {
+                            ghosted = { page: singles.left[0], index: parents.left.indexes[singles.left[0].address] }
+                        } else {
+                            ghosted = { page: parents.left.page, index: parents.left.index }
+                            ok(parents.left.index == parents.left.indexes[parents.left.page.address], 'TODO: ok to replace the above')
+                        }
+                    }
+
+                    descents.push(pages.left = parents.left.fork())
+                    pages.left.descend(pages.left.left, pages.left.level(parents.left.depth + 1), step())
+                }, function () {
                     descents.push(pages.right = parents.right.fork())
                     pages.right.descend(pages.right.left, pages.right.level(parents.right.depth + 1), step())
                 }, function () {
@@ -1893,24 +1939,7 @@ function Strata (options) {
             var keys = [ key ]
             if (leftKey) keys.push(leftKey)
 
-            descents.push(pivot = new Descent(locker))
-            pivot.descend(pivot.key(key), pivot.found(keys), check(lockPivot))
-
-            function lockPivot () {
-                var found = pivot.page.cache[pivot.page.addresses[pivot.index]].key
-                if (comparator(found, keys[0]) == 0) {
-                    pivot.upgrade(check(atPivot))
-                } else {
-                    pivot.upgrade(check(leftAboveRight))
-                }
-            }
-
-            function leftAboveRight () {
-                ghosted = { page: pivot.page, index: pivot.index }
-                descents.push(pivot = pivot.fork())
-                keys.pop()
-                pivot.descend(pivot.key(key), pivot.found(keys), check(atPivot))
-            }
+            merge()
 
             function createSingleUnlocker (singles) {
                 ok(singles != null, 'null singles')
@@ -1926,42 +1955,6 @@ function Strata (options) {
                     }
                 }
             }
-
-            function atPivot () {
-                parents.right = pivot.fork()
-                parents.right.unlocker = createSingleUnlocker(singles.right)
-                parents.right.descend(parents.right.key(key), stopper(parents.right), check(atRightParent))
-            }
-
-            function atRightParent () {
-                parents.left = pivot.fork()
-                parents.left.index--
-                parents.left.unlocker = createSingleUnlocker(singles.left)
-                parents.left.descend(parents.left.right,
-                                     parents.left.level(parents.right.depth),
-                                     check(atLeftParent))
-            }
-
-            function atLeftParent (callback) {
-                if (singles.right.length) {
-                    ancestor = singles.right[0]
-                } else {
-                    ancestor = parents.right.page
-                }
-
-                if (leftKey && !ghosted) {
-                    if (singles.left.length) {
-                        ghosted = { page: singles.left[0], index: parents.left.indexes[singles.left[0].address] }
-                    } else {
-                        ghosted = { page: parents.left.page, index: parents.left.index }
-                        ok(parents.left.index == parents.left.indexes[parents.left.page.address], 'TODO: ok to replace the above')
-                    }
-                }
-
-                descents.push(pages.left = parents.left.fork())
-                pages.left.descend(pages.left.left, pages.left.level(parents.left.depth + 1), check(merge))
-            }
-
 
             function merge () {
                 _merge(check(merged))
