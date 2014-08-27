@@ -2001,38 +2001,27 @@ function Strata (options) {
             }
 
             var _rewriteEmpties = cadence(function (step) {
-                step(function (page) {
-                    rename(page, '', '.unlink', step())
-                })(empties)
+                step(function () {
+                    step(function (page) {
+                        rename(page, '', '.unlink', step())
+                    })(empties)
+                }, function () {
+                    rename(ancestor, '.pending', '.commit', step())
+                }, function () {
+                    step(function (page) {
+                        unlink(page, '.unlink', step())
+                    })(singles.right.slice(1))
+                }, function () {
+                    replace(pages.left.page, '.replace', step())
+                }, function () {
+                    unlink(pages.right.page, '.unlink', step())
+                }, function () {
+                    replace(ancestor, '.commit', step())
+                })
             })
 
             function rewriteEmpties () {
-                _rewriteEmpties(check(beginCommit))
-            }
-
-            function beginCommit () {
-                empties = singles.right.slice(1)
-                rename(ancestor, '.pending', '.commit', check(unlinkEmpties))
-            }
-
-            function unlinkEmpties () {
-                if (empties.length) {
-                    unlink(empties.shift(), '.unlink', check(unlinkEmpties))
-                } else {
-                    replaceLeftPageToMerge()
-                }
-            }
-
-            function replaceLeftPageToMerge () {
-                replace(pages.left.page, '.replace', check(unlinkRightPageToMerge))
-            }
-
-            function unlinkRightPageToMerge () {
-                unlink(pages.right.page, '.unlink', check(endCommit))
-            }
-
-            function endCommit () {
-                replace(ancestor, '.commit', check(propagate))
+                _rewriteEmpties(check(propagate))
             }
 
             function propagate () {
