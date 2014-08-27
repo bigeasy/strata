@@ -1964,47 +1964,42 @@ function Strata (options) {
 
             function merged (dirty) {
                 if (dirty) {
-                    renameRightPageToMerge()
+                    commit()
                 } else {
                     release()
                     callback()
                 }
             }
 
-            function renameRightPageToMerge () {
-                rename(pages.right.page, '', '.unlink', check(rewriteKeyedBranchPage))
-            }
-
-            function rewriteKeyedBranchPage () {
-                var index = parents.right.indexes[ancestor.address]
-
-                designation = ancestor.cache[ancestor.addresses[index]]
-
-                var address = ancestor.addresses[index]
-                splice('addresses', ancestor, index, 1)
-
-                if (pivot.page.address != ancestor.address) {
-                    ok(!index, 'expected ancestor to be removed from zero index')
-                    ok(ancestor.addresses[index], 'expected ancestor to have right sibling')
-                    ok(ancestor.cache[ancestor.addresses[index]], 'expected key to be in memory')
-                    designation = ancestor.cache[ancestor.addresses[index]]
-                    uncacheEntry(ancestor, ancestor.addresses[0])
-                    uncacheEntry(pivot.page, pivot.page.addresses[pivot.index])
-                    encacheEntry(pivot.page, pivot.page.addresses[pivot.index], designation)
-                } else{
-                    ok(index, 'expected ancestor to be non-zero')
-                    uncacheEntry(ancestor, address)
-                }
-
-                empties = singles.right.slice(1)
-                writeBranch(ancestor, '.pending', check(rewriteEmpties))
-            }
-
-            var _rewriteEmpties = cadence(function (step) {
+            var _commit = cadence(function (step) {
                 step(function () {
+                    rename(pages.right.page, '', '.unlink', step())
+                }, function () {
+                    var index = parents.right.indexes[ancestor.address]
+
+                    designation = ancestor.cache[ancestor.addresses[index]]
+
+                    var address = ancestor.addresses[index]
+                    splice('addresses', ancestor, index, 1)
+
+                    if (pivot.page.address != ancestor.address) {
+                        ok(!index, 'expected ancestor to be removed from zero index')
+                        ok(ancestor.addresses[index], 'expected ancestor to have right sibling')
+                        ok(ancestor.cache[ancestor.addresses[index]], 'expected key to be in memory')
+                        designation = ancestor.cache[ancestor.addresses[index]]
+                        uncacheEntry(ancestor, ancestor.addresses[0])
+                        uncacheEntry(pivot.page, pivot.page.addresses[pivot.index])
+                        encacheEntry(pivot.page, pivot.page.addresses[pivot.index], designation)
+                    } else{
+                        ok(index, 'expected ancestor to be non-zero')
+                        uncacheEntry(ancestor, address)
+                    }
+
+                    writeBranch(ancestor, '.pending', step())
+                }, function () {
                     step(function (page) {
                         rename(page, '', '.unlink', step())
-                    })(empties)
+                    })(singles.right.slice(1))
                 }, function () {
                     rename(ancestor, '.pending', '.commit', step())
                 }, function () {
@@ -2020,8 +2015,8 @@ function Strata (options) {
                 })
             })
 
-            function rewriteEmpties () {
-                _rewriteEmpties(check(propagate))
+            function commit () {
+                _commit(check(propagate))
             }
 
             function propagate () {
