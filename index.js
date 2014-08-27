@@ -1368,8 +1368,8 @@ function Strata (options) {
             })
         })
 
-        function balance (callback) {
-            var check = validator(callback), locker = new Locker, address
+        var balance = cadence(function balance (step) {
+            var locker = new Locker, address
 
             var _gather = cadence(function (step, address, length) {
                 var right, node
@@ -1422,111 +1422,99 @@ function Strata (options) {
 
             var addresses = Object.keys(lengths)
             if (addresses.length == 0) {
-                callback(null, true)
+                return step(null, true)
             } else {
                 balancer = new Balancer()
                 balancing = true
-                gather()
             }
 
-            function gather () {
-                var address = +(addresses.shift()), length = lengths[address], right, node
+            step(function () {
+                step(function (address) {
+                    _gather(+address, lengths[address], step())
+                })(addresses)
+            }, function () {
+                tracer('plan', {}, step())
+            }, function () {
+                var address, node, difference, addresses
 
-                _gather(address, length, check(next))
+                for (address in ordered) {
+                    node = ordered[address]
+                }
 
-                function next () {
-                    if (addresses.length) {
-                        gather()
-                    } else {
-                        locker.dispose()
-                        tracer('plan', {}, check(traced))
+                function terminate (node) {
+                    var right
+                    if (node) {
+                        if (right = node.right) {
+                            node.right = null
+                            right.left = null
+                        }
+                    }
+                    return right
+                }
+
+                function unlink (node) {
+                    terminate(node.left)
+                    terminate(node)
+                    return node
+                }
+
+                for (address in lengths) {
+                    length = lengths[address]
+                    node = ordered[address]
+                    difference = node.length - length
+                    if (difference > 0 && node.length > options.leafSize) {
+                        operations.unshift({
+                            method: 'splitLeaf',
+                            parameters: [ node.address, node.key, ghosts[node.address] ]
+                        })
+                        delete ghosts[node.address]
+                        unlink(node)
                     }
                 }
 
-                function traced () { plan(callback) }
-            }
-        }
-
-        function plan (callback) {
-            var address, node, difference, addresses
-
-            for (address in ordered) {
-                node = ordered[address]
-            }
-
-            function terminate (node) {
-                var right
-                if (node) {
-                    if (right = node.right) {
-                        node.right = null
-                        right.left = null
-                    }
+                for (address in ordered) {
+                    if (ordered[address].left) delete ordered[address]
                 }
-                return right
-            }
 
-            function unlink (node) {
-                terminate(node.left)
-                terminate(node)
-                return node
-            }
-
-            for (address in lengths) {
-                length = lengths[address]
-                node = ordered[address]
-                difference = node.length - length
-                if (difference > 0 && node.length > options.leafSize) {
-                    operations.unshift({
-                        method: 'splitLeaf',
-                        parameters: [ node.address, node.key, ghosts[node.address] ]
-                    })
-                    delete ghosts[node.address]
-                    unlink(node)
-                }
-            }
-
-            for (address in ordered) {
-                if (ordered[address].left) delete ordered[address]
-            }
-
-            for (address in ordered) {
-                var node = ordered[address]
-                while (node && node.right) {
-                    if (node.length + node.right.length > options.leafSize) {
-                        node = terminate(node)
-                        ordered[node.address] = node
-                    } else {
-                        if (node = terminate(node.right)) {
+                for (address in ordered) {
+                    var node = ordered[address]
+                    while (node && node.right) {
+                        if (node.length + node.right.length > options.leafSize) {
+                            node = terminate(node)
                             ordered[node.address] = node
+                        } else {
+                            if (node = terminate(node.right)) {
+                                ordered[node.address] = node
+                            }
                         }
                     }
                 }
-            }
 
-            for (address in ordered) {
-                node = ordered[address]
+                for (address in ordered) {
+                    node = ordered[address]
 
-                if (node.right) {
-                    ok(!node.right.right, 'merge pair still linked to sibling')
-                    operations.unshift({
-                        method: 'mergeLeaves',
-                        parameters: [ node.right.key, node.key, lengths, !!ghosts[node.address] ]
-                    })
-                    delete ghosts[node.address]
-                    delete ghosts[node.right.address]
+                    if (node.right) {
+                        ok(!node.right.right, 'merge pair still linked to sibling')
+                        operations.unshift({
+                            method: 'mergeLeaves',
+                            parameters: [ node.right.key, node.key, lengths, !!ghosts[node.address] ]
+                        })
+                        delete ghosts[node.address]
+                        delete ghosts[node.right.address]
+                    }
                 }
-            }
 
-            for (address in ghosts) {
-                node = ghosts[address]
-                if (node.length) operations.unshift({
-                    method: 'deleteGhost',
-                    parameters: [ node.key ]
-                })
-            }
+                for (address in ghosts) {
+                    node = ghosts[address]
+                    if (node.length) operations.unshift({
+                        method: 'deleteGhost',
+                        parameters: [ node.key ]
+                    })
+                }
 
-            operate(callback)
-        }
+                operate(step())
+            })
+        })
 
         var operate = cadence(function (step) {
             step(function () {
@@ -2308,7 +2296,8 @@ function Strata (options) {
             }
         }
 
-        return classify.call(this, balance, unbalanced)
+        this.balance = balance
+        return classify.call(this, unbalanced)
     }
 
     function left (descents, exclusive, callback) {
