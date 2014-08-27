@@ -1881,6 +1881,15 @@ function Strata (options) {
                 descents = [], singles = { left: [], right: [] }, parents = {}, pages = {},
                 ancestor, pivot, empties, ghosted, designation
 
+            var _merge = cadence(function (step) {
+                step(function () {
+                    descents.push(pages.right = parents.right.fork())
+                    pages.right.descend(pages.right.left, pages.right.level(parents.right.depth + 1), step())
+                }, function () {
+                    merger(pages, ghosted, step())
+                })
+            })
+
             var keys = [ key ]
             if (leftKey) keys.push(leftKey)
 
@@ -1950,16 +1959,12 @@ function Strata (options) {
                 }
 
                 descents.push(pages.left = parents.left.fork())
-                pages.left.descend(pages.left.left, pages.left.level(parents.left.depth + 1), check(atLeftPage))
+                pages.left.descend(pages.left.left, pages.left.level(parents.left.depth + 1), check(merge))
             }
 
-            function atLeftPage (callback) {
-                descents.push(pages.right = parents.right.fork())
-                pages.right.descend(pages.right.left, pages.right.level(parents.right.depth + 1), check(atRightPage))
-            }
 
-            function atRightPage () {
-                merger(pages, ghosted, check(merged))
+            function merge () {
+                _merge(check(merged))
             }
 
             function merged (dirty) {
