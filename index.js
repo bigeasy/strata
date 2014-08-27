@@ -2000,12 +2000,14 @@ function Strata (options) {
                 writeBranch(ancestor, '.pending', check(rewriteEmpties))
             }
 
+            var _rewriteEmpties = cadence(function (step) {
+                step(function (page) {
+                    rename(page, '', '.unlink', step())
+                })(empties)
+            })
+
             function rewriteEmpties () {
-                if (empties.length) {
-                    rename(empties.shift(), '', '.unlink', check(rewriteEmpties))
-                } else {
-                    beginCommit()
-                }
+                _rewriteEmpties(check(beginCommit))
             }
 
             function beginCommit () {
