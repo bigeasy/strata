@@ -1338,17 +1338,16 @@ function Strata (options) {
         }
 
         var _nodify = cadence(function (step, locker, page) {
-            step([function () {
-                locker.unlock(page)
-            }], function () {
-                ok(page.address % 2, 'leaf page expected')
+            step(function () {
+                step([function () {
+                    locker.unlock(page)
+                }], function () {
+                    ok(page.address % 2, 'leaf page expected')
 
-                if (page.address == 1) return [{}]
-                else stash(page, 0, step())
-            }, function (entry) {
-                var node
-                step(function () {
-                    node = {
+                    if (page.address == 1) return [{}]
+                    else stash(page, 0, step())
+                }, function (entry) {
+                    var node = {
                         key: entry.key,
                         address: page.address,
                         rightAddress: page.right,
@@ -1358,9 +1357,13 @@ function Strata (options) {
                     if (page.ghosts) {
                         ghosts[node.address] = node
                     }
+                    return [ node ]
+                })
+            }, function (node) {
+                step(function () {
                     tracer('reference', {}, step())
                 }, function () {
-                    return [ node ]
+                    return node
                 })
             })
         })
@@ -1437,10 +1440,10 @@ function Strata (options) {
                     function checkLists () {
                         var left
                         if (left = ordered[descent.page.address]) {
-                            unlock()
+                            locker.unlock(descent.page)
                             attach(left)
                         } else {
-                            nodify(attach)(null, descent.page)
+                            _nodify(locker, descent.page, check(attach))
                         }
                     }
 
