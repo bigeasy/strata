@@ -1647,7 +1647,6 @@ function Strata (options) {
                     return [ encached[0].cache[encached[0].positions[0]].key ]
                 })
             }, function (partition) {
-                            console.log('called')
                 shouldSplitBranch(penultimate.page, partition, step())
             })
         })
@@ -1732,98 +1731,73 @@ function Strata (options) {
             })
         })
 
-        function drainRoot (callback) {
-            var check = validator(callback, release),
-                locker = new Locker,
+        var drainRoot = cadence(function (step) {
+            var locker = new Locker,
                 keys = {}, children = [], locks = [],
                 root, pages, records, remainder
 
-            locker.lock(0, true, check(partition))
+            step(function () {
+                step([function () {
+                    children.forEach(function (page) { locker.unlock(page) })
+                    locks.forEach(function (page) { locker.unlock(root) })
+                    locker.dispose()
+                }], function () {
+                    locker.lock(0, true, step())
+                }, function (locked) {
+                    locks.push(root = locked)
+                    pages = Math.ceil(root.addresses.length / options.branchSize)
+                    records = Math.floor(root.addresses.length / pages)
+                    remainder = root.addresses.length % pages
 
-            function partition (locked) {
-                locks.push(root = locked)
-                pages = Math.ceil(root.addresses.length / options.branchSize)
-                records = Math.floor(root.addresses.length / pages)
-                remainder = root.addresses.length % pages
+                    for (var i = 0; i < pages; i++) {
+                        var page = locker.encache(createBranch({}))
 
-                paginate()
-            }
+                        children.push(page)
 
-            function paginate () {
-                var page = locker.encache(createBranch({}))
+                        var length = remainder-- > 0 ? records + 1 : records
+                        var offset = root.addresses.length - length
 
-                children.push(page)
+                        var cut = splice('addresses', root, offset, length)
 
-                var length = remainder-- > 0 ? records + 1 : records
-                var offset = root.addresses.length - length
+                        cut.slice(offset ? 0 : 1).forEach(function (address) {
+                            keys[address] = uncacheEntry(root, address)
+                        })
 
-                var cut = splice('addresses', root, offset, length)
+                        splice('addresses', page, 0, 0, cut)
 
-                cut.slice(offset ? 0 : 1).forEach(function (address) {
-                    keys[address] = uncacheEntry(root, address)
+                        cut.slice(1).forEach(function (address) {
+                            encacheEntry(page, address, keys[address])
+                        })
+
+                        keys[page.address] = keys[cut[0]]
+                    }
+
+                    children.reverse()
+
+                    splice('addresses', root, 0, 0, children.map(function (page) { return page.address }))
+
+                    root.addresses.slice(1).forEach(function (address) {
+                        encacheEntry(root, address, keys[address])
+                    })
+                }, function () {
+                    step(function (page) {
+                        writeBranch(page, '.replace', step())
+                    })(children)
+                }, function () {
+                    writeBranch(root, '.pending', step())
+                }, function () {
+                    rename(root, '.pending', '.commit', step())
+                }, function () {
+                    step(function (page) {
+                        replace(page, '.replace', step())
+                    })(children)
+                }, function () {
+                    replace(root, '.commit', step())
                 })
-
-                splice('addresses', page, 0, 0, cut)
-
-                cut.slice(1).forEach(function (address) {
-                    encacheEntry(page, address, keys[address])
-                })
-
-                keys[page.address] = keys[cut[0]]
-
-                if (--pages) paginate()
-                else paginated()
-            }
-
-            var unwritten, pending
-            function paginated () {
-                children.reverse()
-
-                splice('addresses', root, 0, 0, children.map(function (page) { return page.address }))
-
-                root.addresses.slice(1).forEach(function (address) {
-                    encacheEntry(root, address, keys[address])
-                })
-
-                unwritten = children.slice()
-                pending = children.slice()
-                writeChild()
-            }
-
-            function writeChild () {
-                if (unwritten.length) writeBranch(unwritten.shift(), '.replace', check(writeChild))
-                else writeRoot()
-            }
-
-            function writeRoot () {
-                writeBranch(root, '.pending', check(commit))
-            }
-
-            function commit () {
-                rename(root, '.pending', '.commit', check(committing))
-            }
-
-            function committing () {
-                if (pending.length) replace(pending.shift(), '.replace', check(committing))
-                else committed()
-            }
-
-            function committed () {
-                replace(root, '.commit', check(complete))
-            }
-
-            function complete () {
-                release()
-                if (root.addresses.length > options.branchSize) drainRoot(callback)
-                else callback(null)
-            }
-
-            function release () {
-                children.forEach(function (page) { locker.unlock(page) })
-                locks.forEach(function (page) { locker.unlock(root) })
-                locker.dispose()
-            }
-        }
+            }, function () {
+                if (root.addresses.length > options.branchSize) drainRoot(step())
+            })
+        })
 
         var exorcise = cadence(function (step, pivot, ghostly, corporal) {
             var entry
