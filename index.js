@@ -1875,14 +1875,41 @@ function Strata (options) {
         methods.splitLeaf = splitLeaf
         methods.deleteGhost = deleteGhost
 
-        function mergePages (key, leftKey, stopper, merger, ghostly, callback) {
-            var check = validator(callback, release),
-                locker = new Locker,
+        var mergePages = cadence(function (step, key, leftKey, stopper, merger, ghostly) {
+            var locker = new Locker,
                 descents = [], singles = { left: [], right: [] }, parents = {}, pages = {},
                 ancestor, pivot, empties, ghosted, designation
 
-            var _merge = cadence(function (step) {
-                step(function () {
+            function createSingleUnlocker (singles) {
+                ok(singles != null, 'null singles')
+                return function (parent, child) {
+                    if (child.addresses.length == 1) {
+                        if (singles.length == 0) singles.push(parent)
+                        singles.push(child)
+                    } else if (singles.length) {
+                        singles.forEach(function (page) { locker.unlock(page) })
+                        singles.length = 0
+                    } else {
+                        locker.unlock(parent)
+                    }
+                }
+            }
+
+            var keys = [ key ]
+            if (leftKey) keys.push(leftKey)
+
+            step(function () {
+                step([function () {
+                    descents.forEach(function (descent) { locker.unlock(descent.page) })
+                    ! [ 'left', 'right' ].forEach(function (direction) {
+                        if (singles[direction].length) {
+                            singles[direction].forEach(function (page) { locker.unlock(page) })
+                        } else {
+                            locker.unlock(parents[direction].page)
+                        }
+                    })
+                    locker.dispose()
+                }], function () {
                     descents.push(pivot = new Descent(locker))
                     pivot.descend(pivot.key(key), pivot.found(keys), step())
                 }, function () {
@@ -1933,44 +1960,9 @@ function Strata (options) {
                     pages.right.descend(pages.right.left, pages.right.level(parents.right.depth + 1), step())
                 }, function () {
                     merger(pages, ghosted, step())
-                })
-            })
-
-            var keys = [ key ]
-            if (leftKey) keys.push(leftKey)
-
-            merge()
-
-            function createSingleUnlocker (singles) {
-                ok(singles != null, 'null singles')
-                return function (parent, child) {
-                    if (child.addresses.length == 1) {
-                        if (singles.length == 0) singles.push(parent)
-                        singles.push(child)
-                    } else if (singles.length) {
-                        singles.forEach(function (page) { locker.unlock(page) })
-                        singles.length = 0
-                    } else {
-                        locker.unlock(parent)
-                    }
-                }
-            }
-
-            function merge () {
-                _merge(check(merged))
-            }
-
-            function merged (dirty) {
-                if (dirty) {
-                    commit()
-                } else {
-                    release()
-                    callback()
-                }
-            }
-
-            var _commit = cadence(function (step) {
-                step(function () {
+                }, function (dirty) {
+                    if (!dirty) step(null)
+                }, function () {
                     rename(pages.right.page, '', '.unlink', step())
                 }, function () {
                     var index = parents.right.indexes[ancestor.address]
@@ -2011,38 +2003,16 @@ function Strata (options) {
                 }, function () {
                     replace(ancestor, '.commit', step())
                 })
-            })
-
-            function commit () {
-                _commit(check(propagate))
-            }
-
-            function propagate () {
-                release()
-
+            }, function () {
                 if (ancestor.address == 0) {
                     if (ancestor.addresses.length == 1 && !(ancestor.addresses[0] % 2)) {
-                        fillRoot(callback)
-                    } else {
-                        callback(null)
+                        fillRoot(step())
                     }
                 } else {
-                    chooseBranchesToMerge(designation.key, ancestor.address, callback)
+                    chooseBranchesToMerge(designation.key, ancestor.address, step())
                 }
-            }
-
-            function release () {
-                descents.forEach(function (descent) { locker.unlock(descent.page) })
-                ! [ 'left', 'right' ].forEach(function (direction) {
-                    if (singles[direction].length) {
-                        singles[direction].forEach(function (page) { locker.unlock(page) })
-                    } else {
-                        locker.unlock(parents[direction].page)
-                    }
-                })
-                locker.dispose()
-            }
-        }
+            })
+        })
 
         function mergeLeaves (key, leftKey, unbalanced, ghostly, callback) {
             function stopper (descent) { return descent.penultimate }
