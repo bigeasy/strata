@@ -1991,9 +1991,7 @@ function Strata (options) {
         function mergeLeaves (key, leftKey, unbalanced, ghostly, callback) {
             function stopper (descent) { return descent.penultimate }
 
-            function merger (leaves, ghosted, callback) {
-                var check = validator(callback)
-
+            var merger = cadence(function (step, leaves, ghosted) {
                 ok(leftKey == null ||
                       comparator(leftKey, leaves.left.page.cache[leaves.left.page.positions[0]].key)  == 0,
                       'left key is not as expected')
@@ -2003,6 +2001,7 @@ function Strata (options) {
 
                 balancer.unbalanced(leaves.left.page, true)
 
+                var index
                 if (left + right > options.leafSize) {
                     if (unbalanced[leaves.left.page.address]) {
                         balancer.unbalanced(leaves.left.page, true)
@@ -2010,63 +2009,41 @@ function Strata (options) {
                     if (unbalanced[leaves.right.page.address]) {
                         balancer.unbalanced(leaves.right.page, true)
                     }
-                    callback(null, false)
+                    step(null, false)
                 } else {
-                    deleteGhost()
-                }
-
-                var index
-
-                function deleteGhost () {
-                    if (ghostly && left + right) {
-                        if (left) {
-                            exorcise(ghosted, leaves.left.page, leaves.left.page, check(merge))
-                        } else {
-                            exorcise(ghosted, leaves.left.page, leaves.right.page, check(merge))
+                    step(function () {
+                        if (ghostly && left + right) {
+                            if (left) {
+                                exorcise(ghosted, leaves.left.page, leaves.left.page, step())
+                            } else {
+                                exorcise(ghosted, leaves.left.page, leaves.right.page, step())
+                            }
                         }
-                    } else {
-                        merge()
-                    }
+                    }, function () {
+                        leaves.left.page.right = leaves.right.page.right
+                        var ghosts = leaves.right.page.ghosts
+                        step(function (index) {
+                            index += ghosts
+                            step(function () {
+                                stash(leaves.right.page, index, step())
+                            }, function (entry) {
+                                var position = leaves.right.page.positions[index]
+                                uncacheEntry(leaves.right.page, position)
+                                splice('positions', leaves.left.page, leaves.left.page.positions.length, 0, -(position + 1))
+                                splice('lengths', leaves.left.page, leaves.left.page.lengths.length, 0, -(position + 1))
+                                encacheEntry(leaves.left.page, -(position + 1), entry)
+                            })
+                        })(leaves.right.page.positions.length - leaves.right.page.ghosts)
+                    }, function () {
+                        splice('positions', leaves.right.page, 0, leaves.right.page.positions.length)
+                        splice('lengths', leaves.right.page, 0, leaves.right.page.lengths.length)
+
+                        rewriteLeaf(leaves.left.page, '.replace', step())
+                    }, function () {
+                        return [ true ]
+                    })
                 }
-
-                function merge () {
-                    leaves.left.page.right = leaves.right.page.right
-
-                    index = leaves.right.page.ghosts
-
-                    if (index < leaves.right.page.positions.length) fetch()
-                    else rewriteLeftLeaf()
-                }
-
-                var position
-
-                function fetch () {
-                    position = leaves.right.page.positions[index]
-                    stash(leaves.right.page, index, check(copy))
-                }
-
-                function copy (entry) {
-                    uncacheEntry(leaves.right.page, position)
-
-                    splice('positions', leaves.left.page, leaves.left.page.positions.length, 0, -(position + 1))
-                    splice('lengths', leaves.left.page, leaves.left.page.lengths.length, 0, -(position + 1))
-                    encacheEntry(leaves.left.page, -(position + 1), entry)
-
-                    if (++index < leaves.right.page.positions.length) fetch()
-                    else rewriteLeftLeaf()
-                }
-
-                function rewriteLeftLeaf () {
-                    splice('positions', leaves.right.page, 0, leaves.right.page.positions.length)
-                    splice('lengths', leaves.right.page, 0, leaves.right.page.lengths.length)
-
-                    rewriteLeaf(leaves.left.page, '.replace', check(resume))
-                }
-
-                function resume () {
-                    callback(null, true)
-                }
-            }
+            })
 
             mergePages(key, leftKey, stopper, merger, ghostly, callback)
         }
