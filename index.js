@@ -2135,19 +2135,20 @@ function Strata (options) {
             mergePages(key, null, stopper, merger, false, callback)
         }
 
-        function fillRoot (callback) {
-            var check = validator(callback), locker = new Locker, descents = [], root, child
+        var fillRoot = cadence(function (step) {
+            var locker = new Locker, descents = [], root, child
 
-            descents.push(root = new Descent(locker))
-            root.exclude()
-            root.descend(root.left, root.level(0), check(getChild))
-
-            function getChild () {
+            step([function () {
+                descents.forEach(function (descent) { locker.unlock(descent.page) })
+                locker.dispose()
+            }], function () {
+                descents.push(root = new Descent(locker))
+                root.exclude()
+                root.descend(root.left, root.level(0), step())
+            }, function () {
                 descents.push(child = root.fork())
-                child.descend(child.left, child.level(1), check(fill))
-            }
-
-            function fill () {
+                child.descend(child.left, child.level(1), step())
+            }, function () {
                 var cut
                 ok(root.page.addresses.length == 1, 'only one address expected')
                 ok(!Object.keys(root.page.cache).length, 'no keys expected')
@@ -2166,27 +2167,17 @@ function Strata (options) {
                     encacheEntry(root.page, address, keys[address])
                 })
 
-                writeBranch(root.page, '.pending', check(rewriteChild))
-            }
-
-            function rewriteChild () {
-                rename(child.page, '', '.unlink', check(beginCommit))
-            }
-
-            function beginCommit () {
-                rename(root.page, '.pending', '.commit', check(unlinkChild))
-            }
-
-            function unlinkChild () {
-                unlink(child.page, '.unlink', check(endCommit))
-            }
-
-            function endCommit () {
-                descents.forEach(function (descent) { locker.unlock(descent.page) })
-                locker.dispose()
-                replace(root.page, '.commit', callback)
-            }
-        }
+                writeBranch(root.page, '.pending', step())
+            }, function () {
+                rename(child.page, '', '.unlink', step())
+            }, function () {
+                rename(root.page, '.pending', '.commit', step())
+            }, function () {
+                unlink(child.page, '.unlink', step())
+            }, function () {
+                replace(root.page, '.commit', step())
+            })
+        })
 
         this.balance = balance
         return classify.call(this, unbalanced)
