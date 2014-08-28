@@ -2048,73 +2048,60 @@ function Strata (options) {
             mergePages(key, leftKey, stopper, merger, ghostly, callback)
         }
 
-        function chooseBranchesToMerge (key, address, callback) {
-            var check = validator(callback, release),
-                locker = new Locker,
+        var chooseBranchesToMerge = cadence(function (step, key, address) {
+            var locker = new Locker,
                 descents = [],
-                choice, lesser, greater, center
+                designator, choice, lesser, greater, center
 
-            descents.push(center = new Descent(locker))
-            center.descend(center.key(key), center.address(address), check(findLeftPage))
-
-            function goToPage (descent, address, direction, next) {
-                descents.push(descent)
-                descent.descend(descent.key(key), descent.address(address), check(goToSibling))
-
-                function goToSibling () {
+            var goToPage = cadence(function (step, descent, address, direction) {
+                step(function () {
+                    descents.push(descent)
+                    descent.descend(descent.key(key), descent.address(address), step())
+                }, function () {
                     descent.index += direction == 'left' ? 1 : -1
-                    descent.descend(descent[direction], descent.level(center.depth), check(next))
+                    descent.descend(descent[direction], descent.level(center.depth), step())
+                })
+            })
+
+            var choose = step(function () {
+                step([function () {
+                    descents.forEach(function (descent) { locker.unlock(descent.page) })
+                    locker.dispose()
+                }], function () {
+                    descents.push(center = new Descent(locker))
+                    center.descend(center.key(key), center.address(address), step())
+                }, function () {
+                    if (center.lesser != null) {
+                        goToPage(lesser = new Descent(locker), center.lesser, 'right', step())
+                    }
+                }, function () {
+                    if (center.greater != null) {
+                        goToPage(greater = new Descent(locker), center.greater, 'left', step())
+                    }
+                }, function () {
+                    if (lesser && lesser.page.addresses.length + center.page.addresses.length <= options.branchSize) {
+                        choice = center
+                    } else if (greater && greater.page.addresses.length + center.page.addresses.length <= options.branchSize) {
+                        choice = greater
+                    }
+
+                    if (choice) {
+                        descents.push(designator = choice.fork())
+                        designator.descend(designator.left, designator.leaf, step())
+                    } else {
+                        // todo: return [ choose ] does not invoke finalizer.
+                        // return [ choose ]
+                        step(null)
+                    }
+                }, function () {
+                    stash(designator.page, 0, step())
+                })
+            }, function (entry) {
+                if (entry) { // todo: fix return [ choose ]
+                    mergeBranches(entry.key, entry.keySize, choice.page.address, step())
                 }
-            }
-
-            function findLeftPage () {
-                if (center.lesser != null) {
-                    goToPage(lesser = new Descent(locker), center.lesser, 'right', findRightPage)
-                } else {
-                    findRightPage()
-                }
-            }
-
-            function findRightPage () {
-                if (center.greater != null) {
-                    goToPage(greater = new Descent(locker), center.greater, 'left', choose)
-                } else {
-                    choose()
-                }
-            }
-
-            function choose () {
-                var choice, designator
-
-                if (lesser && lesser.page.addresses.length + center.page.addresses.length <= options.branchSize) {
-                    choice = center
-                } else if (greater && greater.page.addresses.length + center.page.addresses.length <= options.branchSize) {
-                    choice = greater
-                }
-
-                if (choice) {
-                    descents.push(designator = choice.fork())
-                    designator.descend(designator.left, designator.leaf, check(designate))
-                } else {
-                    release()
-                    callback(null)
-                }
-
-                function designate () {
-                    stash(designator.page, 0, check(propagate))
-                }
-
-                function propagate (entry) {
-                    release()
-                    mergeBranches(entry.key, entry.keySize, choice.page.address, callback)
-                }
-            }
-
-            function release () {
-                descents.forEach(function (descent) { locker.unlock(descent.page) })
-                locker.dispose()
-            }
-        }
+            })(1)
+        })
 
         function mergeBranches (key, keySize, address, callback) {
             function stopper (descent) {
