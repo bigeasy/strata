@@ -2108,7 +2108,7 @@ function Strata (options) {
                 return descent.child(address)
             }
 
-            function merger (pages, ghosted, callback) {
+            var merger = cadence(function (step, pages, ghosted) {
                 ok(address == pages.right.page.address, 'unexpected address')
 
                 var cut = splice('addresses', pages.right.page, 0, pages.right.page.addresses.length)
@@ -2125,12 +2125,12 @@ function Strata (options) {
                 ok(cut.length, 'cut is zero length')
                 encacheKey(pages.left.page, cut[0], key, keySize)
 
-                writeBranch(pages.left.page, '.replace', validate(callback, resume))
-
-                function resume () {
-                    callback(null, true)
-                }
-            }
+                step(function () {
+                    writeBranch(pages.left.page, '.replace', step())
+                }, function () {
+                    return [ true ]
+                })
+            })
 
             mergePages(key, null, stopper, merger, false, callback)
         }
