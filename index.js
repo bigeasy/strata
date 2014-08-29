@@ -287,23 +287,21 @@ function Strata (options) {
             step(function () {
                 fs.fstat(fd, step())
             }, function (stat) {
-                function io (buffer, position, callback) {
-                    var check = validator(callback), offset = 0
+                var io = cadence(function (step, buffer, position) {
+                    var offset = 0
 
                     var length = stat.size - position
                     var slice = length < buffer.length ? buffer.slice(0, length) : buffer
 
-                    done(0)
-
-                    function done (count) {
+                    var loop = step(function (count) {
                         if (count < slice.length - offset) {
                             offset += count
-                            fs[direction](fd, slice, offset, slice.length - offset, position + offset, check(done))
+                            fs[direction](fd, slice, offset, slice.length - offset, position + offset, step())
                         } else {
-                            callback(null, slice, position)
+                            return [ loop, slice, position ]
                         }
-                    }
-                }
+                    })(null, 0)
+                })
                 return [ fd, stat, io ]
             })
         })
