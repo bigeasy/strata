@@ -280,16 +280,14 @@ function Strata (options) {
         writeEntry({ out: out, page: page, header: header }, callback)
     }
 
-    function io (direction, filename, callback) {
-        var check = validator(callback)
-
-        fs.open(filename, direction[0], check(opened))
-
-        function opened (fd) {
-            fs.fstat(fd, check(stat))
-
-            function stat (stat) {
-                callback(null, fd, stat, function (buffer, position, callback) {
+    var io = cadence(function (step, direction, filename) {
+        step(function () {
+            fs.open(filename, direction[0], step())
+        }, function (fd) {
+            step(function () {
+                fs.fstat(fd, step())
+            }, function (stat) {
+                function io (buffer, position, callback) {
                     var check = validator(callback), offset = 0
 
                     var length = stat.size - position
@@ -305,10 +303,11 @@ function Strata (options) {
                             callback(null, slice, position)
                         }
                     }
-                })
-            }
-        }
-    }
+                }
+                return [ fd, stat, io ]
+            })
+        })
+    })
 
     function writePositions (output, page, callback) {
         var header = [ ++page.entries, 0, page.ghosts ]
