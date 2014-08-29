@@ -135,22 +135,23 @@ function Strata (options) {
         return path.join(directory, address + suffix)
     }
 
-    function replace (page, suffix, callback) {
+    var replace = cadence(function (step, page, suffix) {
         var replacement = filename(page.address, suffix),
             permanent = filename(page.address)
 
-        fs.stat(replacement, validator(callback)(stat))
-
-        function stat (stat) {
+        step(function () {
+            fs.stat(replacement, step())
+        }, function (stat) {
             ok(stat.isFile(), 'is not a file')
-            fs.unlink(permanent, unlinked)
-        }
-
-        function unlinked (error) {
-            if (error && error.code != 'ENOENT') callback(error)
-            else fs.rename(replacement, permanent, callback)
-        }
-    }
+            step([function () {
+                fs.unlink(permanent, step())
+            }, /^ENOENT$/, function () {
+                // todo: regex only is a catch and swallow?
+            }])
+        }, function (ror) {
+            fs.rename(replacement, permanent, step())
+        })
+    })
 
     function rename (page, from, to, callback) {
         fs.rename(filename(page.address, from), filename(page.address, to), callback)
