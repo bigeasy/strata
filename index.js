@@ -212,7 +212,7 @@ function Strata (options) {
         return entry
     }
 
-    function writeEntry (options, callback) {
+    var writeEntry = cadence(function (step, options) {
         var entry, buffer, json, line, length
 
         ok(options.page.position != null, 'page has not been positioned: ' + options.page.position)
@@ -262,13 +262,13 @@ function Strata (options) {
 
         var position = options.page.position
 
-        options.out.write(buffer, validate(callback, sent))
-
-        function sent () {
+        step(function () {
+            options.out.write(buffer, step())
+        }, function () {
             options.page.position += length
-            callback(null, position, length, body && body.length)
-        }
-    }
+            return [ position, length, body && body.length ]
+        })
+    })
 
     function writeInsert (out, page, index, record, callback) {
         var header = [ ++page.entries, index + 1 ]
