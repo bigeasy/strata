@@ -356,69 +356,67 @@ function Strata (options) {
         }
     }
 
-    function readLeaf (page, callback) {
+    var findPositionsArray = cadence(function (step, page, fd, stat, read) {
         var positions = [],
             lengths = [],
-            bookmark,
-            check = validator(callback)
-
-        if (options.replay) {
-            io('read', filename(page.address), check(forward))
-        } else {
-            io('read', filename(page.address), check(backward))
-        }
-
-        function forward (fd, stat, read) {
-            page.entries = 0
-            page.ghosts = 0
-            replay(fd, stat, read, page, 0, check(done))
-        }
-
-        function backward (fd, stat, read) {
-            var buffer = new Buffer(options.readLeafStartLength || 1024)
-            read(buffer, Math.max(0, stat.size - buffer.length), check(footer))
-
-            function footer (slice) {
-                for (var i = slice.length - 2; i != -1; i--) {
-                    if (slice[i] == 0x0a) {
-                        var footer = readFooter(readEntry(slice.slice(i + 1)))
-                        ok(!footer.entry, 'footer is supposed to be zero')
-                        bookmark = footer.bookmark
-                        page.right = footer.right
-                        page.position = footer.position
-                        ok(page.position != null, 'no page position')
-                        read(new Buffer(bookmark.length), bookmark.position, check(positioned))
-                        return
-                    }
+            bookmark
+        var buffer = new Buffer(options.readLeafStartLength || 1024)
+        step(function () {
+            read(buffer, Math.max(0, stat.size - buffer.length), step())
+        }, function (slice) {
+            for (var i = slice.length - 2; i != -1; i--) {
+                if (slice[i] == 0x0a) {
+                    var footer = readFooter(readEntry(slice.slice(i + 1)))
+                    ok(!footer.entry, 'footer is supposed to be zero')
+                    bookmark = footer.bookmark
+                    page.right = footer.right
+                    page.position = footer.position
+                    ok(page.position != null, 'no page position')
+                    read(new Buffer(bookmark.length), bookmark.position, step())
+                    return
                 }
-                throw new Error('cannot find footer in last ' + buffer.length + ' bytes')
             }
+            throw new Error('cannot find footer in last ' + buffer.length + ' bytes')
+        }, function (slice) {
+            var positions = readEntry(slice.slice(0, bookmark.length)).header
 
-            function positioned (slice) {
-                var positions = readEntry(slice.slice(0, bookmark.length)).header
+            page.entries = positions.shift()
+            ok(page.entries == bookmark.entry, 'position entry number incorrect')
+            ok(positions.shift() == 0, 'expected housekeeping type')
 
-                page.entries = positions.shift()
-                ok(page.entries == bookmark.entry, 'position entry number incorrect')
-                ok(positions.shift() == 0, 'expected housekeeping type')
+            page.ghosts = positions.shift()
 
-                page.ghosts = positions.shift()
+            ok(!(positions.length % 2), 'expecting even number of positions and lengths')
+            var lengths = positions.splice(positions.length / 2)
 
-                ok(!(positions.length % 2), 'expecting even number of positions and lengths')
-                var lengths = positions.splice(positions.length / 2)
+            splice('positions', page, 0, 0, positions)
+            splice('lengths', page, 0, 0, lengths)
 
-                splice('positions', page, 0, 0, positions)
-                splice('lengths', page, 0, 0, lengths)
+            page.bookmark = bookmark
 
-                page.bookmark = bookmark
+            return [ page, bookmark.position + bookmark.length ]
+        })
+    })
 
-                replay(fd, stat, read, page, bookmark.position + bookmark.length, check(done))
-            }
-        }
-
-        function done () {
-            callback(null, page)
-        }
-    }
+    var readLeaf = cadence(function (step, page) {
+        step(function () {
+            io('read', filename(page.address), step())
+        }, function (fd, stat, read) {
+            step(function () {
+                if (options.replay) {
+                    page.entries = 0
+                    page.ghosts = 0
+                    return [ page, 0 ]
+                } else {
+                    findPositionsArray(page, fd, stat, read, step())
+                }
+            }, function (page, position) {
+                replay(fd, stat, read, page, position, step())
+            }, function () {
+                return [ page ]
+            })
+        })
+    })
 
     function replay (fd, stat, read, page, position, callback) {
         var check = validator(callback),
