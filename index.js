@@ -504,33 +504,23 @@ function Strata (options) {
         })
     })
 
-    function readRecord (page, position, length, callback) {
-        var check = validator(callback), entry
-
-        io('read', filename(page.address), check(input))
-
-        function input (fd, stat, read) {
-            tracer('readRecord', { page: page }, check(record))
-
-            function record () {
-                read(new Buffer(length), position, check(json, close))
-            }
-
-            function json (buffer) {
+    var readRecord = cadence(function (step, page, position, length) {
+        step(function () {
+            io('read', filename(page.address), step())
+        }, function (fd, stat, read) {
+            step([function () {
+                // todo: test what happens when a finalizer throws an error
+                fs.close(fd, step())
+            }],function () {
+                tracer('readRecord', { page: page }, step())
+            }, function () {
+                read(new Buffer(length), position, step())
+            }, function (buffer) {
                 ok(buffer[length - 1] == 0x0A, 'newline expected')
-                entry = readEntry(buffer, false)
-                close()
-            }
-
-            function close (readError) {
-                fs.close(fd, check(closed))
-
-                function closed (closeError) {
-                    callback(readError || closeError, entry)
-                }
-            }
-        }
-    }
+                return [ readEntry(buffer, false) ]
+            })
+        })
+    })
 
     function rewriteLeaf (page, suffix, callback) {
         var check = validator(callback),
