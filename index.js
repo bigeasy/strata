@@ -418,95 +418,91 @@ function Strata (options) {
         })
     })
 
-    function replay (fd, stat, read, page, position, callback) {
-        var check = validator(callback),
-            leaf = !!(page.address % 2),
+    var replay = cadence(function (step, fd, stat, read, page, position) {
+        var leaf = !!(page.address % 2),
             seen = {},
             buffer = new Buffer(options.readLeafStartLength || 1024),
             footer
 
-        read(buffer, position, check(replay, close))
-
-        function replay (slice, start) {
-            for (var offset = 0, i = 0, I = slice.length; i < I; i++) {
-                ok(!footer, 'data beyond footer')
-                if (slice[i] == 0x20) {
-                    var sip = slice.toString('utf8', offset, i)
-                    length = parseInt(sip)
-                    ok(String(length).length == sip.length, 'invalid length')
-                    if (offset + length > slice.length) {
-                        break
-                    }
-                    var position = start + offset
-                    ok(length)
-                    var entry = readEntry(slice.slice(offset, offset + length), !leaf)
-                    var header = readHeader(entry)
-                    if (header.entry) {
-                        ok(header.entry == ++page.entries, 'entry count is off')
-                        var index = header.index
-                        if (leaf) {
-                            if (index > 0) {
-                                seen[position] = true
-                                splice('positions', page, index - 1, 0, position)
-                                splice('lengths', page, index - 1, 0, length)
-                                _cacheRecord(page, position, entry.body, entry.length)
-                            } else if (~index == 0 && page.address != 1) {
-                                ok(!page.ghosts, 'double ghosts')
-                                page.ghosts++
-                            } else if (index < 0) {
-                                var outgoing = splice('positions', page, -(index + 1), 1).shift()
-                                if (seen[outgoing]) uncacheEntry(page, outgoing)
-                                splice('lengths', page, -(index + 1), 1)
-                            } else {
-                                page.bookmark = {
-                                    position: position,
-                                    length: length,
-                                    entry: header.entry
+        // todo: really want to register a cleanup without an indent.
+        step([function () {
+            fs.close(fd, step())
+        }], function () {
+            var loop = step(function (buffer, position) {
+                read(buffer, position, step())
+            }, function (slice, start) {
+                for (var offset = 0, i = 0, I = slice.length; i < I; i++) {
+                    ok(!footer, 'data beyond footer')
+                    if (slice[i] == 0x20) {
+                        var sip = slice.toString('utf8', offset, i)
+                        length = parseInt(sip)
+                        ok(String(length).length == sip.length, 'invalid length')
+                        if (offset + length > slice.length) {
+                            break
+                        }
+                        var position = start + offset
+                        ok(length)
+                        var entry = readEntry(slice.slice(offset, offset + length), !leaf)
+                        var header = readHeader(entry)
+                        if (header.entry) {
+                            ok(header.entry == ++page.entries, 'entry count is off')
+                            var index = header.index
+                            if (leaf) {
+                                if (index > 0) {
+                                    seen[position] = true
+                                    splice('positions', page, index - 1, 0, position)
+                                    splice('lengths', page, index - 1, 0, length)
+                                    _cacheRecord(page, position, entry.body, entry.length)
+                                } else if (~index == 0 && page.address != 1) {
+                                    ok(!page.ghosts, 'double ghosts')
+                                    page.ghosts++
+                                } else if (index < 0) {
+                                    var outgoing = splice('positions', page, -(index + 1), 1).shift()
+                                    if (seen[outgoing]) uncacheEntry(page, outgoing)
+                                    splice('lengths', page, -(index + 1), 1)
+                                } else {
+                                    page.bookmark = {
+                                        position: position,
+                                        length: length,
+                                        entry: header.entry
+                                    }
                                 }
+                            } else {
+                                /* if (index > 0) { */
+                                    var address = header.address
+                                    splice('addresses', page, index - 1, 0, address)
+                                    if (index - 1) {
+                                        encacheKey(page, address, entry.body, entry.length)
+                                    }
+                                /* } else {
+                                    var cut = splice('addresses', page, ~index, 1)
+                                    if (~index) {
+                                        uncacheEntry(page, cut[0])
+                                    }
+                                } */
                             }
                         } else {
-                            /* if (index > 0) { */
-                                var address = header.address
-                                splice('addresses', page, index - 1, 0, address)
-                                if (index - 1) {
-                                    encacheKey(page, address, entry.body, entry.length)
-                                }
-                            /* } else {
-                                var cut = splice('addresses', page, ~index, 1)
-                                if (~index) {
-                                    uncacheEntry(page, cut[0])
-                                }
-                            } */
+                            footer = readFooter(entry)
+                            page.position = position
+                            page.right = footer.right
                         }
-                    } else {
-                        footer = readFooter(entry)
-                        page.position = position
-                        page.right = footer.right
+                        i = offset = offset + length
                     }
-                    i = offset = offset + length
                 }
-            }
 
-            if (start + buffer.length < stat.size) {
-                if (offset == 0) {
-                    buffer = new Buffer(buffer.length * 2)
-                    read(buffer, start, check(replay, close))
+                if (start + buffer.length < stat.size) {
+                    if (offset == 0) {
+                        buffer = new Buffer(buffer.length * 2)
+                        read(buffer, start, step())
+                    } else {
+                        read(buffer, start + offset, step())
+                    }
                 } else {
-                    read(buffer, start + offset, check(replay, close))
+                    return [ loop, page, footer ]
                 }
-            } else {
-                close()
-            }
-        }
-
-        function close (replayError) {
-            fs.close(fd, check(closed, closed))
-
-            function closed (closeError) {
-                callback(replayError || closeError, page, footer)
-            }
-        }
-    }
+            })(null, buffer, position)
+        })
+    })
 
     function readRecord (page, position, length, callback) {
         var check = validator(callback), entry
