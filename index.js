@@ -667,14 +667,13 @@ function Strata (options) {
         }
     }
 
-    function readBranch (page, callback) {
-        var check = validator(callback)
-        io('read', filename(page.address), check(opened))
-
-        function opened (fd, stat, read) {
-            replay(fd, stat, read, page, 0, callback)
-        }
-    }
+    var readBranch = cadence(function (step, page) {
+        step(function () {
+            io('read', filename(page.address), step())
+        }, function (fd, stat, read) {
+            replay(fd, stat, read, page, 0, step())
+        })
+    })
 
     function createMagazine () {
         var magazine = cache.createMagazine()
