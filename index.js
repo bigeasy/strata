@@ -629,24 +629,25 @@ function Strata (options) {
         return encacheEntry(page, address, { key: key, size: length })
     }
 
-    function writeBranch (page, suffix, callback) {
-        var check = validator(callback),
-            addresses = page.addresses.slice(),
-            keys = addresses.map(function (address, index) { return page.cache[address] }),
+    var writeBranch = cadence(function (step, page, suffix) {
+        var keys = page.addresses.map(function (address, index) {
+                return page.cache[address]
+            }),
             out
 
         ok(keys[0] === (void(0)), 'first key is null')
         ok(keys.slice(1).every(function (key) { return key != null }), 'null keys')
 
-        page.entries = 0
-        page.position = 0
+        step(function () {
+            page.entries = 0
+            page.position = 0
 
-        out = journal.branch.open(filename(page.address, suffix), 0, page)
-        out.ready(check(write))
-
-        function write () {
-            if (addresses.length) {
-                var address = addresses.shift()
+            out = journal.branch.open(filename(page.address, suffix), 0, page)
+            out.ready(step())
+        }, [function () {
+            out.scram(step())
+        }], function () {
+            step(function (address) {
                 var key = page.entries ? page.cache[address].key : null
                 page.entries++
                 var header = [ page.entries, page.entries, address ]
@@ -656,16 +657,12 @@ function Strata (options) {
                     header: header,
                     body: key,
                     isKey: true
-                }, check(write))
-            } else {
-                out.close('entry', check(closed))
-            }
-        }
-
-        function closed () {
-            callback(null)
-        }
-    }
+                }, step())
+            })(page.addresses)
+        }, function () {
+            out.close('entry', step())
+        })
+    })
 
     var readBranch = cadence(function (step, page) {
         step(function () {
