@@ -686,19 +686,20 @@ function Strata (options) {
         return magazine
     }
 
-    function create (callback) {
-        var check = validator(callback), locker = new Locker, count = 0, root, leaf, journal
+    // to user land
+    var create = cadence(function (step) {
+        var locker = new Locker, count = 0, root, leaf, journal
 
         magazine = createMagazine()
 
-        fs.stat(directory, check(extant))
-
-        function extant (stat) {
+        step([function () {
+            locker.dispose()
+        }], function () {
+            fs.stat(directory, step())
+        }, function (stat) {
             ok(stat.isDirectory(), 'database ' + directory + ' is not a directory.')
-            fs.readdir(directory, check(empty))
-        }
-
-        function empty (files) {
+            fs.readdir(directory, step())
+        }, function (files) {
             ok(!files.filter(function (f) { return ! /^\./.test(f) }).length,
                   'database ' + directory + ' is not empty.')
 
@@ -706,49 +707,44 @@ function Strata (options) {
             leaf = locker.encache(createLeaf({}))
             splice('addresses', root, 0, 0, leaf.address)
 
-            writeBranch(root, '.replace', check(branchWritten))
-        }
-
-        function branchWritten () {
-            rewriteLeaf(leaf, '.replace', check(leafWritten))
-        }
-
-        function leafWritten () {
-            replace(root, '.replace', check(branchReplaced))
-        }
-
-        function branchReplaced () {
-            replace(leaf, '.replace', check(leafReplaced))
-        }
-
-        function leafReplaced() {
+            writeBranch(root, '.replace', step())
+        }, [function () {
             locker.unlock(root)
+        }], function () {
+            rewriteLeaf(leaf, '.replace', step())
+        }, [function () {
             locker.unlock(leaf)
-            locker.dispose()
-            rescue.callback(callback)
-        }
-    }
+        }], function () {
+            replace(root, '.replace', step())
+        }, function branchReplaced () {
+            replace(leaf, '.replace', step())
+        })
+    })
 
-    function open (callback) {
-        var check = validator(callback)
-
+    // to user land
+    var open = cadence(function (step) {
         magazine = createMagazine()
 
-        fs.stat(directory, check(stat))
+        // todo: instead of rescue, you might try/catch the parts that you know
+        // are likely to cause errors and raise an error of a Strata type.
 
-        function stat (error, stat) {
-            fs.readdir(directory, check(list))
-        }
+        // todo: or you might need some way to catch a callback error. Maybe an
+        // outer most catch block?
 
-        function list (files) {
+        // todo: or if you're using Cadence, doesn't the callback get wrapped
+        // anyway?
+        step(function () {
+            fs.stat(directory, step())
+        }, function stat (error, stat) {
+            fs.readdir(directory, step())
+        }, function (files) {
             files.forEach(function (file) {
                 if (/^\d+$/.test(file)) {
                     nextAddress = Math.max(+(file) + 1, nextAddress)
                 }
             })
-            rescue.callback(callback, null)
-        }
-    }
+        })
+    })
 
     function close (callback) {
         var cartridge = magazine.get(-2), lock = cartridge.value.page.lock
@@ -2335,12 +2331,15 @@ function Strata (options) {
         purge.release()
     }
 
-    return classify.call(this, create, open,
+    var objectToReturn = classify.call(this, create, open,
                                key, left, leftOf, right,
                                iterator, mutator,
                                balance, purge, vivify,
                                close,
                                _size, _nextAddress)
+    this.create = create
+    this.open = open
+    return objectToReturn
 }
 
 module.exports = Strata
