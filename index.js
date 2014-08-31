@@ -540,26 +540,32 @@ function Strata (options) {
             var positions = splice('positions', page, 0, page.positions.length)
             var lengths = splice('lengths', page, 0, page.lengths.length)
 
-            step(function (position) {
-                var length = lengths.shift(), entry
-                step(function () {
-                    stash(page, position, length, step())
-                }, function (entry) {
-                    uncacheEntry(page, position)
-                    cache[position] = entry
-                    writeInsert(out, page, index++, entry.record, step())
-                }, function (position, length) {
-                    splice('positions', page, page.positions.length, 0, position)
-                    splice('lengths', page, page.lengths.length, 0, length)
-                })
-            })(page.positions)
+            step(function () {
+                writePositions(out, page, step())
+            }, function () {
+                step(function (position) {
+                    var length = lengths.shift()
+                    step(function () {
+                        stash(page, position, length, step())
+                    }, function (entry) {
+                        step(function () {
+                            uncacheEntry(page, position)
+                            writeInsert(out, page, index++, entry.record, step())
+                        }, function (position, length) {
+                            cache[position] = entry
+                            splice('positions', page, page.positions.length, 0, position)
+                            splice('lengths', page, page.lengths.length, 0, length)
+                        })
+                    })
+                })(positions)
+            })
         }, function () {
-            var entry
-            for (var position in cache) {
-                entry = cache[position]
-                encacheEntry(page, position, entry)
-            }
-            if (page.positions.length) { // <- why? save a positions array? meh.
+            if (page.positions.length) {
+                var entry
+                for (var position in cache) {
+                    entry = cache[position]
+                    encacheEntry(page, position, entry)
+                }
                 writePositions(out, page, step())
             }
         }, function () {
