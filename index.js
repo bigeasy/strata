@@ -803,13 +803,10 @@ function Strata (options) {
         else callback.apply(null, vargs)
     }
 
-    function _find (page, key, low, callback) {
-        var mid, high = (page.addresses || page.positions).length - 1, check = validator(callback)
+    var _find = cadence(function (step, page, key, low) {
+        var mid, high = (page.addresses || page.positions).length - 1
 
-        if (page.address % 2) test()
-        else callback(null, find())
-
-        function find () {
+        if (page.address % 2 == 0) {
             while (low <= high) {
                 mid = low + ((high - low) >>> 1)
                 var compare = comparator(key, page.cache[page.addresses[mid]].key)
@@ -817,30 +814,28 @@ function Strata (options) {
                 else if (compare > 0) low = mid + 1
                 else return mid
             }
-            return ~low
+            return [ ~low ]
         }
 
-        function test () {
+        var loop = step(function () {
             if (low <= high) {
                 mid = low + ((high - low) >>> 1)
-                stash(page, mid, check(function (entry) { compare(entry.key) }))
+                stash(page, mid, step())
             } else {
-                unwind(callback, null, ~low)
+                return [ loop, ~low ]
             }
-        }
-
-        function compare (other) {
-            ok(other != null, 'key is null in find')
-            var compare = comparator(key, other)
+        }, function (entry) {
+            ok(entry.key != null, 'key is null in find')
+            var compare = comparator(key, entry.key)
             if (compare == 0) {
+                return [ loop, mid ]
                 unwind(callback, null, mid)
             } else {
                 if (compare > 0) low = mid + 1
                 else high = mid - 1
-                test()
             }
-        }
-    }
+        })()
+    })
 
     function Locker () {
         var locks ={}
