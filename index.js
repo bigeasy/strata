@@ -746,10 +746,12 @@ function Strata (options) {
         })
     })
 
-    function close (callback) {
+    // to user land
+    var close = cadence(function (step) {
         var cartridge = magazine.get(-2), lock = cartridge.value.page.lock
-
-        createJournal().close('tree', validate(callback, function () {
+        step(function () {
+            createJournal().close('tree', step())
+        }, function () {
             lock.unlock()
             // todo
             lock.dispose()
@@ -764,12 +766,8 @@ function Strata (options) {
             purge.release()
 
             ok(!magazine.count, 'pages still held by cache')
-
-            thrownByUser = null
-
-            rescue.callback(callback, null)
-        }))
-    }
+        })
+    })
 
     function stash (page, positionOrIndex, length, callback) {
         var position = positionOrIndex
@@ -2339,6 +2337,7 @@ function Strata (options) {
                                _size, _nextAddress)
     this.create = create
     this.open = open
+    this.close = close
     return objectToReturn
 }
 
