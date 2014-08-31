@@ -769,17 +769,16 @@ function Strata (options) {
         })
     })
 
-    function stash (page, positionOrIndex, length, callback) {
+    var stash = cadence(function (step, page, positionOrIndex, length) {
         var position = positionOrIndex
         if (arguments.length == 3) {
-            callback = length
             position = page.positions[positionOrIndex]
             length = page.lengths[positionOrIndex]
         }
         ok(length)
         var entry, loader
         if (loader = page.loaders[position]) {
-            loader.share(callback)
+            loader.share(step())
         } else if (!(entry = page.cache[position])) {
             loader = page.loaders[position] = sequester.createLock()
             loader.exclude(function () {
@@ -792,11 +791,11 @@ function Strata (options) {
                     loader.unlock(error, entry, length)
                 })
             })
-            stash(page, position, length, callback)
+            stash(page, position, length, step())
         } else {
-            callback(null, entry, length)
+            return [ entry, length ]
         }
-    }
+    })
 
     function unwind (callback) {
         var vargs = __slice.call(arguments, 1)
