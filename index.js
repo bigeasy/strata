@@ -522,62 +522,50 @@ function Strata (options) {
         })
     })
 
-    function rewriteLeaf (page, suffix, callback) {
-        var check = validator(callback),
-            cache = {},
-            index = 0,
-            out, positions, lengths
+    var rewriteLeaf = cadence(function (step, page, suffix) {
+        var cache = {}, index = 0, out
 
-        out = journal.leaf.open(filename(page.address, suffix), 0, page)
-        out.ready(check(opened))
-
-        function opened () {
+        step(function () {
+            out = journal.leaf.open(filename(page.address, suffix), 0, page)
+            out.ready(step())
+        }, [function () {
+            // todo: ensure that cadence finalizers are registered in order.
+            // todo: also, don't you want to use a specific finalizer above?
+            // todo: need an error close!
+            out.scram(step())
+        }], function () {
             page.position = 0
             page.entries = 0
 
-            positions = splice('positions', page, 0, page.positions.length)
-            lengths = splice('lengths', page, 0, page.lengths.length)
+            var positions = splice('positions', page, 0, page.positions.length)
+            var lengths = splice('lengths', page, 0, page.lengths.length)
 
-            writePositions(out, page, check(iterate))
-        }
-
-        function iterate () {
-            if (positions.length) rewrite()
-            else if (page.positions.length) append()
-            else close()
-        }
-
-        function rewrite () {
-            var position = positions.shift(), length = lengths.shift(), entry
-
-            stash(page, position, length, check(stashed))
-
-            function stashed ($) {
-                uncacheEntry(page, position)
-                writeInsert(out, page, index++, (entry = $).record, check(written))
-            }
-
-            function written (position, length) {
-                splice('positions', page, page.positions.length, 0, position)
-                splice('lengths', page, page.lengths.length, 0, length)
-                cache[position] = entry
-                iterate()
-            }
-        }
-
-        function append() {
+            step(function (position) {
+                var length = lengths.shift(), entry
+                step(function () {
+                    stash(page, position, length, step())
+                }, function (entry) {
+                    uncacheEntry(page, position)
+                    cache[position] = entry
+                    writeInsert(out, page, index++, entry.record, step())
+                }, function (position, length) {
+                    splice('positions', page, page.positions.length, 0, position)
+                    splice('lengths', page, page.lengths.length, 0, length)
+                })
+            })(page.positions)
+        }, function () {
             var entry
             for (var position in cache) {
                 entry = cache[position]
                 encacheEntry(page, position, entry)
             }
-            writePositions(out, page, check(close))
-        }
-
-        function close() {
-            out.close('entry', callback)
-        }
-    }
+            if (page.positions.length) { // <- why? save a positions array? meh.
+                writePositions(out, page, step())
+            }
+        }, function () {
+            out.close('entry', step())
+        })
+    })
 
     function createPage (page, override, remainder) {
         if (override.address == null) {
