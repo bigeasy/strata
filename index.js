@@ -1106,18 +1106,19 @@ function Strata (options) {
             }))
         }
 
-        function next (callback) {
+        // to user land
+        var next = cadence(function (step) {
             var next
-
             rightLeafKey = null
 
-            if (page.right) {
-                locker.lock(page.right, exclusive, validate(callback, locked))
-            } else {
-                rescue.callback(callback, null, false)
+            if (!page.right) {
+                // return [ step, false ] <- return immediately!
+                return [ false ]
             }
 
-            function locked (next) {
+            step(function () {
+                locker.lock(page.right, exclusive, step())
+            }, function (next) {
                 locker.unlock(page)
 
                 page = next
@@ -1125,9 +1126,9 @@ function Strata (options) {
                 offset = page.ghosts
                 length = page.positions.length
 
-                rescue.callback(callback, null, true)
-            }
-        }
+                return [ true ]
+            })
+        })
 
         function indexOf (key, callback) {
             _find(page, key, page.ghosts, callback)
@@ -1161,6 +1162,7 @@ function Strata (options) {
 
         classify.call(this, unlock, indexOf, get, next,
                             _index, _offset, _length, _ghosts, _address, _right, _exclusive)
+        this.next = next
 
         if (!exclusive) return this
 
