@@ -1045,14 +1045,12 @@ function Strata (options) {
 
         function unlocker_ ($unlocker) { unlocker = $unlocker }
 
-        function descend (next, stop, callback) {
-            var check = validator(callback), above = page
+        var descend = cadence(function (step, next, stop) {
+            var above = page
 
-            downward()
-
-            function downward () {
+            var loop = step(function () {
                 if (stop()) {
-                    unwind(callback, null, page, index)
+                    return [ loop, page, index ]
                 } else {
                     if (index + 1 < page.addresses.length) {
                         greater = page.address
@@ -1060,18 +1058,14 @@ function Strata (options) {
                     if (index > 0) {
                         lesser = page.address
                     }
-                    locker.lock(page.addresses[index], exclusive, check(locked))
+                    locker.lock(page.addresses[index], exclusive, step())
                 }
-            }
-
-            function locked (locked) {
+            }, function (locked) {
                 depth++
                 unlocker(page, locked)
                 page = locked
-                next(check(directed))
-            }
-
-            function directed ($index) {
+                next(step())
+            }, function ($index) {
                 if (!(page.address % 2) && $index < 0) {
                     index = (~$index) - 1
                 } else {
@@ -1082,9 +1076,8 @@ function Strata (options) {
                     ok(page.addresses.length, 'page has addresses')
                     ok(page.cache[page.addresses[0]] == (void(0)), 'first key is cached')
                 }
-                downward()
-            }
-        }
+            })()
+        })
 
         classify.call(this, descend, fork, exclude, upgrade,
                                    key, left, right,
@@ -1092,6 +1085,7 @@ function Strata (options) {
                                    _locker, _page, _depth, _index, index_, _indexes, _lesser, _greater,
                                    unlocker_)
         this.upgrade = upgrade
+        this.descend = descend
         return this
     }
 
