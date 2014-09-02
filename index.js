@@ -1099,9 +1099,10 @@ function Strata (options) {
 
         descents.shift()
 
+        // to user land
         function get (index, callback) {
             stash(page, index, validate(callback, function (entry, size) {
-                rescue.callback(callback, null, entry.record, entry.key, size)
+                callback(null, entry.record, entry.key, size)
             }))
         }
 
