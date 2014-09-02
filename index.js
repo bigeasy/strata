@@ -992,24 +992,21 @@ function Strata (options) {
 
         function exclude () { exclusive = true }
 
-        function upgrade (callback) {
-            locker.unlock(page)
-
-            locker.lock(page.address, exclusive = true, validate(callback, locked, failed))
-
-            function locked (locked) {
-                page = locked
-                callback(null)
-            }
-
-            function failed () {
+        var upgrade = cadence(function (step) {
+            step([function () {
+                locker.unlock(page)
+                locker.lock(page.address, exclusive = true, step())
+            }, function (errors) {
                 locker.lock(-2, false, function (error, locked) {
                     ok(!error, 'impossible error')
                     page = locked
                 })
                 ok(page, 'dummy page not in cache')
-            }
-        }
+                throw errors
+            }], function (locked) {
+                page = locked
+            })
+        })
 
         function key (key) {
             return function (callback) {
@@ -1089,11 +1086,13 @@ function Strata (options) {
             }
         }
 
-        return classify.call(this, descend, fork, exclude, upgrade,
+        classify.call(this, descend, fork, exclude, upgrade,
                                    key, left, right,
                                    found, address, child, penultimate, leaf, level,
                                    _locker, _page, _depth, _index, index_, _indexes, _lesser, _greater,
                                    unlocker_)
+        this.upgrade = upgrade
+        return this
     }
 
     function Cursor (journal, descents, exclusive, searchKey) {
