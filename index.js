@@ -840,9 +840,8 @@ function Strata (options) {
     function Locker () {
         var locks ={}
 
-        function lock (address, exclusive, callback) {
-            var check = validator(callback, release),
-                cartridge = magazine.hold(address, {}), page = cartridge.value.page, locked
+        var lock = cadence(function (step, address, exclusive) {
+            var cartridge = magazine.hold(address, {}), page = cartridge.value.page, locked
 
             ok(!locks[address], 'address already locked by this locker')
 
@@ -867,26 +866,28 @@ function Strata (options) {
                 locks[page.address] = page.queue.createLock()
             }
 
-            locks[page.address][exclusive ? 'exclude' : 'share'](check(trace))
-
-            function trace () {
-                tracer('lock', { address: address, exclusive: exclusive }, check(complete))
-            }
-
-            function complete () {
-                locked = true
-                callback(null, page)
-            }
-
-            function release (error) {
+            step([function () {
+                step(function () {
+                    locks[page.address][exclusive ? 'exclude' : 'share'](step())
+                },
+                function () {
+                    tracer('lock', { address: address, exclusive: exclusive }, step())
+                }, function () {
+                    locked = true
+                    return [ page ]
+                })
+            }, function (errors, error) {
+                // todo: if you don't return something, then the return is the
+                // error, but what else could it be? Document that behavior, or
+                // set a reasonable default.
                 if (!locked) {
                     magazine.get(page.address).release()
                     locks[page.address].unlock(error)
                     delete locks[page.address]
                 }
-                callback(error)
-            }
-        }
+                throw errors
+            }])
+        })
 
         function encache (page) {
             magazine.hold(page.address, { page: page })
@@ -934,7 +935,11 @@ function Strata (options) {
             locks = null
         }
 
-        return classify.call(this, lock, encache, increment, unlock, dispose)
+        classify.call(this, lock, encache, increment, unlock, dispose)
+
+        this.lock = lock
+
+        return this
     }
 
     function Descent (locker, override) {
