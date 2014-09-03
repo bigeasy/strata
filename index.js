@@ -800,12 +800,6 @@ function Strata (options) {
         }
     })
 
-    function unwind (callback) {
-        var vargs = __slice.call(arguments, 1)
-        if (options.setImmediate) setImmediate(function () { callback.apply(null, vargs) })
-        else callback.apply(null, vargs)
-    }
-
     var _find = cadence(function (step, page, key, low) {
         var mid, high = (page.addresses || page.positions).length - 1
 
@@ -832,7 +826,6 @@ function Strata (options) {
             var compare = comparator(key, entry.key)
             if (compare == 0) {
                 return [ loop, mid ]
-                unwind(callback, null, mid)
             } else {
                 if (compare > 0) low = mid + 1
                 else high = mid - 1
