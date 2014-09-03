@@ -1229,45 +1229,40 @@ function Strata (options) {
             })(1)
         })
 
-        function remove (index, callback) {
-            var ghost = page.address != 1 && index == 0,
-                check = validator(callback),
-                entry
-
+        var remove = cadence(function (step, index) {
+            var ghost = page.address != 1 && index == 0, entry
             balancer.unbalanced(page)
-
-            journalist.purge(check(open))
-
-            function open () {
+            step(function () {
+                journalist.purge(step())
+            }, function () {
                 entry = journal.open(filename(page.address), page.position, page)
-                entry.ready(check(ready))
-            }
-
-            function ready () {
-                writeDelete(entry, page, index, check(written, close))
-            }
-
-            function written () {
-                if (ghost) {
-                    page.ghosts++
-                    offset || offset++
-                } else {
-                    uncacheEntry(page, page.positions[index])
-                    splice('positions', page, index, 1)
-                    splice('lengths', page, index, 1)
-                }
-                close()
-            }
-
-            function close (writeError) {
-                entry.close('entry', function (closeError) {
-                    rescue.callback(callback, writeError || closeError)
-                })
-            }
-        }
+                entry.ready(step())
+            }, function () {
+                step([function () {
+                    step(function () {
+                        writeDelete(entry, page, index, step())
+                    }, function () {
+                        if (ghost) {
+                            page.ghosts++
+                            offset || offset++
+                        } else {
+                            uncacheEntry(page, page.positions[index])
+                            splice('positions', page, index, 1)
+                            splice('lengths', page, index, 1)
+                        }
+                    }, function () {
+                        entry.close('entry', step())
+                    })
+                }, function (errors) {
+                    entry.scram(step())
+                    throw errors
+                }])
+            })
+        })
 
         classify.call(this, insert, remove)
         this.insert = insert
+        this.remove = remove
         return this
     }
 
