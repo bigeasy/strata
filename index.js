@@ -2152,22 +2152,17 @@ function Strata (options) {
         })
     }
 
-    function toLeaf (sought, descents, key, exclusive, callback) {
-        var check = validator(callback)
-
+    var toLeaf = cadence(function (step, sought, descents, key, exclusive) {
         thrownByUser = null
-
-        descents[0].descend(sought, descents[0].penultimate, check(penultimate))
-
-        function penultimate() {
+        step(function () {
+            descents[0].descend(sought, descents[0].penultimate, step())
+        }, function () {
             if (exclusive) descents[0].exclude()
-            descents[0].descend(sought, descents[0].leaf, check(leaf))
-        }
-
-        function leaf (page, index) {
-            callback(null, new Cursor(createJournal(), descents, exclusive, key))
-        }
-    }
+            descents[0].descend(sought, descents[0].leaf, step())
+        }, function () {
+            return [ new Cursor(createJournal(), descents, exclusive, key) ]
+        })
+    })
 
     function cursor (key, exclusive, callback) {
         var descents = [ new Descent(new Locker) ],
