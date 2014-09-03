@@ -876,11 +876,9 @@ function Strata (options) {
                 // todo: if you don't return something, then the return is the
                 // error, but what else could it be? Document that behavior, or
                 // set a reasonable default.
-                if (!locked) {
-                    magazine.get(page.address).release()
-                    locks[page.address].unlock(error)
-                    delete locks[page.address]
-                }
+                magazine.get(page.address).release()
+                locks[page.address].unlock(error)
+                delete locks[page.address]
                 throw errors
             }])
         })
