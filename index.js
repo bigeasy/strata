@@ -1128,16 +1128,20 @@ function Strata (options) {
             _find(page, key, page.ghosts, callback)
         }
 
-        function unlock (callback) {
-            ok(callback, 'unlock now requires a callback')
-
-            journal.close('leaf', validate(callback, unlock))
-
-            function unlock () {
+        // todo: pass an integer as the first argument to force the arity of the
+        // return.
+        var _unlock = cadence(function (step) {
+            step([function () {
                 locker.unlock(page)
                 locker.dispose()
-                callback()
-            }
+            }], function () {
+                journal.close('leaf', step(0))
+            })
+        })
+
+        function unlock (callback) {
+            ok(callback, 'unlock now requires a callback')
+            _unlock(callback)
         }
 
         function _index () { return index }
