@@ -1092,11 +1092,13 @@ function Strata (options) {
         descents.shift()
 
         // to user land
-        function get (index, callback) {
-            stash(page, index, validate(callback, function (entry, size) {
-                callback(null, entry.record, entry.key, size)
-            }))
-        }
+        var get = cadence(function (step, index) {
+            step(function () {
+                stash(page, index, step())
+            }, function (entry, size) {
+                return [ entry.record, entry.key, size ]
+            })
+        })
 
         // to user land
         var next = cadence(function (step) {
@@ -1155,6 +1157,7 @@ function Strata (options) {
         classify.call(this, unlock, indexOf, get, next,
                             _index, _offset, _length, _ghosts, _address, _right, _exclusive)
         this.next = next
+        this.get = get
 
         if (!exclusive) return this
 
