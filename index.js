@@ -114,10 +114,6 @@ function Strata (options) {
         }
     })()
 
-    function validator (callback, janitor) {
-        return function (forward, janitor2) { return validate(callback, forward, janitor2 || janitor) }
-    }
-
     function validate (callback, forward, janitor) {
         return rescue.validate(callback, forward, janitor)
     }
