@@ -1166,81 +1166,68 @@ function Strata (options) {
 
         if (!exclusive) return this
 
-        function insert (record, key, index, callback) {
-            var check = validator(callback), unambiguous
+        // to user land
+        var insert = cadence(function (step, record, key, index) {
+            var unambiguous
 
-            if (index == 0 && page.address != 1) {
-                rescue.callback(callback, null, -1)
-                return
-            }
-
-            unambiguous = index < page.positions.length
-            unambiguous = unambiguous || searchKey.length && comparator(searchKey[0], key) == 0
-            unambiguous = unambiguous || ! page.right
-
-            if (unambiguous) insert()
-            else ambiguity()
-
-            function ambiguity () {
-                if (rightLeafKey) {
-                    compare()
-                } else {
-                    locker.lock(page.right, false, check(load))
+            var block = step(function () {
+                if (index == 0 && page.address != 1) {
+                    return [ block, -1 ]
                 }
 
-                function load (rightLeafPage) {
-                    stash(rightLeafPage, 0, validate(callback, designated, release))
+                unambiguous = index < page.positions.length
+                unambiguous = unambiguous || searchKey.length && comparator(searchKey[0], key) == 0
+                unambiguous = unambiguous || ! page.right
 
-                    function designated (entry) {
-                        rightLeafKey = entry.key
-                        release()
-                        compare()
-                    }
-
-                    function release () {
-                        locker.unlock(rightLeafPage)
-                    }
-                }
-
-                function compare () {
-                    if (comparator(key, rightLeafKey) < 0) insert()
-                    else rescue.callback(callback, null, +1)
-                }
-            }
-
-            function insert () {
-                var entry
-
-                balancer.unbalanced(page)
-
-                journalist.purge(check(open))
-
-                function open () {
-                    entry = journal.open(filename(page.address), page.position, page)
-                    entry.ready(check(ready))
-                }
-
-                function ready () {
-                    writeInsert(entry, page, index, record, check(inserted, close))
-                }
-
-                function inserted (position, length, size) {
-                    splice('positions', page, index, 0, position)
-                    splice('lengths', page, index, 0, length)
-                    _cacheRecord(page, position, record, size)
-
-                    length = page.positions.length
-
-                    close()
-                }
-
-                function close (writeError) {
-                    entry.close('entry', function (closeError) {
-                        rescue.callback(callback, writeError || closeError, 0)
+                if (!unambiguous) step(function () {
+                    if (!rightLeafKey) step(function () {
+                        locker.lock(page.right, false, step())
+                    }, function (rightLeafPage) {
+                        step(function () {
+                            stash(rightLeafPage, 0, step())
+                        }, [function () {
+                            locker.unlock(rightLeafPage)
+                        }], function (entry) {
+                            rightLeafKey = entry.key
+                        })
                     })
-                }
-            }
-        }
+                }, function  () {
+                    if (comparator(key, rightLeafKey) >= 0) {
+                        return [ block, +1 ]
+                    }
+                })
+            }, function () {
+                var entry
+                balancer.unbalanced(page)
+                step(function () {
+                    journalist.purge(step())
+                }, function () {
+                    entry = journal.open(filename(page.address), page.position, page)
+                    entry.ready(step())
+                }, function () {
+                    step([function () {
+                        step(function () {
+                            writeInsert(entry, page, index, record, step())
+                        }, function (position, length, size) {
+                            splice('positions', page, index, 0, position)
+                            splice('lengths', page, index, 0, length)
+                            _cacheRecord(page, position, record, size)
+
+                            length = page.positions.length
+                        }, function () {
+                            step(function () {
+                                entry.close('entry', step())
+                            }, function () {
+                                return [ 0 ]
+                            })
+                        })
+                    }, function (errors) {
+                        entry.scram(step())
+                        throw errors
+                    }])
+                })
+            })(1)
+        })
 
         function remove (index, callback) {
             var ghost = page.address != 1 && index == 0,
@@ -1279,7 +1266,9 @@ function Strata (options) {
             }
         }
 
-        return classify.call(this, insert, remove)
+        classify.call(this, insert, remove)
+        this.insert = insert
+        return this
     }
 
     function Balancer () {
