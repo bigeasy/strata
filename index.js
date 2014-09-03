@@ -2215,65 +2215,43 @@ function Strata (options) {
             })
         })
 
-        function expand (parent, pages, index, callback) {
-            var check = validator(callback)
-
-            if (index < pages.length) {
-                var address = pages[index].address
-                locker.lock(address, false, check(address % 2 ? leaf : branch))
-            } else {
-                callback(null, pages)
-            }
-
-            function branch (page) {
-                pages[index].children = page.addresses.map(record)
-                if (index) designated(parent.cache[parent.addresses[index]].key)
-                else keyed()
-
-                function designated (key) {
-                    pages[index].key = key
-                    keyed()
+        var expand = cadence(function (step, parent, pages, index) {
+            var block = step(function () {
+                if (index < pages.length) {
+                    var address = pages[index].address
+                    locker.lock(address, false, step(step, [function (page) { locker.unlock(page) }]))
+                } else {
+                    return [ block, pages ]
                 }
+            }, function (page) {
+                if (page.address % 2 == 0) {
+                    step(function () {
+                        pages[index].children = page.addresses.map(record)
+                        if (index) {
+                            pages[index].key = parent.cache[parent.addresses[index]].key
+                        }
+                        expand(page, pages[index].children, 0, step())
+                    }, function () {
+                        expand(parent, pages, index + 1, step())
+                    })
+                } else {
+                    step(function () {
+                        pages[index].children = []
+                        pages[index].ghosts = page.ghosts
 
-                function keyed () {
-                    expand(page, pages[index].children, 0, validate(callback, expanded, release))
+                        step(function (recordIndex) {
+                            step(function () {
+                                stash(page, recordIndex, step())
+                            }, function (entry) {
+                                pages[index].children.push(entry.record)
+                            })
+                        })(page.positions.length)
+                    }, function () {
+                        expand(parent, pages, index + 1, step())
+                    })
                 }
-
-                function expanded () {
-                    release()
-                    expand(parent, pages, index + 1, callback)
-                }
-
-                function release () {
-                    locker.unlock(page)
-                }
-            }
-
-            function leaf (page) {
-                pages[index].children = []
-                pages[index].ghosts = page.ghosts
-
-                get(0)
-
-                function get (recordIndex) {
-                    if (recordIndex < page.positions.length) {
-                        stash(page, recordIndex, validate(callback, push, release))
-                    } else {
-                        release()
-                        expand(parent, pages, index + 1, callback)
-                    }
-
-                    function push (entry) {
-                        pages[index].children.push(entry.record)
-                        get(recordIndex + 1)
-                    }
-
-                    function release () {
-                        locker.unlock(page)
-                    }
-                }
-            }
-        }
+            })(1)
+        })
     })
 
     function purge (downTo) {
