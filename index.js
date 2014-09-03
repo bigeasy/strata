@@ -2196,28 +2196,28 @@ function Strata (options) {
         balancer.balance(callback)
     }
 
-    function vivify (callback) {
-        var check = validator(callback), locker = new Locker, root
-
-        locker.lock(0, false, check(begin))
+    // to user land
+    var vivify = cadence(function (step) {
+        var locker = new Locker, root
 
         function record (address) {
             return { address: address }
         }
 
-        function begin (page) {
-            expand(page, root = page.addresses.map(record), 0, validate(callback, function () {
-                release()
-                rescue.callback(callback, null, root)
-            }, release))
-
-            function release () {
+        step(function () {
+            locker.lock(0, false, step())
+        }, function (page) {
+            step([function () {
                 locker.unlock(page)
                 locker.dispose()
-            }
-        }
+            }], function () {
+                expand(page, root = page.addresses.map(record), 0, step())
+            })
+        })
 
         function expand (parent, pages, index, callback) {
+            var check = validator(callback)
+
             if (index < pages.length) {
                 var address = pages[index].address
                 locker.lock(address, false, check(address % 2 ? leaf : branch))
@@ -2274,7 +2274,7 @@ function Strata (options) {
                 }
             }
         }
-    }
+    })
 
     function purge (downTo) {
         var purge = magazine.purge()
@@ -2294,6 +2294,7 @@ function Strata (options) {
     this.create = create
     this.open = open
     this.close = close
+    this.vivify = vivify
     return objectToReturn
 }
 
