@@ -3,6 +3,9 @@ var Cache = require('magazine'),
     Rescue = require('rescue'),
     cadence = require('cadence')
 
+// todo: temporary
+var scram = require('./scram')
+
 function extend(to, from) {
     for (var key in from) to[key] = from[key]
     return to
@@ -1200,12 +1203,12 @@ function Strata (options) {
                 var entry
                 balancer.unbalanced(page)
                 step(function () {
+                    entry = journal.open(filename(page.address), page.position, page)
                     journalist.purge(step())
                 }, function () {
-                    entry = journal.open(filename(page.address), page.position, page)
                     entry.ready(step())
                 }, function () {
-                    step([function () {
+                    scram(entry, cadence(function (step) {
                         step(function () {
                             writeInsert(entry, page, index, record, step())
                         }, function (position, length, size) {
@@ -1221,10 +1224,7 @@ function Strata (options) {
                                 return [ 0 ]
                             })
                         })
-                    }, function (errors) {
-                        entry.scram(step())
-                        throw errors
-                    }])
+                    }), step())
                 })
             })(1)
         })
@@ -1238,7 +1238,7 @@ function Strata (options) {
                 entry = journal.open(filename(page.address), page.position, page)
                 entry.ready(step())
             }, function () {
-                step([function () {
+                scram(entry, cadence(function (step) {
                     step(function () {
                         writeDelete(entry, page, index, step())
                     }, function () {
@@ -1253,10 +1253,7 @@ function Strata (options) {
                     }, function () {
                         entry.close('entry', step())
                     })
-                }, function (errors) {
-                    entry.scram(step())
-                    throw errors
-                }])
+                }), step())
             })
         })
 
