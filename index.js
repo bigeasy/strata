@@ -2164,24 +2164,24 @@ function Strata (options) {
         })
     })
 
-    function cursor (key, exclusive, callback) {
-        var descents = [ new Descent(new Locker) ],
-            check = validator(callback, function () {
-                if (descents.length) {
-                    descents[0].locker.unlock(descents[0].page)
-                    descents[0].locker.dispose()
-                }
-            })
-        if  (typeof key == 'function') {
-            key(descents, exclusive, check(done))
-        } else {
-            toLeaf(descents[0].key(key), descents, key, exclusive, check(done))
-        }
-
-        function done (cursor) {
-            rescue.callback(callback, null, cursor)
-        }
-    }
+    // to user land
+    var cursor = cadence(function (step, key, exclusive) {
+        var descents = [ new Descent(new Locker) ]
+        step([function () {
+            if (descents.length) {
+                descents[0].locker.unlock(descents[0].page)
+                descents[0].locker.dispose()
+            }
+        }], function () {
+            if  (typeof key == 'function') {
+                key(descents, exclusive, step())
+            } else {
+                toLeaf(descents[0].key(key), descents, key, exclusive, step())
+            }
+        }, function (cursor) {
+            return [ cursor ]
+        })
+    })
 
     function iterator (key, callback) {
         cursor(key, false, callback)
