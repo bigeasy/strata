@@ -37,6 +37,25 @@ function classify () {
 }
 
 function Strata (options) {
+    var writeFooter = cadence(function (step, out, position, page) {
+        ok(page.address % 2 && page.bookmark != null)
+        var header = [
+            0, page.bookmark.position, page.bookmark.length, page.bookmark.entry,
+            page.right || 0, page.position, page.entries, page.ghosts, page.positions.length - page.ghosts
+        ]
+        step(function () {
+            writeEntry({
+                out: out,
+                page: page,
+                header: header,
+                type: 'footer'
+            }, step())
+        }, function (position, length) {
+            page.position = header[5] // todo: can't we use `position`?
+            return [ position, length ]
+        })
+    })
+
     var sequester = options.sequester || require('sequester'),
         directory = options.directory,
         extractor = options.extractor || extract,
@@ -314,23 +333,6 @@ function Strata (options) {
         var header = [ ++page.entries, 0, page.ghosts ]
         header = header.concat(page.positions).concat(page.lengths)
         writeEntry({ out: output, page: page, header: header, type: 'position' }, callback)
-    }
-
-    function writeFooter (out, position, page, callback) {
-        ok(page.address % 2 && page.bookmark != null)
-        var header = [
-            0, page.bookmark.position, page.bookmark.length, page.bookmark.entry,
-            page.right || 0, page.position, page.entries, page.ghosts, page.positions.length - page.ghosts
-        ]
-        writeEntry({
-            out: out,
-            page: page,
-            header: header,
-            type: 'footer'
-        }, validate(callback, function (position, length) {
-            page.position = header[5] // todo: can't we use `position`?
-            callback(null, position, length)
-        }))
     }
 
     function readHeader (entry) {
