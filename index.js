@@ -2191,12 +2191,9 @@ function Strata (options) {
         cursor(key, true, callback)
     }
 
+    // to user land
     function balance (callback) {
-        balancer.balance(validate(callback, end))
-
-        function end () {
-            rescue.callback(callback)
-        }
+        balancer.balance(callback)
     }
 
     function vivify (callback) {
