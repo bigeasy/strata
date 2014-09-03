@@ -2131,28 +2131,25 @@ function Strata (options) {
     }
 
     function leftOf (key) {
-        return function (descents, exclusive, callback) {
-            var conditions, check = validator(callback)
-
+        return cadence(function (step, descents, exclusive) {
+            // todo: outgoing
             thrownByUser = null
-
             var conditions = [ descents[0].leaf, descents[0].found([key]) ]
-
-            descents[0].descend(descents[0].key(key), function () {
-                return conditions.some(function (condition) {
-                    return condition()
-                })
-            }, check(pivotOrLeaf))
-
-            function pivotOrLeaf(page, index) {
+            step(function () {
+                descents[0].descend(descents[0].key(key), function () {
+                    return conditions.some(function (condition) {
+                        return condition()
+                    })
+                }, step())
+            }, function (page, index) {
                 if (descents[0].page.address % 2) {
-                    callback(null, new Cursor(createJournal(), descents, false, key))
+                    return [ new Cursor(createJournal(), descents, false, key) ]
                 } else {
                     descents[0].index--
-                    toLeaf(descents[0].right, descents, null, exclusive, callback)
+                    toLeaf(descents[0].right, descents, null, exclusive, step())
                 }
-            }
-        }
+            })
+        })
     }
 
     function toLeaf (sought, descents, key, exclusive, callback) {
