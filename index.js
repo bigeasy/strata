@@ -316,6 +316,154 @@ Cursor.prototype.remove = cadence(function (step, index) {
     })
 })
 
+function Descent (sheaf, locker, override) {
+    ok(locker instanceof Locker)
+
+    override = override || {}
+
+    this. exclusive = override.exclusive || false
+    this.depth = override.depth == null ? -1 : override.depth
+    this.indexes = override.indexes || {}
+    this.sheaf = sheaf
+    this.greater = override.greater
+    this.lesser = override.lesser
+    this.page = override.page
+    this._index = override.index == null ? 0 : override.index
+    this.locker = locker
+    this.descent = {}
+
+    if (!this.page) {
+        this.locker.lock(-2, false, function (error, page) {
+            ok(!error, 'impossible error')
+            this.page = page
+        }.bind(this))
+        ok(this.page, 'dummy page not in cache')
+    } else {
+        this.locker.increment(this.page)
+    }
+}
+
+function _locker () { return locker }
+
+function _page () { return page }
+
+
+Descent.prototype.__defineSetter__('index', function (i) {
+    this.indexes[this.page.address] = this._index = i
+})
+
+Descent.prototype.__defineGetter__('index', function () {
+    return this._index
+})
+
+function _indexes () { return indexes }
+
+function _lesser () { return lesser }
+
+function _greater () { return greater }
+
+Descent.prototype.fork = function () {
+    return new Descent(this.sheaf, this.locker, {
+        page: this.page,
+        exclusive: this.exclusive,
+        depth: this.depth,
+        index: this.index,
+        indexes: extend({}, this.indexes)
+    })
+}
+
+Descent.prototype.exclude = function () {
+    this.exclusive = true
+}
+
+Descent.prototype.upgrade = cadence(function (step) {
+    step([function () {
+        this.locker.unlock(this.page)
+        this.locker.lock(this.page.address, this.exclusive = true, step())
+    }, function (errors) {
+        this.locker.lock(-2, false, function (error, locked) {
+            ok(!error, 'impossible error')
+            this.page = locked
+        }.bind(this))
+        ok(this.page, 'dummy page not in cache')
+        throw errors
+    }], function (locked) {
+        this.page = locked
+    })
+})
+
+Descent.prototype.key = function (key) {
+    return function (callback) {
+        return this.sheaf._find(this.page, key, this.page.address % 2 ? this.page.ghosts : 1, callback)
+    }
+}
+
+Descent.prototype.left = function (callback) { callback(null, this.page.ghosts || 0) }
+
+Descent.prototype.right = function (callback) { callback(null, (this.page.addresses || this.page.positions).length - 1) }
+
+Descent.prototype.found = function (keys) {
+    return function () {
+        return this.page.addresses[0] != 0 && this.index != 0 && keys.some(function (key) {
+            return this.sheaf.comparator(this.page.cache[this.page.addresses[this.index]].key,  key) == 0
+        }, this)
+    }
+}
+
+Descent.prototype.child = function (address) { return function () { return this.page.addresses[this.index] == address } }
+
+Descent.prototype.address = function (address) { return function () { return this.page.address == address } }
+
+Descent.prototype.penultimate = function () { return this.page.addresses[0] % 2 }
+
+Descent.prototype.leaf = function () { return this.page.address % 2 }
+
+Descent.prototype.level = function (level) {
+    return function () { return level == this.depth }
+}
+
+Descent.prototype.unlocker = function (parent) {
+    this.locker.unlock(parent)
+}
+
+function unlocker_ ($unlocker) { unlocker = $unlocker }
+
+Descent.prototype.descend = cadence(function (step, next, stop) {
+    ok(next)
+    ok(stop)
+    var above = this.page
+
+    var loop = step(function () {
+        if (stop.call(this)) {
+            return [ loop, this.page, this.index ]
+        } else {
+            if (this.index + 1 < this.page.addresses.length) {
+                this.greater = this.page.address
+            }
+            if (this.index > 0) {
+                this.lesser = this.page.address
+            }
+            this.locker.lock(this.page.addresses[this.index], this.exclusive, step())
+        }
+    }, function (locked) {
+        this.depth++
+        this.unlocker(this.page, locked)
+        this.page = locked
+        next.call(this,step())
+    }, function ($index) {
+        if (!(this.page.address % 2) && $index < 0) {
+            this.index = (~$index) - 1
+        } else {
+            this.index = $index
+        }
+        this.indexes[this.page.address] = this.index
+        if (!(this.page.address % 2)) {
+            ok(this.page.addresses.length, 'page has addresses')
+            ok(this.page.cache[this.page.addresses[0]] == (void(0)), 'first key is cached')
+        }
+    })()
+})
+
 function Strata (options) {
     var writeFooter = cadence(function (step, out, position, page) {
         ok(page.address % 2 && page.bookmark != null)
@@ -1118,153 +1266,6 @@ function Strata (options) {
         })()
     })
 
-    function Descent (locker, override) {
-        override = override || {}
-
-        var exclusive = override.exclusive || false,
-            depth = override.depth == null ? -1 : override.depth,
-            index = override.index == null ? 0 : override.index,
-            page = override.page,
-            indexes = override.indexes || {},
-            descent = {},
-            greater = override.greater, lesser = override.lesser,
-            called
-
-        if (!page) {
-            locker.lock(-2, false, function (error, $page) {
-                ok(!error, 'impossible error')
-                page = $page
-            })
-            ok(page, 'dummy page not in cache')
-        } else {
-            locker.increment(page)
-        }
-
-        function _locker () { return locker }
-
-        function _page () { return page }
-
-        function _index () { return index }
-
-        function index_ (i) { indexes[page.address] = index = i }
-
-        function _indexes () { return indexes }
-
-        function _depth () { return depth }
-
-        function _lesser () { return lesser }
-
-        function _greater () { return greater }
-
-        function fork () {
-            return new Descent(locker, {
-                page: page,
-                exclusive: exclusive,
-                depth: depth,
-                index: index,
-                indexes: extend({}, indexes)
-            })
-        }
-
-        function exclude () { exclusive = true }
-
-        var upgrade = cadence(function (step) {
-            step([function () {
-                locker.unlock(page)
-                locker.lock(page.address, exclusive = true, step())
-            }, function (errors) {
-                locker.lock(-2, false, function (error, locked) {
-                    ok(!error, 'impossible error')
-                    page = locked
-                })
-                ok(page, 'dummy page not in cache')
-                throw errors
-            }], function (locked) {
-                page = locked
-            })
-        })
-
-        function key (key) {
-            return function (callback) {
-                var found = sheaf._find(page, key, page.address % 2 ? page.ghosts : 1, callback)
-                return found
-            }
-        }
-
-        function left (callback) { callback(null, page.ghosts || 0) }
-
-        function right (callback) { callback(null, (page.addresses || page.positions).length - 1) }
-
-        function found (keys) {
-            return function () {
-                return page.addresses[0] != 0 && index != 0 && keys.some(function (key) {
-                    return comparator(page.cache[page.addresses[index]].key,  key) == 0
-                })
-            }
-        }
-
-        function child (address) { return function () { return page.addresses[index] == address } }
-
-        function address (address) { return function () { return page.address == address } }
-
-        function penultimate () { return page.addresses[0] % 2 }
-
-        function leaf () { return page.address % 2 }
-
-        function level (level) {
-            return function () { return level == depth }
-        }
-
-        function unlocker (parent) {
-            locker.unlock(parent)
-        }
-
-        function unlocker_ ($unlocker) { unlocker = $unlocker }
-
-        var descend = cadence(function (step, next, stop) {
-            var above = page
-
-            var loop = step(function () {
-                if (stop()) {
-                    return [ loop, page, index ]
-                } else {
-                    if (index + 1 < page.addresses.length) {
-                        greater = page.address
-                    }
-                    if (index > 0) {
-                        lesser = page.address
-                    }
-                    locker.lock(page.addresses[index], exclusive, step())
-                }
-            }, function (locked) {
-                depth++
-                unlocker(page, locked)
-                page = locked
-                next(step())
-            }, function ($index) {
-                if (!(page.address % 2) && $index < 0) {
-                    index = (~$index) - 1
-                } else {
-                    index = $index
-                }
-                indexes[page.address] = index
-                if (!(page.address % 2)) {
-                    ok(page.addresses.length, 'page has addresses')
-                    ok(page.cache[page.addresses[0]] == (void(0)), 'first key is cached')
-                }
-            })()
-        })
-
-        classify.call(this, descend, fork, exclude, upgrade,
-                                   key, left, right,
-                                   found, address, child, penultimate, leaf, level,
-                                   _locker, _page, _depth, _index, index_, _indexes, _lesser, _greater,
-                                   unlocker_)
-        this.upgrade = upgrade
-        this.descend = descend
-        return this
-    }
-
     function Balancer () {
         var lengths = {},
             operations = [],
@@ -1330,7 +1331,7 @@ function Strata (options) {
                 }, function (node) {
                     if (!(node.length - length < 0)) return
                     if (node.address != 1 && ! node.left) step(function () {
-                        var descent = new Descent(locker)
+                        var descent = new Descent(sheaf, locker)
                         step(function () {
                             descent.descend(descent.key(node.key), descent.found([node.key]), step())
                         }, function () {
@@ -1502,7 +1503,7 @@ function Strata (options) {
                         key = rekey
                     })
                 }, function () {
-                    descents.push(penultimate = new Descent(locker))
+                    descents.push(penultimate = new Descent(sheaf, locker))
 
                     penultimate.descend(address == 1 ? penultimate.left : penultimate.key(key),
                                         penultimate.penultimate, step())
@@ -1612,7 +1613,7 @@ function Strata (options) {
                     descents.forEach(function (descent) { locker.unlock(descent.page) })
                     locker.dispose()
                 }], function () {
-                    descents.push(parent = new Descent(locker))
+                    descents.push(parent = new Descent(sheaf, locker))
                     parent.descend(parent.key(key), parent.child(address), step())
                 }, function () {
                     parent.upgrade(step())
@@ -1778,7 +1779,7 @@ function Strata (options) {
                 descents.forEach(function (descent) { locker.unlock(descent.page) })
                 locker.dispose()
             }], function () {
-                descents.push(pivot = new Descent(locker))
+                descents.push(pivot = new Descent(sheaf, locker))
                 pivot.descend(pivot.key(key), pivot.found([key]), step())
             }, function () {
                 pivot.upgrade(step())
@@ -1801,6 +1802,8 @@ function Strata (options) {
             function createSingleUnlocker (singles) {
                 ok(singles != null, 'null singles')
                 return function (parent, child) {
+                    console.log('super called')
+                    console.log(child.addresses)
                     if (child.addresses.length == 1) {
                         if (singles.length == 0) singles.push(parent)
                         singles.push(child)
@@ -1828,7 +1831,7 @@ function Strata (options) {
                     })
                     locker.dispose()
                 }], function () {
-                    descents.push(pivot = new Descent(locker))
+                    descents.push(pivot = new Descent(sheaf, locker))
                     pivot.descend(pivot.key(key), pivot.found(keys), step())
                 }, function () {
                     var found = pivot.page.cache[pivot.page.addresses[pivot.index]].key
@@ -1867,6 +1870,7 @@ function Strata (options) {
                             ghosted = { page: singles.left[0], index: parents.left.indexes[singles.left[0].address] }
                         } else {
                             ghosted = { page: parents.left.page, index: parents.left.index }
+                            console.log(parents.left.index, parents.left.indexes, parents.left.page.address)
                             ok(parents.left.index == parents.left.indexes[parents.left.page.address], 'TODO: ok to replace the above')
                         }
                     }
@@ -2012,15 +2016,15 @@ function Strata (options) {
                     descents.forEach(function (descent) { locker.unlock(descent.page) })
                     locker.dispose()
                 }], function () {
-                    descents.push(center = new Descent(locker))
+                    descents.push(center = new Descent(sheaf, locker))
                     center.descend(center.key(key), center.address(address), step())
                 }, function () {
                     if (center.lesser != null) {
-                        goToPage(lesser = new Descent(locker), center.lesser, 'right', step())
+                        goToPage(lesser = new Descent(sheaf, locker), center.lesser, 'right', step())
                     }
                 }, function () {
                     if (center.greater != null) {
-                        goToPage(greater = new Descent(locker), center.greater, 'left', step())
+                        goToPage(greater = new Descent(sheaf, locker), center.greater, 'left', step())
                     }
                 }, function () {
                     if (lesser && lesser.page.addresses.length + center.page.addresses.length <= options.branchSize) {
@@ -2086,7 +2090,7 @@ function Strata (options) {
                 descents.forEach(function (descent) { locker.unlock(descent.page) })
                 locker.dispose()
             }], function () {
-                descents.push(root = new Descent(locker))
+                descents.push(root = new Descent(sheaf, locker))
                 root.exclude()
                 root.descend(root.left, root.level(0), step())
             }, function () {
@@ -2149,7 +2153,7 @@ function Strata (options) {
             step(function () {
                 descents[0].descend(descents[0].key(key), function () {
                     return conditions.some(function (condition) {
-                        return condition()
+                        return condition.call(descents[0])
                     })
                 }, step())
             }, function (page, index) {
@@ -2164,6 +2168,7 @@ function Strata (options) {
     }
 
     var toLeaf = cadence(function (step, sought, descents, key, exclusive) {
+        ok(sought)
         thrownByUser = null
         step(function () {
             descents[0].descend(sought, descents[0].penultimate, step())
@@ -2177,7 +2182,7 @@ function Strata (options) {
 
     // to user land
     var cursor = cadence(function (step, key, exclusive) {
-        var descents = [ new Descent(createLocker()) ]
+        var descents = [ new Descent(sheaf, createLocker()) ]
         step([function () {
             if (descents.length) {
                 descents[0].locker.unlock(descents[0].page)
