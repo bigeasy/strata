@@ -1,7 +1,8 @@
 var Cache = require('magazine'),
     Journalist = require('journalist'),
     Rescue = require('rescue'),
-    cadence = require('cadence')
+    cadence = require('cadence'),
+    ok = require('assert').ok
 
 // todo: temporary
 var scram = require('./scram')
@@ -34,6 +35,114 @@ function classify () {
             this[arguments[i].name] = arguments[i]
     }
     return this
+}
+
+function Locker (tracer, sheaf, magazine) {
+    ok(arguments.length, 'no arguments')
+    this._locks = {}
+    this._tracer = tracer
+    this._sheaf = sheaf
+    this._magazine = magazine
+}
+
+Locker.prototype.lock = cadence(function (step, address, exclusive) {
+    var cartridge = this._magazine.hold(address, {}),
+        page = cartridge.value.page,
+        locked
+
+    ok(!this._locks[address], 'address already locked by this locker')
+
+    if (!page)  {
+        if (address % 2) {
+            page = this._sheaf.createLeaf({ address: address })
+        } else {
+            page = this._sheaf.createBranch({ address: address })
+        }
+        cartridge.value.page = page
+        var loaded = function (error) {
+            if (error) {
+                cartridge.value.page = null
+                cartridge.adjustHeft(-cartridge.heft)
+            }
+            this._locks[page.address].unlock(error, page)
+        }.bind(this)
+        this._locks[page.address] = page.queue.createLock()
+        this._locks[page.address].exclude(function () {
+            if (page.address % 2) {
+                this._sheaf.readLeaf(page, loaded)
+            } else {
+                this._sheaf.readBranch(page, loaded)
+            }
+        }.bind(this))
+    } else {
+        this._locks[page.address] = page.queue.createLock()
+    }
+
+    step([function () {
+        step(function () {
+            this._locks[page.address][exclusive ? 'exclude' : 'share'](step())
+        },
+        function () {
+            this._tracer('lock', { address: address, exclusive: exclusive }, step())
+        }, function () {
+            locked = true
+            return [ page ]
+        })
+    }, function (errors, error) {
+        // todo: if you don't return something, then the return is the
+        // error, but what else could it be? Document that behavior, or
+        // set a reasonable default.
+        this._magazine.get(page.address).release()
+        this._locks[page.address].unlock(error)
+        delete this._locks[page.address]
+        throw errors
+    }])
+})
+
+Locker.prototype.encache = function (page) {
+    this._magazine.hold(page.address, { page: page })
+    this._locks[page.address] = page.queue.createLock()
+    this._locks[page.address].exclude(function () {})
+    return page
+}
+
+Locker.prototype.checkCacheSize = function (page) {
+    var size = 0, position
+    if (page.address != -2) {
+        if (page.address % 2) {
+            if (page.positions.length) {
+                size += JSON.stringify(page.positions).length
+                size += JSON.stringify(page.lengths).length
+            }
+        } else {
+            if (page.addresses.length) {
+                size += JSON.stringify(page.addresses).length
+            }
+        }
+        for (position in page.cache) {
+            size += page.cache[position].size
+        }
+    }
+    ok(size == this._magazine.get(page.address).heft, 'sizes are wrong')
+}
+
+Locker.prototype.unlock = function (page) {
+    this.checkCacheSize(page)
+    this._locks[page.address].unlock(null, page)
+    if (!this._locks[page.address].count) {
+        delete this._locks[page.address]
+    }
+    this._magazine.get(page.address).release()
+}
+
+Locker.prototype.increment = function (page) {
+    this._locks[page.address].increment()
+    this._magazine.hold(page.address)
+}
+
+Locker.prototype.dispose = function () {
+    ok(!Object.keys(this._locks).length, 'locks outstanding')
+    this._locks = null
 }
 
 function Strata (options) {
@@ -689,11 +798,15 @@ function Strata (options) {
         return magazine
     }
 
+    function createLocker () {
+        return new Locker(tracer, sheaf, magazine)
+    }
+
     // to user land
     var create = cadence(function (step) {
         magazine = createMagazine()
 
-        var locker = new Locker, count = 0, root, leaf, journal
+        var locker = createLocker(), count = 0, root, leaf, journal
 
         step([function () {
             locker.dispose()
@@ -833,112 +946,6 @@ function Strata (options) {
         })()
     })
 
-    function Locker () {
-        this._locks = {}
-        this._sheaf = sheaf
-        this._magazine = magazine
-    }
-
-    Locker.prototype.lock = cadence(function (step, address, exclusive) {
-        var cartridge = this._magazine.hold(address, {}),
-            page = cartridge.value.page,
-            locked
-
-        ok(!this._locks[address], 'address already locked by this locker')
-
-        if (!page)  {
-            if (address % 2) {
-                page = this._sheaf.createLeaf({ address: address })
-            } else {
-                page = this._sheaf.createBranch({ address: address })
-            }
-            cartridge.value.page = page
-            var loaded = function (error) {
-                if (error) {
-                    cartridge.value.page = null
-                    cartridge.adjustHeft(-cartridge.heft)
-                }
-                this._locks[page.address].unlock(error, page)
-            }.bind(this)
-            this._locks[page.address] = page.queue.createLock()
-            this._locks[page.address].exclude(function () {
-                if (page.address % 2) {
-                    this._sheaf.readLeaf(page, loaded)
-                } else {
-                    this._sheaf.readBranch(page, loaded)
-                }
-            }.bind(this))
-        } else {
-            this._locks[page.address] = page.queue.createLock()
-        }
-
-        step([function () {
-            step(function () {
-                this._locks[page.address][exclusive ? 'exclude' : 'share'](step())
-            },
-            function () {
-                tracer('lock', { address: address, exclusive: exclusive }, step())
-            }, function () {
-                locked = true
-                return [ page ]
-            })
-        }, function (errors, error) {
-            // todo: if you don't return something, then the return is the
-            // error, but what else could it be? Document that behavior, or
-            // set a reasonable default.
-            this._magazine.get(page.address).release()
-            this._locks[page.address].unlock(error)
-            delete this._locks[page.address]
-            throw errors
-        }])
-    })
-
-    Locker.prototype.encache = function (page) {
-        this._magazine.hold(page.address, { page: page })
-        this._locks[page.address] = page.queue.createLock()
-        this._locks[page.address].exclude(function () {})
-        return page
-    }
-
-    Locker.prototype.checkCacheSize = function (page) {
-        var size = 0, position
-        if (page.address != -2) {
-            if (page.address % 2) {
-                if (page.positions.length) {
-                    size += JSON.stringify(page.positions).length
-                    size += JSON.stringify(page.lengths).length
-                }
-            } else {
-                if (page.addresses.length) {
-                    size += JSON.stringify(page.addresses).length
-                }
-            }
-            for (position in page.cache) {
-                size += page.cache[position].size
-            }
-        }
-        ok(size == this._magazine.get(page.address).heft, 'sizes are wrong')
-    }
-
-    Locker.prototype.unlock = function (page) {
-        this.checkCacheSize(page)
-        this._locks[page.address].unlock(null, page)
-        if (!this._locks[page.address].count) {
-            delete this._locks[page.address]
-        }
-        this._magazine.get(page.address).release()
-    }
-
-    Locker.prototype.increment = function (page) {
-        this._locks[page.address].increment()
-        this._magazine.hold(page.address)
-    }
-
-    Locker.prototype.dispose = function () {
-        ok(!Object.keys(this._locks).length, 'locks outstanding')
-        this._locks = null
-    }
-
     function Descent (locker, override) {
         override = override || {}
 
@@ -953,6 +960,7 @@ function Strata (options) {
 
         if (!page) {
             locker.lock(-2, false, function (error, $page) {
+                console.log(error)
                 ok(!error, 'impossible error')
                 page = $page
             })
@@ -1312,7 +1320,7 @@ function Strata (options) {
         })
 
         var balance = cadence(function balance (step) {
-            var locker = new Locker, address
+            var locker = createLocker(), address
 
             var _gather = cadence(function (step, address, length) {
                 var right, node
@@ -1483,7 +1491,7 @@ function Strata (options) {
         }
 
         var splitLeaf = cadence(function (step, address, key, ghosts) {
-            var locker = new Locker,
+            var locker = createLocker(),
                 descents = [], replacements = [], encached = [],
                 completed = 0,
                 penultimate, leaf, split, pages, page,
@@ -1597,7 +1605,7 @@ function Strata (options) {
         classify.call(methods,mergeLeaves)
 
         var splitBranch = cadence(function (step, address, key) {
-            var locker = new Locker,
+            var locker = createLocker(),
                 descents = [],
                 children = [],
                 encached = [],
@@ -1675,7 +1683,7 @@ function Strata (options) {
         })
 
         var drainRoot = cadence(function (step) {
-            var locker = new Locker,
+            var locker = createLocker(),
                 keys = {}, children = [], locks = [],
                 root, pages, records, remainder
 
@@ -1770,7 +1778,7 @@ function Strata (options) {
         })
 
         var deleteGhost = cadence(function (step, key) {
-            var locker = new Locker,
+            var locker = createLocker(),
                 descents = [],
                 pivot, leaf, fd
             step([function () {
@@ -1793,7 +1801,7 @@ function Strata (options) {
         methods.deleteGhost = deleteGhost
 
         var mergePages = cadence(function (step, key, leftKey, stopper, merger, ghostly) {
-            var locker = new Locker,
+            var locker = createLocker(),
                 descents = [], singles = { left: [], right: [] }, parents = {}, pages = {},
                 ancestor, pivot, empties, ghosted, designation
 
@@ -1992,7 +2000,7 @@ function Strata (options) {
         }
 
         var chooseBranchesToMerge = cadence(function (step, key, address) {
-            var locker = new Locker,
+            var locker = createLocker(),
                 descents = [],
                 designator, choice, lesser, greater, center
 
@@ -2079,7 +2087,7 @@ function Strata (options) {
         }
 
         var fillRoot = cadence(function (step) {
-            var locker = new Locker, descents = [], root, child
+            var locker = createLocker(), descents = [], root, child
 
             step([function () {
                 descents.forEach(function (descent) { locker.unlock(descent.page) })
@@ -2176,7 +2184,7 @@ function Strata (options) {
 
     // to user land
     var cursor = cadence(function (step, key, exclusive) {
-        var descents = [ new Descent(new Locker) ]
+        var descents = [ new Descent(createLocker()) ]
         step([function () {
             if (descents.length) {
                 descents[0].locker.unlock(descents[0].page)
@@ -2208,7 +2216,7 @@ function Strata (options) {
 
     // to user land
     var vivify = cadence(function (step) {
-        var locker = new Locker, root
+        var locker = createLocker(), root
 
         function record (address) {
             return { address: address }
