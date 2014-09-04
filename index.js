@@ -145,6 +145,177 @@ Locker.prototype.dispose = function () {
     this._locks = null
 }
 
+function Cursor (sheaf, journal, descents, exclusive, searchKey) {
+    this._journal = journal
+    this._sheaf = sheaf
+    this._locker = descents[0].locker
+    this._page = descents[0].page
+    this._rightLeafKey = null
+    this._searchKey = searchKey
+    this.exclusive = exclusive
+    this.length = this._page.positions.length
+    this.index = descents[0].index
+    this.offset = this.index < 0 ? ~ this.index : this.index
+
+    descents.shift()
+}
+
+// to user land
+Cursor.prototype.get = cadence(function (step, index) {
+    step(function () {
+        this._sheaf.stash(this._page, index, step())
+    }, function (entry, size) {
+        return [ entry.record, entry.key, size ]
+    })
+})
+
+// to user land
+Cursor.prototype.next = cadence(function (step) {
+    var next
+    this._rightLeafKey = null
+
+    if (!this._page.right) {
+        // return [ step, false ] <- return immediately!
+        return [ false ]
+    }
+
+    step(function () {
+        this._locker.lock(this._page.right, this.exclusive, step())
+    }, function (next) {
+        this._locker.unlock(this._page)
+
+        this._page = next
+
+        this.offset = this._page.ghosts
+        this.length = this._page.positions.length
+
+        return [ true ]
+    })
+})
+
+// to user land
+Cursor.prototype.indexOf = function (key, callback) {
+    this._sheaf._find(this._page, key, this._page.ghosts, callback)
+}
+
+// todo: pass an integer as the first argument to force the arity of the
+// return.
+Cursor.prototype._unlock = cadence(function (step) {
+    step([function () {
+        this._locker.unlock(this._page)
+        this._locker.dispose()
+    }], function () {
+        this._journal.close('leaf', step(0))
+    })
+})
+
+Cursor.prototype.unlock = function (callback) {
+    ok(callback, 'unlock now requires a callback')
+    this._unlock(callback)
+}
+
+// note: exclusive, index, offset and length are public
+
+Cursor.prototype.__defineGetter__('address', function () {
+    return this._page.address
+})
+
+Cursor.prototype.__defineGetter__('right', function () {
+    return this._page.right
+})
+
+Cursor.prototype.__defineGetter__('ghosts', function () {
+    return this._page.ghosts
+})
+
+Cursor.prototype.insert = cadence(function (step, record, key, index) {
+    ok(this.exclusive, 'cursor is not exclusive')
+
+    var unambiguous
+
+    var block = step(function () {
+        if (index == 0 && this._page.address != 1) {
+            return [ block, -1 ]
+        }
+
+        unambiguous = index < this._page.positions.length
+        unambiguous = unambiguous || this._searchKey.length && this._sheaf.comparator(this._searchKey[0], key) == 0
+        unambiguous = unambiguous || ! this._page.right
+
+        if (!unambiguous) step(function () {
+            if (!this._rightLeafKey) step(function () {
+                this._locker.lock(this._page.right, false, step())
+            }, function (rightLeafPage) {
+                step(function () {
+                    this._sheaf.stash(rightLeafPage, 0, step())
+                }, [function () {
+                    this._locker.unlock(rightLeafPage)
+                }], function (entry) {
+                    this._rightLeafKey = entry.key
+                })
+            })
+        }, function  () {
+            if (this._sheaf.comparator(key, this._rightLeafKey) >= 0) {
+                return [ block, +1 ]
+            }
+        })
+    }, function () {
+        var entry
+        this._sheaf.balancer.unbalanced(this._page)
+        step(function () {
+            entry = this._journal.open(this._sheaf.filename(this._page.address), this._page.position, this._page)
+            this._sheaf.journalist.purge(step())
+        }, function () {
+            entry.ready(step())
+        }, function () {
+            scram.call(this, entry, cadence(function (step) {
+                step(function () {
+                    this._sheaf.writeInsert(entry, this._page, index, record, step())
+                }, function (position, length, size) {
+                    this._sheaf.splice('positions', this._page, index, 0, position)
+                    this._sheaf.splice('lengths', this._page, index, 0, length)
+                    this._sheaf._cacheRecord(this._page, position, record, size)
+                    this.length = this._page.positions.length
+                }, function () {
+                    step(function () {
+                        entry.close('entry', step())
+                    }, function () {
+                        return [ 0 ]
+                    })
+                })
+            }), step())
+        })
+    })(1)
+})
+
+Cursor.prototype.remove = cadence(function (step, index) {
+    var ghost = this._page.address != 1 && index == 0, entry
+    this._sheaf.balancer.unbalanced(this._page)
+    step(function () {
+        this._sheaf.journalist.purge(step())
+    }, function () {
+        entry = this._journal.open(this._sheaf.filename(this._page.address), this._page.position, this._page)
+        entry.ready(step())
+    }, function () {
+        scram.call(this, entry, cadence(function (step) {
+            step(function () {
+                this._sheaf.writeDelete(entry, this._page, index, step())
+            }, function () {
+                if (ghost) {
+                    this._page.ghosts++
+                    this.offset || this.offset++
+                } else {
+                    this._sheaf.uncacheEntry(this._page, this._page.positions[index])
+                    this._sheaf.splice('positions', this._page, index, 1)
+                    this._sheaf.splice('lengths', this._page, index, 1)
+                }
+            }, function () {
+                entry.close('entry', step())
+            })
+        }), step())
+    })
+})
+
 function Strata (options) {
     var writeFooter = cadence(function (step, out, position, page) {
         ok(page.address % 2 && page.bookmark != null)
@@ -177,7 +348,6 @@ function Strata (options) {
         magazine,
         nextAddress = 0,
         length = 1024,
-        balancer = new Balancer(),
         balancing,
         size = 0,
         checksum,
@@ -257,14 +427,14 @@ function Strata (options) {
         return entry
     }
 
-    function filename (address, suffix) {
+    Sheaf.prototype.filename = function (address, suffix) {
         suffix || (suffix = '')
         return path.join(directory, address + suffix)
     }
 
     var replace = cadence(function (step, page, suffix) {
-        var replacement = filename(page.address, suffix),
-            permanent = filename(page.address)
+        var replacement = sheaf.filename(page.address, suffix),
+            permanent = sheaf.filename(page.address)
 
         step(function () {
             fs.stat(replacement, step())
@@ -281,11 +451,11 @@ function Strata (options) {
     })
 
     function rename (page, from, to, callback) {
-        fs.rename(filename(page.address, from), filename(page.address, to), callback)
+        fs.rename(sheaf.filename(page.address, from), sheaf.filename(page.address, to), callback)
     }
 
     function unlink (page, suffix, callback) {
-        fs.unlink(filename(page.address, suffix), callback)
+        fs.unlink(sheaf.filename(page.address, suffix), callback)
     }
 
     function heft (page, s) {
@@ -305,7 +475,7 @@ function Strata (options) {
         }, override, 0)
     }
 
-    function _cacheRecord (page, position, record, length) {
+    Sheaf.prototype._cacheRecord = function (page, position, record, length) {
         var key = extractor(record)
         ok(key != null, 'null keys are forbidden')
 
@@ -329,7 +499,7 @@ function Strata (options) {
         return entry
     }
 
-    function uncacheEntry (page, reference) {
+    Sheaf.prototype.uncacheEntry = function (page, reference) {
         var entry = page.cache[reference]
         ok (entry, 'entry not cached')
         heft(page, -entry.size)
@@ -395,12 +565,12 @@ function Strata (options) {
         })
     })
 
-    function writeInsert (out, page, index, record, callback) {
+    Sheaf.prototype.writeInsert = function (out, page, index, record, callback) {
         var header = [ ++page.entries, index + 1 ]
         writeEntry({ out: out, page: page, header: header, body: record }, callback)
     }
 
-    function writeDelete (out, page, index, callback) {
+    Sheaf.prototype.writeDelete = function (out, page, index, callback) {
         var header = [ ++page.entries, -(index + 1) ]
         writeEntry({ out: out, page: page, header: header }, callback)
     }
@@ -497,8 +667,8 @@ function Strata (options) {
             ok(!(positions.length % 2), 'expecting even number of positions and lengths')
             var lengths = positions.splice(positions.length / 2)
 
-            splice('positions', page, 0, 0, positions)
-            splice('lengths', page, 0, 0, lengths)
+            sheaf.splice('positions', page, 0, 0, positions)
+            sheaf.splice('lengths', page, 0, 0, lengths)
 
             page.bookmark = bookmark
 
@@ -508,7 +678,7 @@ function Strata (options) {
 
     Sheaf.prototype.readLeaf = cadence(function (step, page) {
         step(function () {
-            io('read', filename(page.address), step())
+            io('read', sheaf.filename(page.address), step())
         }, function (fd, stat, read) {
             step(function () {
                 if (options.replay) {
@@ -558,16 +728,16 @@ function Strata (options) {
                             if (leaf) {
                                 if (index > 0) {
                                     seen[position] = true
-                                    splice('positions', page, index - 1, 0, position)
-                                    splice('lengths', page, index - 1, 0, length)
-                                    _cacheRecord(page, position, entry.body, entry.length)
+                                    sheaf.splice('positions', page, index - 1, 0, position)
+                                    sheaf.splice('lengths', page, index - 1, 0, length)
+                                    sheaf._cacheRecord(page, position, entry.body, entry.length)
                                 } else if (~index == 0 && page.address != 1) {
                                     ok(!page.ghosts, 'double ghosts')
                                     page.ghosts++
                                 } else if (index < 0) {
-                                    var outgoing = splice('positions', page, -(index + 1), 1).shift()
-                                    if (seen[outgoing]) uncacheEntry(page, outgoing)
-                                    splice('lengths', page, -(index + 1), 1)
+                                    var outgoing = sheaf.splice('positions', page, -(index + 1), 1).shift()
+                                    if (seen[outgoing]) sheaf.uncacheEntry(page, outgoing)
+                                    sheaf.splice('lengths', page, -(index + 1), 1)
                                 } else {
                                     page.bookmark = {
                                         position: position,
@@ -578,7 +748,7 @@ function Strata (options) {
                             } else {
                                 /* if (index > 0) { */
                                     var address = header.address
-                                    splice('addresses', page, index - 1, 0, address)
+                                    sheaf.splice('addresses', page, index - 1, 0, address)
                                     if (index - 1) {
                                         encacheKey(page, address, entry.body, entry.length)
                                     }
@@ -614,7 +784,7 @@ function Strata (options) {
 
     var readRecord = cadence(function (step, page, position, length) {
         step(function () {
-            io('read', filename(page.address), step())
+            io('read', sheaf.filename(page.address), step())
         }, function (fd, stat, read) {
             step([function () {
                 // todo: test what happens when a finalizer throws an error
@@ -634,7 +804,7 @@ function Strata (options) {
         var cache = {}, index = 0, out
 
         step(function () {
-            out = journal.leaf.open(filename(page.address, suffix), 0, page)
+            out = journal.leaf.open(sheaf.filename(page.address, suffix), 0, page)
             out.ready(step())
         }, [function () {
             // todo: ensure that cadence finalizers are registered in order.
@@ -645,8 +815,8 @@ function Strata (options) {
             page.position = 0
             page.entries = 0
 
-            var positions = splice('positions', page, 0, page.positions.length)
-            var lengths = splice('lengths', page, 0, page.lengths.length)
+            var positions = sheaf.splice('positions', page, 0, page.positions.length)
+            var lengths = sheaf.splice('lengths', page, 0, page.lengths.length)
 
             step(function () {
                 writePositions(out, page, step())
@@ -654,15 +824,15 @@ function Strata (options) {
                 step(function (position) {
                     var length = lengths.shift()
                     step(function () {
-                        stash(page, position, length, step())
+                        sheaf.stash(page, position, length, step())
                     }, function (entry) {
                         step(function () {
-                            uncacheEntry(page, position)
-                            writeInsert(out, page, index++, entry.record, step())
+                            sheaf.uncacheEntry(page, position)
+                            sheaf.writeInsert(out, page, index++, entry.record, step())
                         }, function (position, length) {
                             cache[position] = entry
-                            splice('positions', page, page.positions.length, 0, position)
-                            splice('lengths', page, page.lengths.length, 0, length)
+                            sheaf.splice('positions', page, page.positions.length, 0, position)
+                            sheaf.splice('lengths', page, page.lengths.length, 0, length)
                         })
                     })
                 })(positions)
@@ -682,7 +852,10 @@ function Strata (options) {
     })
 
     function Sheaf () {
+        this.journalist = journalist
+        this.balancer = new Balancer
         this._sequester = sequester
+        this.comparator = comparator
     }
 
     Sheaf.prototype.createPage = function (page, override, remainder) {
@@ -702,10 +875,9 @@ function Strata (options) {
             queue: this._sequester.createQueue()
         }, override, 1)
     }
-
     var sheaf = new Sheaf
 
-    function splice (collection, page, offset, length, insert) {
+    Sheaf.prototype.splice = function (collection, page, offset, length, insert) {
         ok(typeof collection == 'string', 'incorrect collection passed to splice')
 
         var values = page[collection], json, removals
@@ -754,7 +926,7 @@ function Strata (options) {
             page.entries = 0
             page.position = 0
 
-            out = journal.branch.open(filename(page.address, suffix), 0, page)
+            out = journal.branch.open(sheaf.filename(page.address, suffix), 0, page)
             out.ready(step())
         }, [function () {
             out.scram(step())
@@ -778,7 +950,7 @@ function Strata (options) {
 
     Sheaf.prototype.readBranch = cadence(function (step, page) {
         step(function () {
-            io('read', filename(page.address), step())
+            io('read', sheaf.filename(page.address), step())
         }, function (fd, stat, read) {
             replay(fd, stat, read, page, 0, step())
         })
@@ -821,7 +993,7 @@ function Strata (options) {
 
             root = locker.encache(sheaf.createBranch({ penultimate: true }))
             leaf = locker.encache(sheaf.createLeaf({}))
-            splice('addresses', root, 0, 0, leaf.address)
+            sheaf.splice('addresses', root, 0, 0, leaf.address)
 
             writeBranch(root, '.replace', step())
         }, [function () {
@@ -885,7 +1057,7 @@ function Strata (options) {
         })
     })
 
-    var stash = cadence(function (step, page, positionOrIndex, length) {
+    Sheaf.prototype.stash = cadence(function (step, page, positionOrIndex, length) {
         var position = positionOrIndex
         if (arguments.length == 3) {
             position = page.positions[positionOrIndex]
@@ -902,18 +1074,18 @@ function Strata (options) {
                     delete page.loaders[position]
                     if (!error) {
                         delete page.cache[position]
-                        var entry = _cacheRecord(page, position, entry.body, entry.length)
+                        var entry = sheaf._cacheRecord(page, position, entry.body, entry.length)
                     }
                     loader.unlock(error, entry, length)
                 })
             })
-            stash(page, position, length, step())
+            sheaf.stash(page, position, length, step())
         } else {
             return [ entry, length ]
         }
     })
 
-    var _find = cadence(function (step, page, key, low) {
+    Sheaf.prototype._find = cadence(function (step, page, key, low) {
         var mid, high = (page.addresses || page.positions).length - 1
 
         if (page.address % 2 == 0) {
@@ -930,7 +1102,7 @@ function Strata (options) {
         var loop = step(function () {
             if (low <= high) {
                 mid = low + ((high - low) >>> 1)
-                stash(page, mid, step())
+                sheaf.stash(page, mid, step())
             } else {
                 return [ loop, ~low ]
             }
@@ -960,7 +1132,6 @@ function Strata (options) {
 
         if (!page) {
             locker.lock(-2, false, function (error, $page) {
-                console.log(error)
                 ok(!error, 'impossible error')
                 page = $page
             })
@@ -1015,7 +1186,7 @@ function Strata (options) {
 
         function key (key) {
             return function (callback) {
-                var found = _find(page, key, page.address % 2 ? page.ghosts : 1, callback)
+                var found = sheaf._find(page, key, page.address % 2 ? page.ghosts : 1, callback)
                 return found
             }
         }
@@ -1094,184 +1265,6 @@ function Strata (options) {
         return this
     }
 
-    function Cursor (journal, descents, exclusive, searchKey) {
-        var locker = descents[0].locker,
-            page = descents[0].page,
-            rightLeafKey = null,
-            length = page.positions.length,
-            index = descents[0].index,
-            offset = index < 0 ? ~ index : index
-
-        descents.shift()
-
-        // to user land
-        var get = cadence(function (step, index) {
-            step(function () {
-                stash(page, index, step())
-            }, function (entry, size) {
-                return [ entry.record, entry.key, size ]
-            })
-        })
-
-        // to user land
-        var next = cadence(function (step) {
-            var next
-            rightLeafKey = null
-
-            if (!page.right) {
-                // return [ step, false ] <- return immediately!
-                return [ false ]
-            }
-
-            step(function () {
-                locker.lock(page.right, exclusive, step())
-            }, function (next) {
-                locker.unlock(page)
-
-                page = next
-
-                offset = page.ghosts
-                length = page.positions.length
-
-                return [ true ]
-            })
-        })
-
-        function indexOf (key, callback) {
-            _find(page, key, page.ghosts, callback)
-        }
-
-        // todo: pass an integer as the first argument to force the arity of the
-        // return.
-        var _unlock = cadence(function (step) {
-            step([function () {
-                locker.unlock(page)
-                locker.dispose()
-            }], function () {
-                journal.close('leaf', step(0))
-            })
-        })
-
-        function unlock (callback) {
-            ok(callback, 'unlock now requires a callback')
-            _unlock(callback)
-        }
-
-        function _index () { return index }
-
-        function _offset () { return offset }
-
-        function _length () { return length }
-
-        function _ghosts () { return page.ghosts }
-
-        function _address () { return page.address }
-
-        function _right () { return page.right }
-
-        function _exclusive () { return exclusive }
-
-        classify.call(this, unlock, indexOf, get, next,
-                            _index, _offset, _length, _ghosts, _address, _right, _exclusive)
-        this.next = next
-        this.get = get
-
-        if (!exclusive) return this
-
-        // to user land
-        var insert = cadence(function (step, record, key, index) {
-            var unambiguous
-
-            var block = step(function () {
-                if (index == 0 && page.address != 1) {
-                    return [ block, -1 ]
-                }
-
-                unambiguous = index < page.positions.length
-                unambiguous = unambiguous || searchKey.length && comparator(searchKey[0], key) == 0
-                unambiguous = unambiguous || ! page.right
-
-                if (!unambiguous) step(function () {
-                    if (!rightLeafKey) step(function () {
-                        locker.lock(page.right, false, step())
-                    }, function (rightLeafPage) {
-                        step(function () {
-                            stash(rightLeafPage, 0, step())
-                        }, [function () {
-                            locker.unlock(rightLeafPage)
-                        }], function (entry) {
-                            rightLeafKey = entry.key
-                        })
-                    })
-                }, function  () {
-                    if (comparator(key, rightLeafKey) >= 0) {
-                        return [ block, +1 ]
-                    }
-                })
-            }, function () {
-                var entry
-                balancer.unbalanced(page)
-                step(function () {
-                    entry = journal.open(filename(page.address), page.position, page)
-                    journalist.purge(step())
-                }, function () {
-                    entry.ready(step())
-                }, function () {
-                    scram(entry, cadence(function (step) {
-                        step(function () {
-                            writeInsert(entry, page, index, record, step())
-                        }, function (position, length, size) {
-                            splice('positions', page, index, 0, position)
-                            splice('lengths', page, index, 0, length)
-                            _cacheRecord(page, position, record, size)
-
-                            length = page.positions.length
-                        }, function () {
-                            step(function () {
-                                entry.close('entry', step())
-                            }, function () {
-                                return [ 0 ]
-                            })
-                        })
-                    }), step())
-                })
-            })(1)
-        })
-
-        var remove = cadence(function (step, index) {
-            var ghost = page.address != 1 && index == 0, entry
-            balancer.unbalanced(page)
-            step(function () {
-                journalist.purge(step())
-            }, function () {
-                entry = journal.open(filename(page.address), page.position, page)
-                entry.ready(step())
-            }, function () {
-                scram(entry, cadence(function (step) {
-                    step(function () {
-                        writeDelete(entry, page, index, step())
-                    }, function () {
-                        if (ghost) {
-                            page.ghosts++
-                            offset || offset++
-                        } else {
-                            uncacheEntry(page, page.positions[index])
-                            splice('positions', page, index, 1)
-                            splice('lengths', page, index, 1)
-                        }
-                    }, function () {
-                        entry.close('entry', step())
-                    })
-                }), step())
-            })
-        })
-
-        classify.call(this, insert, remove)
-        this.insert = insert
-        this.remove = remove
-        return this
-    }
-
     function Balancer () {
         var lengths = {},
             operations = [],
@@ -1296,7 +1289,7 @@ function Strata (options) {
                     ok(page.address % 2, 'leaf page expected')
 
                     if (page.address == 1) return [{}]
-                    else stash(page, 0, step())
+                    else sheaf.stash(page, 0, step())
                 }, function (entry) {
                     var node = {
                         key: entry.key,
@@ -1375,7 +1368,7 @@ function Strata (options) {
             if (addresses.length == 0) {
                 return step(null, true)
             } else {
-                balancer = new Balancer()
+                sheaf.balancer = new Balancer()
                 balancing = true
             }
 
@@ -1521,7 +1514,7 @@ function Strata (options) {
                 }, function () {
                     split = leaf.page
                     if (split.positions.length - split.ghosts <= options.leafSize) {
-                        balancer.unbalanced(split, true)
+                        sheaf.balancer.unbalanced(split, true)
                         step(null)
                     }
                 }, function () {
@@ -1540,7 +1533,7 @@ function Strata (options) {
                         page.right = right
                         right = page.address
 
-                        splice('addresses', penultimate.page, penultimate.index + 1, 0, page.address)
+                        sheaf.splice('addresses', penultimate.page, penultimate.index + 1, 0, page.address)
 
                         length = remainder-- > 0 ? records + 1 : records
                         offset = split.positions.length - length
@@ -1553,18 +1546,18 @@ function Strata (options) {
                             ok(index < split.positions.length)
 
                             step(function () {
-                                stash(split, index, step())
+                                sheaf.stash(split, index, step())
                             }, function (entry) {
-                                uncacheEntry(split, position)
-                                splice('positions', page, page.positions.length, 0, position)
-                                splice('lengths', page, page.lengths.length, 0, split.lengths[index])
+                                sheaf.uncacheEntry(split, position)
+                                sheaf.splice('positions', page, page.positions.length, 0, position)
+                                sheaf.splice('lengths', page, page.lengths.length, 0, split.lengths[index])
                                 encacheEntry(page, position, entry)
                                 index++
                             })
                         })(length)
                     }, function () {
-                        splice('positions', split, offset, length)
-                        splice('lengths', split, offset, length)
+                        sheaf.splice('positions', split, offset, length)
+                        sheaf.splice('lengths', split, offset, length)
 
                         var entry = page.cache[page.positions[0]]
 
@@ -1593,8 +1586,8 @@ function Strata (options) {
                 }, function () {
                     replace(penultimate.page, '.commit', step())
                 }, function () {
-                    balancer.unbalanced(leaf.page, true)
-                    balancer.unbalanced(page, true)
+                    sheaf.balancer.unbalanced(leaf.page, true)
+                    sheaf.balancer.unbalanced(page, true)
                     return [ encached[0].cache[encached[0].positions[0]].key ]
                 })
             }, function (partition) {
@@ -1644,18 +1637,18 @@ function Strata (options) {
                         var length = remainder-- > 0 ? records + 1 : records
                         var offset = split.addresses.length - length
 
-                        var cut = splice('addresses', split, offset, length)
+                        var cut = sheaf.splice('addresses', split, offset, length)
 
-                        splice('addresses', parent.page, parent.index + 1, 0, page.address)
+                        sheaf.splice('addresses', parent.page, parent.index + 1, 0, page.address)
 
                         encacheEntry(parent.page, page.address, split.cache[cut[0]])
 
                         var keys = {}
                         cut.forEach(function (address) {
-                            keys[address] = uncacheEntry(split, address)
+                            keys[address] = sheaf.uncacheEntry(split, address)
                         })
 
-                        splice('addresses', page, 0, 0, cut)
+                        sheaf.splice('addresses', page, 0, 0, cut)
 
                         cut.slice(1).forEach(function (address) {
                             encacheEntry(page, address, keys[address])
@@ -1708,13 +1701,13 @@ function Strata (options) {
                         var length = remainder-- > 0 ? records + 1 : records
                         var offset = root.addresses.length - length
 
-                        var cut = splice('addresses', root, offset, length)
+                        var cut = sheaf.splice('addresses', root, offset, length)
 
                         cut.slice(offset ? 0 : 1).forEach(function (address) {
-                            keys[address] = uncacheEntry(root, address)
+                            keys[address] = sheaf.uncacheEntry(root, address)
                         })
 
-                        splice('addresses', page, 0, 0, cut)
+                        sheaf.splice('addresses', page, 0, 0, cut)
 
                         cut.slice(1).forEach(function (address) {
                             encacheEntry(page, address, keys[address])
@@ -1725,7 +1718,7 @@ function Strata (options) {
 
                     children.reverse()
 
-                    splice('addresses', root, 0, 0, children.map(function (page) { return page.address }))
+                    sheaf.splice('addresses', root, 0, 0, children.map(function (page) { return page.address }))
 
                     root.addresses.slice(1).forEach(function (address) {
                         encacheEntry(root, address, keys[address])
@@ -1756,12 +1749,12 @@ function Strata (options) {
             ok(ghostly.ghosts, 'no ghosts')
             ok(corporal.positions.length - corporal.ghosts > 0, 'no replacement')
 
-            uncacheEntry(ghostly, splice('positions', ghostly, 0, 1).shift())
-            splice('lengths', ghostly, 0, 1)
+            sheaf.uncacheEntry(ghostly, sheaf.splice('positions', ghostly, 0, 1).shift())
+            sheaf.splice('lengths', ghostly, 0, 1)
             ghostly.ghosts = 0
 
             step(function () {
-                entry = journal.leaf.open(filename(ghostly.address), ghostly.position, ghostly)
+                entry = journal.leaf.open(sheaf.filename(ghostly.address), ghostly.position, ghostly)
                 entry.ready(step())
             }, function () {
                 writePositions(entry, ghostly, step())
@@ -1769,9 +1762,9 @@ function Strata (options) {
             // todo: close on failure.
                 entry.close('entry', step())
             }, function () {
-                stash(corporal, corporal.ghosts, step())
+                sheaf.stash(corporal, corporal.ghosts, step())
             }, function (entry) {
-                uncacheEntry(pivot.page, pivot.page.addresses[pivot.index])
+                sheaf.uncacheEntry(pivot.page, pivot.page.addresses[pivot.index])
                 encacheKey(pivot.page, pivot.page.addresses[pivot.index], entry.key, entry.keySize)
                 return [ ghostly.key = entry.key ]
             })
@@ -1895,19 +1888,19 @@ function Strata (options) {
                     designation = ancestor.cache[ancestor.addresses[index]]
 
                     var address = ancestor.addresses[index]
-                    splice('addresses', ancestor, index, 1)
+                    sheaf.splice('addresses', ancestor, index, 1)
 
                     if (pivot.page.address != ancestor.address) {
                         ok(!index, 'expected ancestor to be removed from zero index')
                         ok(ancestor.addresses[index], 'expected ancestor to have right sibling')
                         ok(ancestor.cache[ancestor.addresses[index]], 'expected key to be in memory')
                         designation = ancestor.cache[ancestor.addresses[index]]
-                        uncacheEntry(ancestor, ancestor.addresses[0])
-                        uncacheEntry(pivot.page, pivot.page.addresses[pivot.index])
+                        sheaf.uncacheEntry(ancestor, ancestor.addresses[0])
+                        sheaf.uncacheEntry(pivot.page, pivot.page.addresses[pivot.index])
                         encacheEntry(pivot.page, pivot.page.addresses[pivot.index], designation)
                     } else{
                         ok(index, 'expected ancestor to be non-zero')
-                        uncacheEntry(ancestor, address)
+                        sheaf.uncacheEntry(ancestor, address)
                     }
 
                     writeBranch(ancestor, '.pending', step())
@@ -1950,15 +1943,15 @@ function Strata (options) {
                 var left = (leaves.left.page.positions.length - leaves.left.page.ghosts)
                 var right = (leaves.right.page.positions.length - leaves.right.page.ghosts)
 
-                balancer.unbalanced(leaves.left.page, true)
+                sheaf.balancer.unbalanced(leaves.left.page, true)
 
                 var index
                 if (left + right > options.leafSize) {
                     if (unbalanced[leaves.left.page.address]) {
-                        balancer.unbalanced(leaves.left.page, true)
+                        sheaf.balancer.unbalanced(leaves.left.page, true)
                     }
                     if (unbalanced[leaves.right.page.address]) {
-                        balancer.unbalanced(leaves.right.page, true)
+                        sheaf.balancer.unbalanced(leaves.right.page, true)
                     }
                     step(null, false)
                 } else {
@@ -1976,18 +1969,18 @@ function Strata (options) {
                         step(function (index) {
                             index += ghosts
                             step(function () {
-                                stash(leaves.right.page, index, step())
+                                sheaf.stash(leaves.right.page, index, step())
                             }, function (entry) {
                                 var position = leaves.right.page.positions[index]
-                                uncacheEntry(leaves.right.page, position)
-                                splice('positions', leaves.left.page, leaves.left.page.positions.length, 0, -(position + 1))
-                                splice('lengths', leaves.left.page, leaves.left.page.lengths.length, 0, -(position + 1))
+                                sheaf.uncacheEntry(leaves.right.page, position)
+                                sheaf.splice('positions', leaves.left.page, leaves.left.page.positions.length, 0, -(position + 1))
+                                sheaf.splice('lengths', leaves.left.page, leaves.left.page.lengths.length, 0, -(position + 1))
                                 encacheEntry(leaves.left.page, -(position + 1), entry)
                             })
                         })(leaves.right.page.positions.length - leaves.right.page.ghosts)
                     }, function () {
-                        splice('positions', leaves.right.page, 0, leaves.right.page.positions.length)
-                        splice('lengths', leaves.right.page, 0, leaves.right.page.lengths.length)
+                        sheaf.splice('positions', leaves.right.page, 0, leaves.right.page.positions.length)
+                        sheaf.splice('lengths', leaves.right.page, 0, leaves.right.page.lengths.length)
 
                         rewriteLeaf(leaves.left.page, '.replace', step())
                     }, function () {
@@ -2045,7 +2038,7 @@ function Strata (options) {
                         step(null)
                     }
                 }, function () {
-                    stash(designator.page, 0, step())
+                    sheaf.stash(designator.page, 0, step())
                 })
             }, function (entry) {
                 if (entry) { // todo: fix return [ choose ]
@@ -2062,14 +2055,14 @@ function Strata (options) {
             var merger = cadence(function (step, pages, ghosted) {
                 ok(address == pages.right.page.address, 'unexpected address')
 
-                var cut = splice('addresses', pages.right.page, 0, pages.right.page.addresses.length)
+                var cut = sheaf.splice('addresses', pages.right.page, 0, pages.right.page.addresses.length)
 
                 var keys = {}
                 cut.slice(1).forEach(function (address) {
-                    keys[address] = uncacheEntry(pages.right.page, address)
+                    keys[address] = sheaf.uncacheEntry(pages.right.page, address)
                 })
 
-                splice('addresses', pages.left.page, pages.left.page.addresses.length, 0, cut)
+                sheaf.splice('addresses', pages.left.page, pages.left.page.addresses.length, 0, cut)
                 cut.slice(1).forEach(function (address) {
                     encacheEntry(pages.left.page, address, keys[address])
                 })
@@ -2104,16 +2097,16 @@ function Strata (options) {
                 ok(root.page.addresses.length == 1, 'only one address expected')
                 ok(!Object.keys(root.page.cache).length, 'no keys expected')
 
-                splice('addresses', root.page, 0, root.page.addresses.length)
+                sheaf.splice('addresses', root.page, 0, root.page.addresses.length)
 
-                cut = splice('addresses', child.page, 0, child.page.addresses.length)
+                cut = sheaf.splice('addresses', child.page, 0, child.page.addresses.length)
 
                 var keys = {}
                 cut.slice(1).forEach(function (address) {
-                    keys[address] = uncacheEntry(child.page, address)
+                    keys[address] = sheaf.uncacheEntry(child.page, address)
                 })
 
-                splice('addresses', root.page, root.page.addresses.length, 0, cut)
+                sheaf.splice('addresses', root.page, root.page.addresses.length, 0, cut)
                 cut.slice(1).forEach(function  (address) {
                     encacheEntry(root.page, address, keys[address])
                 })
@@ -2161,7 +2154,7 @@ function Strata (options) {
                 }, step())
             }, function (page, index) {
                 if (descents[0].page.address % 2) {
-                    return [ new Cursor(createJournal(), descents, false, key) ]
+                    return [ new Cursor(sheaf, createJournal(), descents, false, key) ]
                 } else {
                     descents[0].index--
                     toLeaf(descents[0].right, descents, null, exclusive, step())
@@ -2178,7 +2171,7 @@ function Strata (options) {
             if (exclusive) descents[0].exclude()
             descents[0].descend(sought, descents[0].leaf, step())
         }, function () {
-            return [ new Cursor(createJournal(), descents, exclusive, key) ]
+            return [ new Cursor(sheaf, createJournal(), descents, exclusive, key) ]
         })
     })
 
@@ -2211,7 +2204,7 @@ function Strata (options) {
 
     // to user land
     function balance (callback) {
-        balancer.balance(callback)
+        sheaf.balancer.balance(callback)
     }
 
     // to user land
@@ -2259,7 +2252,7 @@ function Strata (options) {
 
                         step(function (recordIndex) {
                             step(function () {
-                                stash(page, recordIndex, step())
+                                sheaf.stash(page, recordIndex, step())
                             }, function (entry) {
                                 pages[index].children.push(entry.record)
                             })

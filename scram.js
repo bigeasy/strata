@@ -3,7 +3,7 @@ var cadence = require('cadence')
 
 module.exports = cadence(function (step, entry, f) {
     step([function () {
-        f(step())
+        f.call(this, step())
     }, function (errors) {
         entry.scram(step())
         throw errors
