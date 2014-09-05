@@ -1,7 +1,8 @@
 var Cache = require('magazine'),
     Journalist = require('journalist'),
     cadence = require('cadence'),
-    ok = require('assert').ok
+    ok = require('assert').ok,
+    path = require('path')
 
 // todo: temporary
 var scram = require('./scram')
@@ -38,6 +39,7 @@ function classify () {
 
 function Locker (sheaf, magazine) {
     ok(arguments.length, 'no arguments')
+    ok(magazine)
     this._locks = {}
     this._sheaf = sheaf
     this._magazine = magazine
@@ -427,8 +429,6 @@ Descent.prototype.unlocker = function (parent) {
 function unlocker_ ($unlocker) { unlocker = $unlocker }
 
 Descent.prototype.descend = cadence(function (step, next, stop) {
-    ok(next)
-    ok(stop)
     var above = this.page
 
     var loop = step(function () {
@@ -1109,6 +1109,7 @@ Balancer.prototype.mergePages = cadence(function (step, key, leftKey, stopper, m
         }, function () {
             this.sheaf.replace(pages.left.page, '.replace', step())
         }, function () {
+    console.log('balancer')
             this.sheaf.unlink(pages.right.page, '.unlink', step())
         }, function () {
             this.sheaf.replace(ancestor, '.commit', step())
@@ -1315,78 +1316,34 @@ Balancer.prototype.fillRoot = cadence(function (step) {
     })
 })
 
-function Strata (options) {
-    function writeFooter (out, position, page, callback) {
-        sheaf.writeFooter(out, position, page, callback)
-    }
-
-    function Sheaf () {
-        this.journal = journal
-        this.journalist = journalist
-        this.options = options
-        this.tracer = options.tracer || function () { arguments[2]() }
-        this.balancer = new Balancer(this)
-        this._sequester = sequester
-        this.comparator = comparator
-    }
-
-    Sheaf.prototype. writeFooter = cadence(function (step, out, position, page) {
-        ok(page.address % 2 && page.bookmark != null)
-        var header = [
-            0, page.bookmark.position, page.bookmark.length, page.bookmark.entry,
-            page.right || 0, page.position, page.entries, page.ghosts, page.positions.length - page.ghosts
-        ]
-        step(function () {
-            this.writeEntry({
-                out: out,
-                page: page,
-                header: header,
-                type: 'footer'
-            }, step())
-        }, function (position, length) {
-            page.position = header[5] // todo: can't we use `position`?
-            return [ position, length ]
-        })
-    })
-
-    var sequester = options.sequester || require('sequester'),
-        directory = options.directory,
-        extractor = options.extractor || extract,
-        comparator = options.comparator || compare,
-        fs = options.fs || require('fs'),
-        path = options.path || require('path'),
-        ok = function (condition, message) { if (!condition) throw new Error(message) },
-        cache = options.cache || (new Cache),
-        thrownByUser,
-        magazine,
-        nextAddress = 0,
-        length = 1024,
-        size = 0,
-        checksum,
-        constructors = {},
-        journal = {
-            branch: new Journalist({ stage: 'entry' }).createJournal(),
-            leaf: new Journalist({
-                stage: 'entry',
-                closer: writeFooter
-            }).createJournal()
-        },
-        journalist = new Journalist({
-            count: options.fileHandleCount || 64,
-            stage: options.writeStage || 'entry',
-            cache: options.jouralistCache || (new Cache),
+function Sheaf (options) {
+    var writeFooter = function (out, position, page, callback) {
+        this.writeFooter(out, position, page, callback)
+    }.bind(this)
+    this.fs = options.fs || require('fs')
+    this.nextAddress = 0
+    this.directory = options.directory
+    this.journal = {
+        branch: new Journalist({ stage: 'entry' }).createJournal(),
+        leaf: new Journalist({
+            stage: 'entry',
             closer: writeFooter
-        }),
-        createJournal = (options.writeStage == 'tree' ? (function () {
-            var journal = journalist.createJournal()
-            return function () { return journal }
-        })() : function () {
-            return journalist.createJournal()
-        }),
-        serialize = options.serialize || function (object) { return new Buffer(JSON.stringify(object)) },
-        deserialize = options.deserialize || function (buffer) { return JSON.parse(buffer.toString()) }
-
-    checksum = (function () {
+        }).createJournal()
+    }
+    this.journalist = new Journalist({
+        count: options.fileHandleCount || 64,
+        stage: options.writeStage || 'entry',
+        cache: options.jouralistCache || (new Cache),
+        closer: writeFooter
+    })
+    this.cache = options.cache || (new Cache)
+    this.options = options
+    this.tracer = options.tracer || function () { arguments[2]() }
+    this.balancer = new Balancer(this)
+    this.sequester = options.sequester || require('sequester')
+    this.extractor = options.extractor || extract
+    this.comparator = options.comparator || compare
+    this.checksum = (function () {
         if (typeof options.checksum == 'function') return options.checksum
         var algorithm
         switch (algorithm = options.checksum || 'sha1') {
@@ -1402,576 +1359,676 @@ function Strata (options) {
             return function (m) { return crypto.createHash(algorithm) }
         }
     })()
-
-    function _size () { return magazine.heft }
-
-    function _nextAddress () { return nextAddress }
-
-    Sheaf.prototype.readEntry = function (buffer, isKey) {
-        for (var count = 2, i = 0, I = buffer.length; i < I && count; i++) {
-            if (buffer[i] == 0x20) count--
-        }
-        for (count = 1; i < I && count; i++) {
-            if (buffer[i] == 0x20 || buffer[i] == 0x0a) count--
-        }
-        ok(!count, 'corrupt line: could not find end of line header')
-        var fields = buffer.toString('utf8', 0, i - 1).split(' ')
-        var hash = checksum(), body, length
-        hash.update(fields[2])
-        if (buffer[i - 1] == 0x20) {
-            body = buffer.slice(i, buffer.length - 1)
-            length = body.length
-            hash.update(body)
-        }
-        var digest = hash.digest('hex')
-        ok(fields[1] == '-' || digest == fields[1], 'corrupt line: invalid checksum')
-        if (buffer[i - 1] == 0x20) {
-            body = deserialize(body, isKey)
-        }
-        var entry = { length: length, header: JSON.parse(fields[2]), body: body }
-        ok(entry.header.every(function (n) { return typeof n == 'number' }), 'header values must be numbers')
-        return entry
-    }
-
-    Sheaf.prototype.filename = function (address, suffix) {
-        suffix || (suffix = '')
-        return path.join(directory, address + suffix)
-    }
-
-    Sheaf.prototype.replace = cadence(function (step, page, suffix) {
-        var replacement = sheaf.filename(page.address, suffix),
-            permanent = sheaf.filename(page.address)
-
-        step(function () {
-            fs.stat(replacement, step())
-        }, function (stat) {
-            ok(stat.isFile(), 'is not a file')
-            step([function () {
-                fs.unlink(permanent, step())
-            }, /^ENOENT$/, function () {
-                // todo: regex only is a catch and swallow?
-            }])
-        }, function (ror) {
-            fs.rename(replacement, permanent, step())
-        })
+    this.serialize = options.serialize || function (object) { return new Buffer(JSON.stringify(object)) }
+    this.deserialize = options.deserialize || function (buffer) { return JSON.parse(buffer.toString()) }
+    this.createJournal = (options.writeStage == 'tree' ? (function () {
+        var journal = this.journalist.createJournal()
+        return function () { return journal }
+    }).call(this) : function () {
+        return this.journalist.createJournal()
     })
+}
 
-    Sheaf.prototype.rename = function (page, from, to, callback) {
-        fs.rename(sheaf.filename(page.address, from), sheaf.filename(page.address, to), callback)
-    }
-
-    Sheaf.prototype.unlink = function (page, suffix, callback) {
-        fs.unlink(sheaf.filename(page.address, suffix), callback)
-    }
-
-    Sheaf.prototype.heft = function (page, s) {
-        magazine.get(page.address).adjustHeft(s)
-    }
-
-    Sheaf.prototype.createLeaf = function (override) {
-        return this.createPage({
-            cache: {},
-            loaders: {},
-            entries: 0,
-            ghosts: 0,
-            positions: [],
-            lengths: [],
-            right: 0,
-            queue: this._sequester.createQueue()
-        }, override, 0)
-    }
-
-    Sheaf.prototype._cacheRecord = function (page, position, record, length) {
-        var key = extractor(record)
-        ok(key != null, 'null keys are forbidden')
-
-        var entry = {
-            record: record,
-            size: length,
-            key: key,
-            keySize: serialize(key, true).length
-        }
-
-        return this.encacheEntry(page, position, entry)
-    }
-
-    Sheaf.prototype.encacheEntry = function (page, reference, entry) {
-        ok (!page.cache[reference], 'record already cached for position')
-
-        page.cache[reference] = entry
-
-        this.heft(page, entry.size)
-
-        return entry
-    }
-
-    Sheaf.prototype.uncacheEntry = function (page, reference) {
-        var entry = page.cache[reference]
-        ok (entry, 'entry not cached')
-        this.heft(page, -entry.size)
-        delete page.cache[reference]
-        return entry
-    }
-
-    Sheaf.prototype.writeEntry = cadence(function (step, options) {
-        var entry, buffer, json, line, length
-
-        ok(options.page.position != null, 'page has not been positioned: ' + options.page.position)
-        ok(options.header.every(function (n) { return typeof n == 'number' }), 'header values must be numbers')
-
-        if (options.type == 'position') {
-            options.page.bookmark = { position: options.page.position }
-        }
-
-        entry = options.header.slice()
-        json = JSON.stringify(entry)
-        var hash = checksum()
-        hash.update(json)
-
-        length = 0
-
-        var separator = ''
-        if (options.body != null) {
-            var body = serialize(options.body, options.isKey)
-            separator = ' '
-            length += body.length
-            hash.update(body)
-        }
-
-        line = hash.digest('hex') + ' ' + json + separator
-
-        length += Buffer.byteLength(line, 'utf8') + 1
-
-        var entire = length + String(length).length + 1
-        if (entire < length + String(entire).length + 1) {
-            length = length + String(entire).length + 1
-        } else {
-            length = entire
-        }
-
-        buffer = new Buffer(length)
-        buffer.write(String(length) + ' ' + line)
-        if (options.body != null) {
-            body.copy(buffer, buffer.length - 1 - body.length)
-        }
-        buffer[length - 1] = 0x0A
-
-        if (options.type == 'position') {
-            options.page.bookmark.length = length
-            options.page.bookmark.entry = entry[0]
-        }
-
-        var position = options.page.position
-
-        step(function () {
-            options.out.write(buffer, step())
-        }, function () {
-            options.page.position += length
-            return [ position, length, body && body.length ]
-        })
+Sheaf.prototype.writeFooter = cadence(function (step, out, position, page) {
+    ok(page.address % 2 && page.bookmark != null)
+    var header = [
+        0, page.bookmark.position, page.bookmark.length, page.bookmark.entry,
+        page.right || 0, page.position, page.entries, page.ghosts, page.positions.length - page.ghosts
+    ]
+    step(function () {
+        this.writeEntry({
+            out: out,
+            page: page,
+            header: header,
+            type: 'footer'
+        }, step())
+    }, function (position, length) {
+        page.position = header[5] // todo: can't we use `position`?
+        return [ position, length ]
     })
+})
 
-    Sheaf.prototype.writeInsert = function (out, page, index, record, callback) {
-        var header = [ ++page.entries, index + 1 ]
-        this.writeEntry({ out: out, page: page, header: header, body: record }, callback)
+Sheaf.prototype.readEntry = function (buffer, isKey) {
+    for (var count = 2, i = 0, I = buffer.length; i < I && count; i++) {
+        if (buffer[i] == 0x20) count--
     }
-
-    Sheaf.prototype.writeDelete = function (out, page, index, callback) {
-        var header = [ ++page.entries, -(index + 1) ]
-        this.writeEntry({ out: out, page: page, header: header }, callback)
+    for (count = 1; i < I && count; i++) {
+        if (buffer[i] == 0x20 || buffer[i] == 0x0a) count--
     }
-
-    Sheaf.prototype.io = cadence(function (step, direction, filename) {
-        step(function () {
-            fs.open(filename, direction[0], step())
-        }, function (fd) {
-            step(function () {
-                fs.fstat(fd, step())
-            }, function (stat) {
-                var io = cadence(function (step, buffer, position) {
-                    var offset = 0
-
-                    var length = stat.size - position
-                    var slice = length < buffer.length ? buffer.slice(0, length) : buffer
-
-                    var loop = step(function (count) {
-                        if (count < slice.length - offset) {
-                            offset += count
-                            fs[direction](fd, slice, offset, slice.length - offset, position + offset, step())
-                        } else {
-                            return [ loop, slice, position ]
-                        }
-                    })(null, 0)
-                })
-                return [ fd, stat, io ]
-            })
-        })
-    })
-
-    Sheaf.prototype.writePositions = function (output, page, callback) {
-        var header = [ ++page.entries, 0, page.ghosts ]
-        header = header.concat(page.positions).concat(page.lengths)
-        this.writeEntry({ out: output, page: page, header: header, type: 'position' }, callback)
+    ok(!count, 'corrupt line: could not find end of line header')
+    var fields = buffer.toString('utf8', 0, i - 1).split(' ')
+    var hash = this.checksum(), body, length
+    hash.update(fields[2])
+    if (buffer[i - 1] == 0x20) {
+        body = buffer.slice(i, buffer.length - 1)
+        length = body.length
+        hash.update(body)
     }
-
-    Sheaf.prototype.readHeader = function (entry) {
-        var header = entry.header
-        return {
-            entry:      header[0],
-            index:      header[1],
-            address:    header[2]
-        }
+    var digest = hash.digest('hex')
+    ok(fields[1] == '-' || digest == fields[1], 'corrupt line: invalid checksum')
+    if (buffer[i - 1] == 0x20) {
+        body = this.deserialize(body, isKey)
     }
+    var entry = { length: length, header: JSON.parse(fields[2]), body: body }
+    ok(entry.header.every(function (n) { return typeof n == 'number' }), 'header values must be numbers')
+    return entry
+}
 
-    Sheaf.prototype.readFooter = function (entry) {
-        var footer = entry.header
-        return {
-            entry:      footer[0],
-            bookmark: {
-                position:   footer[1],
-                length:     footer[2],
-                entry:      footer[3]
-            },
-            right:      footer[4],
-            position:   footer[5],
-            entries:    footer[6],
-            ghosts:     footer[7],
-            records:    footer[8]
-        }
-    }
+Sheaf.prototype.filename = function (address, suffix) {
+    suffix || (suffix = '')
+    return path.join(this.directory, address + suffix)
+}
 
-    Sheaf.prototype.findPositionsArray = cadence(function (step, page, fd, stat, read) {
-        var positions = [],
-            lengths = [],
-            bookmark
-        var buffer = new Buffer(options.readLeafStartLength || 1024)
-        step(function () {
-            read(buffer, Math.max(0, stat.size - buffer.length), step())
-        }, function (slice) {
-            for (var i = slice.length - 2; i != -1; i--) {
-                if (slice[i] == 0x0a) {
-                    var footer = this.readFooter(sheaf.readEntry(slice.slice(i + 1)))
-                    ok(!footer.entry, 'footer is supposed to be zero')
-                    bookmark = footer.bookmark
-                    page.right = footer.right
-                    page.position = footer.position
-                    ok(page.position != null, 'no page position')
-                    read(new Buffer(bookmark.length), bookmark.position, step())
-                    return
-                }
-            }
-            throw new Error('cannot find footer in last ' + buffer.length + ' bytes')
-        }, function (slice) {
-            var positions = sheaf.readEntry(slice.slice(0, bookmark.length)).header
+Sheaf.prototype.replace = cadence(function (step, page, suffix) {
+    var replacement = this.filename(page.address, suffix),
+        permanent = this.filename(page.address)
 
-            page.entries = positions.shift()
-            ok(page.entries == bookmark.entry, 'position entry number incorrect')
-            ok(positions.shift() == 0, 'expected housekeeping type')
-
-            page.ghosts = positions.shift()
-
-            ok(!(positions.length % 2), 'expecting even number of positions and lengths')
-            var lengths = positions.splice(positions.length / 2)
-
-            sheaf.splice('positions', page, 0, 0, positions)
-            sheaf.splice('lengths', page, 0, 0, lengths)
-
-            page.bookmark = bookmark
-
-            return [ page, bookmark.position + bookmark.length ]
-        })
-    })
-
-    Sheaf.prototype.readLeaf = cadence(function (step, page) {
-        step(function () {
-            this.io('read', sheaf.filename(page.address), step())
-        }, function (fd, stat, read) {
-            step(function () {
-                if (options.replay) {
-                    page.entries = 0
-                    page.ghosts = 0
-                    return [ page, 0 ]
-                } else {
-                    this.findPositionsArray(page, fd, stat, read, step())
-                }
-            }, function (page, position) {
-                this.replay(fd, stat, read, page, position, step())
-            }, function () {
-                return [ page ]
-            })
-        })
-    })
-
-    Sheaf.prototype.replay = cadence(function (step, fd, stat, read, page, position) {
-        var leaf = !!(page.address % 2),
-            seen = {},
-            buffer = new Buffer(options.readLeafStartLength || 1024),
-            footer
-
-        // todo: really want to register a cleanup without an indent.
+    step(function () {
+        this.fs.stat(replacement, step())
+    }, function (stat) {
+        ok(stat.isFile(), 'is not a file')
         step([function () {
-            fs.close(fd, step())
-        }], function () {
-            var loop = step(function (buffer, position) {
-                read(buffer, position, step())
-            }, function (slice, start) {
-                for (var offset = 0, i = 0, I = slice.length; i < I; i++) {
-                    ok(!footer, 'data beyond footer')
-                    if (slice[i] == 0x20) {
-                        var sip = slice.toString('utf8', offset, i)
-                        length = parseInt(sip)
-                        ok(String(length).length == sip.length, 'invalid length')
-                        if (offset + length > slice.length) {
-                            break
-                        }
-                        var position = start + offset
-                        ok(length)
-                        var entry = this.readEntry(slice.slice(offset, offset + length), !leaf)
-                        var header = this.readHeader(entry)
-                        if (header.entry) {
-                            ok(header.entry == ++page.entries, 'entry count is off')
-                            var index = header.index
-                            if (leaf) {
-                                if (index > 0) {
-                                    seen[position] = true
-                                    sheaf.splice('positions', page, index - 1, 0, position)
-                                    sheaf.splice('lengths', page, index - 1, 0, length)
-                                    sheaf._cacheRecord(page, position, entry.body, entry.length)
-                                } else if (~index == 0 && page.address != 1) {
-                                    ok(!page.ghosts, 'double ghosts')
-                                    page.ghosts++
-                                } else if (index < 0) {
-                                    var outgoing = sheaf.splice('positions', page, -(index + 1), 1).shift()
-                                    if (seen[outgoing]) sheaf.uncacheEntry(page, outgoing)
-                                    sheaf.splice('lengths', page, -(index + 1), 1)
-                                } else {
-                                    page.bookmark = {
-                                        position: position,
-                                        length: length,
-                                        entry: header.entry
-                                    }
-                                }
+            this.fs.unlink(permanent, step())
+        }, /^ENOENT$/, function () {
+            // todo: regex only is a catch and swallow?
+        }])
+    }, function (ror) {
+        this.fs.rename(replacement, permanent, step())
+    })
+})
+
+Sheaf.prototype.rename = function (page, from, to, callback) {
+    this.fs.rename(this.filename(page.address, from), this.filename(page.address, to), callback)
+}
+
+Sheaf.prototype.unlink = function (page, suffix, callback) {
+    this.fs.unlink(this.filename(page.address, suffix), callback)
+}
+
+Sheaf.prototype.heft = function (page, s) {
+    this.magazine.get(page.address).adjustHeft(s)
+}
+
+Sheaf.prototype.createLeaf = function (override) {
+    return this.createPage({
+        cache: {},
+        loaders: {},
+        entries: 0,
+        ghosts: 0,
+        positions: [],
+        lengths: [],
+        right: 0,
+        queue: this.sequester.createQueue()
+    }, override, 0)
+}
+
+Sheaf.prototype._cacheRecord = function (page, position, record, length) {
+    var key = this.extractor(record)
+    ok(key != null, 'null keys are forbidden')
+
+    var entry = {
+        record: record,
+        size: length,
+        key: key,
+        keySize: this.serialize(key, true).length
+    }
+
+    return this.encacheEntry(page, position, entry)
+}
+
+Sheaf.prototype.encacheEntry = function (page, reference, entry) {
+    ok (!page.cache[reference], 'record already cached for position')
+
+    page.cache[reference] = entry
+
+    this.heft(page, entry.size)
+
+    return entry
+}
+
+Sheaf.prototype.uncacheEntry = function (page, reference) {
+    var entry = page.cache[reference]
+    ok (entry, 'entry not cached')
+    this.heft(page, -entry.size)
+    delete page.cache[reference]
+    return entry
+}
+
+Sheaf.prototype.writeEntry = cadence(function (step, options) {
+    var entry, buffer, json, line, length
+
+    ok(options.page.position != null, 'page has not been positioned: ' + options.page.position)
+    ok(options.header.every(function (n) { return typeof n == 'number' }), 'header values must be numbers')
+
+    if (options.type == 'position') {
+        options.page.bookmark = { position: options.page.position }
+    }
+
+    entry = options.header.slice()
+    json = JSON.stringify(entry)
+    var hash = this.checksum()
+    hash.update(json)
+
+    length = 0
+
+    var separator = ''
+    if (options.body != null) {
+        var body = this.serialize(options.body, options.isKey)
+        separator = ' '
+        length += body.length
+        hash.update(body)
+    }
+
+    line = hash.digest('hex') + ' ' + json + separator
+
+    length += Buffer.byteLength(line, 'utf8') + 1
+
+    var entire = length + String(length).length + 1
+    if (entire < length + String(entire).length + 1) {
+        length = length + String(entire).length + 1
+    } else {
+        length = entire
+    }
+
+    buffer = new Buffer(length)
+    buffer.write(String(length) + ' ' + line)
+    if (options.body != null) {
+        body.copy(buffer, buffer.length - 1 - body.length)
+    }
+    buffer[length - 1] = 0x0A
+
+    if (options.type == 'position') {
+        options.page.bookmark.length = length
+        options.page.bookmark.entry = entry[0]
+    }
+
+    var position = options.page.position
+
+    step(function () {
+        options.out.write(buffer, step())
+    }, function () {
+        options.page.position += length
+        return [ position, length, body && body.length ]
+    })
+})
+
+Sheaf.prototype.writeInsert = function (out, page, index, record, callback) {
+    var header = [ ++page.entries, index + 1 ]
+    this.writeEntry({ out: out, page: page, header: header, body: record }, callback)
+}
+
+Sheaf.prototype.writeDelete = function (out, page, index, callback) {
+    var header = [ ++page.entries, -(index + 1) ]
+    this.writeEntry({ out: out, page: page, header: header }, callback)
+}
+
+Sheaf.prototype.io = cadence(function (step, direction, filename) {
+    step(function () {
+        this.fs.open(filename, direction[0], step())
+    }, function (fd) {
+        step(function () {
+            this.fs.fstat(fd, step())
+        }, function (stat) {
+            var fs = this.fs, io = cadence(function (step, buffer, position) {
+                var offset = 0
+
+                var length = stat.size - position
+                var slice = length < buffer.length ? buffer.slice(0, length) : buffer
+
+                var loop = step(function (count) {
+                    if (count < slice.length - offset) {
+                        offset += count
+                        fs[direction](fd, slice, offset, slice.length - offset, position + offset, step())
+                    } else {
+                        return [ loop, slice, position ]
+                    }
+                })(null, 0)
+            })
+            return [ fd, stat, io ]
+        })
+    })
+})
+
+Sheaf.prototype.writePositions = function (output, page, callback) {
+    var header = [ ++page.entries, 0, page.ghosts ]
+    header = header.concat(page.positions).concat(page.lengths)
+    this.writeEntry({ out: output, page: page, header: header, type: 'position' }, callback)
+}
+
+Sheaf.prototype.readHeader = function (entry) {
+    var header = entry.header
+    return {
+        entry:      header[0],
+        index:      header[1],
+        address:    header[2]
+    }
+}
+
+Sheaf.prototype.readFooter = function (entry) {
+    var footer = entry.header
+    return {
+        entry:      footer[0],
+        bookmark: {
+            position:   footer[1],
+            length:     footer[2],
+            entry:      footer[3]
+        },
+        right:      footer[4],
+        position:   footer[5],
+        entries:    footer[6],
+        ghosts:     footer[7],
+        records:    footer[8]
+    }
+}
+
+Sheaf.prototype.findPositionsArray = cadence(function (step, page, fd, stat, read) {
+    var positions = [],
+        lengths = [],
+        bookmark
+    var buffer = new Buffer(this.options.readLeafStartLength || 1024)
+    step(function () {
+        read(buffer, Math.max(0, stat.size - buffer.length), step())
+    }, function (slice) {
+        for (var i = slice.length - 2; i != -1; i--) {
+            if (slice[i] == 0x0a) {
+                var footer = this.readFooter(this.readEntry(slice.slice(i + 1)))
+                ok(!footer.entry, 'footer is supposed to be zero')
+                bookmark = footer.bookmark
+                page.right = footer.right
+                page.position = footer.position
+                ok(page.position != null, 'no page position')
+                read(new Buffer(bookmark.length), bookmark.position, step())
+                return
+            }
+        }
+        throw new Error('cannot find footer in last ' + buffer.length + ' bytes')
+    }, function (slice) {
+        var positions = this.readEntry(slice.slice(0, bookmark.length)).header
+
+        page.entries = positions.shift()
+        ok(page.entries == bookmark.entry, 'position entry number incorrect')
+        ok(positions.shift() == 0, 'expected housekeeping type')
+
+        page.ghosts = positions.shift()
+
+        ok(!(positions.length % 2), 'expecting even number of positions and lengths')
+        var lengths = positions.splice(positions.length / 2)
+
+        this.splice('positions', page, 0, 0, positions)
+        this.splice('lengths', page, 0, 0, lengths)
+
+        page.bookmark = bookmark
+
+        return [ page, bookmark.position + bookmark.length ]
+    })
+})
+
+Sheaf.prototype.readLeaf = cadence(function (step, page) {
+    step(function () {
+        this.io('read', this.filename(page.address), step())
+    }, function (fd, stat, read) {
+        step(function () {
+            if (this.options.replay) {
+                page.entries = 0
+                page.ghosts = 0
+                return [ page, 0 ]
+            } else {
+                this.findPositionsArray(page, fd, stat, read, step())
+            }
+        }, function (page, position) {
+            this.replay(fd, stat, read, page, position, step())
+        }, function () {
+            return [ page ]
+        })
+    })
+})
+
+Sheaf.prototype.replay = cadence(function (step, fd, stat, read, page, position) {
+    var leaf = !!(page.address % 2),
+        seen = {},
+        buffer = new Buffer(this.options.readLeafStartLength || 1024),
+        footer, length
+
+    // todo: really want to register a cleanup without an indent.
+    step([function () {
+        this.fs.close(fd, step())
+    }], function () {
+        var loop = step(function (buffer, position) {
+            read(buffer, position, step())
+        }, function (slice, start) {
+            for (var offset = 0, i = 0, I = slice.length; i < I; i++) {
+                ok(!footer, 'data beyond footer')
+                if (slice[i] == 0x20) {
+                    var sip = slice.toString('utf8', offset, i)
+                    length = parseInt(sip)
+                    ok(String(length).length == sip.length, 'invalid length')
+                    if (offset + length > slice.length) {
+                        break
+                    }
+                    var position = start + offset
+                    ok(length)
+                    var entry = this.readEntry(slice.slice(offset, offset + length), !leaf)
+                    var header = this.readHeader(entry)
+                    if (header.entry) {
+                        ok(header.entry == ++page.entries, 'entry count is off')
+                        var index = header.index
+                        if (leaf) {
+                            if (index > 0) {
+                                seen[position] = true
+                                this.splice('positions', page, index - 1, 0, position)
+                                this.splice('lengths', page, index - 1, 0, length)
+                                this._cacheRecord(page, position, entry.body, entry.length)
+                            } else if (~index == 0 && page.address != 1) {
+                                ok(!page.ghosts, 'double ghosts')
+                                page.ghosts++
+                            } else if (index < 0) {
+                                var outgoing = this.splice('positions', page, -(index + 1), 1).shift()
+                                if (seen[outgoing]) this.uncacheEntry(page, outgoing)
+                                this.splice('lengths', page, -(index + 1), 1)
                             } else {
-                                /* if (index > 0) { */
-                                    var address = header.address
-                                    sheaf.splice('addresses', page, index - 1, 0, address)
-                                    if (index - 1) {
-                                        sheaf.encacheKey(page, address, entry.body, entry.length)
-                                    }
-                                /* } else {
-                                    var cut = splice('addresses', page, ~index, 1)
-                                    if (~index) {
-                                        uncacheEntry(page, cut[0])
-                                    }
-                                } */
+                                page.bookmark = {
+                                    position: position,
+                                    length: length,
+                                    entry: header.entry
+                                }
                             }
                         } else {
-                            footer = this.readFooter(entry)
-                            page.position = position
-                            page.right = footer.right
+                            /* if (index > 0) { */
+                                var address = header.address
+                                this.splice('addresses', page, index - 1, 0, address)
+                                if (index - 1) {
+                                    this.encacheKey(page, address, entry.body, entry.length)
+                                }
+                            /* } else {
+                                var cut = splice('addresses', page, ~index, 1)
+                                if (~index) {
+                                    uncacheEntry(page, cut[0])
+                                }
+                            } */
                         }
-                        i = offset = offset + length
-                    }
-                }
-
-                if (start + buffer.length < stat.size) {
-                    if (offset == 0) {
-                        buffer = new Buffer(buffer.length * 2)
-                        read(buffer, start, step())
                     } else {
-                        read(buffer, start + offset, step())
+                        footer = this.readFooter(entry)
+                        page.position = position
+                        page.right = footer.right
                     }
+                    i = offset = offset + length
+                }
+            }
+
+            if (start + buffer.length < stat.size) {
+                if (offset == 0) {
+                    buffer = new Buffer(buffer.length * 2)
+                    read(buffer, start, step())
                 } else {
-                    return [ loop, page, footer ]
+                    read(buffer, start + offset, step())
                 }
-            })(null, buffer, position)
+            } else {
+                return [ loop, page, footer ]
+            }
+        })(null, buffer, position)
+    })
+})
+
+Sheaf.prototype.readRecord = cadence(function (step, page, position, length) {
+    step(function () {
+        this.io('read', this.filename(page.address), step())
+    }, function (fd, stat, read) {
+        step([function () {
+            // todo: test what happens when a finalizer throws an error
+            this.fs.close(fd, step())
+        }],function () {
+            this.tracer('readRecord', { page: page }, step())
+        }, function () {
+            read(new Buffer(length), position, step())
+        }, function (buffer) {
+            ok(buffer[length - 1] == 0x0A, 'newline expected')
+            return [ this.readEntry(buffer, false) ]
         })
     })
+})
 
-    Sheaf.prototype.readRecord = cadence(function (step, page, position, length) {
-        step(function () {
-            this.io('read', sheaf.filename(page.address), step())
-        }, function (fd, stat, read) {
-            step([function () {
-                // todo: test what happens when a finalizer throws an error
-                fs.close(fd, step())
-            }],function () {
-                sheaf.tracer('readRecord', { page: page }, step())
-            }, function () {
-                read(new Buffer(length), position, step())
-            }, function (buffer) {
-                ok(buffer[length - 1] == 0x0A, 'newline expected')
-                return [ this.readEntry(buffer, false) ]
-            })
-        })
-    })
+Sheaf.prototype.rewriteLeaf = cadence(function (step, page, suffix) {
+    var cache = {}, index = 0, out
 
-    Sheaf.prototype.rewriteLeaf = cadence(function (step, page, suffix) {
-        var cache = {}, index = 0, out
+    step(function () {
+        out = this.journal.leaf.open(this.filename(page.address, suffix), 0, page)
+        out.ready(step())
+    }, [function () {
+        // todo: ensure that cadence finalizers are registered in order.
+        // todo: also, don't you want to use a specific finalizer above?
+        // todo: need an error close!
+        out.scram(step())
+    }], function () {
+        page.position = 0
+        page.entries = 0
+
+        var positions = this.splice('positions', page, 0, page.positions.length)
+        var lengths = this.splice('lengths', page, 0, page.lengths.length)
 
         step(function () {
-            out = journal.leaf.open(sheaf.filename(page.address, suffix), 0, page)
-            out.ready(step())
-        }, [function () {
-            // todo: ensure that cadence finalizers are registered in order.
-            // todo: also, don't you want to use a specific finalizer above?
-            // todo: need an error close!
-            out.scram(step())
-        }], function () {
-            page.position = 0
-            page.entries = 0
-
-            var positions = sheaf.splice('positions', page, 0, page.positions.length)
-            var lengths = sheaf.splice('lengths', page, 0, page.lengths.length)
-
-            step(function () {
-                sheaf.writePositions(out, page, step())
-            }, function () {
-                step(function (position) {
-                    var length = lengths.shift()
+            this.writePositions(out, page, step())
+        }, function () {
+            step(function (position) {
+                var length = lengths.shift()
+                step(function () {
+                    this.stash(page, position, length, step())
+                }, function (entry) {
                     step(function () {
-                        sheaf.stash(page, position, length, step())
-                    }, function (entry) {
-                        step(function () {
-                            sheaf.uncacheEntry(page, position)
-                            sheaf.writeInsert(out, page, index++, entry.record, step())
-                        }, function (position, length) {
-                            cache[position] = entry
-                            sheaf.splice('positions', page, page.positions.length, 0, position)
-                            sheaf.splice('lengths', page, page.lengths.length, 0, length)
-                        })
+                        this.uncacheEntry(page, position)
+                        this.writeInsert(out, page, index++, entry.record, step())
+                    }, function (position, length) {
+                        cache[position] = entry
+                        this.splice('positions', page, page.positions.length, 0, position)
+                        this.splice('lengths', page, page.lengths.length, 0, length)
                     })
-                })(positions)
-            })
-        }, function () {
-            if (page.positions.length) {
-                var entry
-                for (var position in cache) {
-                    entry = cache[position]
-                    this.encacheEntry(page, position, entry)
+                })
+            })(positions)
+        })
+    }, function () {
+        if (page.positions.length) {
+            var entry
+            for (var position in cache) {
+                entry = cache[position]
+                this.encacheEntry(page, position, entry)
+            }
+            this.writePositions(out, page, step())
+        }
+    }, function () {
+        out.close('entry', step())
+    })
+})
+
+Sheaf.prototype.createPage = function (page, override, remainder) {
+    if (override.address == null) {
+        while ((this.nextAddress % 2) == remainder) this.nextAddress++
+        override.address = this.nextAddress++
+    }
+    return extend(page, override)
+}
+
+Sheaf.prototype.createBranch = function (override) {
+    return this.createPage({
+        addresses: [],
+        cache: {},
+        entries: 0,
+        penultimate: true,
+        queue: this.sequester.createQueue()
+    }, override, 1)
+}
+
+Sheaf.prototype.splice = function (collection, page, offset, length, insert) {
+    ok(typeof collection == 'string', 'incorrect collection passed to splice')
+
+    var values = page[collection], json, removals
+
+    ok(values, 'incorrect collection passed to splice')
+
+    if (length) {
+        removals = values.splice(offset, length)
+
+        json = values.length == 0 ? '[' + removals.join(',') + ']'
+                                                            : ',' + removals.join(',')
+
+        this.heft(page, -json.length)
+    } else {
+        removals = []
+    }
+
+    if (insert != null) {
+        if (! Array.isArray(insert)) insert = [ insert ]
+        if (insert.length) {
+            json = values.length == 0 ? '[' + insert.join(',') + ']'
+                                                                : ',' + insert.join(',')
+
+            this.heft(page, json.length)
+
+            values.splice.apply(values, [ offset, 0 ].concat(insert))
+        }
+    }
+    return removals
+}
+
+Sheaf.prototype.encacheKey = function (page, address, key, length) {
+    return this.encacheEntry(page, address, { key: key, size: length })
+}
+
+Sheaf.prototype.writeBranch = cadence(function (step, page, suffix) {
+    var keys = page.addresses.map(function (address, index) {
+            return page.cache[address]
+        }),
+        out
+
+    ok(keys[0] === (void(0)), 'first key is null')
+    ok(keys.slice(1).every(function (key) { return key != null }), 'null keys')
+
+    step(function () {
+        page.entries = 0
+        page.position = 0
+
+        out = this.journal.branch.open(this.filename(page.address, suffix), 0, page)
+        out.ready(step())
+    }, [function () {
+        out.scram(step())
+    }], function () {
+        step(function (address) {
+            var key = page.entries ? page.cache[address].key : null
+            page.entries++
+            var header = [ page.entries, page.entries, address ]
+            this.writeEntry({
+                out: out,
+                page: page,
+                header: header,
+                body: key,
+                isKey: true
+            }, step())
+        })(page.addresses)
+    }, function () {
+        out.close('entry', step())
+    })
+})
+
+Sheaf.prototype.readBranch = cadence(function (step, page) {
+    step(function () {
+        this.io('read', this.filename(page.address), step())
+    }, function (fd, stat, read) {
+        this.replay(fd, stat, read, page, 0, step())
+    })
+})
+
+Sheaf.prototype.createMagazine = function () {
+    var magazine = this.cache.createMagazine()
+    var dummy = magazine.hold(-2, {
+        page: {
+            address: -2,
+            addresses: [ 0 ],
+            queue: this.sequester.createQueue()
+        }
+    }).value.page
+    dummy.lock = dummy.queue.createLock()
+    dummy.lock.share(function () {})
+    this.magazine = magazine
+}
+
+Sheaf.prototype.createLocker = function () {
+    return new Locker(this, this.magazine)
+}
+
+Sheaf.prototype.stash = cadence(function (step, page, positionOrIndex, length) {
+    var position = positionOrIndex
+    if (arguments.length == 3) {
+        position = page.positions[positionOrIndex]
+        length = page.lengths[positionOrIndex]
+    }
+    ok(length)
+    var entry, loader
+    if (loader = page.loaders[position]) {
+        loader.share(step())
+    } else if (!(entry = page.cache[position])) {
+        loader = page.loaders[position] = this.sequester.createLock()
+        loader.exclude(function () {
+            this.readRecord(page, position, length, function (error, entry) {
+                delete page.loaders[position]
+                if (!error) {
+                    delete page.cache[position]
+                    var entry = this._cacheRecord(page, position, entry.body, entry.length)
                 }
-                sheaf.writePositions(out, page, step())
-            }
-        }, function () {
-            out.close('entry', step())
-        })
-    })
+                loader.unlock(error, entry, length)
+            }.bind(this))
+        }.bind(this))
+        this.stash(page, position, length, step())
+    } else {
+        return [ entry, length ]
+    }
+})
 
-    Sheaf.prototype.createPage = function (page, override, remainder) {
-        if (override.address == null) {
-            while ((nextAddress % 2) == remainder) nextAddress++
-            override.address = nextAddress++
+Sheaf.prototype._find = cadence(function (step, page, key, low) {
+    var mid, high = (page.addresses || page.positions).length - 1
+
+    if (page.address % 2 == 0) {
+        while (low <= high) {
+            mid = low + ((high - low) >>> 1)
+            var compare = this.comparator(key, page.cache[page.addresses[mid]].key)
+            if (compare < 0) high = mid - 1
+            else if (compare > 0) low = mid + 1
+            else return mid
         }
-        return extend(page, override)
+        return [ ~low ]
     }
 
-    Sheaf.prototype.createBranch = function (override) {
-        return this.createPage({
-            addresses: [],
-            cache: {},
-            entries: 0,
-            penultimate: true,
-            queue: this._sequester.createQueue()
-        }, override, 1)
-    }
-    var sheaf = new Sheaf
-
-    Sheaf.prototype.splice = function (collection, page, offset, length, insert) {
-        ok(typeof collection == 'string', 'incorrect collection passed to splice')
-
-        var values = page[collection], json, removals
-
-        ok(values, 'incorrect collection passed to splice')
-
-        if (length) {
-            removals = values.splice(offset, length)
-
-            json = values.length == 0 ? '[' + removals.join(',') + ']'
-                                                                : ',' + removals.join(',')
-
-            this.heft(page, -json.length)
+    var loop = step(function () {
+        if (low <= high) {
+            mid = low + ((high - low) >>> 1)
+            this.stash(page, mid, step())
         } else {
-            removals = []
+            return [ loop, ~low ]
         }
-
-        if (insert != null) {
-            if (! Array.isArray(insert)) insert = [ insert ]
-            if (insert.length) {
-                json = values.length == 0 ? '[' + insert.join(',') + ']'
-                                                                    : ',' + insert.join(',')
-
-                this.heft(page, json.length)
-
-                values.splice.apply(values, [ offset, 0 ].concat(insert))
-            }
+    }, function (entry) {
+        ok(entry.key != null, 'key is null in find')
+        var compare = this.comparator(key, entry.key)
+        if (compare == 0) {
+            return [ loop, mid ]
+        } else {
+            if (compare > 0) low = mid + 1
+            else high = mid - 1
         }
-        return removals
-    }
+    })()
+})
 
-    Sheaf.prototype.encacheKey = function (page, address, key, length) {
-        return this.encacheEntry(page, address, { key: key, size: length })
-    }
+function Strata (options) {
+    var sheaf = new Sheaf(options)
 
-    Sheaf.prototype.writeBranch = cadence(function (step, page, suffix) {
-        var keys = page.addresses.map(function (address, index) {
-                return page.cache[address]
-            }),
-            out
+    var ok = function (condition, message) { if (!condition) throw new Error(message) },
+        thrownByUser,
+        magazine,
+        length = 1024,
+        size = 0,
+        checksum,
+        constructors = {}
 
-        ok(keys[0] === (void(0)), 'first key is null')
-        ok(keys.slice(1).every(function (key) { return key != null }), 'null keys')
 
-        step(function () {
-            page.entries = 0
-            page.position = 0
+    function _size () { return sheaf.magazine.heft }
 
-            out = journal.branch.open(sheaf.filename(page.address, suffix), 0, page)
-            out.ready(step())
-        }, [function () {
-            out.scram(step())
-        }], function () {
-            step(function (address) {
-                var key = page.entries ? page.cache[address].key : null
-                page.entries++
-                var header = [ page.entries, page.entries, address ]
-                this.writeEntry({
-                    out: out,
-                    page: page,
-                    header: header,
-                    body: key,
-                    isKey: true
-                }, step())
-            })(page.addresses)
-        }, function () {
-            out.close('entry', step())
-        })
-    })
-
-    Sheaf.prototype.readBranch = cadence(function (step, page) {
-        step(function () {
-            this.io('read', sheaf.filename(page.address), step())
-        }, function (fd, stat, read) {
-            this.replay(fd, stat, read, page, 0, step())
-        })
-    })
-
-    Sheaf.prototype.createMagazine = function () {
-        var magazine = cache.createMagazine()
-        var dummy = magazine.hold(-2, {
-            page: {
-                address: -2,
-                addresses: [ 0 ],
-                queue: sequester.createQueue()
-            }
-        }).value.page
-        dummy.lock = dummy.queue.createLock()
-        dummy.lock.share(function () {})
-        return magazine
-    }
-
-    Sheaf.prototype.createLocker = function () {
-        return new Locker(this, magazine)
-    }
+    function _nextAddress () { return sheaf.nextAddress }
 
     // to user land
     var create = cadence(function (step) {
@@ -1982,13 +2039,13 @@ function Strata (options) {
         step([function () {
             locker.dispose()
         }], function () {
-            fs.stat(directory, step())
+            sheaf.fs.stat(sheaf.directory, step())
         }, function (stat) {
-            ok(stat.isDirectory(), 'database ' + directory + ' is not a directory.')
-            fs.readdir(directory, step())
+            ok(stat.isDirectory(), 'database ' + sheaf.directory + ' is not a directory.')
+            sheaf.fs.readdir(sheaf.directory, step())
         }, function (files) {
             ok(!files.filter(function (f) { return ! /^\./.test(f) }).length,
-                  'database ' + directory + ' is not empty.')
+                  'database ' + sheaf.directory + ' is not empty.')
 
             root = locker.encache(sheaf.createBranch({ penultimate: true }))
             leaf = locker.encache(sheaf.createLeaf({}))
@@ -2021,13 +2078,13 @@ function Strata (options) {
         // todo: or if you're using Cadence, doesn't the callback get wrapped
         // anyway?
         step(function () {
-            fs.stat(directory, step())
+            sheaf.fs.stat(sheaf.directory, step())
         }, function stat (error, stat) {
-            fs.readdir(directory, step())
+            sheaf.fs.readdir(sheaf.directory, step())
         }, function (files) {
             files.forEach(function (file) {
                 if (/^\d+$/.test(file)) {
-                    nextAddress = Math.max(+(file) + 1, nextAddress)
+                    sheaf.nextAddress = Math.max(+(file) + 1, sheaf.nextAddress)
                 }
             })
         })
@@ -2035,9 +2092,9 @@ function Strata (options) {
 
     // to user land
     var close = cadence(function (step) {
-        var cartridge = magazine.get(-2), lock = cartridge.value.page.lock
+        var cartridge = sheaf.magazine.get(-2), lock = cartridge.value.page.lock
         step(function () {
-            createJournal().close('tree', step())
+            sheaf.createJournal().close('tree', step())
         }, function () {
             lock.unlock()
             // todo
@@ -2045,76 +2102,15 @@ function Strata (options) {
 
             cartridge.release()
 
-            var purge = magazine.purge()
+            var purge = sheaf.magazine.purge()
             while (purge.cartridge) {
                 purge.cartridge.remove()
                 purge.next()
             }
             purge.release()
 
-            ok(!magazine.count, 'pages still held by cache')
+            ok(!sheaf.magazine.count, 'pages still held by cache')
         })
-    })
-
-    Sheaf.prototype.stash = cadence(function (step, page, positionOrIndex, length) {
-        var position = positionOrIndex
-        if (arguments.length == 3) {
-            position = page.positions[positionOrIndex]
-            length = page.lengths[positionOrIndex]
-        }
-        ok(length)
-        var entry, loader
-        if (loader = page.loaders[position]) {
-            loader.share(step())
-        } else if (!(entry = page.cache[position])) {
-            loader = page.loaders[position] = sequester.createLock()
-            loader.exclude(function () {
-                this.readRecord(page, position, length, function (error, entry) {
-                    delete page.loaders[position]
-                    if (!error) {
-                        delete page.cache[position]
-                        var entry = sheaf._cacheRecord(page, position, entry.body, entry.length)
-                    }
-                    loader.unlock(error, entry, length)
-                })
-            }.bind(this))
-            sheaf.stash(page, position, length, step())
-        } else {
-            return [ entry, length ]
-        }
-    })
-
-    Sheaf.prototype._find = cadence(function (step, page, key, low) {
-        var mid, high = (page.addresses || page.positions).length - 1
-
-        if (page.address % 2 == 0) {
-            while (low <= high) {
-                mid = low + ((high - low) >>> 1)
-                var compare = comparator(key, page.cache[page.addresses[mid]].key)
-                if (compare < 0) high = mid - 1
-                else if (compare > 0) low = mid + 1
-                else return mid
-            }
-            return [ ~low ]
-        }
-
-        var loop = step(function () {
-            if (low <= high) {
-                mid = low + ((high - low) >>> 1)
-                sheaf.stash(page, mid, step())
-            } else {
-                return [ loop, ~low ]
-            }
-        }, function (entry) {
-            ok(entry.key != null, 'key is null in find')
-            var compare = comparator(key, entry.key)
-            if (compare == 0) {
-                return [ loop, mid ]
-            } else {
-                if (compare > 0) low = mid + 1
-                else high = mid - 1
-            }
-        })()
     })
 
     function left (descents, exclusive, callback) {
@@ -2144,7 +2140,7 @@ function Strata (options) {
                 }, step())
             }, function (page, index) {
                 if (descents[0].page.address % 2) {
-                    return [ new Cursor(sheaf, createJournal(), descents, false, key) ]
+                    return [ new Cursor(sheaf, sheaf.createJournal(), descents, false, key) ]
                 } else {
                     descents[0].index--
                     toLeaf(descents[0].right, descents, null, exclusive, step())
@@ -2162,7 +2158,7 @@ function Strata (options) {
             if (exclusive) descents[0].exclude()
             descents[0].descend(sought, descents[0].leaf, step())
         }, function () {
-            return [ new Cursor(sheaf, createJournal(), descents, exclusive, key) ]
+            return [ new Cursor(sheaf, sheaf.createJournal(), descents, exclusive, key) ]
         })
     })
 
@@ -2257,8 +2253,8 @@ function Strata (options) {
     })
 
     function purge (downTo) {
-        var purge = magazine.purge()
-        while (purge.cartridge && magazine.heft > downTo) {
+        var purge = sheaf.magazine.purge()
+        while (purge.cartridge && sheaf.magazine.heft > downTo) {
             purge.cartridge.remove()
             purge.next()
         }
