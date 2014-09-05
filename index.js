@@ -23,20 +23,6 @@ function compare (a, b) { return a < b ? -1 : a > b ? 1 : 0 }
 
 function extract (a) { return a }
 
-function classify () {
-    var i, I, name
-    for (i = 0, I = arguments.length; i < I; i++) {
-        name = arguments[i].name
-        if (name[0] == '_')
-            this.__defineGetter__(name.slice(1), arguments[i])
-        else if (name[name.length - 1] == '_')
-            this.__defineSetter__(name.slice(0, name.length - 1), arguments[i])
-        else
-            this[arguments[i].name] = arguments[i]
-    }
-    return this
-}
-
 function Locker (sheaf, magazine) {
     ok(arguments.length, 'no arguments')
     ok(magazine)
@@ -2015,258 +2001,242 @@ Sheaf.prototype._find = cadence(function (step, page, key, low) {
 })
 
 function Strata (options) {
-    var sheaf = new Sheaf(options)
+    this.sheaf = new Sheaf(options)
+}
 
-    var ok = function (condition, message) { if (!condition) throw new Error(message) },
-        magazine,
-        length = 1024,
-        size = 0,
-        checksum,
-        constructors = {}
+Strata.prototype.__defineGetter__('size', function () {
+    return this.sheaf.magazine.heft
+})
 
+Strata.prototype.__defineGetter__('nextAddress', function () {
+    return this.sheaf.nextAddress
+})
 
-    function _size () { return sheaf.magazine.heft }
+// to user land
+Strata.prototype.create = cadence(function (step) {
+    this.sheaf.createMagazine()
 
-    function _nextAddress () { return sheaf.nextAddress }
+    var locker = this.sheaf.createLocker(), count = 0, root, leaf, journal
 
-    // to user land
-    var create = cadence(function (step) {
-        magazine = sheaf.createMagazine()
+    step([function () {
+        locker.dispose()
+    }], function () {
+        this.sheaf.fs.stat(this.sheaf.directory, step())
+    }, function (stat) {
+        ok(stat.isDirectory(), 'database ' + this.sheaf.directory + ' is not a directory.')
+        this.sheaf.fs.readdir(this.sheaf.directory, step())
+    }, function (files) {
+        ok(!files.filter(function (f) { return ! /^\./.test(f) }).length,
+              'database ' + this.sheaf.directory + ' is not empty.')
 
-        var locker = sheaf.createLocker(), count = 0, root, leaf, journal
+        root = locker.encache(this.sheaf.createBranch({ penultimate: true }))
+        leaf = locker.encache(this.sheaf.createLeaf({}))
+        this.sheaf.splice('addresses', root, 0, 0, leaf.address)
 
-        step([function () {
-            locker.dispose()
-        }], function () {
-            sheaf.fs.stat(sheaf.directory, step())
-        }, function (stat) {
-            ok(stat.isDirectory(), 'database ' + sheaf.directory + ' is not a directory.')
-            sheaf.fs.readdir(sheaf.directory, step())
-        }, function (files) {
-            ok(!files.filter(function (f) { return ! /^\./.test(f) }).length,
-                  'database ' + sheaf.directory + ' is not empty.')
-
-            root = locker.encache(sheaf.createBranch({ penultimate: true }))
-            leaf = locker.encache(sheaf.createLeaf({}))
-            sheaf.splice('addresses', root, 0, 0, leaf.address)
-
-            sheaf.writeBranch(root, '.replace', step())
-        }, [function () {
-            locker.unlock(root)
-        }], function () {
-            sheaf.rewriteLeaf(leaf, '.replace', step())
-        }, [function () {
-            locker.unlock(leaf)
-        }], function () {
-            sheaf.replace(root, '.replace', step())
-        }, function branchReplaced () {
-            sheaf.replace(leaf, '.replace', step())
-        })
+        this.sheaf.writeBranch(root, '.replace', step())
+    }, [function () {
+        locker.unlock(root)
+    }], function () {
+        this.sheaf.rewriteLeaf(leaf, '.replace', step())
+    }, [function () {
+        locker.unlock(leaf)
+    }], function () {
+        this.sheaf.replace(root, '.replace', step())
+    }, function branchReplaced () {
+        this.sheaf.replace(leaf, '.replace', step())
     })
+})
 
-    // to user land
-    var open = cadence(function (step) {
-        magazine = sheaf.createMagazine()
+// to user land
+Strata.prototype.open = cadence(function (step) {
+    this.sheaf.createMagazine()
 
-        // todo: instead of rescue, you might try/catch the parts that you know
-        // are likely to cause errors and raise an error of a Strata type.
+    // todo: instead of rescue, you might try/catch the parts that you know
+    // are likely to cause errors and raise an error of a Strata type.
 
-        // todo: or you might need some way to catch a callback error. Maybe an
-        // outer most catch block?
+    // todo: or you might need some way to catch a callback error. Maybe an
+    // outer most catch block?
 
-        // todo: or if you're using Cadence, doesn't the callback get wrapped
-        // anyway?
-        step(function () {
-            sheaf.fs.stat(sheaf.directory, step())
-        }, function stat (error, stat) {
-            sheaf.fs.readdir(sheaf.directory, step())
-        }, function (files) {
-            files.forEach(function (file) {
-                if (/^\d+$/.test(file)) {
-                    sheaf.nextAddress = Math.max(+(file) + 1, sheaf.nextAddress)
-                }
-            })
-        })
-    })
-
-    // to user land
-    var close = cadence(function (step) {
-        var cartridge = sheaf.magazine.get(-2), lock = cartridge.value.page.lock
-        step(function () {
-            sheaf.createJournal().close('tree', step())
-        }, function () {
-            lock.unlock()
-            // todo
-            lock.dispose()
-
-            cartridge.release()
-
-            var purge = sheaf.magazine.purge()
-            while (purge.cartridge) {
-                purge.cartridge.remove()
-                purge.next()
+    // todo: or if you're using Cadence, doesn't the callback get wrapped
+    // anyway?
+    step(function () {
+        this.sheaf.fs.stat(this.sheaf.directory, step())
+    }, function stat (error, stat) {
+        this.sheaf.fs.readdir(this.sheaf.directory, step())
+    }, function (files) {
+        files.forEach(function (file) {
+            if (/^\d+$/.test(file)) {
+                this.sheaf.nextAddress = Math.max(+(file) + 1, this.sheaf.nextAddress)
             }
-            purge.release()
-
-            ok(!sheaf.magazine.count, 'pages still held by cache')
-        })
+        }, this)
     })
+})
 
-    function left (descents, exclusive, callback) {
-        toLeaf(descents[0].left, descents, null, exclusive, callback)
-    }
+// to user land
+Strata.prototype.close = cadence(function (step) {
+    var cartridge = this.sheaf.magazine.get(-2), lock = cartridge.value.page.lock
+    step(function () {
+        this.sheaf.createJournal().close('tree', step())
+    }, function () {
+        lock.unlock()
+        // todo
+        lock.dispose()
 
-    function right (descents, exclusive, callback) {
-        toLeaf(descents[0].right, descents, null, exclusive, callback)
-    }
+        cartridge.release()
 
-    function key(key) {
-        return function (descents, exclusive, callback) {
-            toLeaf(descents[0].key(key), descents, null, exclusive, callback)
-        }
-    }
-
-    function leftOf (key) {
-        return cadence(function (step, descents, exclusive) {
-            var conditions = [ descents[0].leaf, descents[0].found([key]) ]
-            step(function () {
-                descents[0].descend(descents[0].key(key), function () {
-                    return conditions.some(function (condition) {
-                        return condition.call(descents[0])
-                    })
-                }, step())
-            }, function (page, index) {
-                if (descents[0].page.address % 2) {
-                    return [ new Cursor(sheaf, sheaf.createJournal(), descents, false, key) ]
-                } else {
-                    descents[0].index--
-                    toLeaf(descents[0].right, descents, null, exclusive, step())
-                }
-            })
-        })
-    }
-
-    var toLeaf = cadence(function (step, sought, descents, key, exclusive) {
-        step(function () {
-            descents[0].descend(sought, descents[0].penultimate, step())
-        }, function () {
-            if (exclusive) descents[0].exclude()
-            descents[0].descend(sought, descents[0].leaf, step())
-        }, function () {
-            return [ new Cursor(sheaf, sheaf.createJournal(), descents, exclusive, key) ]
-        })
-    })
-
-    // to user land
-    var cursor = cadence(function (step, key, exclusive) {
-        var descents = [ new Descent(sheaf, sheaf.createLocker()) ]
-        step([function () {
-            if (descents.length) {
-                descents[0].locker.unlock(descents[0].page)
-                descents[0].locker.dispose()
-            }
-        }], function () {
-            if  (typeof key == 'function') {
-                key(descents, exclusive, step())
-            } else {
-                toLeaf(descents[0].key(key), descents, key, exclusive, step())
-            }
-        }, function (cursor) {
-            return [ cursor ]
-        })
-    })
-
-    function iterator (key, callback) {
-        cursor(key, false, callback)
-    }
-
-    function mutator (key, callback) {
-        cursor(key, true, callback)
-    }
-
-    // to user land
-    function balance (callback) {
-        sheaf.balancer.balance(callback)
-    }
-
-    // to user land
-    var vivify = cadence(function (step) {
-        var locker = sheaf.createLocker(), root
-
-        function record (address) {
-            return { address: address }
-        }
-
-        step(function () {
-            locker.lock(0, false, step())
-        }, function (page) {
-            step([function () {
-                locker.unlock(page)
-                locker.dispose()
-            }], function () {
-                expand(page, root = page.addresses.map(record), 0, step())
-            })
-        })
-
-        var expand = cadence(function (step, parent, pages, index) {
-            var block = step(function () {
-                if (index < pages.length) {
-                    var address = pages[index].address
-                    locker.lock(address, false, step(step, [function (page) { locker.unlock(page) }]))
-                } else {
-                    return [ block, pages ]
-                }
-            }, function (page) {
-                if (page.address % 2 == 0) {
-                    step(function () {
-                        pages[index].children = page.addresses.map(record)
-                        if (index) {
-                            pages[index].key = parent.cache[parent.addresses[index]].key
-                        }
-                        expand(page, pages[index].children, 0, step())
-                    }, function () {
-                        expand(parent, pages, index + 1, step())
-                    })
-                } else {
-                    step(function () {
-                        pages[index].children = []
-                        pages[index].ghosts = page.ghosts
-
-                        step(function (recordIndex) {
-                            step(function () {
-                                sheaf.stash(page, recordIndex, step())
-                            }, function (entry) {
-                                pages[index].children.push(entry.record)
-                            })
-                        })(page.positions.length)
-                    }, function () {
-                        expand(parent, pages, index + 1, step())
-                    })
-                }
-            })(1)
-        })
-    })
-
-    function purge (downTo) {
-        var purge = sheaf.magazine.purge()
-        while (purge.cartridge && sheaf.magazine.heft > downTo) {
+        var purge = this.sheaf.magazine.purge()
+        while (purge.cartridge) {
             purge.cartridge.remove()
             purge.next()
         }
         purge.release()
+
+        ok(!this.sheaf.magazine.count, 'pages still held by cache')
+    })
+})
+
+Strata.prototype.left = function (descents, exclusive, callback) {
+    this.toLeaf(descents[0].left, descents, null, exclusive, callback)
+}
+
+Strata.prototype.right = function (descents, exclusive, callback) {
+    this.toLeaf(descents[0].right, descents, null, exclusive, callback)
+}
+
+Strata.prototype.key = function (key) {
+    return function (descents, exclusive, callback) {
+        this.toLeaf(descents[0].key(key), descents, null, exclusive, callback)
+    }
+}
+
+Strata.prototype.leftOf = function (key) {
+    return cadence(function (step, descents, exclusive) {
+        var conditions = [ descents[0].leaf, descents[0].found([key]) ]
+        step(function () {
+            descents[0].descend(descents[0].key(key), function () {
+                return conditions.some(function (condition) {
+                    return condition.call(descents[0])
+                })
+            }, step())
+        }, function (page, index) {
+            if (descents[0].page.address % 2) {
+                return [ new Cursor(this.sheaf, this.sheaf.createJournal(), descents, false, key) ]
+            } else {
+                descents[0].index--
+                this.toLeaf(descents[0].right, descents, null, exclusive, step())
+            }
+        })
+    })
+}
+
+Strata.prototype.toLeaf = cadence(function (step, sought, descents, key, exclusive) {
+    step(function () {
+        descents[0].descend(sought, descents[0].penultimate, step())
+    }, function () {
+        if (exclusive) descents[0].exclude()
+        descents[0].descend(sought, descents[0].leaf, step())
+    }, function () {
+        return [ new Cursor(this.sheaf, this.sheaf.createJournal(), descents, exclusive, key) ]
+    })
+})
+
+// to user land
+Strata.prototype.cursor = cadence(function (step, key, exclusive) {
+    var descents = [ new Descent(this.sheaf, this.sheaf.createLocker()) ]
+    step([function () {
+        if (descents.length) {
+            descents[0].locker.unlock(descents[0].page)
+            descents[0].locker.dispose()
+        }
+    }], function () {
+        if  (typeof key == 'function') {
+            key.call(this, descents, exclusive, step())
+        } else {
+            this.toLeaf(descents[0].key(key), descents, key, exclusive, step())
+        }
+    }, function (cursor) {
+        return [ cursor ]
+    })
+})
+
+Strata.prototype.iterator = function (key, callback) {
+    this.cursor(key, false, callback)
+}
+
+Strata.prototype.mutator = function (key, callback) {
+    this.cursor(key, true, callback)
+}
+
+// to user land
+Strata.prototype.balance = function (callback) {
+    this.sheaf.balancer.balance(callback)
+}
+
+// to user land
+Strata.prototype.vivify = cadence(function (step) {
+    var locker = this.sheaf.createLocker(), root
+
+    function record (address) {
+        return { address: address }
     }
 
-    var objectToReturn = classify.call(this, create, open,
-                               key, left, leftOf, right,
-                               iterator, mutator,
-                               balance, purge, vivify,
-                               close,
-                               _size, _nextAddress)
-    this.create = create
-    this.open = open
-    this.close = close
-    this.vivify = vivify
-    return objectToReturn
+    step(function () {
+        locker.lock(0, false, step())
+    }, function (page) {
+        step([function () {
+            locker.unlock(page)
+            locker.dispose()
+        }], function () {
+            expand.call(this, page, root = page.addresses.map(record), 0, step())
+        })
+    })
+
+    var expand = cadence(function (step, parent, pages, index) {
+        var block = step(function () {
+            if (index < pages.length) {
+                var address = pages[index].address
+                locker.lock(address, false, step(step, [function (page) { locker.unlock(page) }]))
+            } else {
+                return [ block, pages ]
+            }
+        }, function (page) {
+            if (page.address % 2 == 0) {
+                step(function () {
+                    pages[index].children = page.addresses.map(record)
+                    if (index) {
+                        pages[index].key = parent.cache[parent.addresses[index]].key
+                    }
+                    expand.call(this, page, pages[index].children, 0, step())
+                }, function () {
+                    expand.call(this, parent, pages, index + 1, step())
+                })
+            } else {
+                step(function () {
+                    pages[index].children = []
+                    pages[index].ghosts = page.ghosts
+
+                    step(function (recordIndex) {
+                        step(function () {
+                            this.sheaf.stash(page, recordIndex, step())
+                        }, function (entry) {
+                            pages[index].children.push(entry.record)
+                        })
+                    })(page.positions.length)
+                }, function () {
+                    expand.call(this, parent, pages, index + 1, step())
+                })
+            }
+        })(1)
+    })
+})
+
+Strata.prototype.purge = function (downTo) {
+    var purge = this.sheaf.magazine.purge()
+    while (purge.cartridge && this.sheaf.magazine.heft > downTo) {
+        purge.cartridge.remove()
+        purge.next()
+    }
+    purge.release()
 }
 
 module.exports = Strata
