@@ -1,6 +1,5 @@
 var Cache = require('magazine'),
     Journalist = require('journalist'),
-    Rescue = require('rescue'),
     cadence = require('cadence'),
     ok = require('assert').ok
 
@@ -1371,8 +1370,7 @@ function Strata (options) {
             return journalist.createJournal()
         }),
         serialize = options.serialize || function (object) { return new Buffer(JSON.stringify(object)) },
-        deserialize = options.deserialize || function (buffer) { return JSON.parse(buffer.toString()) },
-        rescue = new Rescue
+        deserialize = options.deserialize || function (buffer) { return JSON.parse(buffer.toString()) }
 
     checksum = (function () {
         if (typeof options.checksum == 'function') return options.checksum
