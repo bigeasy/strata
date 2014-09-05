@@ -2018,7 +2018,6 @@ function Strata (options) {
     var sheaf = new Sheaf(options)
 
     var ok = function (condition, message) { if (!condition) throw new Error(message) },
-        thrownByUser,
         magazine,
         length = 1024,
         size = 0,
@@ -2129,8 +2128,6 @@ function Strata (options) {
 
     function leftOf (key) {
         return cadence(function (step, descents, exclusive) {
-            // todo: outgoing
-            thrownByUser = null
             var conditions = [ descents[0].leaf, descents[0].found([key]) ]
             step(function () {
                 descents[0].descend(descents[0].key(key), function () {
@@ -2150,8 +2147,6 @@ function Strata (options) {
     }
 
     var toLeaf = cadence(function (step, sought, descents, key, exclusive) {
-        ok(sought)
-        thrownByUser = null
         step(function () {
             descents[0].descend(sought, descents[0].penultimate, step())
         }, function () {
