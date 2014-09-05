@@ -329,11 +329,6 @@ function Descent (sheaf, locker, override) {
     }
 }
 
-function _locker () { return locker }
-
-function _page () { return page }
-
-
 Descent.prototype.__defineSetter__('index', function (i) {
     this.indexes[this.page.address] = this._index = i
 })
@@ -341,12 +336,6 @@ Descent.prototype.__defineSetter__('index', function (i) {
 Descent.prototype.__defineGetter__('index', function () {
     return this._index
 })
-
-function _indexes () { return indexes }
-
-function _lesser () { return lesser }
-
-function _greater () { return greater }
 
 Descent.prototype.fork = function () {
     return new Descent(this.sheaf, this.locker, {
@@ -411,8 +400,6 @@ Descent.prototype.level = function (level) {
 Descent.prototype.unlocker = function (parent) {
     this.locker.unlock(parent)
 }
-
-function unlocker_ ($unlocker) { unlocker = $unlocker }
 
 Descent.prototype.descend = cadence(function (step, next, stop) {
     var above = this.page
