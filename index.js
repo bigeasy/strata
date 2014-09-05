@@ -1316,14 +1316,28 @@ Balancer.prototype.fillRoot = cadence(function (step) {
 })
 
 function Strata (options) {
-    var writeFooter = cadence(function (step, out, position, page) {
+    function writeFooter (out, position, page, callback) {
+        sheaf.writeFooter(out, position, page, callback)
+    }
+
+    function Sheaf () {
+        this.journal = journal
+        this.journalist = journalist
+        this.options = options
+        this.tracer = options.tracer || function () { arguments[2]() }
+        this.balancer = new Balancer(this)
+        this._sequester = sequester
+        this.comparator = comparator
+    }
+
+    Sheaf.prototype. writeFooter = cadence(function (step, out, position, page) {
         ok(page.address % 2 && page.bookmark != null)
         var header = [
             0, page.bookmark.position, page.bookmark.length, page.bookmark.entry,
             page.right || 0, page.position, page.entries, page.ghosts, page.positions.length - page.ghosts
         ]
         step(function () {
-            writeEntry({
+            this.writeEntry({
                 out: out,
                 page: page,
                 header: header,
@@ -1393,7 +1407,7 @@ function Strata (options) {
 
     function _nextAddress () { return nextAddress }
 
-    function readEntry (buffer, isKey) {
+    Sheaf.prototype.readEntry = function (buffer, isKey) {
         for (var count = 2, i = 0, I = buffer.length; i < I && count; i++) {
             if (buffer[i] == 0x20) count--
         }
@@ -1450,7 +1464,7 @@ function Strata (options) {
         fs.unlink(sheaf.filename(page.address, suffix), callback)
     }
 
-    function heft (page, s) {
+    Sheaf.prototype.heft = function (page, s) {
         magazine.get(page.address).adjustHeft(s)
     }
 
@@ -1486,7 +1500,7 @@ function Strata (options) {
 
         page.cache[reference] = entry
 
-        heft(page, entry.size)
+        this.heft(page, entry.size)
 
         return entry
     }
@@ -1494,12 +1508,12 @@ function Strata (options) {
     Sheaf.prototype.uncacheEntry = function (page, reference) {
         var entry = page.cache[reference]
         ok (entry, 'entry not cached')
-        heft(page, -entry.size)
+        this.heft(page, -entry.size)
         delete page.cache[reference]
         return entry
     }
 
-    var writeEntry = cadence(function (step, options) {
+    Sheaf.prototype.writeEntry = cadence(function (step, options) {
         var entry, buffer, json, line, length
 
         ok(options.page.position != null, 'page has not been positioned: ' + options.page.position)
@@ -1559,15 +1573,15 @@ function Strata (options) {
 
     Sheaf.prototype.writeInsert = function (out, page, index, record, callback) {
         var header = [ ++page.entries, index + 1 ]
-        writeEntry({ out: out, page: page, header: header, body: record }, callback)
+        this.writeEntry({ out: out, page: page, header: header, body: record }, callback)
     }
 
     Sheaf.prototype.writeDelete = function (out, page, index, callback) {
         var header = [ ++page.entries, -(index + 1) ]
-        writeEntry({ out: out, page: page, header: header }, callback)
+        this.writeEntry({ out: out, page: page, header: header }, callback)
     }
 
-    var io = cadence(function (step, direction, filename) {
+    Sheaf.prototype.io = cadence(function (step, direction, filename) {
         step(function () {
             fs.open(filename, direction[0], step())
         }, function (fd) {
@@ -1597,10 +1611,10 @@ function Strata (options) {
     Sheaf.prototype.writePositions = function (output, page, callback) {
         var header = [ ++page.entries, 0, page.ghosts ]
         header = header.concat(page.positions).concat(page.lengths)
-        writeEntry({ out: output, page: page, header: header, type: 'position' }, callback)
+        this.writeEntry({ out: output, page: page, header: header, type: 'position' }, callback)
     }
 
-    function readHeader (entry) {
+    Sheaf.prototype.readHeader = function (entry) {
         var header = entry.header
         return {
             entry:      header[0],
@@ -1609,7 +1623,7 @@ function Strata (options) {
         }
     }
 
-    function readFooter (entry) {
+    Sheaf.prototype.readFooter = function (entry) {
         var footer = entry.header
         return {
             entry:      footer[0],
@@ -1626,7 +1640,7 @@ function Strata (options) {
         }
     }
 
-    var findPositionsArray = cadence(function (step, page, fd, stat, read) {
+    Sheaf.prototype.findPositionsArray = cadence(function (step, page, fd, stat, read) {
         var positions = [],
             lengths = [],
             bookmark
@@ -1636,7 +1650,7 @@ function Strata (options) {
         }, function (slice) {
             for (var i = slice.length - 2; i != -1; i--) {
                 if (slice[i] == 0x0a) {
-                    var footer = readFooter(readEntry(slice.slice(i + 1)))
+                    var footer = this.readFooter(sheaf.readEntry(slice.slice(i + 1)))
                     ok(!footer.entry, 'footer is supposed to be zero')
                     bookmark = footer.bookmark
                     page.right = footer.right
@@ -1648,7 +1662,7 @@ function Strata (options) {
             }
             throw new Error('cannot find footer in last ' + buffer.length + ' bytes')
         }, function (slice) {
-            var positions = readEntry(slice.slice(0, bookmark.length)).header
+            var positions = sheaf.readEntry(slice.slice(0, bookmark.length)).header
 
             page.entries = positions.shift()
             ok(page.entries == bookmark.entry, 'position entry number incorrect')
@@ -1670,7 +1684,7 @@ function Strata (options) {
 
     Sheaf.prototype.readLeaf = cadence(function (step, page) {
         step(function () {
-            io('read', sheaf.filename(page.address), step())
+            this.io('read', sheaf.filename(page.address), step())
         }, function (fd, stat, read) {
             step(function () {
                 if (options.replay) {
@@ -1678,17 +1692,17 @@ function Strata (options) {
                     page.ghosts = 0
                     return [ page, 0 ]
                 } else {
-                    findPositionsArray(page, fd, stat, read, step())
+                    this.findPositionsArray(page, fd, stat, read, step())
                 }
             }, function (page, position) {
-                replay(fd, stat, read, page, position, step())
+                this.replay(fd, stat, read, page, position, step())
             }, function () {
                 return [ page ]
             })
         })
     })
 
-    var replay = cadence(function (step, fd, stat, read, page, position) {
+    Sheaf.prototype.replay = cadence(function (step, fd, stat, read, page, position) {
         var leaf = !!(page.address % 2),
             seen = {},
             buffer = new Buffer(options.readLeafStartLength || 1024),
@@ -1712,8 +1726,8 @@ function Strata (options) {
                         }
                         var position = start + offset
                         ok(length)
-                        var entry = readEntry(slice.slice(offset, offset + length), !leaf)
-                        var header = readHeader(entry)
+                        var entry = this.readEntry(slice.slice(offset, offset + length), !leaf)
+                        var header = this.readHeader(entry)
                         if (header.entry) {
                             ok(header.entry == ++page.entries, 'entry count is off')
                             var index = header.index
@@ -1752,7 +1766,7 @@ function Strata (options) {
                                 } */
                             }
                         } else {
-                            footer = readFooter(entry)
+                            footer = this.readFooter(entry)
                             page.position = position
                             page.right = footer.right
                         }
@@ -1774,9 +1788,9 @@ function Strata (options) {
         })
     })
 
-    var readRecord = cadence(function (step, page, position, length) {
+    Sheaf.prototype.readRecord = cadence(function (step, page, position, length) {
         step(function () {
-            io('read', sheaf.filename(page.address), step())
+            this.io('read', sheaf.filename(page.address), step())
         }, function (fd, stat, read) {
             step([function () {
                 // todo: test what happens when a finalizer throws an error
@@ -1787,7 +1801,7 @@ function Strata (options) {
                 read(new Buffer(length), position, step())
             }, function (buffer) {
                 ok(buffer[length - 1] == 0x0A, 'newline expected')
-                return [ readEntry(buffer, false) ]
+                return [ this.readEntry(buffer, false) ]
             })
         })
     })
@@ -1843,16 +1857,6 @@ function Strata (options) {
         })
     })
 
-    function Sheaf () {
-        this.journal = journal
-        this.journalist = journalist
-        this.options = options
-        this.tracer = options.tracer || function () { arguments[2]() }
-        this.balancer = new Balancer(this)
-        this._sequester = sequester
-        this.comparator = comparator
-    }
-
     Sheaf.prototype.createPage = function (page, override, remainder) {
         if (override.address == null) {
             while ((nextAddress % 2) == remainder) nextAddress++
@@ -1885,7 +1889,7 @@ function Strata (options) {
             json = values.length == 0 ? '[' + removals.join(',') + ']'
                                                                 : ',' + removals.join(',')
 
-            heft(page, -json.length)
+            this.heft(page, -json.length)
         } else {
             removals = []
         }
@@ -1896,7 +1900,7 @@ function Strata (options) {
                 json = values.length == 0 ? '[' + insert.join(',') + ']'
                                                                     : ',' + insert.join(',')
 
-                heft(page, json.length)
+                this.heft(page, json.length)
 
                 values.splice.apply(values, [ offset, 0 ].concat(insert))
             }
@@ -1930,7 +1934,7 @@ function Strata (options) {
                 var key = page.entries ? page.cache[address].key : null
                 page.entries++
                 var header = [ page.entries, page.entries, address ]
-                writeEntry({
+                this.writeEntry({
                     out: out,
                     page: page,
                     header: header,
@@ -1945,13 +1949,13 @@ function Strata (options) {
 
     Sheaf.prototype.readBranch = cadence(function (step, page) {
         step(function () {
-            io('read', sheaf.filename(page.address), step())
+            this.io('read', sheaf.filename(page.address), step())
         }, function (fd, stat, read) {
-            replay(fd, stat, read, page, 0, step())
+            this.replay(fd, stat, read, page, 0, step())
         })
     })
 
-    function createMagazine () {
+    Sheaf.prototype.createMagazine = function () {
         var magazine = cache.createMagazine()
         var dummy = magazine.hold(-2, {
             page: {
@@ -1965,19 +1969,15 @@ function Strata (options) {
         return magazine
     }
 
-    function createLocker () {
-        return new Locker(sheaf, magazine)
-    }
-
     Sheaf.prototype.createLocker = function () {
         return new Locker(this, magazine)
     }
 
     // to user land
     var create = cadence(function (step) {
-        magazine = createMagazine()
+        magazine = sheaf.createMagazine()
 
-        var locker = createLocker(), count = 0, root, leaf, journal
+        var locker = sheaf.createLocker(), count = 0, root, leaf, journal
 
         step([function () {
             locker.dispose()
@@ -2010,7 +2010,7 @@ function Strata (options) {
 
     // to user land
     var open = cadence(function (step) {
-        magazine = createMagazine()
+        magazine = sheaf.createMagazine()
 
         // todo: instead of rescue, you might try/catch the parts that you know
         // are likely to cause errors and raise an error of a Strata type.
@@ -2069,7 +2069,7 @@ function Strata (options) {
         } else if (!(entry = page.cache[position])) {
             loader = page.loaders[position] = sequester.createLock()
             loader.exclude(function () {
-                readRecord(page, position, length, function (error, entry) {
+                this.readRecord(page, position, length, function (error, entry) {
                     delete page.loaders[position]
                     if (!error) {
                         delete page.cache[position]
@@ -2077,7 +2077,7 @@ function Strata (options) {
                     }
                     loader.unlock(error, entry, length)
                 })
-            })
+            }.bind(this))
             sheaf.stash(page, position, length, step())
         } else {
             return [ entry, length ]
@@ -2168,7 +2168,7 @@ function Strata (options) {
 
     // to user land
     var cursor = cadence(function (step, key, exclusive) {
-        var descents = [ new Descent(sheaf, createLocker()) ]
+        var descents = [ new Descent(sheaf, sheaf.createLocker()) ]
         step([function () {
             if (descents.length) {
                 descents[0].locker.unlock(descents[0].page)
@@ -2200,7 +2200,7 @@ function Strata (options) {
 
     // to user land
     var vivify = cadence(function (step) {
-        var locker = createLocker(), root
+        var locker = sheaf.createLocker(), root
 
         function record (address) {
             return { address: address }
