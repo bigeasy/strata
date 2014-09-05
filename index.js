@@ -1391,10 +1391,6 @@ function Strata (options) {
         }
     })()
 
-    function validate (callback, forward, janitor) {
-        return rescue.validate(callback, forward, janitor)
-    }
-
     function _size () { return magazine.heft }
 
     function _nextAddress () { return nextAddress }
