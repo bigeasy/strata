@@ -1082,7 +1082,6 @@ Balancer.prototype.mergePages = cadence(function (step, key, leftKey, stopper, m
         }, function () {
             this.sheaf.replace(pages.left.page, '.replace', step())
         }, function () {
-    console.log('balancer')
             this.sheaf.unlink(pages.right.page, '.unlink', step())
         }, function () {
             this.sheaf.replace(ancestor, '.commit', step())
