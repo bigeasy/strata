@@ -1208,9 +1208,7 @@ Balancer.prototype.chooseBranchesToMerge = cadence(function (step, key, address)
             this.sheaf.stash(designator.page, 0, step())
         })
     }, function (entry) {
-        if (entry) { // todo: fix return [ choose ]
-            this.mergeBranches(entry.key, entry.keySize, choice.page.address, step())
-        }
+        this.mergeBranches(entry.key, entry.keySize, choice.page.address, step())
     })
 })
 
