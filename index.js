@@ -139,7 +139,6 @@ function Cursor (sheaf, journal, descents, exclusive, searchKey) {
     this._rightLeafKey = null
     this._searchKey = searchKey
     this.exclusive = exclusive
-    this.length = this._page.positions.length
     this.index = descents[0].index
     this.offset = this.index < 0 ? ~ this.index : this.index
 
@@ -180,9 +179,36 @@ Cursor.prototype.next = cadence(function (step) {
 })
 
 // to user land
-Cursor.prototype.indexOf = function (key, callback) {
-    this._sheaf._find(this._page, key, this._page.ghosts, callback)
-}
+Cursor.prototype.indexOf = cadence(function (step, key) {
+    step(function () {
+        this._sheaf._find(this._page, key, this._page.ghosts, step())
+    }, function (index) {
+        var unambiguous
+        unambiguous = -1 < index
+                   || ~ index < this._page.positions.length
+                   || ! this._page.right
+                   || this._searchKey.length && this._sheaf.comparator(this._searchKey[0], key) == 0
+        if (!unambiguous) step(function () {
+            if (!this._rightLeafKey) step(function () {
+                this._locker.lock(this._page.right, false, step())
+            }, function (rightLeafPage) {
+                step(function () {
+                    this._sheaf.stash(rightLeafPage, 0, step())
+                }, [function () {
+                    this._locker.unlock(rightLeafPage)
+                }], function (entry) {
+                    this._rightLeafKey = entry.key
+                })
+            })
+        }, function  () {
+            if (this._sheaf.comparator(key, this._rightLeafKey) >= 0) {
+                return [ ~(this._page.positions.length + 1) ]
+            } else {
+                return index
+            }
+        })
+    })
+})
 
 // todo: pass an integer as the first argument to force the arity of the
 // return.
@@ -214,64 +240,39 @@ Cursor.prototype.__defineGetter__('ghosts', function () {
     return this._page.ghosts
 })
 
+Cursor.prototype.__defineGetter__('length', function () {
+    return this._page.positions.length
+})
+
 Cursor.prototype.insert = cadence(function (step, record, key, index) {
     ok(this.exclusive, 'cursor is not exclusive')
+    ok(index > 0 || this._page.address == 1)
 
-    var unambiguous
-
-    var block = step(function () {
-        if (index == 0 && this._page.address != 1) {
-            return [ block, -1 ]
-        }
-
-        unambiguous = index < this._page.positions.length
-        unambiguous = unambiguous || this._searchKey.length && this._sheaf.comparator(this._searchKey[0], key) == 0
-        unambiguous = unambiguous || ! this._page.right
-
-        if (!unambiguous) step(function () {
-            if (!this._rightLeafKey) step(function () {
-                this._locker.lock(this._page.right, false, step())
-            }, function (rightLeafPage) {
+    var entry
+    this._sheaf.balancer.unbalanced(this._page)
+    step(function () {
+        entry = this._journal.open(this._sheaf.filename(this._page.address), this._page.position, this._page)
+        this._sheaf.journalist.purge(step())
+    }, function () {
+        entry.ready(step())
+    }, function () {
+        scram.call(this, entry, cadence(function (step) {
+            step(function () {
+                this._sheaf.writeInsert(entry, this._page, index, record, step())
+            }, function (position, length, size) {
+                this._sheaf.splice('positions', this._page, index, 0, position)
+                this._sheaf.splice('lengths', this._page, index, 0, length)
+                this._sheaf._cacheRecord(this._page, position, record, size)
+                this.length = this._page.positions.length
+            }, function () {
                 step(function () {
-                    this._sheaf.stash(rightLeafPage, 0, step())
-                }, [function () {
-                    this._locker.unlock(rightLeafPage)
-                }], function (entry) {
-                    this._rightLeafKey = entry.key
+                    entry.close('entry', step())
+                }, function () {
+                    return []
                 })
             })
-        }, function  () {
-            if (this._sheaf.comparator(key, this._rightLeafKey) >= 0) {
-                return [ block, +1 ]
-            }
-        })
-    }, function () {
-        var entry
-        this._sheaf.balancer.unbalanced(this._page)
-        step(function () {
-            entry = this._journal.open(this._sheaf.filename(this._page.address), this._page.position, this._page)
-            this._sheaf.journalist.purge(step())
-        }, function () {
-            entry.ready(step())
-        }, function () {
-            scram.call(this, entry, cadence(function (step) {
-                step(function () {
-                    this._sheaf.writeInsert(entry, this._page, index, record, step())
-                }, function (position, length, size) {
-                    this._sheaf.splice('positions', this._page, index, 0, position)
-                    this._sheaf.splice('lengths', this._page, index, 0, length)
-                    this._sheaf._cacheRecord(this._page, position, record, size)
-                    this.length = this._page.positions.length
-                }, function () {
-                    step(function () {
-                        entry.close('entry', step())
-                    }, function () {
-                        return [ 0 ]
-                    })
-                })
-            }), step())
-        })
-    })(1)
+        }), step())
+    })
 })
 
 Cursor.prototype.remove = cadence(function (step, index) {
@@ -299,6 +300,9 @@ Cursor.prototype.remove = cadence(function (step, index) {
                 entry.close('entry', step())
             })
         }), step())
+    }, function () {
+        // todo: arity in delclaration.
+        return []
     })
 })
 

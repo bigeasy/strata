@@ -14,10 +14,12 @@ require('./proof')(3, function (step, Strata, tmp, serialize, gather, assert) {
         strata.mutator('c', step())
     }, function (cursor) {
         step(function () {
+            cursor.indexOf('c', step())
+        }, function (index) {
+            assert(~index <= cursor.length, 'unambiguous')
             cursor.insert('c', 'c', ~cursor.index, step())
-        }, function (unambiguous) {
+        }, function () {
             cursor.unlock(step())
-            assert(unambiguous, 0, 'unambiguous')
         }, function () {
             gather(strata, step())
         })

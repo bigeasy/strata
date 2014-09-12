@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(5, function (step, Strata, tmp, load, vivify, assert, say) {
+require('./proof')(4, function (step, Strata, tmp, load, vivify, assert, say) {
     var strata
     step(function () {
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
@@ -11,8 +11,7 @@ require('./proof')(5, function (step, Strata, tmp, load, vivify, assert, say) {
         assert(cursor.exclusive, 'exclusive')
         step(function () {
             cursor.insert('a', 'a', ~ cursor.index, step())
-        }, function (inserted) {
-            assert(inserted, 0, 'inserted')
+        }, function () {
             cursor.unlock(step())
         }, function () {
             assert(strata.size, 14, 'json size')

@@ -16,10 +16,10 @@ require('./proof')(3, function (step, Strata, tmp, serialize, gather, assert) {
         step(function () {
             cursor.indexOf('e', step())
         }, function (index) {
+            assert(index <= cursor.length, 'unambiguous')
             cursor.insert('e', 'e', ~index, step())
-        }, function (unambiguous) {
+        }, function () {
             cursor.unlock(step())
-            assert(unambiguous, 0, 'unambiguous')
         }, function () {
             gather(strata, step())
         })

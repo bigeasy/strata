@@ -17,14 +17,16 @@ require('./proof')(3, function (step, Strata, tmp, serialize, gather, assert) {
         var page = step(function () {
             cursor.indexOf('z', step())
         }, function (index) {
-            cursor.insert('z', 'z', ~index, step())
-        }, function (unambiguous) {
-            ambiguity.unshift(unambiguous)
+            ambiguity.unshift(cursor.length < ~index)
             if (ambiguity[0]) {
                 cursor.next(step(page(), 0))
             } else {
-                assert(ambiguity, [ 0, 1, 1, 1 ], 'unambiguous')
-                cursor.unlock(step())
+                step(function () {
+                    cursor.insert('z', 'z', ~index, step())
+                }, function () {
+                    assert(ambiguity, [ 0, 1, 1, 1 ], 'unambiguous')
+                    cursor.unlock(step())
+                })
             }
         })(1)
     }, function () {
