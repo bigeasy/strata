@@ -502,7 +502,7 @@ function script (options, callback) {
         var mutate, next
         step(function () {
             if (action.values.length) strata.mutator(action.values[0], step())
-            else step(null)
+            else return [ step ]
         }, function (cursor) {
             action.values.shift()
             step(function () {

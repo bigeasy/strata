@@ -1,5 +1,6 @@
 ### Issue by Issue
 
+ * Upgrade Cadence to 0.0.40. #389.
  * Upgrade Journalist to 0.0.6. #388.
  * Upgrade Proof to 0.0.47. #387.
  * Upgrade Cadence to 0.0.39 #376.

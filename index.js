@@ -539,7 +539,7 @@ Balancer.prototype.balance = cadence(function balance (step) {
 
     var addresses = Object.keys(this.lengths)
     if (addresses.length == 0) {
-        return step(null, true)
+        return [ step, true ]
     } else {
         this.sheaf.balancer = new Balancer(this.sheaf)
         this.sheaf.balancing = true
@@ -684,7 +684,7 @@ Balancer.prototype.splitLeaf = cadence(function (step, address, key, ghosts) {
             split = leaf.page
             if (split.positions.length - split.ghosts <= this.sheaf.options.leafSize) {
                 this.sheaf.balancer.unbalanced(split, true)
-                step(null)
+                return [ step ]
             }
         }, function () {
             pages = Math.ceil(split.positions.length / this.sheaf.options.leafSize)
@@ -1044,7 +1044,7 @@ Balancer.prototype.mergePages = cadence(function (step, key, leftKey, stopper, m
         }, function () {
             merger.call(this, pages, ghosted, step())
         }, function (dirty) {
-            if (!dirty) step(null)
+            if (!dirty) return [ step ]
         }, function () {
             this.sheaf.rename(pages.right.page, '', '.unlink', step())
         }, function () {
@@ -1118,7 +1118,7 @@ Balancer.prototype.mergeLeaves = function (key, leftKey, unbalanced, ghostly, ca
             if (unbalanced[leaves.right.page.address]) {
                 this.sheaf.balancer.unbalanced(leaves.right.page, true)
             }
-            step(null, false)
+            return [ false ]
         } else {
             step(function () {
                 if (ghostly && left + right) {
@@ -1198,9 +1198,7 @@ Balancer.prototype.chooseBranchesToMerge = cadence(function (step, key, address)
                 descents.push(designator = choice.fork())
                 designator.descend(designator.left, designator.leaf, step())
             } else {
-                // todo: return [ choose ] does not invoke finalizer.
-                // return [ choose ]
-                step(null)
+                return [ choose ]
             }
         }, function () {
             this.sheaf.stash(designator.page, 0, step())
@@ -1209,7 +1207,7 @@ Balancer.prototype.chooseBranchesToMerge = cadence(function (step, key, address)
         if (entry) { // todo: fix return [ choose ]
             this.mergeBranches(entry.key, entry.keySize, choice.page.address, step())
         }
-    })(1)
+    })
 })
 
 Balancer.prototype.mergeBranches = function (key, keySize, address, callback) {
