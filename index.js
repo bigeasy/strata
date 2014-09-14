@@ -2228,7 +2228,7 @@ Strata.prototype.purge = function (downTo) {
 }
 
 Strata.prototype.__defineGetter__('balanced', function () {
-    return !! Object.keys(this.sheaf.balancer.lengths)
+    return ! Object.keys(this.sheaf.balancer.lengths).length
 })
 
 module.exports = Strata

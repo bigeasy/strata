@@ -33,7 +33,7 @@ require('./proof')(4, function (step, Strata, tmp, load, serialize, vivify, gath
         strata.purge(0)
         assert(strata.size, 0, 'purged')
 
-        assert(strata.balanced, 'balanced')
+        assert(!strata.balanced, 'not balanced')
 
         strata.close(step())
     })
