@@ -1172,6 +1172,7 @@ Balancer.prototype.chooseBranchesToMerge = cadence(function (step, key, address)
             descent.descend(descent.key(key), descent.address(address), step())
         }, function () {
             descent.index += direction == 'left' ? 1 : -1
+                                        // ^^^ This ain't broke.
             descent.descend(descent[direction], descent.level(center.depth), step())
         })
     })
