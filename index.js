@@ -1201,6 +1201,7 @@ Balancer.prototype.chooseBranchesToMerge = cadence(function (step, key, address)
 
             if (choice) {
                 descents.push(designator = choice.fork())
+                designator.index = 0
                 designator.descend(designator.left, designator.leaf, step())
             } else {
                 return [ choose ]
