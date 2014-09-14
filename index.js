@@ -914,21 +914,21 @@ Balancer.prototype.drainRoot = cadence(function (step) {
     })
 })
 
-Balancer.prototype.exorcise = cadence(function (step, pivot, ghostly, corporal) {
+Balancer.prototype.exorcise = cadence(function (step, pivot, page, corporal) {
     var entry
 
-    ok(ghostly.ghosts, 'no ghosts')
+    ok(page.ghosts, 'no ghosts')
     ok(corporal.positions.length - corporal.ghosts > 0, 'no replacement')
 
-    this.sheaf.uncacheEntry(ghostly, this.sheaf.splice('positions', ghostly, 0, 1).shift())
-    this.sheaf.splice('lengths', ghostly, 0, 1)
-    ghostly.ghosts = 0
+    this.sheaf.uncacheEntry(page, this.sheaf.splice('positions', page, 0, 1).shift())
+    this.sheaf.splice('lengths', page, 0, 1)
+    page.ghosts = 0
 
     step(function () {
-        entry = this.sheaf.journal.leaf.open(this.sheaf.filename(ghostly.address), ghostly.position, ghostly)
+        entry = this.sheaf.journal.leaf.open(this.sheaf.filename(page.address), page.position, page)
         entry.ready(step())
     }, function () {
-        this.sheaf.writePositions(entry, ghostly, step())
+        this.sheaf.writePositions(entry, page, step())
     }, function () {
     // todo: close on failure.
         entry.close('entry', step())
@@ -937,7 +937,7 @@ Balancer.prototype.exorcise = cadence(function (step, pivot, ghostly, corporal) 
     }, function (entry) {
         this.sheaf.uncacheEntry(pivot.page, pivot.page.addresses[pivot.index])
         this.sheaf.encacheKey(pivot.page, pivot.page.addresses[pivot.index], entry.key, entry.keySize)
-        return [ ghostly.key = entry.key ]
+        return [ page.key = entry.key ]
     })
 })
 
