@@ -1,5 +1,6 @@
 ### Issue by Issue
 
+ * Upgrade Journalist to 0.0.7. #398.
  * Upgrade Proof to 0.0.48. #397.
  * Move ambiguity test into `indexOf`. #390.
  * Upgrade Cadence to 0.0.40. #389.
