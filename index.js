@@ -2183,7 +2183,7 @@ Strata.prototype.vivify = cadence(function (step) {
         var block = step(function () {
             if (index < pages.length) {
                 var address = pages[index].address
-                locker.lock(address, false, step(step, [function (page) { locker.unlock(page) }]))
+                locker.lock(address, false, step(step)([function (page) { locker.unlock(page) }]))
             } else {
                 return [ block, pages ]
             }
