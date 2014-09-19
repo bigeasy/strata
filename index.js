@@ -424,7 +424,7 @@ Descent.prototype.descend = cadence(function (step, next, stop) {
         this.depth++
         this.unlocker(this.page, locked)
         this.page = locked
-        next.call(this,step())
+        next.call(this, step())
     }, function (index) {
         if (!(this.page.address % 2) && index < 0) {
             this.index = (~index) - 1
