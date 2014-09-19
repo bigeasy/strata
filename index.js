@@ -425,11 +425,11 @@ Descent.prototype.descend = cadence(function (step, next, stop) {
         this.unlocker(this.page, locked)
         this.page = locked
         next.call(this,step())
-    }, function ($index) {
-        if (!(this.page.address % 2) && $index < 0) {
-            this.index = (~$index) - 1
+    }, function (index) {
+        if (!(this.page.address % 2) && index < 0) {
+            this.index = (~index) - 1
         } else {
-            this.index = $index
+            this.index = index
         }
         this.indexes[this.page.address] = this.index
         if (!(this.page.address % 2)) {
