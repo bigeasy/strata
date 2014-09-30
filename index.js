@@ -443,10 +443,8 @@ function Balancer (sheaf) {
     this.sheaf = sheaf
     this.lengths = {}
     this.operations = []
-    this.referenced = {}
     this.ordered = {}
     this.ghosts = {}
-    this.methods = {}
 }
 
 Balancer.prototype.unbalanced = function (page, force) {
@@ -541,17 +539,20 @@ Balancer.prototype.balance = cadence(function balance (step) {
 
     ok(!this.sheaf.balancing, 'already balancing')
 
-    var addresses = Object.keys(this.lengths)
+    var lengths = this.lengths, addresses = Object.keys(lengths)
     if (addresses.length == 0) {
         return [ step, true ]
     } else {
-        this.sheaf.balancer = new Balancer(this.sheaf)
+        this.lengths = {}
+        this.operations = []
+        this.ordered = {}
+        this.ghosts = {}
         this.sheaf.balancing = true
     }
 
     step(function () {
         step(function (address) {
-            _gather.call(this, +address, this.lengths[address], step())
+            _gather.call(this, +address, lengths[address], step())
         })(addresses)
     }, function () {
         this.sheaf.tracer('plan', {}, step())
@@ -579,8 +580,8 @@ Balancer.prototype.balance = cadence(function balance (step) {
             return node
         }
 
-        for (address in this.lengths) {
-            length = this.lengths[address]
+        for (address in lengths) {
+            length = lengths[address]
             node = this.ordered[address]
             difference = node.length - length
             if (difference > 0 && node.length > this.sheaf.options.leafSize) {
@@ -618,7 +619,7 @@ Balancer.prototype.balance = cadence(function balance (step) {
                 ok(!node.right.right, 'merge pair still linked to sibling')
                 operations.unshift({
                     method: 'mergeLeaves',
-                    parameters: [ node.right.key, node.key, this.lengths, !!this.ghosts[node.address] ]
+                    parameters: [ node.right.key, node.key, lengths, !!this.ghosts[node.address] ]
                 })
                 delete this.ghosts[node.address]
                 delete this.ghosts[node.right.address]
