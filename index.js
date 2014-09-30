@@ -249,7 +249,7 @@ Cursor.prototype.insert = cadence(function (step, record, key, index) {
     ok(index > 0 || this._page.address == 1)
 
     var entry
-    this._sheaf.balancer.unbalanced(this._page)
+    this._sheaf.unbalanced(this._page)
     step(function () {
         entry = this._journal.open(this._sheaf.filename(this._page.address), this._page.position, this._page)
         this._sheaf.journalist.purge(step())
@@ -277,7 +277,7 @@ Cursor.prototype.insert = cadence(function (step, record, key, index) {
 
 Cursor.prototype.remove = cadence(function (step, index) {
     var ghost = this._page.address != 1 && index == 0, entry
-    this._sheaf.balancer.unbalanced(this._page)
+    this._sheaf.unbalanced(this._page)
     step(function () {
         this._sheaf.journalist.purge(step())
     }, function () {
@@ -439,23 +439,15 @@ Descent.prototype.descend = cadence(function (step, next, stop) {
     })()
 })
 
-function Balancer (sheaf) {
-    this.sheaf = sheaf
-    this.lengths = {}
-    this.operations = []
-    this.ordered = {}
-    this.ghosts = {}
-}
-
-Balancer.prototype.unbalanced = function (page, force) {
+Sheaf.prototype.unbalanced = function (page, force) {
     if (force) {
-        this.lengths[page.address] = this.sheaf.options.leafSize
+        this.lengths[page.address] = this.options.leafSize
     } else if (this.lengths[page.address] == null) {
         this.lengths[page.address] = page.positions.length - page.ghosts
     }
 }
 
-Balancer.prototype._nodify = cadence(function (step, locker, page) {
+Sheaf.prototype._nodify = cadence(function (step, locker, page) {
     step(function () {
         step([function () {
             locker.unlock(page)
@@ -463,7 +455,7 @@ Balancer.prototype._nodify = cadence(function (step, locker, page) {
             ok(page.address % 2, 'leaf page expected')
 
             if (page.address == 1) return [{}]
-            else this.sheaf.stash(page, 0, step())
+            else this.stash(page, 0, step())
         }, function (entry) {
             var node = {
                 key: entry.key,
@@ -479,15 +471,16 @@ Balancer.prototype._nodify = cadence(function (step, locker, page) {
         })
     }, function (node) {
         step(function () {
-            this.sheaf.tracer('reference', {}, step())
+            this.tracer('reference', {}, step())
         }, function () {
             return node
         })
     })
 })
 
-Balancer.prototype.balance = cadence(function balance (step) {
-    var locker = this.sheaf.createLocker(), operations = [], address, length
+// to user land
+Sheaf.prototype.balance = cadence(function balance (step) {
+    var locker = this.createLocker(), operations = [], address, length
 
     var _gather = cadence(function (step, address, length) {
         var right, node
@@ -504,7 +497,7 @@ Balancer.prototype.balance = cadence(function balance (step) {
         }, function (node) {
             if (!(node.length - length < 0)) return
             if (node.address != 1 && ! node.left) step(function () {
-                var descent = new Descent(this.sheaf, locker)
+                var descent = new Descent(this, locker)
                 step(function () {
                     descent.descend(descent.key(node.key), descent.found([node.key]), step())
                 }, function () {
@@ -537,7 +530,7 @@ Balancer.prototype.balance = cadence(function balance (step) {
         })
     })
 
-    ok(!this.sheaf.balancing, 'already balancing')
+    ok(!this.balancing, 'already balancing')
 
     var lengths = this.lengths, addresses = Object.keys(lengths)
     if (addresses.length == 0) {
@@ -547,7 +540,7 @@ Balancer.prototype.balance = cadence(function balance (step) {
         this.operations = []
         this.ordered = {}
         this.ghosts = {}
-        this.sheaf.balancing = true
+        this.balancing = true
     }
 
     step(function () {
@@ -555,7 +548,7 @@ Balancer.prototype.balance = cadence(function balance (step) {
             _gather.call(this, +address, lengths[address], step())
         })(addresses)
     }, function () {
-        this.sheaf.tracer('plan', {}, step())
+        this.tracer('plan', {}, step())
     }, function () {
         var address, node, difference, addresses
 
@@ -584,7 +577,7 @@ Balancer.prototype.balance = cadence(function balance (step) {
             length = lengths[address]
             node = this.ordered[address]
             difference = node.length - length
-            if (difference > 0 && node.length > this.sheaf.options.leafSize) {
+            if (difference > 0 && node.length > this.options.leafSize) {
                 operations.unshift({
                     method: 'splitLeaf',
                     parameters: [ node.address, node.key, this.ghosts[node.address] ]
@@ -601,7 +594,7 @@ Balancer.prototype.balance = cadence(function balance (step) {
         for (address in this.ordered) {
             var node = this.ordered[address]
             while (node && node.right) {
-                if (node.length + node.right.length > this.sheaf.options.leafSize) {
+                if (node.length + node.right.length > this.options.leafSize) {
                     node = terminate(node)
                     this.ordered[node.address] = node
                 } else {
@@ -639,14 +632,14 @@ Balancer.prototype.balance = cadence(function balance (step) {
                 this[operation.method].apply(this, operation.parameters.concat(step()))
             })(operations)
         }, function () {
-            this.sheaf.balancing = false
+            this.balancing = false
             return false
         })
     })
 })
 
-Balancer.prototype.shouldSplitBranch = function (branch, key, callback) {
-    if (branch.addresses.length > this.sheaf.options.branchSize) {
+Sheaf.prototype.shouldSplitBranch = function (branch, key, callback) {
+    if (branch.addresses.length > this.options.branchSize) {
         if (branch.address == 0) {
             this.drainRoot(callback)
         } else {
@@ -657,8 +650,8 @@ Balancer.prototype.shouldSplitBranch = function (branch, key, callback) {
     }
 }
 
-Balancer.prototype.splitLeaf = cadence(function (step, address, key, ghosts) {
-    var locker = this.sheaf.createLocker(),
+Sheaf.prototype.splitLeaf = cadence(function (step, address, key, ghosts) {
+    var locker = this.createLocker(),
         descents = [], replacements = [], encached = [],
         completed = 0,
         penultimate, leaf, split, pages, page,
@@ -676,7 +669,7 @@ Balancer.prototype.splitLeaf = cadence(function (step, address, key, ghosts) {
                 key = rekey
             })
         }, function () {
-            descents.push(penultimate = new Descent(this.sheaf, locker))
+            descents.push(penultimate = new Descent(this, locker))
 
             penultimate.descend(address == 1 ? penultimate.left : penultimate.key(key),
                                 penultimate.penultimate, step())
@@ -687,12 +680,12 @@ Balancer.prototype.splitLeaf = cadence(function (step, address, key, ghosts) {
             leaf.descend(address == 1 ? leaf.left : leaf.key(key), leaf.leaf, step())
         }, function () {
             split = leaf.page
-            if (split.positions.length - split.ghosts <= this.sheaf.options.leafSize) {
-                this.sheaf.balancer.unbalanced(split, true)
+            if (split.positions.length - split.ghosts <= this.options.leafSize) {
+                this.unbalanced(split, true)
                 return [ step ]
             }
         }, function () {
-            pages = Math.ceil(split.positions.length / this.sheaf.options.leafSize)
+            pages = Math.ceil(split.positions.length / this.options.leafSize)
             records = Math.floor(split.positions.length / pages)
             remainder = split.positions.length % pages
 
@@ -701,13 +694,13 @@ Balancer.prototype.splitLeaf = cadence(function (step, address, key, ghosts) {
             offset = split.positions.length
 
             step(function () {
-                page = locker.encache(this.sheaf.createLeaf({ loaded: true }))
+                page = locker.encache(this.createLeaf({ loaded: true }))
                 encached.push(page)
 
                 page.right = right
                 right = page.address
 
-                this.sheaf.splice('addresses', penultimate.page, penultimate.index + 1, 0, page.address)
+                this.splice('addresses', penultimate.page, penultimate.index + 1, 0, page.address)
 
                 length = remainder-- > 0 ? records + 1 : records
                 offset = split.positions.length - length
@@ -720,48 +713,48 @@ Balancer.prototype.splitLeaf = cadence(function (step, address, key, ghosts) {
                     ok(index < split.positions.length)
 
                     step(function () {
-                        this.sheaf.stash(split, index, step())
+                        this.stash(split, index, step())
                     }, function (entry) {
-                        this.sheaf.uncacheEntry(split, position)
-                        this.sheaf.splice('positions', page, page.positions.length, 0, position)
-                        this.sheaf.splice('lengths', page, page.lengths.length, 0, split.lengths[index])
-                        this.sheaf.encacheEntry(page, position, entry)
+                        this.uncacheEntry(split, position)
+                        this.splice('positions', page, page.positions.length, 0, position)
+                        this.splice('lengths', page, page.lengths.length, 0, split.lengths[index])
+                        this.encacheEntry(page, position, entry)
                         index++
                     })
                 })(length)
             }, function () {
-                this.sheaf.splice('positions', split, offset, length)
-                this.sheaf.splice('lengths', split, offset, length)
+                this.splice('positions', split, offset, length)
+                this.splice('lengths', split, offset, length)
 
                 var entry = page.cache[page.positions[0]]
 
-                this.sheaf.encacheKey(penultimate.page, page.address, entry.key, entry.keySize)
+                this.encacheKey(penultimate.page, page.address, entry.key, entry.keySize)
 
                 replacements.push(page)
 
-                this.sheaf.rewriteLeaf(page, '.replace', step())
+                this.rewriteLeaf(page, '.replace', step())
             })(pages - 1)
         }, function () {
             split.right = right
 
             replacements.push(split)
 
-            this.sheaf.rewriteLeaf(split, '.replace', step())
+            this.rewriteLeaf(split, '.replace', step())
         }, function () {
-            this.sheaf.writeBranch(penultimate.page, '.pending', step())
+            this.writeBranch(penultimate.page, '.pending', step())
         }, function () {
-            this.sheaf.tracer('splitLeafCommit', {}, step())
+            this.tracer('splitLeafCommit', {}, step())
         }, function () {
-            this.sheaf.rename(penultimate.page, '.pending', '.commit', step())
+            this.rename(penultimate.page, '.pending', '.commit', step())
         }, function () {
             step(function (page) {
-                this.sheaf.replace(page, '.replace', step())
+                this.replace(page, '.replace', step())
             })(replacements)
         }, function () {
-            this.sheaf.replace(penultimate.page, '.commit', step())
+            this.replace(penultimate.page, '.commit', step())
         }, function () {
-            this.sheaf.balancer.unbalanced(leaf.page, true)
-            this.sheaf.balancer.unbalanced(page, true)
+            this.unbalanced(leaf.page, true)
+            this.unbalanced(page, true)
             return [ encached[0].cache[encached[0].positions[0]].key ]
         })
     }, function (partition) {
@@ -769,8 +762,8 @@ Balancer.prototype.splitLeaf = cadence(function (step, address, key, ghosts) {
     })
 })
 
-Balancer.prototype.splitBranch = cadence(function (step, address, key) {
-    var locker = this.sheaf.createLocker(),
+Sheaf.prototype.splitBranch = cadence(function (step, address, key) {
+    var locker = this.createLocker(),
         descents = [],
         children = [],
         encached = [],
@@ -784,7 +777,7 @@ Balancer.prototype.splitBranch = cadence(function (step, address, key) {
             descents.forEach(function (descent) { locker.unlock(descent.page) })
             locker.dispose()
         }], function () {
-            descents.push(parent = new Descent(this.sheaf, locker))
+            descents.push(parent = new Descent(this, locker))
             parent.descend(parent.key(key), parent.child(address), step())
         }, function () {
             parent.upgrade(step())
@@ -794,14 +787,14 @@ Balancer.prototype.splitBranch = cadence(function (step, address, key) {
         }, function () {
             split = full.page
 
-            pages = Math.ceil(split.addresses.length / this.sheaf.options.branchSize)
+            pages = Math.ceil(split.addresses.length / this.options.branchSize)
             records = Math.floor(split.addresses.length / pages)
             remainder = split.addresses.length % pages
 
             offset = split.addresses.length
 
             for (var i = 0; i < pages - 1; i++ ) {
-                var page = locker.encache(this.sheaf.createBranch({}))
+                var page = locker.encache(this.createBranch({}))
 
                 children.push(page)
                 encached.push(page)
@@ -809,46 +802,46 @@ Balancer.prototype.splitBranch = cadence(function (step, address, key) {
                 var length = remainder-- > 0 ? records + 1 : records
                 var offset = split.addresses.length - length
 
-                var cut = this.sheaf.splice('addresses', split, offset, length)
+                var cut = this.splice('addresses', split, offset, length)
 
-                this.sheaf.splice('addresses', parent.page, parent.index + 1, 0, page.address)
+                this.splice('addresses', parent.page, parent.index + 1, 0, page.address)
 
-                this.sheaf.encacheEntry(parent.page, page.address, split.cache[cut[0]])
+                this.encacheEntry(parent.page, page.address, split.cache[cut[0]])
 
                 var keys = {}
                 cut.forEach(function (address) {
-                    keys[address] = this.sheaf.uncacheEntry(split, address)
+                    keys[address] = this.uncacheEntry(split, address)
                 }, this)
 
-                this.sheaf.splice('addresses', page, 0, 0, cut)
+                this.splice('addresses', page, 0, 0, cut)
 
                 cut.slice(1).forEach(function (address) {
-                    this.sheaf.encacheEntry(page, address, keys[address])
+                    this.encacheEntry(page, address, keys[address])
                 }, this)
             }
         }, function () {
             children.unshift(full.page)
             step(function (page) {
-                this.sheaf.writeBranch(page, '.replace', step())
+                this.writeBranch(page, '.replace', step())
             })(children)
         }, function () {
-            this.sheaf.writeBranch(parent.page, '.pending', step())
+            this.writeBranch(parent.page, '.pending', step())
         }, function () {
-            this.sheaf.rename(parent.page, '.pending', '.commit', step())
+            this.rename(parent.page, '.pending', '.commit', step())
         }, function () {
             step(function (page) {
-                this.sheaf.replace(page, '.replace', step())
+                this.replace(page, '.replace', step())
             })(children)
         }, function () {
-            this.sheaf.replace(parent.page, '.commit', step())
+            this.replace(parent.page, '.commit', step())
         })
     }, function () {
         this.shouldSplitBranch(parent.page, key, step())
     })
 })
 
-Balancer.prototype.drainRoot = cadence(function (step) {
-    var locker = this.sheaf.createLocker(),
+Sheaf.prototype.drainRoot = cadence(function (step) {
+    var locker = this.createLocker(),
         keys = {}, children = [], locks = [],
         root, pages, records, remainder
 
@@ -861,28 +854,28 @@ Balancer.prototype.drainRoot = cadence(function (step) {
             locker.lock(0, true, step())
         }, function (locked) {
             locks.push(root = locked)
-            pages = Math.ceil(root.addresses.length / this.sheaf.options.branchSize)
+            pages = Math.ceil(root.addresses.length / this.options.branchSize)
             records = Math.floor(root.addresses.length / pages)
             remainder = root.addresses.length % pages
 
             for (var i = 0; i < pages; i++) {
-                var page = locker.encache(this.sheaf.createBranch({}))
+                var page = locker.encache(this.createBranch({}))
 
                 children.push(page)
 
                 var length = remainder-- > 0 ? records + 1 : records
                 var offset = root.addresses.length - length
 
-                var cut = this.sheaf.splice('addresses', root, offset, length)
+                var cut = this.splice('addresses', root, offset, length)
 
                 cut.slice(offset ? 0 : 1).forEach(function (address) {
-                    keys[address] = this.sheaf.uncacheEntry(root, address)
+                    keys[address] = this.uncacheEntry(root, address)
                 }, this)
 
-                this.sheaf.splice('addresses', page, 0, 0, cut)
+                this.splice('addresses', page, 0, 0, cut)
 
                 cut.slice(1).forEach(function (address) {
-                    this.sheaf.encacheEntry(page, address, keys[address])
+                    this.encacheEntry(page, address, keys[address])
                 }, this)
 
                 keys[page.address] = keys[cut[0]]
@@ -890,67 +883,67 @@ Balancer.prototype.drainRoot = cadence(function (step) {
 
             children.reverse()
 
-            this.sheaf.splice('addresses', root, 0, 0, children.map(function (page) { return page.address }))
+            this.splice('addresses', root, 0, 0, children.map(function (page) { return page.address }))
 
             root.addresses.slice(1).forEach(function (address) {
-                this.sheaf.encacheEntry(root, address, keys[address])
+                this.encacheEntry(root, address, keys[address])
             }, this)
         }, function () {
             step(function (page) {
-                this.sheaf.writeBranch(page, '.replace', step())
+                this.writeBranch(page, '.replace', step())
             })(children)
         }, function () {
-            this.sheaf.writeBranch(root, '.pending', step())
+            this.writeBranch(root, '.pending', step())
         }, function () {
-            this.sheaf.rename(root, '.pending', '.commit', step())
+            this.rename(root, '.pending', '.commit', step())
         }, function () {
             step(function (page) {
-                this.sheaf.replace(page, '.replace', step())
+                this.replace(page, '.replace', step())
             })(children)
         }, function () {
-            this.sheaf.replace(root, '.commit', step())
+            this.replace(root, '.commit', step())
         })
     }, function () {
-        if (root.addresses.length > this.sheaf.options.branchSize) this.drainRoot(step())
+        if (root.addresses.length > this.options.branchSize) this.drainRoot(step())
     })
 })
 
-Balancer.prototype.exorcise = cadence(function (step, pivot, page, corporal) {
+Sheaf.prototype.exorcise = cadence(function (step, pivot, page, corporal) {
     var entry
 
     ok(page.ghosts, 'no ghosts')
     ok(corporal.positions.length - corporal.ghosts > 0, 'no replacement')
 
-    this.sheaf.uncacheEntry(page, this.sheaf.splice('positions', page, 0, 1).shift())
-    this.sheaf.splice('lengths', page, 0, 1)
+    this.uncacheEntry(page, this.splice('positions', page, 0, 1).shift())
+    this.splice('lengths', page, 0, 1)
     page.ghosts = 0
 
     step(function () {
-        entry = this.sheaf.journal.leaf.open(this.sheaf.filename(page.address), page.position, page)
+        entry = this.journal.leaf.open(this.filename(page.address), page.position, page)
         entry.ready(step())
     }, function () {
-        this.sheaf.writePositions(entry, page, step())
+        this.writePositions(entry, page, step())
     }, function () {
     // todo: close on failure.
         entry.close('entry', step())
     }, function () {
-        this.sheaf.stash(corporal, corporal.ghosts, step())
+        this.stash(corporal, corporal.ghosts, step())
     }, function (entry) {
-        this.sheaf.uncacheEntry(pivot.page, pivot.page.addresses[pivot.index])
-        this.sheaf.encacheKey(pivot.page, pivot.page.addresses[pivot.index], entry.key, entry.keySize)
+        this.uncacheEntry(pivot.page, pivot.page.addresses[pivot.index])
+        this.encacheKey(pivot.page, pivot.page.addresses[pivot.index], entry.key, entry.keySize)
         return [ page.key = entry.key ]
     })
 })
 
-Balancer.prototype.deleteGhost = cadence(function (step, key) {
-    var locker = this.sheaf.createLocker(),
+Sheaf.prototype.deleteGhost = cadence(function (step, key) {
+    var locker = this.createLocker(),
         descents = [],
         pivot, leaf, fd
     step([function () {
         descents.forEach(function (descent) { locker.unlock(descent.page) })
         locker.dispose()
     }], function () {
-        descents.push(pivot = new Descent(this.sheaf, locker))
+        descents.push(pivot = new Descent(this, locker))
         pivot.descend(pivot.key(key), pivot.found([key]), step())
     }, function () {
         pivot.upgrade(step())
@@ -963,8 +956,8 @@ Balancer.prototype.deleteGhost = cadence(function (step, key) {
     })
 })
 
-Balancer.prototype.mergePages = cadence(function (step, key, leftKey, stopper, merger, ghostly) {
-    var locker = this.sheaf.createLocker(),
+Sheaf.prototype.mergePages = cadence(function (step, key, leftKey, stopper, merger, ghostly) {
+    var locker = this.createLocker(),
         descents = [], singles = { left: [], right: [] }, parents = {}, pages = {},
         ancestor, pivot, empties, ghosted, designation
 
@@ -998,11 +991,11 @@ Balancer.prototype.mergePages = cadence(function (step, key, leftKey, stopper, m
             })
             locker.dispose()
         }], function () {
-            descents.push(pivot = new Descent(this.sheaf, locker))
+            descents.push(pivot = new Descent(this, locker))
             pivot.descend(pivot.key(key), pivot.found(keys), step())
         }, function () {
             var found = pivot.page.cache[pivot.page.addresses[pivot.index]].key
-            if (this.sheaf.comparator(found, keys[0]) == 0) {
+            if (this.comparator(found, keys[0]) == 0) {
                 pivot.upgrade(step())
             } else {
                 step(function () { // left above right
@@ -1051,45 +1044,45 @@ Balancer.prototype.mergePages = cadence(function (step, key, leftKey, stopper, m
         }, function (dirty) {
             if (!dirty) return [ step ]
         }, function () {
-            this.sheaf.rename(pages.right.page, '', '.unlink', step())
+            this.rename(pages.right.page, '', '.unlink', step())
         }, function () {
             var index = parents.right.indexes[ancestor.address]
 
             designation = ancestor.cache[ancestor.addresses[index]]
 
             var address = ancestor.addresses[index]
-            this.sheaf.splice('addresses', ancestor, index, 1)
+            this.splice('addresses', ancestor, index, 1)
 
             if (pivot.page.address != ancestor.address) {
                 ok(!index, 'expected ancestor to be removed from zero index')
                 ok(ancestor.addresses[index], 'expected ancestor to have right sibling')
                 ok(ancestor.cache[ancestor.addresses[index]], 'expected key to be in memory')
                 designation = ancestor.cache[ancestor.addresses[index]]
-                this.sheaf.uncacheEntry(ancestor, ancestor.addresses[0])
-                this.sheaf.uncacheEntry(pivot.page, pivot.page.addresses[pivot.index])
-                this.sheaf.encacheEntry(pivot.page, pivot.page.addresses[pivot.index], designation)
+                this.uncacheEntry(ancestor, ancestor.addresses[0])
+                this.uncacheEntry(pivot.page, pivot.page.addresses[pivot.index])
+                this.encacheEntry(pivot.page, pivot.page.addresses[pivot.index], designation)
             } else{
                 ok(index, 'expected ancestor to be non-zero')
-                this.sheaf.uncacheEntry(ancestor, address)
+                this.uncacheEntry(ancestor, address)
             }
 
-            this.sheaf.writeBranch(ancestor, '.pending', step())
+            this.writeBranch(ancestor, '.pending', step())
         }, function () {
             step(function (page) {
-                this.sheaf.rename(page, '', '.unlink', step())
+                this.rename(page, '', '.unlink', step())
             })(singles.right.slice(1))
         }, function () {
-            this.sheaf.rename(ancestor, '.pending', '.commit', step())
+            this.rename(ancestor, '.pending', '.commit', step())
         }, function () {
             step(function (page) {
-                this.sheaf.unlink(page, '.unlink', step())
+                this.unlink(page, '.unlink', step())
             })(singles.right.slice(1))
         }, function () {
-            this.sheaf.replace(pages.left.page, '.replace', step())
+            this.replace(pages.left.page, '.replace', step())
         }, function () {
-            this.sheaf.unlink(pages.right.page, '.unlink', step())
+            this.unlink(pages.right.page, '.unlink', step())
         }, function () {
-            this.sheaf.replace(ancestor, '.commit', step())
+            this.replace(ancestor, '.commit', step())
         })
     }, function () {
         if (ancestor.address == 0) {
@@ -1102,26 +1095,26 @@ Balancer.prototype.mergePages = cadence(function (step, key, leftKey, stopper, m
     })
 })
 
-Balancer.prototype.mergeLeaves = function (key, leftKey, unbalanced, ghostly, callback) {
+Sheaf.prototype.mergeLeaves = function (key, leftKey, unbalanced, ghostly, callback) {
     function stopper (descent) { return descent.penultimate }
 
     var merger = cadence(function (step, leaves, ghosted) {
         ok(leftKey == null ||
-              this.sheaf.comparator(leftKey, leaves.left.page.cache[leaves.left.page.positions[0]].key)  == 0,
+              this.comparator(leftKey, leaves.left.page.cache[leaves.left.page.positions[0]].key)  == 0,
               'left key is not as expected')
 
         var left = (leaves.left.page.positions.length - leaves.left.page.ghosts)
         var right = (leaves.right.page.positions.length - leaves.right.page.ghosts)
 
-        this.sheaf.balancer.unbalanced(leaves.left.page, true)
+        this.unbalanced(leaves.left.page, true)
 
         var index
-        if (left + right > this.sheaf.options.leafSize) {
+        if (left + right > this.options.leafSize) {
             if (unbalanced[leaves.left.page.address]) {
-                this.sheaf.balancer.unbalanced(leaves.left.page, true)
+                this.unbalanced(leaves.left.page, true)
             }
             if (unbalanced[leaves.right.page.address]) {
-                this.sheaf.balancer.unbalanced(leaves.right.page, true)
+                this.unbalanced(leaves.right.page, true)
             }
             return [ false ]
         } else {
@@ -1139,20 +1132,20 @@ Balancer.prototype.mergeLeaves = function (key, leftKey, unbalanced, ghostly, ca
                 step(function (index) {
                     index += ghosts
                     step(function () {
-                        this.sheaf.stash(leaves.right.page, index, step())
+                        this.stash(leaves.right.page, index, step())
                     }, function (entry) {
                         var position = leaves.right.page.positions[index]
-                        this.sheaf.uncacheEntry(leaves.right.page, position)
-                        this.sheaf.splice('positions', leaves.left.page, leaves.left.page.positions.length, 0, -(position + 1))
-                        this.sheaf.splice('lengths', leaves.left.page, leaves.left.page.lengths.length, 0, -(position + 1))
-                        this.sheaf.encacheEntry(leaves.left.page, -(position + 1), entry)
+                        this.uncacheEntry(leaves.right.page, position)
+                        this.splice('positions', leaves.left.page, leaves.left.page.positions.length, 0, -(position + 1))
+                        this.splice('lengths', leaves.left.page, leaves.left.page.lengths.length, 0, -(position + 1))
+                        this.encacheEntry(leaves.left.page, -(position + 1), entry)
                     })
                 })(leaves.right.page.positions.length - leaves.right.page.ghosts)
             }, function () {
-                this.sheaf.splice('positions', leaves.right.page, 0, leaves.right.page.positions.length)
-                this.sheaf.splice('lengths', leaves.right.page, 0, leaves.right.page.lengths.length)
+                this.splice('positions', leaves.right.page, 0, leaves.right.page.positions.length)
+                this.splice('lengths', leaves.right.page, 0, leaves.right.page.lengths.length)
 
-                this.sheaf.rewriteLeaf(leaves.left.page, '.replace', step())
+                this.rewriteLeaf(leaves.left.page, '.replace', step())
             }, function () {
                 return [ true ]
             })
@@ -1162,8 +1155,8 @@ Balancer.prototype.mergeLeaves = function (key, leftKey, unbalanced, ghostly, ca
     this.mergePages(key, leftKey, stopper, merger, ghostly, callback)
 }
 
-Balancer.prototype.chooseBranchesToMerge = cadence(function (step, key, address) {
-    var locker = this.sheaf.createLocker(),
+Sheaf.prototype.chooseBranchesToMerge = cadence(function (step, key, address) {
+    var locker = this.createLocker(),
         descents = [],
         designator, choice, lesser, greater, center
 
@@ -1183,20 +1176,20 @@ Balancer.prototype.chooseBranchesToMerge = cadence(function (step, key, address)
             descents.forEach(function (descent) { locker.unlock(descent.page) })
             locker.dispose()
         }], function () {
-            descents.push(center = new Descent(this.sheaf, locker))
+            descents.push(center = new Descent(this, locker))
             center.descend(center.key(key), center.address(address), step())
         }, function () {
             if (center.lesser != null) {
-                goToPage(lesser = new Descent(this.sheaf, locker), center.lesser, 'right', step())
+                goToPage(lesser = new Descent(this, locker), center.lesser, 'right', step())
             }
         }, function () {
             if (center.greater != null) {
-                goToPage(greater = new Descent(this.sheaf, locker), center.greater, 'left', step())
+                goToPage(greater = new Descent(this, locker), center.greater, 'left', step())
             }
         }, function () {
-            if (lesser && lesser.page.addresses.length + center.page.addresses.length <= this.sheaf.options.branchSize) {
+            if (lesser && lesser.page.addresses.length + center.page.addresses.length <= this.options.branchSize) {
                 choice = center
-            } else if (greater && greater.page.addresses.length + center.page.addresses.length <= this.sheaf.options.branchSize) {
+            } else if (greater && greater.page.addresses.length + center.page.addresses.length <= this.options.branchSize) {
                 choice = greater
             }
 
@@ -1208,14 +1201,14 @@ Balancer.prototype.chooseBranchesToMerge = cadence(function (step, key, address)
                 return [ choose ]
             }
         }, function () {
-            this.sheaf.stash(designator.page, 0, step())
+            this.stash(designator.page, 0, step())
         })
     }, function (entry) {
         this.mergeBranches(entry.key, entry.keySize, choice.page.address, step())
     })
 })
 
-Balancer.prototype.mergeBranches = function (key, keySize, address, callback) {
+Sheaf.prototype.mergeBranches = function (key, keySize, address, callback) {
     function stopper (descent) {
         return descent.child(address)
     }
@@ -1223,22 +1216,22 @@ Balancer.prototype.mergeBranches = function (key, keySize, address, callback) {
     var merger = cadence(function (step, pages, ghosted) {
         ok(address == pages.right.page.address, 'unexpected address')
 
-        var cut = this.sheaf.splice('addresses', pages.right.page, 0, pages.right.page.addresses.length)
+        var cut = this.splice('addresses', pages.right.page, 0, pages.right.page.addresses.length)
 
         var keys = {}
         cut.slice(1).forEach(function (address) {
-            keys[address] = this.sheaf.uncacheEntry(pages.right.page, address)
+            keys[address] = this.uncacheEntry(pages.right.page, address)
         }, this)
 
-        this.sheaf.splice('addresses', pages.left.page, pages.left.page.addresses.length, 0, cut)
+        this.splice('addresses', pages.left.page, pages.left.page.addresses.length, 0, cut)
         cut.slice(1).forEach(function (address) {
-            this.sheaf.encacheEntry(pages.left.page, address, keys[address])
+            this.encacheEntry(pages.left.page, address, keys[address])
         }, this)
         ok(cut.length, 'cut is zero length')
-        this.sheaf.encacheKey(pages.left.page, cut[0], key, keySize)
+        this.encacheKey(pages.left.page, cut[0], key, keySize)
 
         step(function () {
-            this.sheaf.writeBranch(pages.left.page, '.replace', step())
+            this.writeBranch(pages.left.page, '.replace', step())
         }, function () {
             return [ true ]
         })
@@ -1247,14 +1240,14 @@ Balancer.prototype.mergeBranches = function (key, keySize, address, callback) {
     this.mergePages(key, null, stopper, merger, false, callback)
 }
 
-Balancer.prototype.fillRoot = cadence(function (step) {
-    var locker = this.sheaf.createLocker(), descents = [], root, child
+Sheaf.prototype.fillRoot = cadence(function (step) {
+    var locker = this.createLocker(), descents = [], root, child
 
     step([function () {
         descents.forEach(function (descent) { locker.unlock(descent.page) })
         locker.dispose()
     }], function () {
-        descents.push(root = new Descent(this.sheaf, locker))
+        descents.push(root = new Descent(this, locker))
         root.exclude()
         root.descend(root.left, root.level(0), step())
     }, function () {
@@ -1265,29 +1258,29 @@ Balancer.prototype.fillRoot = cadence(function (step) {
         ok(root.page.addresses.length == 1, 'only one address expected')
         ok(!Object.keys(root.page.cache).length, 'no keys expected')
 
-        this.sheaf.splice('addresses', root.page, 0, root.page.addresses.length)
+        this.splice('addresses', root.page, 0, root.page.addresses.length)
 
-        cut = this.sheaf.splice('addresses', child.page, 0, child.page.addresses.length)
+        cut = this.splice('addresses', child.page, 0, child.page.addresses.length)
 
         var keys = {}
         cut.slice(1).forEach(function (address) {
-            keys[address] = this.sheaf.uncacheEntry(child.page, address)
+            keys[address] = this.uncacheEntry(child.page, address)
         }, this)
 
-        this.sheaf.splice('addresses', root.page, root.page.addresses.length, 0, cut)
+        this.splice('addresses', root.page, root.page.addresses.length, 0, cut)
         cut.slice(1).forEach(function  (address) {
-            this.sheaf.encacheEntry(root.page, address, keys[address])
+            this.encacheEntry(root.page, address, keys[address])
         }, this)
 
-        this.sheaf.writeBranch(root.page, '.pending', step())
+        this.writeBranch(root.page, '.pending', step())
     }, function () {
-        this.sheaf.rename(child.page, '', '.unlink', step())
+        this.rename(child.page, '', '.unlink', step())
     }, function () {
-        this.sheaf.rename(root.page, '.pending', '.commit', step())
+        this.rename(root.page, '.pending', '.commit', step())
     }, function () {
-        this.sheaf.unlink(child.page, '.unlink', step())
+        this.unlink(child.page, '.unlink', step())
     }, function () {
-        this.sheaf.replace(root.page, '.commit', step())
+        this.replace(root.page, '.commit', step())
     })
 })
 
@@ -1314,7 +1307,6 @@ function Sheaf (options) {
     this.cache = options.cache || (new Cache)
     this.options = options
     this.tracer = options.tracer || function () { arguments[2]() }
-    this.balancer = new Balancer(this)
     this.sequester = options.sequester || require('sequester')
     this.extractor = options.extractor || extract
     this.comparator = options.comparator || compare
@@ -1342,6 +1334,7 @@ function Sheaf (options) {
     }).call(this) : function () {
         return this.journalist.createJournal()
     })
+    this.lengths = {}
 }
 
 Sheaf.prototype.writeFooter = cadence(function (step, out, position, page) {
@@ -2158,7 +2151,7 @@ Strata.prototype.mutator = function (key, callback) {
 
 // to user land
 Strata.prototype.balance = function (callback) {
-    this.sheaf.balancer.balance(callback)
+    this.sheaf.balance(callback)
 }
 
 // to user land
@@ -2229,7 +2222,7 @@ Strata.prototype.purge = function (downTo) {
 }
 
 Strata.prototype.__defineGetter__('balanced', function () {
-    return ! Object.keys(this.sheaf.balancer.lengths).length
+    return ! Object.keys(this.sheaf.lengths).length
 })
 
 module.exports = Strata
