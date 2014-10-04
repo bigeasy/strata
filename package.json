@@ -26,7 +26,7 @@
                         "pointcut": "0.0.1",
                         "sequester": "0.0.8",
                         "journalist": "0.0.8",
-                        "cadence": "0.0.42"
+                        "cadence": "0.0.43"
     },
     "devDependencies":
     {
