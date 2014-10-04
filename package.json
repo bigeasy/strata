@@ -23,6 +23,7 @@
     "dependencies":
     {
                         "magazine": "0.0.12",
+                        "pointcut": "0.0.1",
                         "sequester": "0.0.8",
                         "journalist": "0.0.8",
                         "cadence": "0.0.42"
