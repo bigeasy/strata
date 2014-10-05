@@ -1,8 +1,6 @@
 #!/usr/bin/env node
 
-Error.stackTraceLimit = Infinity
-
-require('./proof')(3, function (step, Strata, tmp, load, serialize, vivify, gather, assert) {
+require('./proof')(3, function (step, assert) {
     var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
     step(function () {
         serialize(__dirname + '/fixtures/branch.before.json', tmp, step())

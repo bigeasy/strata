@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (step, Strata, tmp, serialize, ok) {
+require('./proof')(1, function (step, assert) {
     var strata
     step(function () {
         serialize(__dirname + '/fixtures/tree.before.json', tmp, step())
@@ -16,7 +16,7 @@ require('./proof')(1, function (step, Strata, tmp, serialize, ok) {
         step(function () {
             cursor.get(cursor.offset, step())
         }, function (value) {
-            ok(value, 'h', 'got')
+            assert(value, 'h', 'got')
             cursor.unlock(step())
         })
     }, function() {

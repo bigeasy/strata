@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(9, function (step, Strata, tmp, serialize, assert) {
+require('./proof')(9, function (step, assert) {
     var strata
     step(function () {
         serialize(__dirname + '/fixtures/get.json', tmp, step())

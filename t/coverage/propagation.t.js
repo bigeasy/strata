@@ -1,4 +1,6 @@
-require('./proof')(1, function (step, Strata, tmp, equal) {
+#!/usr/bin/env node
+
+require('./proof')(1, function (step, assert) {
     var strata
     step(function () {
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
@@ -10,7 +12,7 @@ require('./proof')(1, function (step, Strata, tmp, equal) {
                 throw new Error('propagated')
             })
         } catch (e) {
-            equal(e.message, 'propagated', 'propagated error')
+            assert(e.message, 'propagated', 'propagated error')
             strata.close(step())
         }
     })

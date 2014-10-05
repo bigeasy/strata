@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(4, function (step, Strata, tmp, serialize, gather, assert) {
+require('./proof')(4, function (step, assert) {
     var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
     step(function () {
         serialize(__dirname + '/fixtures/ambiguous.before.json', tmp, step())

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (step, Strata, tmp, assert) {
+require('./proof')(1, function (step, assert) {
     var strata
     step(function () {
         strata = new Strata({

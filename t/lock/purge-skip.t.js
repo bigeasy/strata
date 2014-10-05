@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(2, function (step, Strata, tmp, serialize, equal) {
+require('./proof')(2, function (step, assert) {
     var strata
     step(function () {
         serialize(__dirname + '/fixtures/tree.before.json', tmp, step())
@@ -10,9 +10,9 @@ require('./proof')(2, function (step, Strata, tmp, serialize, equal) {
     }, function () {
         strata.mutator('h', step())
     }, function (cursor) {
-        equal(strata.size, 41, 'before purge')
+        assert(strata.size, 41, 'before purge')
         strata.purge(0)
-        equal(strata.size, 18, 'after purge')
+        assert(strata.size, 18, 'after purge')
         cursor.unlock(step())
     }, function() {
         strata.close(step())

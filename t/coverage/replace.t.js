@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (step, Strata, tmp, serialize, insert, equal) {
+require('./proof')(1, function (step, assert) {
     function forward (name) {
         return function () { return fs[name].apply(fs, arguments) }
     }
@@ -23,6 +23,6 @@ require('./proof')(1, function (step, Strata, tmp, serialize, insert, equal) {
     }, [function () {
         strata.balance(step())
     }, function (_, error) {
-        equal(error.code, 'EACCES', 'unlink error')
+        assert(error.code, 'EACCES', 'unlink error')
     }])
 })

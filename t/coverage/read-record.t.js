@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (step, Strata, tmp, serialize, equal) {
+require('./proof')(1, function (step, assert) {
     var path = require('path'), strata = new Strata({
         directory: tmp,
         leafSize: 3,
@@ -25,7 +25,7 @@ require('./proof')(1, function (step, Strata, tmp, serialize, equal) {
             cursor.unlock()
         })
     }, function (_, error) {
-        equal(error.message, 'bogus error', 'error on read record')
+        assert(error.message, 'bogus error', 'error on read record')
     }], function () {
         strata.close(step())
     })

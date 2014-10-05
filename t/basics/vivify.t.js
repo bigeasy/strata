@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (step, Strata, tmp, serialize, assert, say) {
+require('./proof')(1, function (step, assert) {
     var strata
     step(function () {
         serialize(__dirname + '/fixtures/vivify.json', tmp, step())

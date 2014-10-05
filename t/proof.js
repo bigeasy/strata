@@ -376,26 +376,37 @@ function deltree (directory, callback) {
     }
 }
 
-module.exports = function (dirname) {
+var invoke = cadence(function (async, tmp, assert, test) {
+    async(function () {
+        deltree(tmp, async())
+    }, function () {
+        fs.mkdir(tmp, 0755, async())
+    }, function () {
+        assert.global = function (name, value) {
+            global[name] = value
+            assert.leak(name)
+        }
+        assert.global('Strata', Strata)
+        assert.global('tmp', tmp)
+        assert.global('load', load)
+        assert.global('stringify', stringify)
+        assert.global('insert', insert)
+        assert.global('serialize', serialize)
+        assert.global('gather', gather)
+        assert.global('vivify', vivify)
+        assert.global('script', script)
+        test(assert, async())
+    }, function () {
+        if (!('UNTIDY' in process.env)) {
+            deltree(tmp, async())
+        }
+    })
+})
+
+module.exports = function (module, dirname) {
     var tmp = dirname + '/tmp'
-    return require('proof')(function (step) {
-        deltree(tmp, step())
-    }, function (step) {
-        step(function () {
-            fs.mkdir(tmp, 0755, step())
-        }, function () {
-            return {
-                Strata: Strata,
-                tmp: tmp,
-                load: load,
-                stringify: stringify,
-                insert: insert,
-                serialize: serialize,
-                gather: gather,
-                vivify: vivify,
-                script: script
-            }
-        })
+    return require('proof')(module, function (body, assert, callback) {
+        invoke(tmp, assert, cadence(body), callback)
     })
 }
 

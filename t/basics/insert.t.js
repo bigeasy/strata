@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(4, function (step, Strata, tmp, load, vivify, assert, say) {
+require('./proof')(4, function (step, assert) {
     var strata
     step(function () {
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
@@ -20,12 +20,12 @@ require('./proof')(4, function (step, Strata, tmp, load, vivify, assert, say) {
         vivify(tmp, step())
         load(__dirname + '/fixtures/insert.json', step())
     }, function (actual, expected) {
-        say(expected)
-        say(actual)
+        assert.say(expected)
+        assert.say(actual)
 
         assert(actual, expected, 'insert')
 
-        say(expected.segment00000001)
+        assert.say(expected.segment00000001)
 
         strata.purge(0)
         assert(strata.size, 0, 'purged')

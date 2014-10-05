@@ -1,4 +1,6 @@
-require('./proof')(1, function (step, Strata, tmp, serialize, equal) {
+#!/usr/bin/env node
+
+require('./proof')(1, function (step, assert) {
     var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3, readLeafStartLength: 3 }),
             path = require('path')
     step(function () {
@@ -8,6 +10,6 @@ require('./proof')(1, function (step, Strata, tmp, serialize, equal) {
     },[function () {
         strata.iterator('a', step())
     }, function (_, error) {
-        equal(error.message, 'cannot find footer in last 3 bytes', 'cannot find footer')
+        assert(error.message, 'cannot find footer in last 3 bytes', 'cannot find footer')
     }])
 })

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(5, function (step, Strata, tmp, serialize, assert) {
+require('./proof')(5, function (step, assert) {
     var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 }), records = []
     step(function () {
         serialize(__dirname + '/fixtures/two.json', tmp, step())

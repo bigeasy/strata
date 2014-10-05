@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(3, function (step, Strata, tmp, load, serialize, vivify, gather, assert, say) {
+require('./proof')(3, function (step, assert) {
     var strata
     step(function () {
         serialize(__dirname + '/fixtures/merge.before.json', tmp, step())
@@ -25,8 +25,8 @@ require('./proof')(3, function (step, Strata, tmp, load, serialize, vivify, gath
             vivify(tmp, step())
             load(__dirname + '/fixtures/merge.after.json', step())
         }, function (actual, expected) {
-            say(expected)
-            say(actual)
+            assert.say(expected)
+            assert.say(actual)
 
             assert(actual, expected, 'merge')
         }, function () {

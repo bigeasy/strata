@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (step, Strata, tmp, serialize, gather, assert) {
+require('./proof')(1, function (step, assert) {
     var strata = new Strata({
         directory: tmp,
         branchSize: 3,

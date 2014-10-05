@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(5, function (step, Strata, tmp, load, vivify, assert, say) {
+require('./proof')(5, function (step, assert) {
     var fs = require('fs'), strata
     step(function () {
         fs.writeFile(tmp + '/.ignore', '', 'utf8', step())
@@ -15,8 +15,8 @@ require('./proof')(5, function (step, Strata, tmp, load, vivify, assert, say) {
         vivify(tmp, step())
         load(__dirname + '/fixtures/create.after.json', step())
     }, function (actual, expected) {
-        say(actual)
-        say(expected)
+        assert.say(actual)
+        assert.say(expected)
 
         assert(actual, expected, 'written')
 

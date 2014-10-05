@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (step, Strata, tmp, serialize, equal) {
+require('./proof')(1, function (step, assert) {
     var strata
 
     function tracer (type, object, callback) {
@@ -31,7 +31,7 @@ require('./proof')(1, function (step, Strata, tmp, serialize, equal) {
     }, [function (records) {
         strata.balance(step())
     }, function (_, error) {
-        equal(error.message, 'bogus', 'caught')
+        assert(error.message, 'bogus', 'caught')
     }], function(actual, expected) {
         strata.close(step())
     })

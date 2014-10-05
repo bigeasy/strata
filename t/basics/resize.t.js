@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (step, Strata, tmp, serialize, assert) {
+require('./proof')(1, function (step, assert) {
     var strata
     step(function () {
         serialize(__dirname + '/fixtures/resize.before.json', tmp, step())

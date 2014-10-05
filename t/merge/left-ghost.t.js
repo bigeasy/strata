@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(3, function (step, Strata, tmp, load, serialize, vivify, gather, say, assert) {
+require('./proof')(3, function (step, assert) {
     var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
     step(function () {
         serialize(__dirname + '/fixtures/left-ghost.before.json', tmp, step())
@@ -26,8 +26,8 @@ require('./proof')(3, function (step, Strata, tmp, load, serialize, vivify, gath
         vivify(tmp, step())
         load(__dirname + '/fixtures/left-ghost.after.json', step())
     }, function (actual, expected) {
-        say(expected)
-        say(actual)
+        assert.say(expected)
+        assert.say(actual)
 
         assert(actual, expected, 'after')
         strata.close(step())

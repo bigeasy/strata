@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (step, Strata, tmp, gather, equal) {
+require('./proof')(1, function (step, assert) {
     var strata, value = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTU'
     step(function () {
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
@@ -21,7 +21,7 @@ require('./proof')(1, function (step, Strata, tmp, gather, equal) {
     }, function () {
         gather(strata, step())
     }, function (records) {
-        equal(records[0], value, 'done')
+        assert(records[0], value, 'done')
         strata.close(step())
     })
 })
