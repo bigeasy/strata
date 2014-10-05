@@ -1,7 +1,23 @@
+### Merge `Balancer` into `Sheaf`
+
+The `Balancer` has now been absorbed by the internal `Sheaf` object.
+
+### Add Pointcut
+
+It doesn't do anything at this point, but Pointcut will provide use with the ability to profile the many asynchronous operations of Strata.
+
+### Upgrade Proof
+
+Proof 0.0.50 has a new scaffold. This called for a change to the test harness and all off the tests. Proof no longer provides cleanup, but the test harness, the proof wrapper in Strata, it will now perform the cleanup before and after.
+
+The common utility functions are now exported globally. They may move into a utility object at some point in the future.
+
 ### Issue by Issue
 
  * Upgrade Proof to 0.0.50. #411.
  * Upgrade Journalist to 0.0.9. #410.
  * Upgrade Cadence to 0.0.43. #409.
+ * Integrate Pointcut. #407.
+ * Merge `Balancer` with `Sheaf`. #405.
  * Upgrade Journalist to 0.0.8. #402.
  * Upgrade Cadence to 0.0.42. #401.
