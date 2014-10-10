@@ -591,3 +591,30 @@ don't know why I don't use it to build Strata.
  * Mutator should return false if index is to low instead of asserting. #110.
  * All Strata constructor options should be in the `options` hash. #109.
  * Fix aspect ratio of `README.md` image. #108.
+
+# Time-Series Indices
+
+Indexing a time series has multiple requirements over other types of data, but
+also a few advantages. Since a TS-Tree is balanced, it must be split in such a
+way that does not cause overlap, but traditionally splitting algorithms do not
+work simply because time-series tend to be so large - we can't implement a
+splitting method that propagates too far up the tree. Thus, we simply split the
+tree first based on its most descriptive dimension - obviously time - and from
+there we must separate based on any lower dimensions - in our case, the keys.
+So we have to define a separator, some discrete value to roughly represent the
+shortest time series between two nodes.
+
+If we are actually simply indexing a log, then we know our tree will be
+naturally ordered, and we probably only need to define a separator and way to
+index the lower dimensions, since it can be reasonably assumed that we will
+never be inserting anywhere beyond the current page. If this is not the case,
+however, and entries can be made at any point in the tree (batch operations,
+late reports, whatever), then we need to quantize the time series so that we
+have a way of grouping similar values(though this is also probably necessary if
+splitting is done out of spatial necessity instead of equiwidth quantization).
+So, we can quantize the series based on interval length (equiwidth, i.e. days,
+weeks, etc) or interval size (equidepth, i.e. 500 entries, 1K entries)
+depending on the domain, combined with bounding meta-data similar to an
+R-tree's minimum bounding rectangle to give us both a rough, overall method of
+quantization while maintaining the meta-data needed to give us a finer one if
+we should need it.
