@@ -618,3 +618,27 @@ depending on the domain, combined with bounding meta-data similar to an
 R-tree's minimum bounding rectangle to give us both a rough, overall method of
 quantization while maintaining the meta-data needed to give us a finer one if
 we should need it.
+
+# Simplified Leaf Pages
+
+I'm concerned that a leaf page might grow so large and spotty that it will be
+difficult, unpleasant to load all the leaves. This is why I created the notion
+of a positions array. The positions array can be cached at the end of the leaf.
+It will contain an array of all the entries in the leaf, so you don't have to
+laod the entires until you need them.
+
+But, the moment I test Locket, I find that it is far too slow, so now I loathe
+trips to the drive. I don't want large leaves. I start thinking about how I
+might read a leaf in memory, then serve slices of leaf when data is requested.
+(Of course, this makes cache evacuation a bit difficult, oh, but not really, it
+would still be held by the slice reference, okay, never mind.)
+
+I'm eager to load the entire leaf, why not ask that the application keep leaves
+small so that leaf loads are cheap? Then it occurs to me, why not make leaves
+small, but make penultimate nodes very large. That way, if we have an
+application that goes to different spots in the tree, leaves not expensive to
+keep tidy, they are small, and penultimate nodes are expensive to keep tidy, but
+only if the key is very large, and only at balance time.
+
+We could also get really agressive with the lookup table, instead of writing it
+into the body, write it into the footer.
