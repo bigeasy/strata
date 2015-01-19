@@ -20,6 +20,7 @@
                         "email":  "chrite.demarius@gmail.com",
                         "web":    "https://github.com/demarius"
     }],
+    "main":             "strata.js",
     "dependencies":
     {
                         "magazine": "0.0.12",
