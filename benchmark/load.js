@@ -32,7 +32,8 @@ var runner = cadence(function (async) {
         directory: directory,
         extractor: extractor,
         leafSize: 256,
-        branchSize: 256
+        branchSize: 256,
+        writeStage: 'leaf'
     })
     async(function () {
         rimraf(directory, async())
