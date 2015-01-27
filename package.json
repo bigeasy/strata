@@ -31,7 +31,13 @@
     },
     "devDependencies":
     {
-                        "proof": "0.0.50"
+                        "seedrandom": "2.3.10",
+                        "proof": "0.0.50",
+                        "advance": "0.0.8",
+                        "rimraf": "~2.2",
+                        "mkdirp": "~0.3",
+                        "splice": "0.0.9",
+                        "arguable": "0.0.22"
     },
     "licenses":
     [{
