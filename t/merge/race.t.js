@@ -1,19 +1,19 @@
 #!/usr/bin/env node
 
-require('./proof')(2, function (step, assert) {
+require('./proof')(2, function (async, assert) {
     var cadence = require('cadence'), strata, insert
 
     function tracer (type, object, callback) {
         switch (type) {
         case 'plan':
-            cadence(function (step) {
-                step(function () {
-                    strata.mutator(insert, step())
+            cadence(function (async) {
+                async(function () {
+                    strata.mutator(insert, async())
                 }, function (cursor) {
-                    step(function () {
-                        cursor.insert(insert, insert, ~cursor.index, step())
+                    async(function () {
+                        cursor.insert(insert, insert, ~cursor.index, async())
                     }, function () {
-                        cursor.unlock(step())
+                        cursor.unlock(async())
                     })
                 })
             })(callback)
@@ -23,49 +23,49 @@ require('./proof')(2, function (step, assert) {
         }
     }
 
-    step(function () {
-        serialize(__dirname + '/fixtures/race.before.json', tmp, step())
+    async(function () {
+        serialize(__dirname + '/fixtures/race.before.json', tmp, async())
     }, function () {
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3, tracer: tracer })
-        strata.open(step())
+        strata.open(async())
     }, function () {
-        strata.mutator('b', step())
+        strata.mutator('b', async())
     }, function (cursor) {
-        step(function () {
-            cursor.remove(cursor.index, step())
+        async(function () {
+            cursor.remove(cursor.index, async())
         }, function () {
-            cursor.unlock(step())
+            cursor.unlock(async())
         })
     }, function () {
         insert = 'b'
-        strata.balance(step())
+        strata.balance(async())
     }, function () {
-        vivify(tmp, step())
-        load(__dirname + '/fixtures/race-left.after.json', step())
+        vivify(tmp, async())
+        load(__dirname + '/fixtures/race-left.after.json', async())
     }, function(actual, expected) {
         assert(actual, expected, 'race left')
-        strata.close(step())
+        strata.close(async())
     }, function () {
-        serialize(__dirname + '/fixtures/race.before.json', tmp, step())
+        serialize(__dirname + '/fixtures/race.before.json', tmp, async())
     }, function () {
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3, tracer: tracer })
-        strata.open(step())
+        strata.open(async())
     }, function () {
-        strata.mutator('d', step())
+        strata.mutator('d', async())
     }, function (cursor) {
-        step(function () {
-            cursor.remove(cursor.index, step())
+        async(function () {
+            cursor.remove(cursor.index, async())
         }, function () {
-            cursor.unlock(step())
+            cursor.unlock(async())
         })
     }, function () {
         insert = 'd'
-        strata.balance(step())
+        strata.balance(async())
     }, function () {
-        vivify(tmp, step())
-        load(__dirname + '/fixtures/race-right.after.json', step())
+        vivify(tmp, async())
+        load(__dirname + '/fixtures/race-right.after.json', async())
     }, function(actual, expected) {
         assert(actual, expected, 'race right')
-        strata.close(step())
+        strata.close(async())
     })
 })

@@ -1,39 +1,39 @@
 #!/usr/bin/env node
 
-require('./proof')(4, function (step, assert) {
+require('./proof')(4, function (async, assert) {
     var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
-    step(function () {
-        serialize(__dirname + '/fixtures/branch.before.json', tmp, step())
+    async(function () {
+        serialize(__dirname + '/fixtures/branch.before.json', tmp, async())
     }, function () {
-        strata.open(step())
+        strata.open(async())
     }, function () {
-        strata.mutator('n', step())
+        strata.mutator('n', async())
     }, function (cursor) {
-        step(function () {
-            cursor.insert('n', 'n', ~ cursor.index, step())
+        async(function () {
+            cursor.insert('n', 'n', ~ cursor.index, async())
         }, function () {
-            cursor.unlock(step())
+            cursor.unlock(async())
         })
     }, function () {
-        gather(strata, step())
+        gather(strata, async())
     }, function (records) {
         assert(records, [ 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n' ], 'records')
-        strata.balance(step())
+        strata.balance(async())
     }, function () {
-        vivify(tmp, step())
-        load(__dirname + '/fixtures/branch.after.json', step())
+        vivify(tmp, async())
+        load(__dirname + '/fixtures/branch.after.json', async())
     }, function (actual, expected) {
         assert(actual, expected, 'split')
         strata.purge(0)
         assert(strata.size, 0, 'purge completely')
-        strata.close(step())
+        strata.close(async())
     }, function () {
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
-        strata.open(step())
+        strata.open(async())
     }, function () {
-        gather(strata, step())
+        gather(strata, async())
     }, function (records) {
         assert(records, [ 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n' ], 'records')
-        strata.close(step())
+        strata.close(async())
     })
 })

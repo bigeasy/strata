@@ -1,35 +1,35 @@
 #!/usr/bin/env node
 
-require('./proof')(5, function (step, assert) {
+require('./proof')(5, function (async, assert) {
     var strata, right
-    step(function () {
-        serialize(__dirname + '/fixtures/merge.before.json', tmp, step())
+    async(function () {
+        serialize(__dirname + '/fixtures/merge.before.json', tmp, async())
     }, function () {
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
-        strata.open(step())
+        strata.open(async())
     }, function () {
-        strata.mutator(strata.leftOf('c'), step())
+        strata.mutator(strata.leftOf('c'), async())
     }, function (cursor) {
         assert(cursor.exclusive, 'exclusive')
         right = cursor.right
-        step(function () {
-            cursor.get(0, step())
+        async(function () {
+            cursor.get(0, async())
         }, function (got) {
             assert(got, 'a', 'go left')
-            cursor.unlock(step())
+            cursor.unlock(async())
         })
     }, function () {
-        strata.mutator(strata.leftOf('d'), step())
+        strata.mutator(strata.leftOf('d'), async())
     }, function (cursor) {
         assert(cursor.address, right, 'address and right')
         assert(!cursor.exclusive, 'shared')
-        step(function () {
-            cursor.get(0, step())
+        async(function () {
+            cursor.get(0, async())
         }, function (got) {
             assert(got, 'c', 'go left missing')
-            cursor.unlock(step())
+            cursor.unlock(async())
         })
     }, function () {
-        strata.close(step())
+        strata.close(async())
     })
 })

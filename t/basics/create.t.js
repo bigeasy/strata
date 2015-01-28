@@ -1,19 +1,19 @@
 #!/usr/bin/env node
 
-require('./proof')(5, function (step, assert) {
+require('./proof')(5, function (async, assert) {
     var fs = require('fs'), strata
-    step(function () {
-        fs.writeFile(tmp + '/.ignore', '', 'utf8', step())
+    async(function () {
+        fs.writeFile(tmp + '/.ignore', '', 'utf8', async())
     }, function () {
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
-        strata.create(step())
+        strata.create(async())
     }, function () {
         assert(strata.size, 3, 'json size')
-        strata.close(step())
+        strata.close(async())
     }, function () {
         assert(1, 'created')
-        vivify(tmp, step())
-        load(__dirname + '/fixtures/create.after.json', step())
+        vivify(tmp, async())
+        load(__dirname + '/fixtures/create.after.json', async())
     }, function (actual, expected) {
         assert.say(actual)
         assert.say(expected)
@@ -21,17 +21,17 @@ require('./proof')(5, function (step, assert) {
         assert(actual, expected, 'written')
 
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
-        strata.open(step())
+        strata.open(async())
     }, function () {
-        strata.iterator('a', step())
+        strata.iterator('a', async())
     }, function (cursor) {
         assert(cursor.length - cursor.offset, 0, 'empty')
 
-        cursor.unlock(step())
+        cursor.unlock(async())
     }, function () {
         strata.purge(0)
         assert(strata.size, 0, 'purged')
 
-        strata.close(step())
+        strata.close(async())
     })
 })

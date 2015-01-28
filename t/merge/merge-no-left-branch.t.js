@@ -3,12 +3,12 @@
 // Same test as unpurged key, which covered the uncovered condition of
 // determining how to merge a branch page that has no left sibliing.
 
-require('./proof')(1, function (step, assert) {
+require('./proof')(1, function (async, assert) {
     var path = require('path')
     script({
         file: path.join(__dirname, 'fixtures', 'unpurged-key.txt'),
         directory: tmp,
         cadence: require('cadence'),
         assert: assert
-    }, step())
+    }, async())
 })

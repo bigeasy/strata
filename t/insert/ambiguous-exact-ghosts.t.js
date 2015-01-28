@@ -1,42 +1,42 @@
 #!/usr/bin/env node
 
-require('./proof')(4, function (step, assert) {
+require('./proof')(4, function (async, assert) {
     var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
-    step(function () {
-        serialize(__dirname + '/fixtures/ambiguous.before.json', tmp, step())
+    async(function () {
+        serialize(__dirname + '/fixtures/ambiguous.before.json', tmp, async())
     }, function () {
-        strata.open(step())
+        strata.open(async())
     }, function () {
-        gather(strata, step())
+        gather(strata, async())
     }, function (records) {
         assert(records, [ 'a', 'd', 'f', 'g', 'h', 'i', 'l', 'm', 'n' ], 'records')
     }, function () {
-        strata.mutator('g', step())
+        strata.mutator('g', async())
     }, function (cursor) {
-        step(function () {
-            cursor.remove(cursor.index, step())
+        async(function () {
+            cursor.remove(cursor.index, async())
         }, function () {
-            cursor.unlock(step())
+            cursor.unlock(async())
         }, function () {
-            gather(strata, step())
+            gather(strata, async())
         })
     }, function (records) {
         assert(records, [ 'a', 'd', 'f', 'h', 'i', 'l', 'm', 'n' ], 'records after delete')
-        strata.mutator('j', step())
+        strata.mutator('j', async())
     }, function (cursor) {
-        step(function () {
-            cursor.indexOf('j', step())
+        async(function () {
+            cursor.indexOf('j', async())
         }, function (index) {
             assert(~index <= cursor.length, 'unambiguous')
-            cursor.insert('j', 'j', ~cursor.index, step())
+            cursor.insert('j', 'j', ~cursor.index, async())
         }, function () {
-            cursor.unlock(step())
+            cursor.unlock(async())
         }, function () {
-            gather(strata, step())
+            gather(strata, async())
         })
     }, function (records) {
         assert(records, [ 'a', 'd', 'f', 'h', 'i', 'j', 'l', 'm', 'n' ], 'records after insert')
     }, function() {
-        strata.close(step())
+        strata.close(async())
     })
 })

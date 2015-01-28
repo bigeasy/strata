@@ -1,44 +1,44 @@
 #!/usr/bin/env node
 
-require('./proof')(4, function (step, assert) {
+require('./proof')(4, function (async, assert) {
     var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
-    step(function () {
-        serialize(__dirname + '/fixtures/split.before.json', tmp, step())
+    async(function () {
+        serialize(__dirname + '/fixtures/split.before.json', tmp, async())
     }, function () {
-        strata.open(step())
+        strata.open(async())
     }, function () {
-        strata.mutator('d', step())
+        strata.mutator('d', async())
     }, function (cursor) {
-        step(function () {
-            cursor.remove(cursor.index, step())
+        async(function () {
+            cursor.remove(cursor.index, async())
         }, function () {
-            cursor.indexOf('g', step())
+            cursor.indexOf('g', async())
         }, function (index) {
-            cursor.insert('g', 'g', ~index, step())
+            cursor.insert('g', 'g', ~index, async())
         }, function () {
-            cursor.indexOf('h', step())
+            cursor.indexOf('h', async())
         }, function (index) {
-            cursor.insert('h', 'h', ~index, step())
+            cursor.insert('h', 'h', ~index, async())
         }, function () {
-            cursor.unlock(step())
+            cursor.unlock(async())
         }, function () {
-            gather(strata, step())
+            gather(strata, async())
         })
     }, function (records) {
         assert(records, [ 'a', 'b', 'c', 'e', 'f', 'g', 'h' ], 'records')
-        vivify(tmp, step())
-        load(__dirname + '/fixtures/split.after.json', step())
+        vivify(tmp, async())
+        load(__dirname + '/fixtures/split.after.json', async())
     }, function (actual, expected) {
         assert(actual, expected, 'after tree')
-        strata.balance(step())
+        strata.balance(async())
     }, function () {
-        gather(strata, step())
+        gather(strata, async())
     }, function (records) {
         assert(records, [ 'a', 'b', 'c', 'e', 'f', 'g', 'h' ], 'balanced records')
-        vivify(tmp, step())
-        load(__dirname + '/fixtures/split.balanced.json', step())
+        vivify(tmp, async())
+        load(__dirname + '/fixtures/split.balanced.json', async())
     }, function (actual, expected) {
         assert(actual, expected, 'after balance')
-        strata.close(step())
+        strata.close(async())
     })
 })

@@ -1,32 +1,32 @@
 #!/usr/bin/env node
 
-require('./proof')(2, function (step, assert) {
+require('./proof')(2, function (async, assert) {
     var strata
-    step(function () {
-        serialize(__dirname + '/../basics/fixtures/split.before.json', tmp, step())
+    async(function () {
+        serialize(__dirname + '/../basics/fixtures/split.before.json', tmp, async())
     }, function () {
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
-        strata.open(step())
+        strata.open(async())
     }, function () {
-        strata.mutator('b', step())
+        strata.mutator('b', async())
     }, function (cursor) {
-        step(function () {
-            cursor.insert('b', 'b', ~ cursor.index, step())
+        async(function () {
+            cursor.insert('b', 'b', ~ cursor.index, async())
         }, function () {
-            cursor.unlock(step())
+            cursor.unlock(async())
         })
     }, function () {
-        strata.balance(step())
-        step([function () {
-            strata.balance(step())
+        strata.balance(async())
+        async([function () {
+            strata.balance(async())
         }, function (_, error) {
             assert(error.message, 'already balancing', 'error')
         }])
     }, function () {
-        gather(strata, step())
+        gather(strata, async())
     }, function (records) {
         assert(records, [ 'a', 'b', 'c', 'd' ], 'records')
     }, function() {
-        strata.close(step())
+        strata.close(async())
     })
 })

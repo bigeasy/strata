@@ -1,28 +1,28 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (step, assert) {
+require('./proof')(1, function (async, assert) {
     var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
-    step(function () {
-        strata.create(step())
+    async(function () {
+        strata.create(async())
     }, function () {
-        strata.mutator('a', step())
+        strata.mutator('a', async())
     }, function (a) {
-        step(function () {
-            a.insert('a', 'a', ~ a.index, step())
+        async(function () {
+            a.insert('a', 'a', ~ a.index, async())
         }, function () {
-            strata.mutator('b', step())
-            a.unlock(step())
+            strata.mutator('b', async())
+            a.unlock(async())
         }, function (b) {
-            step(function () {
-                b.insert('b', 'b', ~ b.index, step())
+            async(function () {
+                b.insert('b', 'b', ~ b.index, async())
             }, function () {
-                b.unlock(step())
+                b.unlock(async())
             }, function () {
-                gather(strata, step())
+                gather(strata, async())
             })
         })
     }, function (records) {
         assert(records, [ 'a', 'b' ], 'records')
-        strata.close(step())
+        strata.close(async())
     })
 })

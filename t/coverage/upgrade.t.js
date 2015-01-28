@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (step, assert) {
+require('./proof')(1, function (async, assert) {
     var strata
 
     function tracer (type, object, callback) {
@@ -15,24 +15,24 @@ require('./proof')(1, function (step, assert) {
         }
     }
 
-    step(function () {
-        serialize(__dirname + '/fixtures/split-race.before.json', tmp, step())
+    async(function () {
+        serialize(__dirname + '/fixtures/split-race.before.json', tmp, async())
     }, function () {
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3, tracer: tracer })
-        strata.open(step())
+        strata.open(async())
     }, function () {
-        strata.mutator('d', step())
+        strata.mutator('d', async())
     }, function (cursor) {
-        step(function () {
-            cursor.insert('d', 'd', ~ cursor.index, step())
+        async(function () {
+            cursor.insert('d', 'd', ~ cursor.index, async())
         }, function () {
-            cursor.unlock(step())
+            cursor.unlock(async())
         })
     }, [function (records) {
-        strata.balance(step())
+        strata.balance(async())
     }, function (_, error) {
         assert(error.message, 'bogus', 'caught')
     }], function(actual, expected) {
-        strata.close(step())
+        strata.close(async())
     })
 })

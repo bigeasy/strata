@@ -69,43 +69,44 @@ function load (segments, callback) {
     }
 }
 
-function insert (step, strata, values) {
-    step(function () {
+// todo: do not accept async, make a real function.
+function insert (async, strata, values) {
+    async(function () {
         values.sort()
-        strata.mutator(values[0], step())
+        strata.mutator(values[0], async())
     }, function (cursor) {
-        step(function () {
-            cursor.insert(values[0], values[0], ~ cursor.index, step())
+        async(function () {
+            cursor.insert(values[0], values[0], ~ cursor.index, async())
         }, function () {
-            cursor.unlock(step())
+            cursor.unlock(async())
         })
     })
 }
 
-var gather = cadence(function (step, strata) {
+var gather = cadence(function (async, strata) {
     var records = [], page, item
     if (typeof strata == 'function') throw new Error
-    step(function () {
-        strata.iterator(strata.left, step())
+    async(function () {
+        strata.iterator(strata.left, async())
     }, function (cursor) {
-        var loop = step(function (more) {
+        var loop = async(function (more) {
             if (!more) {
-                step(function () {
-                    cursor.unlock(step())
+                async(function () {
+                    cursor.unlock(async())
                 }, function () {
                     return [ loop, records ]
                 })
             } else {
-                step(function () {
-                    step(function (index) {
-                        step(function () {
-                            cursor.get(index + cursor.offset, step())
+                async(function () {
+                    async(function (index) {
+                        async(function () {
+                            cursor.get(index + cursor.offset, async())
                         }, function (record) {
                             records.push(record)
                         })
                     })(cursor.length - cursor.offset)
                 }, function () {
-                    cursor.next(step())
+                    cursor.next(async())
                 })
             }
         })(null, true)
@@ -457,17 +458,17 @@ function script (options, callback) {
 
     var actions = {}
 
-    actions.create = cadence(function (step, action) {
-        step(function () {
-            fs.readdir(options.directory, step())
+    actions.create = cadence(function (async, action) {
+        async(function () {
+            fs.readdir(options.directory, async())
         }, function (list) {
             list = list.filter(function (file) { return ! /^\./.test(file) })
             if (!list.every(function (file) { return /^\d+$/.test(file) })) {
                 throw new Error('doesn\'t look like a strata directory')
             }
-            step(function (file) { fs.unlink(file, step()) })(list)
+            async(function (file) { fs.unlink(file, async()) })(list)
         }, function () {
-            strata.create(step())
+            strata.create(async())
         })
     })
 
@@ -487,20 +488,20 @@ function script (options, callback) {
         return parts.reverse().join('')
     }
 
-    actions.add = cadence(function (step, action) {
-        step(function () {
-            strata.mutator(action.values[0], step())
+    actions.add = cadence(function (async, action) {
+        async(function () {
+            strata.mutator(action.values[0], async())
         }, function (cursor) {
-            var loop = step(function () {
-                cursor.indexOf(action.values[0], step())
+            var loop = async(function () {
+                cursor.indexOf(action.values[0], async())
             }, function (index) {
                 ok(index < 0)
-                cursor.insert(action.values[0], action.values[0], ~ index, step())
+                cursor.insert(action.values[0], action.values[0], ~ index, async())
                 action.values.shift()
             }, function () {
                 if (!action.values.length) {
-                    step(function () {
-                        cursor.unlock(step())
+                    async(function () {
+                        cursor.unlock(async())
                     }, function () {
                         return [ loop ]
                     })
@@ -509,17 +510,17 @@ function script (options, callback) {
         })
     })
 
-    actions.remove = cadence(function (step, action) {
+    actions.remove = cadence(function (async, action) {
         var mutate, next
-        step(function () {
-            if (action.values.length) strata.mutator(action.values[0], step())
-            else return [ step ]
+        async(function () {
+            if (action.values.length) strata.mutator(action.values[0], async())
+            else return [ async ]
         }, function (cursor) {
             action.values.shift()
-            step(function () {
-                if (cursor.index >= 0) cursor.remove(cursor.index, step())
+            async(function () {
+                if (cursor.index >= 0) cursor.remove(cursor.index, async())
             }, function () {
-                cursor.unlock(step())
+                cursor.unlock(async())
             })
         })()
     })
@@ -547,34 +548,34 @@ function script (options, callback) {
         })
     }
 
-    actions.vivify = cadence(function (step, action) {
-        step(function () {
-            strata.vivify(step())
+    actions.vivify = cadence(function (async, action) {
+        async(function () {
+            strata.vivify(async())
         }, function (tree) {
             print(tree, 0, 0, 0)
         })
     })
 
-    actions.stringify = cadence(function (step, action) {
-        step(function () {
-            stringify(options.directory, step())
+    actions.stringify = cadence(function (async, action) {
+        async(function () {
+            stringify(options.directory, async())
         }, function (result) {
-            fs.writeFile(action.file, pretty(JSON.parse(result)), 'utf8', step())
+            fs.writeFile(action.file, pretty(JSON.parse(result)), 'utf8', async())
         })
     })
 
-    actions.serialize = cadence(function (step, action) {
-        step(function () {
-            serialize(action.file, options.directory, step())
+    actions.serialize = cadence(function (async, action) {
+        async(function () {
+            serialize(action.file, options.directory, async())
         }, function () {
-            strata.open(step())
+            strata.open(async())
         })
     })
 
-    actions.fixture = cadence(function (step, action) {
-        step(function () {
-            vivify(options.directory, step())
-            load(action.file, step())
+    actions.fixture = cadence(function (async, action) {
+        async(function () {
+            vivify(options.directory, async())
+            load(action.file, async())
         }, function (actual, expected) {
             options.assert(actual, expected, action.file)
         })
@@ -594,11 +595,11 @@ function script (options, callback) {
         }
     }
 
-    cadence(function (step) {
+    cadence(function (async) {
         var buffer = ''
         var fs = require('fs')
-        step(function () {
-            fs.readFile(options.file, 'utf8', step())
+        async(function () {
+            fs.readFile(options.file, 'utf8', async())
         }, function (body) {
             var lines = body.split(/\n/)
             lines.pop()
@@ -633,10 +634,10 @@ function script (options, callback) {
                     break
                 }
             })
-            step(function (action) {
-                actions[action.type](action, step())
+            async(function (action) {
+                actions[action.type](action, async())
             }, function () {
-                setImmediate(step())
+                setImmediate(async())
             })(queue)
         })
     })(callback)

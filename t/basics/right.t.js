@@ -1,23 +1,23 @@
 #!/usr/bin/env node
 
-require('./proof')(2, function (step, assert) {
+require('./proof')(2, function (async, assert) {
     var strata
-    step(function () {
-        serialize(__dirname + '/fixtures/merge.before.json', tmp, step())
+    async(function () {
+        serialize(__dirname + '/fixtures/merge.before.json', tmp, async())
     }, function () {
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
-        strata.open(step())
+        strata.open(async())
     }, function () {
-        strata.mutator(strata.right, step())
+        strata.mutator(strata.right, async())
     }, function (cursor) {
         assert(cursor.exclusive, 'exclusive')
-        step(function () {
-            cursor.get(0, step())
+        async(function () {
+            cursor.get(0, async())
         }, function (got) {
             assert(got, 'c', 'right')
-            cursor.unlock(step())
+            cursor.unlock(async())
         })
     }, function () {
-        strata.close(step())
+        strata.close(async())
     })
 })

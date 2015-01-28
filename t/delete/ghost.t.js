@@ -1,52 +1,52 @@
 #!/usr/bin/env node
 
-require('./proof')(5, function (step, assert) {
+require('./proof')(5, function (async, assert) {
     var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
-    step(function () {
-        serialize(__dirname + '/fixtures/delete.json', tmp, step())
+    async(function () {
+        serialize(__dirname + '/fixtures/delete.json', tmp, async())
     }, function () {
-        strata.open(step())
+        strata.open(async())
     }, function () {
-        gather(strata, step())
+        gather(strata, async())
     }, function (records) {
         assert(records, [ 'a', 'b', 'c', 'd' ], 'records')
     }, function () {
-        strata.mutator('c', step())
+        strata.mutator('c', async())
     }, function (cursor) {
-        step(function() {
-            cursor.indexOf('c', step())
+        async(function() {
+            cursor.indexOf('c', async())
         }, function (i) {
-            cursor.remove(i, step())
+            cursor.remove(i, async())
         }, function () {
-            cursor.unlock(step())
+            cursor.unlock(async())
         }, function () {
-            gather(strata, step())
+            gather(strata, async())
         })
     }, function (records) {
         assert(records, [ 'a', 'b', 'd' ], 'deleted')
-        vivify(tmp, step())
-        load(__dirname + '/fixtures/ghost.after.json', step())
+        vivify(tmp, async())
+        load(__dirname + '/fixtures/ghost.after.json', async())
     }, function (actual, expected) {
         assert.say(expected)
         assert.say(actual)
         assert(actual, expected, 'directory')
-        strata.close(step())
+        strata.close(async())
     }, function () {
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
-        strata.open(step())
+        strata.open(async())
     }, function () {
-        strata.iterator('a', step())
+        strata.iterator('a', async())
     }, function (cursor) {
-        step(function () {
-            cursor.next(step())
+        async(function () {
+            cursor.next(async())
         }, function (next) {
             assert(cursor.offset, 1, 'ghosted')
-            cursor.unlock(step())
+            cursor.unlock(async())
         })
     }, function () {
-        gather(strata, step())
+        gather(strata, async())
     }, function (records) {
         assert(records, [ 'a', 'b', 'd' ], 'reopened')
-        strata.close(step())
+        strata.close(async())
     })
 })

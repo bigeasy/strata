@@ -1,26 +1,26 @@
 #!/usr/bin/env node
 
-require('./proof')(3, function (step, assert) {
+require('./proof')(3, function (async, assert) {
     var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
-    step(function () {
-        serialize(__dirname + '/fixtures/leaf-remainder.before.json', tmp, step())
+    async(function () {
+        serialize(__dirname + '/fixtures/leaf-remainder.before.json', tmp, async())
     }, function () {
-        strata.open(step())
+        strata.open(async())
     }, function () {
-        gather(strata, step())
+        gather(strata, async())
     }, function (records) {
         assert(records, [ 'a', 'c', 'd', 'e', 'f', 'g', 'h' ], 'records')
-        strata.balance(step())
+        strata.balance(async())
     }, function () {
-        gather(strata, step())
+        gather(strata, async())
     }, function (records) {
         assert(records, [ 'a', 'c', 'd', 'e', 'f', 'g', 'h' ], 'records after balance')
 
-        vivify(tmp, step())
-        load(__dirname + '/fixtures/leaf-remainder.before.json', step())
+        vivify(tmp, async())
+        load(__dirname + '/fixtures/leaf-remainder.before.json', async())
     }, function (actual, expected) {
         assert(actual, expected, 'split')
     }, function() {
-        strata.close(step())
+        strata.close(async())
     })
 })

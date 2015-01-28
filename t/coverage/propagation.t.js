@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (step, assert) {
+require('./proof')(1, function (async, assert) {
     var strata
-    step(function () {
+    async(function () {
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
-        strata.create(step())
+        strata.create(async())
     }, function () {
         try {
             strata.iterator('a', function (error, cursor) {
@@ -13,7 +13,7 @@ require('./proof')(1, function (step, assert) {
             })
         } catch (e) {
             assert(e.message, 'propagated', 'propagated error')
-            strata.close(step())
+            strata.close(async())
         }
     })
 })

@@ -1,21 +1,21 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (step, assert) {
+require('./proof')(1, function (async, assert) {
     var strata = new Strata({
         directory: tmp,
         branchSize: 3,
         leafSize: 3,
         readLeafStartLength: 128
     })
-    step(function () {
-        serialize(__dirname + '/fixtures/read-record.before.json', tmp, step())
+    async(function () {
+        serialize(__dirname + '/fixtures/read-record.before.json', tmp, async())
     }, function () {
-        strata.open(step())
+        strata.open(async())
     }, function () {
-        gather(strata, step())
+        gather(strata, async())
     }, function (records) {
         assert(records, [ 'a', 'c', 'd' ], 'records')
     }, function () {
-        strata.close(step())
+        strata.close(async())
     })
 })

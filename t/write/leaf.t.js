@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-require('./proof')(2, function (step, assert) {
+require('./proof')(2, function (async, assert) {
     var strata
-    step(function () {
-        serialize(__dirname + '/../basics/fixtures/merge.before.json', tmp, step())
+    async(function () {
+        serialize(__dirname + '/../basics/fixtures/merge.before.json', tmp, async())
     }, function () {
         strata = new Strata({
             directory: tmp,
@@ -11,25 +11,25 @@ require('./proof')(2, function (step, assert) {
             branchSize: 3,
             writeStage: 'leaf'
         })
-        strata.open(step())
+        strata.open(async())
     }, function () {
-        strata.mutator('a', step())
+        strata.mutator('a', async())
     }, function (cursor) {
-        step(function () {
-            cursor.next(step())
+        async(function () {
+            cursor.next(async())
         }, function () {
-            cursor.indexOf('e', step())
+            cursor.indexOf('e', async())
         }, function (index) {
-            cursor.insert('e', 'e', ~ index, step())
+            cursor.insert('e', 'e', ~ index, async())
         }, function () {
-            cursor.unlock(step())
+            cursor.unlock(async())
         }, function () {
-            gather(strata, step())
+            gather(strata, async())
         })
     }, function (records) {
         assert(records, [ 'a', 'b', 'c', 'd', 'e' ], 'cached')
     }, function () {
-        strata.close(step())
+        strata.close(async())
     }, function () {
         strata = new Strata({
             directory: tmp,
@@ -37,9 +37,9 @@ require('./proof')(2, function (step, assert) {
             branchSize: 3,
             writeStage: 'leaf'
         })
-        strata.open(step())
+        strata.open(async())
     }, function () {
-        gather(strata, step())
+        gather(strata, async())
     }, function (records) {
         assert(records, [ 'a', 'b', 'c', 'd', 'e' ], 'flushed')
     })

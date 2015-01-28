@@ -1,32 +1,32 @@
 #!/usr/bin/env node
 
-require('./proof')(2, function (step, assert) {
+require('./proof')(2, function (async, assert) {
     var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
-    step(function () {
-        serialize(__dirname + '/fixtures/between.before.json', tmp, step())
+    async(function () {
+        serialize(__dirname + '/fixtures/between.before.json', tmp, async())
     }, function () {
-        strata.open(step())
+        strata.open(async())
     }, function() {
-        strata.mutator('b', step())
+        strata.mutator('b', async())
     }, function (cursor) {
-        step(function () {
-            cursor.insert('b', 'b', ~ cursor.index,  step())
+        async(function () {
+            cursor.insert('b', 'b', ~ cursor.index,  async())
         }, function () {
-            cursor.unlock(step())
-            vivify(tmp, step())
-            load(__dirname + '/fixtures/between.after.json', step())
+            cursor.unlock(async())
+            vivify(tmp, async())
+            load(__dirname + '/fixtures/between.after.json', async())
         })
     }, function (actual, expected) {
         assert(actual, expected, 'insert')
-        strata.close(step())
+        strata.close(async())
     }, function () {
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
-        strata.open(step())
+        strata.open(async())
     }, function () {
-        gather(strata, step())
+        gather(strata, async())
     }, function (records) {
         assert(records, [ 'a', 'b', 'c' ], 'records')
     }, function() {
-        strata.close(step())
+        strata.close(async())
     })
 })

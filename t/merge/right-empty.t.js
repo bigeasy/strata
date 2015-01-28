@@ -1,44 +1,44 @@
 #!/usr/bin/env node
 
-require('./proof')(3, function (step, assert) {
+require('./proof')(3, function (async, assert) {
     var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
-    step(function () {
-        serialize(__dirname + '/fixtures/merge.before.json', tmp, step())
+    async(function () {
+        serialize(__dirname + '/fixtures/merge.before.json', tmp, async())
     }, function () {
-        strata.open(step())
+        strata.open(async())
     }, function () {
-        strata.mutator('c', step())
+        strata.mutator('c', async())
     }, function (cursor) {
-        step(function () {
-            cursor.indexOf('c', step())
+        async(function () {
+            cursor.indexOf('c', async())
         }, function (index) {
-            cursor.remove(index, step())
+            cursor.remove(index, async())
         }, function () {
-            cursor.indexOf('d', step())
+            cursor.indexOf('d', async())
         }, function (index) {
-            cursor.remove(index, step())
+            cursor.remove(index, async())
         }, function () {
-            cursor.unlock(step())
+            cursor.unlock(async())
         })
     }, function () {
-        gather(strata, step())
+        gather(strata, async())
     }, function (records) {
         assert(records, [ 'a', 'b' ], 'records')
 
-        strata.balance(step())
+        strata.balance(async())
     }, function () {
-        vivify(tmp, step())
-        load(__dirname + '/fixtures/right-empty.after.json', step())
+        vivify(tmp, async())
+        load(__dirname + '/fixtures/right-empty.after.json', async())
     }, function (actual, expected) {
         assert.say(expected)
         assert.say(actual)
 
         assert(actual, expected, 'merge')
     }, function () {
-        gather(strata, step())
+        gather(strata, async())
     }, function (records) {
         assert(records, [ 'a', 'b' ], 'merged')
     }, function() {
-        strata.close(step())
+        strata.close(async())
     })
 })

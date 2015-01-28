@@ -1,41 +1,41 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (step, assert) {
+require('./proof')(1, function (async, assert) {
     var strata
-    step(function () {
+    async(function () {
         strata = new Strata({
             directory: tmp,
             serialize: function (string) { return new Buffer(string) },
             deserialize: function (buffer)  { return buffer.toString() }
         })
-        strata.create(step())
+        strata.create(async())
     }, function () {
-        strata.mutator('a', step())
+        strata.mutator('a', async())
     }, function (cursor) {
-        step(function () {
-            cursor.insert('a', 'a', ~ cursor.index, step())
+        async(function () {
+            cursor.insert('a', 'a', ~ cursor.index, async())
         }, function (inserted) {
-            cursor.unlock(step())
+            cursor.unlock(async())
         })
     }, function () {
-        strata.close(step())
+        strata.close(async())
     }, function () {
         strata = new Strata({
             directory: tmp,
             serialize: function (string) { return new Buffer(string) },
             deserialize: function (buffer)  { return buffer.toString() }
         })
-        strata.open(step())
+        strata.open(async())
     }, function () {
-        strata.iterator('a', step())
+        strata.iterator('a', async())
     }, function (cursor) {
-        step(function () {
-            cursor.get(cursor.index, step())
+        async(function () {
+            cursor.get(cursor.index, async())
         }, function (got) {
             assert(got, 'a', 'inserted binary')
-            cursor.unlock(step())
+            cursor.unlock(async())
         })
     }, function () {
-        strata.close(step())
+        strata.close(async())
     })
 })

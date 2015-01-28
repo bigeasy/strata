@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(4, function (step, assert) {
+require('./proof')(4, function (async, assert) {
     var strata, count = 0
 
     function tracer (type, object, callback) {
@@ -18,49 +18,49 @@ require('./proof')(4, function (step, assert) {
         }
     }
 
-    step(function () {
-        serialize(__dirname + '/fixtures/tree.before.json', tmp, step())
+    async(function () {
+        serialize(__dirname + '/fixtures/tree.before.json', tmp, async())
     }, function () {
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3, tracer: tracer })
-        strata.open(step())
+        strata.open(async())
     }, function () {
-        strata.mutator('h', step())
+        strata.mutator('h', async())
     }, function (cursor) {
-        step(function () {
-            cursor.indexOf('h', step())
+        async(function () {
+            cursor.indexOf('h', async())
         }, function (index) {
-            cursor.remove(index, step())
+            cursor.remove(index, async())
         }, function () {
-            cursor.indexOf('i', step())
+            cursor.indexOf('i', async())
         }, function (index) {
-            cursor.remove(index, step())
+            cursor.remove(index, async())
         }, function () {
-            cursor.unlock(step())
+            cursor.unlock(async())
         })
     }, function () {
-        strata.mutator('e', step())
+        strata.mutator('e', async())
     }, function (cursor) {
-        step(function () {
-            cursor.indexOf('e', step())
+        async(function () {
+            cursor.indexOf('e', async())
         }, function (index) {
-            cursor.remove(index, step())
+            cursor.remove(index, async())
         }, function () {
-            cursor.indexOf('g', step())
+            cursor.indexOf('g', async())
         }, function (index) {
-            cursor.remove(index, step())
+            cursor.remove(index, async())
         }, function () {
-            cursor.unlock(step())
+            cursor.unlock(async())
         })
     }, function () {
-        gather(strata, step())
+        gather(strata, async())
     }, function (records) {
         assert(records, [ 'a', 'b', 'c', 'd',  'f', 'j', 'k', 'l', 'm', 'n' ], 'records')
-        strata.balance(step())
+        strata.balance(async())
     }, function () {
-        vivify(tmp, step())
-        load(__dirname + '/fixtures/tree.after.json', step())
+        vivify(tmp, async())
+        load(__dirname + '/fixtures/tree.after.json', async())
     }, function (actual, expected) {
         assert(actual, expected, 'merge')
-        strata.close(step())
+        strata.close(async())
     })
 })

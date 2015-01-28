@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(3, function (step, assert) {
+require('./proof')(3, function (async, assert) {
     var ok = require('assert').ok, strata = new Strata({
         directory: tmp,
         leafSize: 3,
@@ -10,38 +10,38 @@ require('./proof')(3, function (step, assert) {
             return a < b ? - 1 : a > b ? 1 : 0
         }
     })
-    step(function () {
-        serialize(__dirname + '/fixtures/left-most.before.json', tmp, step())
+    async(function () {
+        serialize(__dirname + '/fixtures/left-most.before.json', tmp, async())
     }, function () {
-        strata.open(step())
+        strata.open(async())
     }, function () {
-        strata.mutator('d', step())
+        strata.mutator('d', async())
     }, function (cursor) {
-        step(function () {
-            cursor.insert('d', 'd', ~ cursor.index, step())
+        async(function () {
+            cursor.insert('d', 'd', ~ cursor.index, async())
         }, function () {
-            cursor.unlock(step())
+            cursor.unlock(async())
         })
     }, function () {
-        gather(strata, step())
+        gather(strata, async())
     }, function (records) {
         assert(records, [
             'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p'
         ], 'records')
-        strata.balance(step())
+        strata.balance(async())
     }, function () {
-        gather(strata, step())
+        gather(strata, async())
     }, function (records) {
         assert(records, [
             'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p'
         ], 'records after balance')
-        stringify(tmp, step())
+        stringify(tmp, async())
     }, function (json) {
-        vivify(tmp, step())
-        load(__dirname + '/fixtures/left-most.after.json', step())
+        vivify(tmp, async())
+        load(__dirname + '/fixtures/left-most.after.json', async())
     }, function (actual, expected) {
         assert(actual, expected, 'split')
     }, function() {
-        strata.close(step())
+        strata.close(async())
     })
 })

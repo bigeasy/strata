@@ -1,36 +1,36 @@
 #!/usr/bin/env node
 
-require('./proof')(3, function (step, assert) {
+require('./proof')(3, function (async, assert) {
     var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
-    step(function () {
-        serialize(__dirname + '/fixtures/unsplittable.before.json', tmp, step())
+    async(function () {
+        serialize(__dirname + '/fixtures/unsplittable.before.json', tmp, async())
     }, function () {
-        strata.open(step())
+        strata.open(async())
     }, function () {
-        strata.mutator('g', step())
+        strata.mutator('g', async())
     }, function (cursor) {
-        step(function () {
-            cursor.insert('g', 'g', ~cursor.index, step())
+        async(function () {
+            cursor.insert('g', 'g', ~cursor.index, async())
         }, function () {
-            cursor.indexOf('d', step())
+            cursor.indexOf('d', async())
         }, function (index) {
-            cursor.remove(index, step())
+            cursor.remove(index, async())
         }, function () {
-            cursor.unlock(step())
+            cursor.unlock(async())
         }, function () {
-            gather(strata, step())
+            gather(strata, async())
         })
     }, function (records) {
         assert(records, [ 'a', 'b', 'c', 'e', 'f', 'g' ], 'records')
-        strata.balance(step())
+        strata.balance(async())
     }, function () {
-        gather(strata, step())
+        gather(strata, async())
     }, function (records) {
         assert(records, [ 'a', 'b', 'c', 'e', 'f', 'g' ], 'balanced')
-        vivify(tmp, step())
-        load(__dirname + '/fixtures/unsplittable.after.json', step())
+        vivify(tmp, async())
+        load(__dirname + '/fixtures/unsplittable.after.json', async())
     }, function (actual, expected) {
         assert(actual, expected, 'after')
-        strata.close(step())
+        strata.close(async())
     })
 })

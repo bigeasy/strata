@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (step, assert) {
+require('./proof')(1, function (async, assert) {
     var strata
-    step(function () {
-        serialize(__dirname + '/../basics/fixtures/get.json', tmp, step())
+    async(function () {
+        serialize(__dirname + '/../basics/fixtures/get.json', tmp, async())
     }, function () {
         strata = new Strata({
             directory: tmp,
@@ -11,17 +11,17 @@ require('./proof')(1, function (step, assert) {
             branchSize: 3,
             setImmediate: true
         })
-        strata.open(step())
+        strata.open(async())
     }, function () {
-        strata.iterator('a', step())
+        strata.iterator('a', async())
     }, function (cursor) {
-        step(function () {
-            cursor.get(cursor.offset, step())
+        async(function () {
+            cursor.get(cursor.offset, async())
         }, function (got) {
             assert(got, 'a', 'get')
-            cursor.unlock(step())
+            cursor.unlock(async())
         }, function () {
-            strata.close(step())
+            strata.close(async())
         })
     })
 })

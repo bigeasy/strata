@@ -2,32 +2,32 @@
 
 // Asserts that log replay will add and remove a record.
 
-require('./proof')(1, function (step, assert) {
+require('./proof')(1, function (async, assert) {
     var strata
-    step(function () {
+    async(function () {
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
-        strata.create(step())
+        strata.create(async())
     }, function () {
-        strata.mutator('a', step())
+        strata.mutator('a', async())
     }, function (cursor) {
-        step(function () {
-            cursor.insert('a', 'a', ~ cursor.index, step())
+        async(function () {
+            cursor.insert('a', 'a', ~ cursor.index, async())
         }, function (inserted) {
-            cursor.remove(0, step())
+            cursor.remove(0, async())
         }, function () {
-            cursor.unlock(step())
+            cursor.unlock(async())
         })
     }, function () {
-        gather(strata, step())
+        gather(strata, async())
     }, function (records) {
         assert(records, [], 'empty')
-        strata.close(step())
+        strata.close(async())
     }, function () {
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
-        strata.open(step())
+        strata.open(async())
     }, function () {
-        strata.iterator('a', step())
+        strata.iterator('a', async())
     }, function (cursor) {
-        cursor.unlock(step())
+        cursor.unlock(async())
     })
 })

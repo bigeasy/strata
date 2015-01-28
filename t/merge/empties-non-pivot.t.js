@@ -1,26 +1,26 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (step, assert) {
+require('./proof')(1, function (async, assert) {
     var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
-    step(function () {
-        serialize(__dirname + '/fixtures/empties-non-pivot.before.json', tmp, step())
+    async(function () {
+        serialize(__dirname + '/fixtures/empties-non-pivot.before.json', tmp, async())
     }, function () {
-        strata.open(step())
+        strata.open(async())
     }, function () {
-        strata.mutator('cr', step())
+        strata.mutator('cr', async())
     }, function (cursor) {
-        step(function () {
-            cursor.remove(cursor.index, step())
+        async(function () {
+            cursor.remove(cursor.index, async())
         }, function () {
-            cursor.unlock(step())
+            cursor.unlock(async())
         })
     }, function () {
-        strata.balance(step())
+        strata.balance(async())
     }, function () {
-        vivify(tmp, step())
-        load(__dirname + '/fixtures/empties-non-pivot.after.json', step())
+        vivify(tmp, async())
+        load(__dirname + '/fixtures/empties-non-pivot.after.json', async())
     }, function (actual, expected) {
         assert(actual, expected, 'after')
-        strata.close(step())
+        strata.close(async())
     })
 })

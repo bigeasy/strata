@@ -1,36 +1,36 @@
 #!/usr/bin/env node
 
-require('./proof')(4, function (step, assert) {
+require('./proof')(4, function (async, assert) {
     var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
-    step(function () {
-        serialize(__dirname + '/fixtures/merge.before.json', tmp, step())
+    async(function () {
+        serialize(__dirname + '/fixtures/merge.before.json', tmp, async())
     }, function () {
-        strata.open(step())
+        strata.open(async())
     }, function () {
-        strata.mutator('a', step())
+        strata.mutator('a', async())
     }, function (cursor) {
-        step(function () {
-            cursor.remove(cursor.index, step())
+        async(function () {
+            cursor.remove(cursor.index, async())
         }, function () {
             assert(cursor.index, 0, 'unghostable')
-            cursor.unlock(step())
+            cursor.unlock(async())
         })
     }, function () {
-        gather(strata, step())
+        gather(strata, async())
     }, function (records) {
         assert(records, [ 'b', 'c', 'd' ], 'records')
-        strata.balance(step())
+        strata.balance(async())
     }, function () {
-        gather(strata, step())
+        gather(strata, async())
     }, function (records) {
         assert(records, [ 'b', 'c', 'd' ], 'merged')
-        vivify(tmp, step())
-        load(__dirname + '/fixtures/left-most-unghostable.after.json', step())
+        vivify(tmp, async())
+        load(__dirname + '/fixtures/left-most-unghostable.after.json', async())
     }, function (actual, expected) {
         assert.say(expected)
         assert.say(actual)
 
         assert(actual, expected, 'after')
-        strata.close(step())
+        strata.close(async())
     })
 })

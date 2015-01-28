@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (step, assert) {
+require('./proof')(1, function (async, assert) {
     var strata
-    step(function () {
-        serialize(__dirname + '/fixtures/vivify.json', tmp, step())
+    async(function () {
+        serialize(__dirname + '/fixtures/vivify.json', tmp, async())
     }, function () {
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
-        strata.open(step())
+        strata.open(async())
     }, function () {
-        strata.vivify(step())
+        strata.vivify(async())
     }, function (result) {
         console.log(require('util').inspect(result, false, null))
         assert(result,

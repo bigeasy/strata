@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (step, assert) {
+require('./proof')(1, function (async, assert) {
     function forward (name) { return function () { return fs[name].apply(fs, arguments) } }
 
     var fs = require('fs'), path = require('path'), proxy = {}
@@ -19,17 +19,17 @@ require('./proof')(1, function (step, assert) {
     }
 
     var strata = new Strata({ directory: tmp, fs: proxy, leafSize: 3 })
-    step(function () {
-        serialize(__dirname + '/../basics/fixtures/split.before.json', tmp, step())
+    async(function () {
+        serialize(__dirname + '/../basics/fixtures/split.before.json', tmp, async())
     }, function () {
-        strata.open(step())
+        strata.open(async())
     }, function () {
-        insert(step, strata, [ 'b' ])
+        insert(async, strata, [ 'b' ])
     }, function () {
-        strata.close(step())
+        strata.close(async())
     }, function () {
-        vivify(tmp, step())
-        load(__dirname + '/fixtures/write.after.json', step())
+        vivify(tmp, async())
+        load(__dirname + '/fixtures/write.after.json', async())
     }, function (actual, expected) {
         assert.say(actual)
         assert.say(expected)

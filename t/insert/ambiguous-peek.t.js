@@ -1,36 +1,36 @@
 #!/usr/bin/env node
 
-require('./proof')(4, function (step, assert) {
+require('./proof')(4, function (async, assert) {
     var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
-    step(function () {
-        serialize(__dirname + '/fixtures/ambiguous.before.json', tmp, step())
+    async(function () {
+        serialize(__dirname + '/fixtures/ambiguous.before.json', tmp, async())
     }, function () {
-        strata.open(step())
+        strata.open(async())
     }, function () {
-        gather(strata, step())
+        gather(strata, async())
     }, function (records) {
         assert(records, [ 'a', 'd', 'f', 'g', 'h', 'i', 'l', 'm', 'n' ], 'records')
     }, function () {
-        strata.mutator('a', step())
+        strata.mutator('a', async())
     }, function (cursor) {
-        step(function () {
-            cursor.indexOf('b', step())
+        async(function () {
+            cursor.indexOf('b', async())
         }, function (index) {
             assert(~index <= cursor.length, 'unambiguous')
-            cursor.insert('b', 'b', ~index, step())
+            cursor.insert('b', 'b', ~index, async())
         }, function () {
-            cursor.indexOf('c', step())
+            cursor.indexOf('c', async())
         }, function (index) {
             assert(~index <= cursor.length, 'unambiguous cached')
-            cursor.insert('c', 'c', ~index, step())
+            cursor.insert('c', 'c', ~index, async())
         }, function (unambiguous) {
-            cursor.unlock(step())
+            cursor.unlock(async())
         }, function () {
-            gather(strata, step())
+            gather(strata, async())
         })
     }, function (records) {
         assert(records, [ 'a', 'b', 'c', 'd', 'f', 'g', 'h', 'i', 'l', 'm', 'n' ], 'records')
     }, function() {
-        strata.close(step())
+        strata.close(async())
     })
 })

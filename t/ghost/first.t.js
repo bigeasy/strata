@@ -1,28 +1,28 @@
 #!/usr/bin/env node
 
-require('./proof')(2, function (step, assert) {
+require('./proof')(2, function (async, assert) {
     var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
-    step(function () {
-        serialize(__dirname + '/fixtures/first.before.json', tmp, step())
+    async(function () {
+        serialize(__dirname + '/fixtures/first.before.json', tmp, async())
     }, function () {
-        strata.open(step())
+        strata.open(async())
     }, function () {
-        strata.mutator('a', step())
+        strata.mutator('a', async())
     }, function (cursor) {
-        step(function () {
-            cursor.remove(cursor.index, step())
+        async(function () {
+            cursor.remove(cursor.index, async())
         }, function () {
-            cursor.unlock(step())
+            cursor.unlock(async())
         })
     }, function () {
-        vivify(tmp, step())
-        load(__dirname + '/fixtures/first.after.json', step())
+        vivify(tmp, async())
+        load(__dirname + '/fixtures/first.after.json', async())
     }, function (actual, expected) {
         assert(actual, expected, 'after')
-        strata.vivify(step())
+        strata.vivify(async())
     }, function (result) {
         assert(result, [ { address: 1, children: [ 'b', 'c' ], ghosts: 0 } ], 'ghostbusters')
     }, function () {
-        strata.close(step())
+        strata.close(async())
     })
 })

@@ -1,24 +1,24 @@
 #!/usr/bin/env node
 
-require('./proof')(4, function (step, assert) {
+require('./proof')(4, function (async, assert) {
     var strata
-    step(function () {
+    async(function () {
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
-        strata.create(step())
+        strata.create(async())
     }, function () {
-        strata.mutator('a', step())
+        strata.mutator('a', async())
     }, function (cursor) {
         assert(cursor.exclusive, 'exclusive')
-        step(function () {
-            cursor.insert('a', 'a', ~ cursor.index, step())
+        async(function () {
+            cursor.insert('a', 'a', ~ cursor.index, async())
         }, function () {
-            cursor.unlock(step())
+            cursor.unlock(async())
         }, function () {
             assert(strata.size, 14, 'json size')
         })
     }, function () {
-        vivify(tmp, step())
-        load(__dirname + '/fixtures/insert.json', step())
+        vivify(tmp, async())
+        load(__dirname + '/fixtures/insert.json', async())
     }, function (actual, expected) {
         assert.say(expected)
         assert.say(actual)
@@ -30,6 +30,6 @@ require('./proof')(4, function (step, assert) {
         strata.purge(0)
         assert(strata.size, 0, 'purged')
 
-        strata.close(step())
+        strata.close(async())
     })
 })
