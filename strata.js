@@ -1590,60 +1590,14 @@ Sheaf.prototype.readFooter = function (entry) {
     }
 }
 
-prototype(Sheaf, 'findPositionsArray', cadence(function (step, page, fd, stat, read) {
-    var positions = [],
-        lengths = [],
-        bookmark
-    var buffer = new Buffer(this.options.readLeafStartLength || 1024)
-    step(function () {
-        read(buffer, Math.max(0, stat.size - buffer.length), step())
-    }, function (slice) {
-        for (var i = slice.length - 2; i != -1; i--) {
-            if (slice[i] == 0x0a) {
-                var footer = this.readFooter(this.readEntry(slice.slice(i + 1)))
-                ok(!footer.entry, 'footer is supposed to be zero')
-                bookmark = footer.bookmark
-                page.right = footer.right
-                page.position = footer.position
-                ok(page.position != null, 'no page position')
-                read(new Buffer(bookmark.length), bookmark.position, step())
-                return
-            }
-        }
-        throw new Error('cannot find footer in last ' + buffer.length + ' bytes')
-    }, function (slice) {
-        var positions = this.readEntry(slice.slice(0, bookmark.length)).header
-
-        page.entries = positions.shift()
-        ok(page.entries == bookmark.entry, 'position entry number incorrect')
-        ok(positions.shift() == 0, 'expected housekeeping type')
-
-        page.ghosts = positions.shift()
-
-        ok(!(positions.length % 2), 'expecting even number of positions and lengths')
-        var lengths = positions.splice(positions.length / 2)
-
-        this.splice('positions', page, 0, 0, positions)
-        this.splice('lengths', page, 0, 0, lengths)
-
-        page.bookmark = bookmark
-
-        return [ page, bookmark.position + bookmark.length ]
-    })
-}))
-
 prototype(Sheaf, 'readLeaf', cadence(function (step, page) {
     step(function () {
         this.io('read', this.filename(page.address), step())
     }, function (fd, stat, read) {
         step(function () {
-            if (true || this.options.replay) {
-                page.entries = 0
-                page.ghosts = 0
-                return [ page, 0 ]
-            } else {
-                this.findPositionsArray(page, fd, stat, read, step())
-            }
+            page.entries = 0
+            page.ghosts = 0
+            return [ page, 0 ]
         }, function (page, position) {
             this.replay(fd, stat, read, page, position, step())
         }, function () {
@@ -1692,7 +1646,7 @@ prototype(Sheaf, 'replay', cadence(function (step, fd, stat, read, page, positio
                                 page.ghosts++
                             } else if (index < 0) {
                                 var outgoing = this.splice('positions', page, -(index + 1), 1).shift()
-                                if (seen[outgoing]) this.uncacheEntry(page, outgoing)
+                                this.uncacheEntry(page, outgoing)
                                 this.splice('lengths', page, -(index + 1), 1)
                             } else {
                                 page.bookmark = {
@@ -1735,24 +1689,6 @@ prototype(Sheaf, 'replay', cadence(function (step, fd, stat, read, page, positio
                 return [ loop, page, footer ]
             }
         })(null, buffer, position)
-    })
-}))
-
-prototype(Sheaf, 'readRecord', cadence(function (step, page, position, length) {
-    step(function () {
-        this.io('read', this.filename(page.address), step())
-    }, function (fd, stat, read) {
-        step([function () {
-            // todo: test what happens when a finalizer throws an error
-            this.fs.close(fd, step())
-        }],function () {
-            this.tracer('readRecord', { page: page }, step())
-        }, function () {
-            read(new Buffer(length), position, step())
-        }, function (buffer) {
-            ok(buffer[length - 1] == 0x0A, 'newline expected')
-            return [ this.readEntry(buffer, false) ]
-        })
     })
 }))
 
@@ -1834,10 +1770,8 @@ Sheaf.prototype.splice = function (collection, page, offset, length, insert) {
 
     if (length) {
         removals = values.splice(offset, length)
-
         json = values.length == 0 ? '[' + removals.join(',') + ']'
-                                                            : ',' + removals.join(',')
-
+                                  : ',' + removals.join(',')
         this.heft(page, -json.length)
     } else {
         removals = []
@@ -1845,14 +1779,10 @@ Sheaf.prototype.splice = function (collection, page, offset, length, insert) {
 
     if (insert != null) {
         if (! Array.isArray(insert)) insert = [ insert ]
-        if (insert.length) {
-            json = values.length == 0 ? '[' + insert.join(',') + ']'
-                                                                : ',' + insert.join(',')
-
-            this.heft(page, json.length)
-
-            values.splice.apply(values, [ offset, 0 ].concat(insert))
-        }
+        json = values.length == 0 ? '[' + insert.join(',') + ']'
+                                  : ',' + insert.join(',')
+        this.heft(page, json.length)
+        values.splice.apply(values, [ offset, 0 ].concat(insert))
     }
     return removals
 }
@@ -1929,25 +1859,7 @@ prototype(Sheaf, 'stash', cadence(function (step, page, positionOrIndex, length)
         length = page.lengths[positionOrIndex]
     }
     ok(length)
-    var entry, loader
-    if (loader = page.loaders[position]) {
-        loader.share(step())
-    } else if (!(entry = page.cache[position])) {
-        loader = page.loaders[position] = this.sequester.createLock()
-        loader.exclude(function () {
-            this.readRecord(page, position, length, function (error, entry) {
-                delete page.loaders[position]
-                if (!error) {
-                    delete page.cache[position]
-                    var entry = this._cacheRecord(page, position, entry.body, entry.length)
-                }
-                loader.unlock(error, entry, length)
-            }.bind(this))
-        }.bind(this))
-        this.stash(page, position, length, step())
-    } else {
-        return [ entry, length ]
-    }
+    return [ page.cache[position], length ]
 }))
 
 prototype(Sheaf, '_find', cadence(function (step, page, key, low) {
