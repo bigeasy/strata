@@ -10,9 +10,9 @@ require('./proof')(2, function (step, assert) {
     }, function () {
         strata.mutator('h', step())
     }, function (cursor) {
-        assert(strata.size, 41, 'before purge')
+        assert(strata.size, 44, 'before purge')
         strata.purge(0)
-        assert(strata.size, 18, 'after purge')
+        assert(strata.size, 21, 'after purge')
         cursor.unlock(step())
     }, function() {
         strata.close(step())

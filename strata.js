@@ -1637,7 +1637,7 @@ prototype(Sheaf, 'readLeaf', cadence(function (step, page) {
         this.io('read', this.filename(page.address), step())
     }, function (fd, stat, read) {
         step(function () {
-            if (this.options.replay) {
+            if (true || this.options.replay) {
                 page.entries = 0
                 page.ghosts = 0
                 return [ page, 0 ]
