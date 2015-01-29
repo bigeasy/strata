@@ -337,47 +337,6 @@ function directivize (json) {
     return directory
 }
 
-function deltree (directory, callback) {
-    var files, count = -1
-
-    readdir()
-
-    function readdir () {
-        fs.readdir(directory, extant)
-    }
-
-    function extant (error, $1) {
-        if (error) {
-            if (error.code != 'ENOENT') callback(error)
-            else callback()
-        } else {
-            list($1)
-        }
-    }
-
-    function list ($1) {
-        (files = $1).forEach(function (file) {
-            stat(path.resolve(directory, file))
-        })
-        deleted()
-    }
-
-    function stat (file) {
-        var stat
-
-        fs.stat(file, check(callback, inspect))
-
-        function inspect ($1) {
-            if ((stat = $1).isDirectory()) deltree(file, check(callback, deleted))
-            else fs.unlink(file, check(callback, deleted))
-        }
-    }
-
-    function deleted () {
-        if (++count == files.length) fs.rmdir(directory, callback)
-    }
-}
-
 var invoke = cadence(function (async, tmp, assert, test) {
     async(function () {
         rimraf(tmp, async())
