@@ -923,8 +923,6 @@ prototype(Sheaf, 'exorcise', cadence(function (async, pivot, page, corporal) {
         entry = this.journal.leaf.open(this.filename(page.address), page.position, page)
         entry.ready(async())
     }, function () {
-        this.writePositions(entry, page, async())
-    }, function () {
     // todo: close on failure.
         entry.close('entry', async())
     }, function () {
@@ -1339,10 +1337,9 @@ function Sheaf (options) {
 }
 
 prototype(Sheaf, 'writeFooter', cadence(function (async, out, position, page) {
-    ok(page.address % 2 && page.bookmark != null)
     var header = [
-        0, page.bookmark.position, page.bookmark.length, page.bookmark.entry,
-        page.right || 0, page.position, page.entries, page.ghosts, page.positions.length - page.ghosts
+        0, page.right || 0, page.position, page.entries, page.ghosts,
+        page.positions.length - page.ghosts
     ]
     async(function () {
         this.writeEntry({
@@ -1352,7 +1349,7 @@ prototype(Sheaf, 'writeFooter', cadence(function (async, out, position, page) {
             type: 'footer'
         }, async())
     }, function (position, length) {
-        page.position = header[5] // todo: can't we use `position`?
+        page.position = position // todo: can't we use `position`?
         return [ position, length ]
     })
 }))
@@ -1469,10 +1466,6 @@ prototype(Sheaf, 'writeEntry', cadence(function (async, options) {
     ok(options.page.position != null, 'page has not been positioned: ' + options.page.position)
     ok(options.header.every(function (n) { return typeof n == 'number' }), 'header values must be numbers')
 
-    if (options.type == 'position') {
-        options.page.bookmark = { position: options.page.position }
-    }
-
     entry = options.header.slice()
     json = JSON.stringify(entry)
     var hash = this.checksum()
@@ -1506,11 +1499,6 @@ prototype(Sheaf, 'writeEntry', cadence(function (async, options) {
     }
     buffer[length - 1] = 0x0A
 
-    if (options.type == 'position') {
-        options.page.bookmark.length = length
-        options.page.bookmark.entry = entry[0]
-    }
-
     var position = options.page.position
 
     async(function () {
@@ -1523,12 +1511,12 @@ prototype(Sheaf, 'writeEntry', cadence(function (async, options) {
 
 prototype(Sheaf, 'writeInsert', function (out, page, index, record, callback) {
     var header = [ ++page.entries, index + 1 ]
-    this.writeEntry({ out: out, page: page, header: header, body: record }, callback)
+    this.writeEntry({ out: out, page: page, header: header, body: record, type: 'insert' }, callback)
 })
 
 prototype(Sheaf, 'writeDelete', function (out, page, index, callback) {
     var header = [ ++page.entries, -(index + 1) ]
-    this.writeEntry({ out: out, page: page, header: header }, callback)
+    this.writeEntry({ out: out, page: page, header: header, type: 'delete' }, callback)
 })
 
 prototype(Sheaf, 'io', cadence(function (async, direction, filename) {
@@ -1558,12 +1546,6 @@ prototype(Sheaf, 'io', cadence(function (async, direction, filename) {
     })
 }))
 
-prototype(Sheaf, 'writePositions', function (output, page, callback) {
-    var header = [ ++page.entries, 0, page.ghosts ]
-    header = header.concat(page.positions).concat(page.lengths)
-    this.writeEntry({ out: output, page: page, header: header, type: 'position' }, callback)
-})
-
 Sheaf.prototype.readHeader = function (entry) {
     var header = entry.header
     return {
@@ -1577,16 +1559,11 @@ Sheaf.prototype.readFooter = function (entry) {
     var footer = entry.header
     return {
         entry:      footer[0],
-        bookmark: {
-            position:   footer[1],
-            length:     footer[2],
-            entry:      footer[3]
-        },
-        right:      footer[4],
-        position:   footer[5],
-        entries:    footer[6],
-        ghosts:     footer[7],
-        records:    footer[8]
+        right:      footer[1],
+        position:   footer[2],
+        entries:    footer[3],
+        ghosts:     footer[4],
+        records:    footer[5]
     }
 }
 
@@ -1648,12 +1625,6 @@ prototype(Sheaf, 'replay', cadence(function (async, fd, stat, read, page, positi
                                 var outgoing = this.splice('positions', page, -(index + 1), 1).shift()
                                 this.uncacheEntry(page, outgoing)
                                 this.splice('lengths', page, -(index + 1), 1)
-                            } else {
-                                page.bookmark = {
-                                    position: position,
-                                    length: length,
-                                    entry: header.entry
-                                }
                             }
                         } else {
                             /* if (index > 0) { */
@@ -1711,8 +1682,6 @@ prototype(Sheaf, 'rewriteLeaf', cadence(function (async, page, suffix) {
         var lengths = this.splice('lengths', page, 0, page.lengths.length)
 
         async(function () {
-            this.writePositions(out, page, async())
-        }, function () {
             async(function (position) {
                 var length = lengths.shift()
                 async(function () {
@@ -1736,7 +1705,6 @@ prototype(Sheaf, 'rewriteLeaf', cadence(function (async, page, suffix) {
                 entry = cache[position]
                 this.encacheEntry(page, position, entry)
             }
-            this.writePositions(out, page, async())
         }
     }, function () {
         out.close('entry', async())

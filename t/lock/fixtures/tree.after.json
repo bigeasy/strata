@@ -4,29 +4,23 @@
     },
     "1": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "a" },
-            { "type": "add", "value": "b" },
-            { "type": "pos" }
+            { "type": "add", "value": "b" }
         ],
         "right": 5
     },
     "3": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "j" },
-            { "type": "add", "value": "k" },
-            { "type": "pos" }
+            { "type": "add", "value": "k" }
         ],
         "right": 7
     },
     "5": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "c" },
             { "type": "add", "value": "d" },
-            { "type": "add", "value": "f" },
-            { "type": "pos" }
+            { "type": "add", "value": "f" }
         ],
         "right": 3
     },
@@ -35,11 +29,9 @@
     },
     "7": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "l" },
             { "type": "add", "value": "m" },
-            { "type": "add", "value": "n" },
-            { "type": "pos" }
+            { "type": "add", "value": "n" }
         ]
     },
     "8": {

@@ -4,29 +4,23 @@
     },
     "1": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "a" },
-            { "type": "add", "value": "b" },
-            { "type": "pos" }
+            { "type": "add", "value": "b" }
         ],
         "right": 5
     },
     "3": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "f" },
             { "type": "add", "value": "g" },
-            { "type": "add", "value": "h" },
-            { "type": "pos" }
+            { "type": "add", "value": "h" }
         ]
     },
     "5": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "c" },
             { "type": "add", "value": "d" },
-            { "type": "add", "value": "e" },
-            { "type": "pos" }
+            { "type": "add", "value": "e" }
         ],
         "right": 3
     }

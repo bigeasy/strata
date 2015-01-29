@@ -14,7 +14,7 @@ require('./proof')(4, function (async, assert) {
         }, function () {
             cursor.unlock(async())
         }, function () {
-            assert(strata.size, 14, 'json size')
+            assert(strata.size, 13, 'json size')
         })
     }, function () {
         vivify(tmp, async())

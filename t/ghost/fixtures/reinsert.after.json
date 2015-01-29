@@ -4,21 +4,17 @@
     },
     "1": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "a" },
             { "type": "add", "value": "b" },
-            { "type": "add", "value": "c" },
-            { "type": "pos" }
+            { "type": "add", "value": "c" }
         ],
         "right": 3
     },
     "3": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "d" },
             { "type": "add", "value": "e" },
             { "type": "add", "value": "f" },
-            { "type": "pos" },
             { "type": "del", "index": 0 },
             { "type": "add", "value": "d" }
         ]

@@ -4,160 +4,128 @@
     },
     "1": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "aa" },
             { "type": "add", "value": "ab" },
-            { "type": "add", "value": "ac" },
-            { "type": "pos" }
+            { "type": "add", "value": "ac" }
         ],
         "right": 31
     },
     "3": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "cx" },
-            { "type": "add", "value": "cy" },
-            { "type": "pos" }
+            { "type": "add", "value": "cy" }
         ],
         "right": 63
     },
     "5": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "cu" },
             { "type": "add", "value": "cv" },
-            { "type": "add", "value": "cw" },
-            { "type": "pos" }
+            { "type": "add", "value": "cw" }
         ],
         "right": 3
     },
     "7": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "cr" },
             { "type": "add", "value": "cs" },
-            { "type": "add", "value": "ct" },
-            { "type": "pos" }
+            { "type": "add", "value": "ct" }
         ],
         "right": 5
     },
     "9": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "co" },
             { "type": "add", "value": "cp" },
-            { "type": "add", "value": "cq" },
-            { "type": "pos" }
+            { "type": "add", "value": "cq" }
         ],
         "right": 7
     },
     "11": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "cl" },
             { "type": "add", "value": "cm" },
-            { "type": "add", "value": "cn" },
-            { "type": "pos" }
+            { "type": "add", "value": "cn" }
         ],
         "right": 9
     },
     "13": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "ch" },
             { "type": "add", "value": "ci" },
-            { "type": "add", "value": "ck" },
-            { "type": "pos" }
+            { "type": "add", "value": "ck" }
         ],
         "right": 11
     },
     "15": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "ce" },
             { "type": "add", "value": "cf" },
-            { "type": "add", "value": "cg" },
-            { "type": "pos" }
+            { "type": "add", "value": "cg" }
         ],
         "right": 13
     },
     "17": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "cb" },
             { "type": "add", "value": "cc" },
-            { "type": "add", "value": "cd" },
-            { "type": "pos" }
+            { "type": "add", "value": "cd" }
         ],
         "right": 15
     },
     "19": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "by" },
             { "type": "add", "value": "bz" },
-            { "type": "add", "value": "ca" },
-            { "type": "pos" }
+            { "type": "add", "value": "ca" }
         ],
         "right": 17
     },
     "21": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "at" },
             { "type": "add", "value": "au" },
-            { "type": "add", "value": "av" },
-            { "type": "pos" }
+            { "type": "add", "value": "av" }
         ],
         "right": 19
     },
     "23": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "aq" },
             { "type": "add", "value": "ar" },
-            { "type": "add", "value": "as" },
-            { "type": "pos" }
+            { "type": "add", "value": "as" }
         ],
         "right": 21
     },
     "25": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "an" },
             { "type": "add", "value": "ao" },
-            { "type": "add", "value": "ap" },
-            { "type": "pos" }
+            { "type": "add", "value": "ap" }
         ],
         "right": 23
     },
     "27": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "ak" },
             { "type": "add", "value": "al" },
-            { "type": "add", "value": "am" },
-            { "type": "pos" }
+            { "type": "add", "value": "am" }
         ],
         "right": 25
     },
     "29": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "ag" },
             { "type": "add", "value": "ah" },
-            { "type": "add", "value": "ai" },
-            { "type": "pos" }
+            { "type": "add", "value": "ai" }
         ],
         "right": 27
     },
     "31": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "ad" },
             { "type": "add", "value": "ae" },
-            { "type": "add", "value": "af" },
-            { "type": "pos" }
+            { "type": "add", "value": "af" }
         ],
         "right": 29
     },
@@ -187,89 +155,71 @@
     },
     "47": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "dx" },
             { "type": "add", "value": "dy" },
-            { "type": "add", "value": "dz" },
-            { "type": "pos" }
+            { "type": "add", "value": "dz" }
         ]
     },
     "49": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "du" },
             { "type": "add", "value": "dv" },
-            { "type": "add", "value": "dw" },
-            { "type": "pos" }
+            { "type": "add", "value": "dw" }
         ],
         "right": 47
     },
     "51": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "dr" },
             { "type": "add", "value": "ds" },
-            { "type": "add", "value": "dt" },
-            { "type": "pos" }
+            { "type": "add", "value": "dt" }
         ],
         "right": 49
     },
     "53": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "do" },
             { "type": "add", "value": "dp" },
-            { "type": "add", "value": "dq" },
-            { "type": "pos" }
+            { "type": "add", "value": "dq" }
         ],
         "right": 51
     },
     "55": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "dl" },
             { "type": "add", "value": "dm" },
-            { "type": "add", "value": "dn" },
-            { "type": "pos" }
+            { "type": "add", "value": "dn" }
         ],
         "right": 53
     },
     "57": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "dh" },
             { "type": "add", "value": "di" },
-            { "type": "add", "value": "dk" },
-            { "type": "pos" }
+            { "type": "add", "value": "dk" }
         ],
         "right": 55
     },
     "59": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "de" },
             { "type": "add", "value": "df" },
-            { "type": "add", "value": "dg" },
-            { "type": "pos" }
+            { "type": "add", "value": "dg" }
         ],
         "right": 57
     },
     "61": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "db" },
             { "type": "add", "value": "dc" },
-            { "type": "add", "value": "dd" },
-            { "type": "pos" }
+            { "type": "add", "value": "dd" }
         ],
         "right": 59
     },
     "63": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "cz" },
-            { "type": "add", "value": "da" },
-            { "type": "pos" }
+            { "type": "add", "value": "da" }
         ],
         "right": 61
     },

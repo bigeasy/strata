@@ -4,19 +4,15 @@
     },
     "1": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "a" },
-            { "type": "add", "value": "b" },
-            { "type": "pos" }
+            { "type": "add", "value": "b" }
         ],
         "right": 3
     },
     "3": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "c" },
             { "type": "add", "value": "d" },
-            { "type": "pos" },
             { "type": "del", "index": 0 }
         ]
     }

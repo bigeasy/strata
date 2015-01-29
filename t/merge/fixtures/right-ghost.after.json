@@ -4,11 +4,9 @@
     },
     "1": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "a" },
             { "type": "add", "value": "b" },
-            { "type": "add", "value": "d" },
-            { "type": "pos" }
+            { "type": "add", "value": "d" }
         ]
     }
 }

@@ -4,7 +4,6 @@
     },
     "1": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "d" },
             { "type": "add", "value": "c" },
             { "type": "add", "value": "a" },

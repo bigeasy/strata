@@ -4,29 +4,23 @@
     },
     "1": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "a" },
-            { "type": "add", "value": "b" },
-            { "type": "pos" }
+            { "type": "add", "value": "b" }
         ],
         "right": 5
     },
     "3": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "e" },
             { "type": "add", "value": "f" },
-            { "type": "add", "value": "g" },
-            { "type": "pos" }
+            { "type": "add", "value": "g" }
         ],
         "right": 9
     },
     "5": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "c" },
-            { "type": "add", "value": "d" },
-            { "type": "pos" }
+            { "type": "add", "value": "d" }
         ],
         "right": 3
     },
@@ -35,19 +29,15 @@
     },
     "7": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "l" },
             { "type": "add", "value": "m" },
-            { "type": "add", "value": "n" },
-            { "type": "pos" }
+            { "type": "add", "value": "n" }
         ]
     },
     "9": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "j" },
-            { "type": "add", "value": "k" },
-            { "type": "pos" }
+            { "type": "add", "value": "k" }
         ],
         "right": 7
     },

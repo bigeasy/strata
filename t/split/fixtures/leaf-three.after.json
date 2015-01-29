@@ -4,30 +4,24 @@
     },
     "1": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "a" },
             { "type": "add", "value": "b" },
-            { "type": "add", "value": "c" },
-            { "type": "pos" }
+            { "type": "add", "value": "c" }
         ],
         "right": 5
     },
     "3": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "g" },
             { "type": "add", "value": "h" },
-            { "type": "add", "value": "i" },
-            { "type": "pos" }
+            { "type": "add", "value": "i" }
         ]
     },
     "5": {
         "log": [
-            { "type": "pos" },
             { "type": "add", "value": "d" },
             { "type": "add", "value": "e" },
-            { "type": "add", "value": "f" },
-            { "type": "pos" }
+            { "type": "add", "value": "f" }
         ],
         "right": 3
     }

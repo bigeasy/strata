@@ -31,6 +31,7 @@ function vivify (directory, callback) {
 
         fs.readFile(path.resolve(directory, file), 'utf8', check(callback, lines))
 
+
         function lines (lines) {
             lines = lines.split(/\n/)
             lines.pop()
@@ -154,7 +155,6 @@ function serialize (segments, directory, callback) {
 function abstracted (dir, lengths) {
     var output = {}
     var position = 0
-    var bookmark
 
     for (var file in dir) {
         var record
@@ -166,10 +166,7 @@ function abstracted (dir, lengths) {
                 if (json[0]) {
                     ok(index + 1 == json[0], 'entry record is wrong')
                     var length = lengths[file][index]
-                    if (json[1] == 0) {
-                        bookmark = { position: position, length: length, entry: index + 1 }
-                        record.log.push({ type: 'pos' })
-                    } else if (json[1] > 0) {
+                    if (json[1] > 0) {
                         record.log.push({ type: 'add', value: line.body })
                     } else {
                         record.log.push({ type: 'del', index: Math.abs(json[1]) - 1 })
@@ -177,11 +174,7 @@ function abstracted (dir, lengths) {
                     position += length
                 } else {
                     ok(index == dir[file].length - 1, 'footer not last entry')
-                    if (json[4]) record.right = Math.abs(json[4])
-                    if (json[1] != bookmark.position || json[2] != bookmark.length || json[3] != bookmark.entry) {
-                        console.log(require('util').inspect(dir, false, null), json, bookmark)
-                        throw new Error
-                    }
+                    if (json[1]) record.right = Math.abs(json[1])
                 }
             })
         } else {
@@ -286,15 +279,12 @@ function directivize (json) {
             var position = 0
             var order = []
             var records = 0
-            var bookmark
-            directory[address] = object.log.map(function (entry, count) {
+            directory[address] = object.log.filter(function (entry) {
+                return entry.type != 'pos'
+            }).map(function (entry, count) {
                 var record
                 var index
                 switch (entry.type) {
-                case 'pos':
-                    record = [ count + 1, 0, ghosts ]
-                    record = { header: record.concat(positions).concat(lengths) }
-                    break
                 case 'add':
                     records++
                     for (index = 0; index < order.length; index++) {
@@ -318,9 +308,6 @@ function directivize (json) {
                 var entire = length + String(length).length + 1
                 length = Math.max(entire, length + String(entire).length + 1)
                 switch (entry.type) {
-                case 'pos':
-                    bookmark = { position: position, length: length, entry: count + 1 }
-                    break
                 case 'add':
                     lengths.splice(index, 0, length)
                     break
@@ -329,7 +316,7 @@ function directivize (json) {
                 return record
             })
             directory[address].push({ header: [
-                0, bookmark.position, bookmark.length, bookmark.entry, object.right || 0, position, directory[address].length, ghosts, records
+                0, object.right || 0, position, directory[address].length, ghosts, records
             ]})
         }
     }
