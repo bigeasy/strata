@@ -3,6 +3,7 @@ var fs = require('fs'),
     crypto = require('crypto'),
     cadence = require('cadence'),
     Strata = require('..'),
+    rimraf = require('rimraf'),
     ok = require('assert').ok
 
 function check (callback, forward) {
@@ -379,7 +380,7 @@ function deltree (directory, callback) {
 
 var invoke = cadence(function (async, tmp, assert, test) {
     async(function () {
-        deltree(tmp, async())
+        rimraf(tmp, async())
     }, function () {
         fs.mkdir(tmp, 0755, async())
     }, function () {
@@ -399,7 +400,7 @@ var invoke = cadence(function (async, tmp, assert, test) {
         test(assert, async())
     }, function () {
         if (!('UNTIDY' in process.env)) {
-            deltree(tmp, async())
+            rimraf(tmp, async())
         }
     })
 })
