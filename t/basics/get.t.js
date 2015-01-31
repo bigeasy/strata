@@ -19,7 +19,7 @@ require('./proof')(9, function (async, assert) {
         }, function (record, key, size) {
             assert(record, 'a', 'get record')
             assert(key, 'a', 'get key')
-            assert(strata.size, 13, 'json size after read')
+            assert(strata.size, 54, 'json size after read')
             assert(size, 54, 'record size')
 
             cursor.unlock(async())

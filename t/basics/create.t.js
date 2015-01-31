@@ -8,7 +8,7 @@ require('./proof')(5, function (async, assert) {
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
         strata.create(async())
     }, function () {
-        assert(strata.size, 3, 'json size')
+        assert(strata.size, 0, 'total heft')
         strata.close(async())
     }, function () {
         assert(1, 'created')
