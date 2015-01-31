@@ -258,7 +258,7 @@ prototype(Cursor, 'insert', cadence(function (async, record, key, index) {
         }), async())
     })
 }))
-Error.stackTraceLimit = 20 // Infinity
+
 prototype(Cursor, 'remove', cadence(function (async, index) {
     var ghost = this._page.address != 1 && index == 0, entry
     this._sheaf.unbalanced(this._page)
