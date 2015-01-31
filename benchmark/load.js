@@ -80,17 +80,10 @@ var runner = cadence(function (async) {
                         return [ loop, records ]
                     })
                 } else {
-                    async(function () {
-                        async(function (index) {
-                            async(function () {
-                                cursor.get(index + cursor.offset, async())
-                            }, function (record) {
-                                records.push(record)
-                            })
-                        })(cursor.length - cursor.offset)
-                    }, function () {
-                        cursor.next(async())
-                    })
+                    for (var i = cursor.offset, I = cursor.length; i < I; i++) {
+                        records.push(cursor.get(i).record)
+                    }
+                    cursor.next(async())
                 }
             })(null, true)
         }, function () {

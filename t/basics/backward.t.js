@@ -12,23 +12,15 @@ require('./proof')(5, function (async, assert) {
     }, function (cursor) {
         assert(cursor.exclusive, 'exclusive')
         right = cursor.right
-        async(function () {
-            cursor.get(0, async())
-        }, function (got) {
-            assert(got, 'a', 'go left')
-            cursor.unlock(async())
-        })
+        assert(cursor.get(0).record, 'a', 'go left')
+        cursor.unlock(async())
     }, function () {
         strata.mutator(strata.leftOf('d'), async())
     }, function (cursor) {
         assert(cursor.address, right, 'address and right')
         assert(!cursor.exclusive, 'shared')
-        async(function () {
-            cursor.get(0, async())
-        }, function (got) {
-            assert(got, 'c', 'go left missing')
-            cursor.unlock(async())
-        })
+        assert(cursor.get(0).record, 'c', 'go left missing')
+        cursor.unlock(async())
     }, function () {
         strata.close(async())
     })

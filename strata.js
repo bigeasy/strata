@@ -132,14 +132,9 @@ function Cursor (sheaf, journal, descents, exclusive, searchKey) {
     descents.shift()
 }
 
-// to user land
-prototype(Cursor, 'get', cadence(function (async, index) {
-    async(function () {
-        this._sheaf.stash(this._page, index, async())
-    }, function (entry, size) {
-        return [ entry.record, entry.key, size ]
-    })
-}))
+Cursor.prototype.get = function (index) {
+    return this._page.items[index]
+}
 
 // to user land
 prototype(Cursor, 'next', cadence(function (async) {

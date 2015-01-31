@@ -10,12 +10,8 @@ require('./proof')(1, function (async, assert) {
     }, function () {
         strata.iterator(strata.key('a'), async())
     }, function (cursor) {
-        async(function () {
-            cursor.get(cursor.offset, async())
-        }, function (got) {
-            cursor.unlock(async())
-            assert(got, 'a', 'got')
-        })
+        assert(cursor.get(cursor.offset).record, 'a', 'got')
+        cursor.unlock(async())
     }, function () {
         strata.close(async())
     })

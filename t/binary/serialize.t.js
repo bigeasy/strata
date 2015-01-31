@@ -29,12 +29,8 @@ require('./proof')(1, function (async, assert) {
     }, function () {
         strata.iterator('a', async())
     }, function (cursor) {
-        async(function () {
-            cursor.get(cursor.index, async())
-        }, function (got) {
-            assert(got, 'a', 'inserted binary')
-            cursor.unlock(async())
-        })
+        assert(cursor.get(cursor.index).record, 'a', 'inserted binary')
+        cursor.unlock(async())
     }, function () {
         strata.close(async())
     })

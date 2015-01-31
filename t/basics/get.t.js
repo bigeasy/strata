@@ -15,12 +15,11 @@ require('./proof')(9, function (async, assert) {
             assert(! cursor.exclusive, 'shared')
             assert(cursor.index, 0, 'index')
             assert(cursor.offset, 0, 'offset')
-            cursor.get(cursor.offset, async())
-        }, function (record, key, size) {
-            assert(record, 'a', 'get record')
-            assert(key, 'a', 'get key')
+            var item = cursor.get(cursor.offset)
+            assert(item.record, 'a', 'get record')
+            assert(item.key, 'a', 'get key')
             assert(strata.size, 54, 'json size after read')
-            assert(size, 54, 'record size')
+            assert(item.heft, 54, 'record size')
 
             cursor.unlock(async())
         }, function () {

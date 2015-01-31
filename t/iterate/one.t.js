@@ -14,9 +14,7 @@ require('./proof')(5, function (async, assert) {
             assert(cursor.offset, 0, 'offset')
             assert(cursor.ghosts, 0, 'ghosts')
             assert(cursor.length, 1, 'length')
-            cursor.get(cursor.index, async())
-        }, function (record) {
-            assert(record, 'a', 'records')
+            assert(cursor.get(cursor.index).record, 'a', 'records')
             cursor.unlock(async())
         }, function () {
             strata.close(async())

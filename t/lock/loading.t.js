@@ -11,18 +11,10 @@ require('./proof')(2, function (async, assert) {
         strata.iterator('h', async())
         strata.iterator('h', async())
     }, function (first, second) {
-        async(function () {
-            first.get(first.offset, async())
-        }, function (value) {
-            assert(value, 'h', 'first')
-            first.unlock(async())
-        })
-        async(function () {
-            second.get(second.offset, async())
-        }, function (value) {
-            assert(value, 'h', 'second')
-            second.unlock(async())
-        })
+        assert(first.get(first.offset).record, 'h', 'first')
+        first.unlock(async())
+        assert(second.get(second.offset).record, 'h', 'second')
+        second.unlock(async())
     }, function() {
         strata.close(async())
     })

@@ -13,12 +13,10 @@ require('./proof')(5, function (async, assert) {
             assert(cursor.index, 0, 'found')
             assert(cursor.offset, 0, 'found')
             assert(cursor.length, 2, 'length')
-            cursor.get(cursor.index, async())
-        }, function (record) {
+            var record = cursor.get(cursor.index).record
             records.push(record)
             assert(cursor.index, 0, 'same index')
-            cursor.get(cursor.index + 1, async())
-        }, function (record) {
+            var record = cursor.get(cursor.index + 1).record
             records.push(record)
             assert(records, [ 'a', 'b' ], 'records')
             cursor.unlock(async())

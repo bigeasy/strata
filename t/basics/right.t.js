@@ -11,12 +11,8 @@ require('./proof')(2, function (async, assert) {
         strata.mutator(strata.right, async())
     }, function (cursor) {
         assert(cursor.exclusive, 'exclusive')
-        async(function () {
-            cursor.get(0, async())
-        }, function (got) {
-            assert(got, 'c', 'right')
-            cursor.unlock(async())
-        })
+        assert(cursor.get(0).record, 'c', 'right')
+        cursor.unlock(async())
     }, function () {
         strata.close(async())
     })
