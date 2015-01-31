@@ -163,7 +163,7 @@ prototype(Cursor, 'next', cadence(function (async) {
 // to user land
 prototype(Cursor, 'indexOf', cadence(function (async, key) {
     async(function () {
-        this._sheaf._find(this._page, key, this._page.ghosts, async())
+        return this._sheaf.find(this._page, key, this._page.ghosts)
     }, function (index) {
         var unambiguous
         unambiguous = -1 < index
@@ -355,7 +355,7 @@ prototype(Descent, 'upgrade', cadence(function (async) {
 
 Descent.prototype.key = function (key) {
     return function (callback) {
-        return this.sheaf._find(this.page, key, this.page.address % 2 ? this.page.ghosts : 1, callback)
+        callback(null, this.sheaf.find(this.page, key, this.page.address % 2 ? this.page.ghosts : 1))
     }
 }
 
@@ -1707,7 +1707,7 @@ prototype(Sheaf, 'stash', cadence(function (async, page, index) {
     return [ item, item.heft ]
 }))
 
-prototype(Sheaf, '_find', cadence(function (async, page, key, low) {
+Sheaf.prototype.find = function (page, key, low) {
     var mid, high = page.items.length - 1
 
     while (low <= high) {
@@ -1718,8 +1718,8 @@ prototype(Sheaf, '_find', cadence(function (async, page, key, low) {
         else return mid
     }
 
-    return [ ~low ]
-}))
+    return ~low
+}
 
 function Strata (options) {
     this.sheaf = new Sheaf(options)
