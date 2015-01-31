@@ -1,4 +1,5 @@
 /node_modules
+/benchmark/tmp
 /.proof.out
 /coverage
 /t/*/tmp
