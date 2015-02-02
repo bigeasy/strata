@@ -174,12 +174,10 @@ prototype(Cursor, 'indexOf', cadence(function (async, key) {
             if (!this._rightLeafKey) async(function () {
                 this._locker.lock(this._page.right, false, async())
             }, function (rightLeafPage) {
-                async(function () {
-                    this._sheaf.stash(rightLeafPage, 0, async())
-                }, [function () {
+                async([function () {
                     this._locker.unlock(rightLeafPage)
                 }], function (entry) {
-                    this._rightLeafKey = entry.key
+                    this._rightLeafKey = rightLeafPage.items[0].key
                 })
             })
         }, function  () {
@@ -434,11 +432,12 @@ prototype(Sheaf, '_nodify', cadence(function (async, locker, page) {
         async([function () {
             locker.unlock(page)
         }], function () {
+            var entry
             ok(page.address % 2, 'leaf page expected')
 
-            if (page.address == 1) return [{}]
-            else this.stash(page, 0, async())
-        }, function (entry) {
+            if (page.address == 1) entry = {}
+            else entry = page.items[0]
+
             var node = {
                 key: entry.key,
                 address: page.address,
@@ -1157,7 +1156,7 @@ prototype(Sheaf, 'chooseBranchesToMerge', cadence(function (async, key, address)
                 return [ choose ]
             }
         }, function () {
-            this.stash(designator.page, 0, async())
+            return designator.page.items[0]
         })
     }, function (entry) {
         this.mergeBranches(entry.key, entry.heft, choice.page.address, async())
@@ -1701,12 +1700,6 @@ Sheaf.prototype.createLocker = function () {
     return new Locker(this, this.magazine)
 }
 
-prototype(Sheaf, 'stash', cadence(function (async, page, index) {
-    ok(arguments.length != 4, 'check for old signature calls, todo: remove')
-    var item = page.items[index]
-    return [ item, item.heft ]
-}))
-
 Sheaf.prototype.find = function (page, key, low) {
     var mid, high = page.items.length - 1
 
@@ -1937,11 +1930,7 @@ prototype(Strata, 'vivify', cadence(function (async) {
                     pages[index].ghosts = page.ghosts
 
                     async(function (recordIndex) {
-                        async(function () {
-                            this.sheaf.stash(page, recordIndex, async())
-                        }, function (entry) {
-                            pages[index].children.push(entry.record)
-                        })
+                        pages[index].children.push(page.items[recordIndex].record)
                     })(page.items.length)
                 }, function () {
                     expand.call(this, parent, pages, index + 1, async())
