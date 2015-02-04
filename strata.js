@@ -1277,9 +1277,7 @@ function Sheaf (options) {
     this.directory = options.directory
     this.journal = {
         branch: new Journalist({ stage: 'entry' }).createJournal(),
-        leaf: new Journalist({
-            stage: 'entry'
-        }).createJournal()
+        leaf: new Journalist({ stage: 'entry' }).createJournal()
     }
     this.journalist = new Journalist({
         count: options.fileHandleCount || 64,
