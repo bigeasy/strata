@@ -7,6 +7,36 @@ var Cache = require('magazine'),
 
 require('cadence/loops')
 
+function Queue () {
+    this.buffers = []
+    this.buffer = new Buffer(4098)
+    this.offset = 0
+    this.length = 0
+}
+
+Queue.prototype.slice = function (size) {
+    if (size > this.buffer.length - this.offset) {
+        var buffer = this.buffer.slice(0, this.offset)
+        this.length += buffer.length
+        this.buffers.push(buffer)
+        this.buffer = new Buffer(Math.max(size, 4098))
+        this.offset = 0
+    }
+    var slice = this.buffer.slice(this.offset, this.offset + size)
+    this.offset += size
+    return slice
+}
+
+Queue.prototype.clear = function () {
+    this.buffers.length = 0
+    this.length = 0
+}
+
+Queue.prototype.finish = function (size) {
+    this.buffers.push(this.buffer.slice(0, this.offset))
+    this.buffer = null
+}
+
 // todo: temporary
 var scram = require('./scram')
 
@@ -265,6 +295,7 @@ prototype(Cursor, 'remove', cadence(function (async, index) {
     var ghost = this._page.address != 1 && index == 0, entry
     this._sheaf.unbalanced(this._page)
     async(function () {
+        // todo: do this at next, or unlock.
         this._sheaf.journalist.purge(async())
     }, function () {
         entry = this._journal.open(this._sheaf._filename(this._page.address, 0), this._page.position, this._page)
@@ -1395,6 +1426,47 @@ Sheaf.prototype.createLeaf = function (override) {
     }, override, 0)
 }
 
+Sheaf.prototype.writeEntry2 = function (options) {
+    var entry, buffer, json, line, length
+
+    ok(options.page.position != null, 'page has not been positioned: ' + options.page.position)
+    ok(options.header.every(function (n) { return typeof n == 'number' }), 'header values must be numbers')
+
+    entry = options.header.slice()
+    json = JSON.stringify(entry)
+    var hash = this.checksum()
+    hash.update(json)
+
+    length = 0
+
+    var separator = ''
+    if (options.body != null) {
+        var body = this.serialize(options.body, options.isKey)
+        separator = ' '
+        length += body.length
+        hash.update(body)
+    }
+
+    line = hash.digest('hex') + ' ' + json + separator
+
+    length += Buffer.byteLength(line, 'utf8') + 1
+
+    var entire = length + String(length).length + 1
+    if (entire < length + String(entire).length + 1) {
+        length = length + String(entire).length + 1
+    } else {
+        length = entire
+    }
+
+    buffer = options.queue.slice(length)
+
+    buffer.write(String(length) + ' ' + line)
+    if (options.body != null) {
+        body.copy(buffer, buffer.length - 1 - body.length)
+    }
+    buffer[length - 1] = 0x0A
+}
+
 prototype(Sheaf, 'writeEntry', cadence(function (async, options) {
     var entry, buffer, json, line, length
 
@@ -1442,6 +1514,9 @@ prototype(Sheaf, 'writeEntry', cadence(function (async, options) {
         options.page.position += length
         return [ position, length, body && body.length ]
     })
+}))
+
+prototype(Sheaf, 'write', cadence(function (async, out, queue) {
 }))
 
 prototype(Sheaf, 'writeInsert', function (out, page, index, record, callback) {
@@ -1678,6 +1753,8 @@ prototype(Sheaf, 'writeBranch', cadence(function (async, page, suffix) {
     ok(items[0].heft == 0, 'heft of first item must be zero')
     ok(items.slice(1).every(function (item) { return item.key != null }), 'null keys')
 
+    var queue = new Queue
+
     async(function () {
         page.entries = 0
         page.position = 0
@@ -1687,18 +1764,34 @@ prototype(Sheaf, 'writeBranch', cadence(function (async, page, suffix) {
     }, [function () {
         out.scram(async())
     }], function () {
-        async.forEach(function (item) {
-            var key = page.entries ? item.key : null
-            page.entries++
-            var header = [ page.entries, page.entries, item.address ]
-            this.writeEntry({
-                out: out,
-                page: page,
-                header: header,
-                body: key,
-                isKey: true
-            }, async())
-        })(page.items)
+        var i = 0, I = page.items.length
+        var loop = async(function (item) {
+            queue.clear()
+            for (; i < I && queue.buffers.length == 0; i++) {
+                var item = page.items[i]
+                var key = page.entries ? item.key : null
+                page.entries++
+                var header = [ page.entries, page.entries, item.address ]
+                this.writeEntry2({
+                    queue: queue,
+                    page: page,
+                    header: header,
+                    body: key,
+                    isKey: true
+                })
+            }
+            if (i == I) {
+                queue.finish()
+            }
+            page.position += queue.length
+            async.forEach(function (buffer) {
+                out.write(buffer, async())
+            })(queue.buffers)
+        }, function () {
+            if (i == I) {
+                return [ loop ]
+            }
+        })()
     }, function () {
         out.close('entry', async())
     })
@@ -1775,16 +1868,15 @@ prototype(Strata, 'create', cadence(function (async) {
 
         root = locker.encache(this.sheaf.createBranch({ penultimate: true }))
         leaf = locker.encache(this.sheaf.createLeaf({}))
-        this.sheaf.splice(root, 0, 0, { address: leaf.address, heft: 0 })
-
-        this.sheaf.writeBranch(root, '.replace', async())
     }, [function () {
         locker.unlock(root)
-    }], function () {
-        this.sheaf.rewriteLeaf(leaf, '.replace', async())
-    }, [function () {
         locker.unlock(leaf)
     }], function () {
+        this.sheaf.splice(root, 0, 0, { address: leaf.address, heft: 0 })
+        this.sheaf.writeBranch(root, '.replace', async())
+    }, function () {
+        this.sheaf.rewriteLeaf(leaf, '.replace', async())
+    }, function () {
         this.sheaf.replace(root, '.replace', async())
     }, function branchReplaced () {
         this.sheaf.replace(leaf, '.replace', async())
