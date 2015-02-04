@@ -356,14 +356,18 @@ prototype(Descent, 'upgrade', cadence(function (async) {
 }))
 
 Descent.prototype.key = function (key) {
-    return function (callback) {
-        callback(null, this.sheaf.find(this.page, key, this.page.address % 2 ? this.page.ghosts : 1))
+    return function () {
+        return this.sheaf.find(this.page, key, this.page.address % 2 ? this.page.ghosts : 1)
     }
 }
 
-Descent.prototype.left = function (callback) { callback(null, this.page.ghosts || 0) }
+Descent.prototype.left = function () {
+   return this.page.ghosts || 0
+}
 
-Descent.prototype.right = function (callback) { callback(null, this.page.items.length - 1) }
+Descent.prototype.right = function () {
+    return this.page.items.length - 1
+}
 
 Descent.prototype.found = function (keys) {
     return function () {
@@ -390,8 +394,6 @@ Descent.prototype.unlocker = function (parent) {
 }
 
 prototype(Descent, 'descend', cadence(function (async, next, stop) {
-    var above = this.page
-
     var loop = async(function () {
         if (stop.call(this)) {
             return [ loop, this.page, this.index ]
@@ -408,8 +410,7 @@ prototype(Descent, 'descend', cadence(function (async, next, stop) {
         this.depth++
         this.unlocker(this.page, locked)
         this.page = locked
-        next.call(this, async())
-    }, function (index) {
+        var index = next.call(this)
         if (!(this.page.address % 2) && index < 0) {
             this.index = (~index) - 1
         } else {
