@@ -33,9 +33,11 @@ Queue.prototype.clear = function () {
 }
 
 Queue.prototype.finish = function (size) {
-    var buffer = this.buffer.slice(0, this.offset)
-    this.buffers.push(buffer)
-    this.length += buffer.length
+    if (this.offset != 0) {
+        var buffer = this.buffer.slice(0, this.offset)
+        this.buffers.push(buffer)
+        this.length += buffer.length
+    }
     this.buffer = null
 }
 
@@ -231,6 +233,13 @@ prototype(Cursor, '_unlock', cadence(function (async) {
         this._locker.unlock(this._page)
         this._locker.dispose()
     }], function () {
+        if (this.queue) {
+            this.queue.finish()
+            if (this.queue.buffers.length) {
+                this._write(async())
+            }
+        }
+    }, function () {
         this._journal.close('leaf', async())
     }, function () {
         return []
@@ -260,29 +269,22 @@ Cursor.prototype.__defineGetter__('length', function () {
     return this._page.items.length
 })
 
-prototype(Cursor, 'insert', cadence(function (async, record, key, index) {
-    ok(this.exclusive, 'cursor is not exclusive')
-    ok(index > 0 || this._page.address == 1)
-
+prototype(Cursor, '_write', cadence(function (async) {
     var entry
-    this._sheaf.unbalanced(this._page)
     async(function () {
         entry = this._journal.open(this._sheaf._filename(this._page.address, 0), this._page.position, this._page)
         this._sheaf.journalist.purge(async())
     }, function () {
         entry.ready(async())
     }, function () {
+        this._page.position += this.queue.length
         scram.call(this, entry, cadence(function (async) {
             async(function () {
-                this._sheaf.writeInsert(entry, this._page, index, record, async())
-            }, function (position, length, size) {
-                this._sheaf.splice(this._page, index, 0, {
-                    key: key,
-                    record: record,
-                    heft: length
-                })
-                this.length = this._page.items.length
+                async.forEach(function (buffer) {
+                    entry.write(buffer, async())
+                })(this.queue.buffers)
             }, function () {
+                this.queue.clear()
                 async(function () {
                     entry.close('entry', async())
                 }, function () {
@@ -293,34 +295,48 @@ prototype(Cursor, 'insert', cadence(function (async, record, key, index) {
     })
 }))
 
+prototype(Cursor, 'insert', cadence(function (async, record, key, index) {
+    ok(this.exclusive, 'cursor is not exclusive')
+    ok(index > 0 || this._page.address == 1)
+
+    this._sheaf.unbalanced(this._page)
+
+    if (!this.queue) {
+        this.queue = new Queue
+    }
+
+    var length = this._sheaf.writeInsert(this.queue, this._page, index, record)
+    this._sheaf.splice(this._page, index, 0, {
+        key: key,
+        record: record,
+        heft: length
+    })
+    this.length = this._page.items.length
+
+    if (this.queue.buffers.length) {
+        this._write(async())
+    }
+}))
+
 prototype(Cursor, 'remove', cadence(function (async, index) {
     var ghost = this._page.address != 1 && index == 0, entry
     this._sheaf.unbalanced(this._page)
-    async(function () {
-        // todo: do this at next, or unlock.
-        this._sheaf.journalist.purge(async())
-    }, function () {
-        entry = this._journal.open(this._sheaf._filename(this._page.address, 0), this._page.position, this._page)
-        entry.ready(async())
-    }, function () {
-        scram.call(this, entry, cadence(function (async) {
-            async(function () {
-                this._sheaf.writeDelete(entry, this._page, index, async())
-            }, function () {
-                if (ghost) {
-                    this._page.ghosts++
-                    this.offset || this.offset++
-                } else {
-                    this._sheaf.splice(this._page, index, 1)
-                }
-            }, function () {
-                entry.close('entry', async())
-            })
-        }), async())
-    }, function () {
-        // todo: arity in delclaration.
-        return []
-    })
+
+    if (!this.queue) {
+        this.queue = new Queue
+    }
+
+    this._sheaf.writeDelete(this.queue, this._page, index)
+    if (ghost) {
+        this._page.ghosts++
+        this.offset || this.offset++
+    } else {
+        this._sheaf.splice(this._page, index, 1)
+    }
+
+    if (this.queue.buffers.length) {
+        this._write(async())
+    }
 }))
 
 function Descent (sheaf, locker, override) {
@@ -1428,7 +1444,7 @@ Sheaf.prototype.createLeaf = function (override) {
     }, override, 0)
 }
 
-Sheaf.prototype.writeEntry2 = function (options) {
+Sheaf.prototype.writeEntry = function (options) {
     var entry, buffer, json, line, length
 
     ok(options.page.position != null, 'page has not been positioned: ' + options.page.position)
@@ -1467,80 +1483,23 @@ Sheaf.prototype.writeEntry2 = function (options) {
         body.copy(buffer, buffer.length - 1 - body.length)
     }
     buffer[length - 1] = 0x0A
+
+    return length
 }
 
-prototype(Sheaf, 'writeEntry', cadence(function (async, options) {
-    var entry, buffer, json, line, length
-
-    ok(options.page.position != null, 'page has not been positioned: ' + options.page.position)
-    ok(options.header.every(function (n) { return typeof n == 'number' }), 'header values must be numbers')
-
-    entry = options.header.slice()
-    json = JSON.stringify(entry)
-    var hash = this.checksum()
-    hash.update(json)
-
-    length = 0
-
-    var separator = ''
-    if (options.body != null) {
-        var body = this.serialize(options.body, options.isKey)
-        separator = ' '
-        length += body.length
-        hash.update(body)
-    }
-
-    line = hash.digest('hex') + ' ' + json + separator
-
-    length += Buffer.byteLength(line, 'utf8') + 1
-
-    var entire = length + String(length).length + 1
-    if (entire < length + String(entire).length + 1) {
-        length = length + String(entire).length + 1
-    } else {
-        length = entire
-    }
-
-    buffer = new Buffer(length)
-    buffer.write(String(length) + ' ' + line)
-    if (options.body != null) {
-        body.copy(buffer, buffer.length - 1 - body.length)
-    }
-    buffer[length - 1] = 0x0A
-
-    var position = options.page.position
-
-    async(function () {
-        options.out.write(buffer, async())
-    }, function () {
-        options.page.position += length
-        return [ position, length, body && body.length ]
-    })
-}))
-
-prototype(Sheaf, 'writeInsert', function (out, page, index, record, callback) {
+Sheaf.prototype.writeInsert = function (queue, page, index, record) {
     var header = [ ++page.entries, index + 1 ]
-    this.writeEntry({ out: out, page: page, header: header, body: record, type: 'insert' }, callback)
-})
-
-Sheaf.prototype.writeInsert2 = function (queue, page, index, record) {
-    var header = [ ++page.entries, index + 1 ]
-    this.writeEntry2({ queue: queue, page: page, header: header, body: record, type: 'insert' })
+    return this.writeEntry({ queue: queue, page: page, header: header, body: record, type: 'insert' })
 }
 
-prototype(Sheaf, 'writeDelete', function (out, page, index, callback) {
+Sheaf.prototype.writeDelete = function (queue, page, index, callback) {
     var header = [ ++page.entries, -(index + 1) ]
-    this.writeEntry({ out: out, page: page, header: header, type: 'delete' }, callback)
-})
+    this.writeEntry({ queue: queue, page: page, header: header, type: 'delete' })
+}
 
-prototype(Sheaf, 'writeHeader', function (out, page, callback) {
+Sheaf.prototype.writeHeader = function (queue, page) {
     var header = [ 0, ++page.entries, page.right ]
-    this.writeEntry({ out: out, page: page, header: header, type: 'header' }, callback)
-})
-
-Sheaf.prototype.writeHeader2 = function (queue, page) {
-    var header = [ 0, ++page.entries, page.right ]
-    this.writeEntry2({ queue: queue, page: page, header: header, type: 'header' })
+    return this.writeEntry({ queue: queue, page: page, header: header, type: 'header' })
 }
 
 prototype(Sheaf, 'io', cadence(function (async, direction, filename) {
@@ -1705,11 +1664,11 @@ prototype(Sheaf, 'rewriteLeaf', cadence(function (async, page, suffix) {
 
         var i = 0, I = items.length
         var loop = async(function () {
-            this.writeHeader2(queue, page)
+            this.writeHeader(queue, page)
         }, function () {
             for (; i < I && queue.buffers.length == 0; i++) {
                 var item = items[i]
-                this.writeInsert2(queue, page, i, item.record)
+                this.writeInsert(queue, page, i, item.record)
                 this.splice(page, page.items.length, 0, item)
             }
             if (i == I) {
@@ -1793,7 +1752,7 @@ prototype(Sheaf, 'writeBranch', cadence(function (async, page, suffix) {
                 var key = page.entries ? item.key : null
                 page.entries++
                 var header = [ page.entries, page.entries, item.address ]
-                this.writeEntry2({
+                this.writeEntry({
                     queue: queue,
                     page: page,
                     header: header,
