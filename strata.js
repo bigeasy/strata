@@ -1315,7 +1315,7 @@ function Sheaf (options) {
     }
     this.journalist = new Journalist({
         count: options.fileHandleCount || 64,
-        stage: options.writeStage || 'entry',
+        stage: options.writeStage || 'leaf',
         cache: options.jouralistCache || new Cache()
     })
     this.cache = options.cache || (new Cache)
