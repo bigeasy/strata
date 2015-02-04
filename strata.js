@@ -33,7 +33,9 @@ Queue.prototype.clear = function () {
 }
 
 Queue.prototype.finish = function (size) {
-    this.buffers.push(this.buffer.slice(0, this.offset))
+    var buffer = this.buffer.slice(0, this.offset)
+    this.buffers.push(buffer)
+    this.length += buffer.length
     this.buffer = null
 }
 
@@ -1516,13 +1518,15 @@ prototype(Sheaf, 'writeEntry', cadence(function (async, options) {
     })
 }))
 
-prototype(Sheaf, 'write', cadence(function (async, out, queue) {
-}))
-
 prototype(Sheaf, 'writeInsert', function (out, page, index, record, callback) {
     var header = [ ++page.entries, index + 1 ]
     this.writeEntry({ out: out, page: page, header: header, body: record, type: 'insert' }, callback)
 })
+
+Sheaf.prototype.writeInsert2 = function (queue, page, index, record) {
+    var header = [ ++page.entries, index + 1 ]
+    this.writeEntry2({ queue: queue, page: page, header: header, body: record, type: 'insert' })
+}
 
 prototype(Sheaf, 'writeDelete', function (out, page, index, callback) {
     var header = [ ++page.entries, -(index + 1) ]
@@ -1533,6 +1537,11 @@ prototype(Sheaf, 'writeHeader', function (out, page, callback) {
     var header = [ 0, ++page.entries, page.right ]
     this.writeEntry({ out: out, page: page, header: header, type: 'header' }, callback)
 })
+
+Sheaf.prototype.writeHeader2 = function (queue, page) {
+    var header = [ 0, ++page.entries, page.right ]
+    this.writeEntry2({ queue: queue, page: page, header: header, type: 'header' })
+}
 
 prototype(Sheaf, 'io', cadence(function (async, direction, filename) {
     async(function () {
@@ -1692,17 +1701,29 @@ prototype(Sheaf, 'rewriteLeaf', cadence(function (async, page, suffix) {
 
         var items = this.splice(page, 0, page.items.length)
 
-        async(function () {
-            this.writeHeader(out, page, async())
+        var queue = new Queue
+
+        var i = 0, I = items.length
+        var loop = async(function () {
+            this.writeHeader2(queue, page)
         }, function () {
-            async.forEach(function (item) {
-                async(function () {
-                    this.writeInsert(out, page, index++, item.record, async())
-                }, function (position, length) {
-                    this.splice(page, page.items.length, 0, item)
-                })
-            })(items)
-        })
+            for (; i < I && queue.buffers.length == 0; i++) {
+                var item = items[i]
+                this.writeInsert2(queue, page, i, item.record)
+                this.splice(page, page.items.length, 0, item)
+            }
+            if (i == I) {
+                queue.finish()
+            }
+            page.position += queue.length
+            async.forEach(function (buffer) {
+                out.write(buffer, async())
+            })(queue.buffers)
+        }, function () {
+            if (i == I) {
+                return [ loop ]
+            }
+        })()
     }, function () {
         out.close('entry', async())
     })
