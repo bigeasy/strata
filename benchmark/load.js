@@ -10,7 +10,7 @@
 
 var advance = require('advance')
 var splice = require('splice')
-var cadence = require('cadence')
+var cadence = require('cadence/redux')
 var path = require('path')
 var crypto = require('crypto')
 var seedrandom = require('seedrandom')
@@ -42,7 +42,9 @@ var runner = cadence(function (async) {
     }, function () {
         strata.create(async())
     }, function () {
-        async(function () {
+        var batch = 0
+        var loop = async(function () {
+            if (batch++ == 7) return [ loop ]
             var entries = []
             var type, sha, buffer, value
             for (var i = 0; i < 1024; i++) {
@@ -62,7 +64,7 @@ var runner = cadence(function (async) {
             splice(function (incoming, existing) {
                 return incoming.record.type
             }, strata, iterator, async())
-        })(7)
+        })()
     }, function () {
         strata.close(async())
     }, function () {
@@ -85,7 +87,7 @@ var runner = cadence(function (async) {
                     }
                     cursor.next(async())
                 }
-            })(null, true)
+            })(true)
         }, function () {
             console.log('count', records.length)
             strata.close(async())
