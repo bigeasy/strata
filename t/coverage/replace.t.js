@@ -22,7 +22,7 @@ require('./proof')(1, function (async, assert) {
         insert(async, strata, [ 'b' ])
     }, [function () {
         strata.balance(async())
-    }, function (_, error) {
+    }, function (error) {
         assert(error.code, 'EACCES', 'unlink error')
     }])
 })

@@ -1,10 +1,12 @@
 var fs = require('fs'),
     path = require('path'),
     crypto = require('crypto'),
-    cadence = require('cadence'),
+    cadence = require('cadence/redux'),
     Strata = require('..'),
     rimraf = require('rimraf'),
     ok = require('assert').ok
+
+require('cadence/loops')
 
 function check (callback, forward) {
     return function (error, result) {
@@ -104,7 +106,7 @@ var gather = cadence(function (async, strata) {
                 }
                 cursor.next(async())
             }
-        })(null, true)
+        })(true)
     })
 })
 
@@ -450,9 +452,9 @@ function script (options, callback) {
 
     actions.remove = cadence(function (async, action) {
         var mutate, next
-        async(function () {
+        var loop = async(function () {
             if (action.values.length) strata.mutator(action.values[0], async())
-            else return [ async ]
+            else return [ loop ]
         }, function (cursor) {
             action.values.shift()
             async(function () {
@@ -572,7 +574,7 @@ function script (options, callback) {
                     break
                 }
             })
-            async(function (action) {
+            async.forEach(function (action) {
                 actions[action.type](action, async())
             }, function () {
                 setImmediate(async())

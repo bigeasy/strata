@@ -13,13 +13,16 @@ require('./proof')(3, function (async, assert) {
     }, function () {
         strata.mutator('a', async())
     }, function (cursor) {
-        var page
         var page = async(function () {
             cursor.indexOf('z', async())
         }, function (index) {
             ambiguity.unshift(cursor.length < ~index)
             if (ambiguity[0]) {
-                cursor.next(async(page(), 0))
+                async(function () {
+                    cursor.next(async())
+                }, function () {
+                    return [ page() ]
+                })
             } else {
                 async(function () {
                     cursor.insert('z', 'z', ~index, async())
@@ -28,7 +31,9 @@ require('./proof')(3, function (async, assert) {
                     cursor.unlock(async())
                 })
             }
-        })(1)
+        }, function () {
+            return [ page ]
+        })()
     }, function () {
         gather(strata, async())
     }, function (records) {

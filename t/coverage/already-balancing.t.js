@@ -19,7 +19,7 @@ require('./proof')(2, function (async, assert) {
         strata.balance(async())
         async([function () {
             strata.balance(async())
-        }, function (_, error) {
+        }, function (error) {
             assert(error.message, 'already balancing', 'error')
         }])
     }, function () {

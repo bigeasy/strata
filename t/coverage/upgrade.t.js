@@ -30,7 +30,7 @@ require('./proof')(1, function (async, assert) {
         })
     }, [function (records) {
         strata.balance(async())
-    }, function (_, error) {
+    }, function (error) {
         assert(error.message, 'bogus', 'caught')
     }], function(actual, expected) {
         strata.close(async())
