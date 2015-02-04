@@ -1224,24 +1224,19 @@ prototype(Sheaf, 'fillRoot', cadence(function (async) {
 }))
 
 function Sheaf (options) {
-    var writeFooter = function (out, position, page, callback) {
-        this.writeFooter(out, position, page, callback)
-    }.bind(this)
     this.fs = options.fs || require('fs')
     this.nextAddress = 0
     this.directory = options.directory
     this.journal = {
         branch: new Journalist({ stage: 'entry' }).createJournal(),
         leaf: new Journalist({
-            stage: 'entry',
-            closer: writeFooter
+            stage: 'entry'
         }).createJournal()
     }
     this.journalist = new Journalist({
         count: options.fileHandleCount || 64,
         stage: options.writeStage || 'entry',
-        cache: options.jouralistCache || (new Cache),
-        closer: writeFooter
+        cache: options.jouralistCache || new Cache()
     })
     this.cache = options.cache || (new Cache)
     this.options = options
@@ -1275,24 +1270,6 @@ function Sheaf (options) {
     })
     this.lengths = {}
 }
-
-prototype(Sheaf, 'writeFooter', cadence(function (async, out, position, page) {
-    var header = [
-        0, page.right || 0, page.position, page.entries, page.ghosts,
-        page.items.length - page.ghosts
-    ]
-    async(function () {
-        this.writeEntry({
-            out: out,
-            page: page,
-            header: header,
-            type: 'footer'
-        }, async())
-    }, function (position, length) {
-        page.position = position // todo: can't we use `position`?
-        return [ position, length ]
-    })
-}))
 
 Sheaf.prototype.readEntry = function (buffer, isKey) {
     for (var count = 2, i = 0, I = buffer.length; i < I && count; i++) {
@@ -1425,6 +1402,11 @@ prototype(Sheaf, 'writeDelete', function (out, page, index, callback) {
     this.writeEntry({ out: out, page: page, header: header, type: 'delete' }, callback)
 })
 
+prototype(Sheaf, 'writeHeader', function (out, page, callback) {
+    var header = [ 0, ++page.entries, page.right ]
+    this.writeEntry({ out: out, page: page, header: header, type: 'header' }, callback)
+})
+
 prototype(Sheaf, 'io', cadence(function (async, direction, filename) {
     async(function () {
         this.fs.open(filename, direction[0], async())
@@ -1499,6 +1481,7 @@ prototype(Sheaf, 'replay', cadence(function (async, fd, stat, read, page, positi
     async([function () {
         this.fs.close(fd, async())
     }], function () {
+        page.position = 0
         var loop = async(function (buffer, position) {
             read(buffer, position, async())
         }, function (slice, start) {
@@ -1513,9 +1496,10 @@ prototype(Sheaf, 'replay', cadence(function (async, fd, stat, read, page, positi
                     }
                     var position = start + offset
                     ok(length)
+                    page.position += length
                     var entry = this.readEntry(slice.slice(offset, offset + length), !leaf)
                     var header = this.readHeader(entry)
-                    if (header.entry) {
+                    if (entry.header[0]) {
                         ok(header.entry == ++page.entries, 'entry count is off')
                         var index = header.index
                         if (leaf) {
@@ -1533,26 +1517,18 @@ prototype(Sheaf, 'replay', cadence(function (async, fd, stat, read, page, positi
                                 this.splice(page, -(index + 1), 1)
                             }
                         } else {
-                            /* if (index > 0) { */
-                                var address = header.address, key = null, heft = 0
-                                if (index - 1) {
-                                    key = entry.body
-                                    heft = length
-                                }
-                                this.splice(page, index - 1, 0, {
-                                    key: key, address: address, heft: heft
-                                })
-                            /* } else {
-                                var cut = splice('addresses', page, ~index, 1)
-                                if (~index) {
-                                    uncacheEntry(page, cut[0])
-                                }
-                            } */
+                            var address = header.address, key = null, heft = 0
+                            if (index - 1) {
+                                key = entry.body
+                                heft = length
+                            }
+                            this.splice(page, index - 1, 0, {
+                                key: key, address: address, heft: heft
+                            })
                         }
                     } else {
-                        footer = this.readFooter(entry)
-                        page.position = position
-                        page.right = footer.right
+                        page.right = entry.header[2]
+                        page.entries++
                     }
                     i = offset = offset + length
                 }
@@ -1590,6 +1566,8 @@ prototype(Sheaf, 'rewriteLeaf', cadence(function (async, page, suffix) {
         var items = this.splice(page, 0, page.items.length)
 
         async(function () {
+            this.writeHeader(out, page, async())
+        }, function () {
             async(function (item) {
                 async(function () {
                     this.writeInsert(out, page, index++, item.record, async())
