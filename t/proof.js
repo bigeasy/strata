@@ -138,34 +138,32 @@ function serialize (segments, directory, callback) {
                 records.push(length + ' ' + record)
             })
             records = records.join('\n') + '\n'
-            fs.writeFile(path.resolve(directory, String(file)), records, 'utf8', check(callback, written))
+            fs.writeFile(path.resolve(directory, String(file) + '.0'), records, 'utf8', check(callback, written))
         })
 
         function written () { if (++count == files.length) callback(null) }
     }
 }
 
-function abstracted (dir, lengths) {
+function abstracted (dir) {
     var output = {}
     var position = 0
 
     for (var file in dir) {
+        var address = file.split('.').shift()
         var record
-        if (file % 2) {
+        if (address % 2) {
             record = { log: [] }
             position = 0
             dir[file].forEach(function (line, index) {
                 var json = line.header
-                console.log(json)
                 if (json[0]) {
                     ok(index + 1 == json[0], 'entry record is wrong')
-                    var length = lengths[file][index]
                     if (json[1] > 0) {
                         record.log.push({ type: 'add', value: line.body })
                     } else {
                         record.log.push({ type: 'del', index: Math.abs(json[1]) - 1 })
                     }
-                    position += length
                 } else {
                     ok(index == 0, 'header not first entry')
                     ok(json[1] == 1, 'header not first entry')
@@ -183,7 +181,7 @@ function abstracted (dir, lengths) {
             })
             record = { children: children }
         }
-        output[file] = record
+        output[address] = record
     }
 
     return output

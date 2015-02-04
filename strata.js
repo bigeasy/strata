@@ -231,7 +231,7 @@ prototype(Cursor, 'insert', cadence(function (async, record, key, index) {
     var entry
     this._sheaf.unbalanced(this._page)
     async(function () {
-        entry = this._journal.open(this._sheaf.filename(this._page.address), this._page.position, this._page)
+        entry = this._journal.open(this._sheaf._filename(this._page.address, 0), this._page.position, this._page)
         this._sheaf.journalist.purge(async())
     }, function () {
         entry.ready(async())
@@ -263,7 +263,7 @@ prototype(Cursor, 'remove', cadence(function (async, index) {
     async(function () {
         this._sheaf.journalist.purge(async())
     }, function () {
-        entry = this._journal.open(this._sheaf.filename(this._page.address), this._page.position, this._page)
+        entry = this._journal.open(this._sheaf._filename(this._page.address, 0), this._page.position, this._page)
         entry.ready(async())
     }, function () {
         scram.call(this, entry, cadence(function (async) {
@@ -718,7 +718,7 @@ prototype(Sheaf, 'splitLeaf', cadence(function (async, address, key, ghosts) {
         }, function () {
             this.tracer('splitLeafCommit', {}, async())
         }, function () {
-            this.rename(penultimate.page, '.pending', '.commit', async())
+            this._rename(penultimate.page, 0, '.pending', '.commit', async())
         }, function () {
             async(function (page) {
                 this.replace(page, '.replace', async())
@@ -796,7 +796,7 @@ prototype(Sheaf, 'splitBranch', cadence(function (async, address, key) {
         }, function () {
             this.writeBranch(parent.page, '.pending', async())
         }, function () {
-            this.rename(parent.page, '.pending', '.commit', async())
+            this._rename(parent.page, 0, '.pending', '.commit', async())
         }, function () {
             async(function (page) {
                 this.replace(page, '.replace', async())
@@ -859,7 +859,7 @@ prototype(Sheaf, 'drainRoot', cadence(function (async) {
         }, function () {
             this.writeBranch(root, '.pending', async())
         }, function () {
-            this.rename(root, '.pending', '.commit', async())
+            this._rename(root, 0, '.pending', '.commit', async())
         }, function () {
             async(function (page) {
                 this.replace(page, '.replace', async())
@@ -889,7 +889,7 @@ prototype(Sheaf, 'exorcise', cadence(function (async, pivot, page, corporal) {
     this.splice(pivot.page, pivot.index, 0, item)
 
     async(function () {
-        entry = this.journal.leaf.open(this.filename(page.address), page.position, page)
+        entry = this.journal.leaf.open(this._filename(page.address, 0), page.position, page)
         entry.ready(async())
     }, function () {
     // todo: close on failure.
@@ -1008,7 +1008,7 @@ prototype(Sheaf, 'mergePages', cadence(function (async, key, leftKey, stopper, m
         }, function (dirty) {
             if (!dirty) return [ async ]
         }, function () {
-            this.rename(pages.right.page, '', '.unlink', async())
+            this._rename(pages.right.page, 0, '', '.unlink', async())
         }, function () {
             var index = parents.right.indexes[ancestor.address]
 
@@ -1032,18 +1032,18 @@ prototype(Sheaf, 'mergePages', cadence(function (async, key, leftKey, stopper, m
             this.writeBranch(ancestor, '.pending', async())
         }, function () {
             async(function (page) {
-                this.rename(page, '', '.unlink', async())
+                this._rename(page, 0, '', '.unlink', async())
             })(singles.right.slice(1))
         }, function () {
-            this.rename(ancestor, '.pending', '.commit', async())
+            this._rename(ancestor, 0, '.pending', '.commit', async())
         }, function () {
             async(function (page) {
-                this.unlink(page, '.unlink', async())
+                this._unlink(page, 0, '.unlink', async())
             })(singles.right.slice(1))
         }, function () {
             this.replace(pages.left.page, '.replace', async())
         }, function () {
-            this.unlink(pages.right.page, '.unlink', async())
+            this._unlink(pages.right.page, 0, '.unlink', async())
         }, function () {
             this.replace(ancestor, '.commit', async())
         })
@@ -1213,11 +1213,11 @@ prototype(Sheaf, 'fillRoot', cadence(function (async) {
 
         this.writeBranch(root.page, '.pending', async())
     }, function () {
-        this.rename(child.page, '', '.unlink', async())
+        this._rename(child.page, 0, '', '.unlink', async())
     }, function () {
-        this.rename(root.page, '.pending', '.commit', async())
+        this._rename(root.page, 0, '.pending', '.commit', async())
     }, function () {
-        this.unlink(child.page, '.unlink', async())
+        this._unlink(child.page, 0, '.unlink', async())
     }, function () {
         this.replace(root.page, '.commit', async())
     })
@@ -1297,14 +1297,14 @@ Sheaf.prototype.readEntry = function (buffer, isKey) {
     return entry
 }
 
-Sheaf.prototype.filename = function (address, suffix) {
+Sheaf.prototype._filename = function (address, rotation, suffix) {
     suffix || (suffix = '')
-    return path.join(this.directory, address + suffix)
+    return path.join(this.directory, address + '.' + rotation + suffix)
 }
 
 prototype(Sheaf, 'replace', cadence(function (async, page, suffix) {
-    var replacement = this.filename(page.address, suffix),
-        permanent = this.filename(page.address)
+    var replacement = this._filename(page.address, 0, suffix),
+        permanent = this._filename(page.address, 0)
 
     async(function () {
         this.fs.stat(replacement, async())
@@ -1320,12 +1320,15 @@ prototype(Sheaf, 'replace', cadence(function (async, page, suffix) {
     })
 }))
 
-prototype(Sheaf, 'rename', function (page, from, to, callback) {
-    this.fs.rename(this.filename(page.address, from), this.filename(page.address, to), callback)
+prototype(Sheaf, '_rename', function (page, rotation, from, to, callback) {
+    this.fs.rename(
+        this._filename(page.address, rotation, from),
+        this._filename(page.address, rotation, to),
+        callback)
 })
 
-prototype(Sheaf, 'unlink', function (page, suffix, callback) {
-    this.fs.unlink(this.filename(page.address, suffix), callback)
+prototype(Sheaf, '_unlink', function (page, rotation, suffix, callback) {
+    this.fs.unlink(this._filename(page.address, rotation, suffix), callback)
 })
 
 Sheaf.prototype.heft = function (page, s) {
@@ -1457,7 +1460,7 @@ Sheaf.prototype.readFooter = function (entry) {
 
 prototype(Sheaf, 'readLeaf', cadence(function (async, page) {
     async(function () {
-        this.io('read', this.filename(page.address), async())
+        this.io('read', this._filename(page.address, 0), async())
     }, function (fd, stat, read) {
         async(function () {
             page.entries = 0
@@ -1552,7 +1555,7 @@ prototype(Sheaf, 'rewriteLeaf', cadence(function (async, page, suffix) {
     var index = 0, out
 
     async(function () {
-        out = this.journal.leaf.open(this.filename(page.address, suffix), 0, page)
+        out = this.journal.leaf.open(this._filename(page.address, 0, suffix), 0, page)
         out.ready(async())
     }, [function () {
         // todo: ensure that cadence finalizers are registered in order.
@@ -1630,7 +1633,7 @@ prototype(Sheaf, 'writeBranch', cadence(function (async, page, suffix) {
         page.entries = 0
         page.position = 0
 
-        out = this.journal.branch.open(this.filename(page.address, suffix), 0, page)
+        out = this.journal.branch.open(this._filename(page.address, 0, suffix), 0, page)
         out.ready(async())
     }, [function () {
         out.scram(async())
@@ -1654,7 +1657,7 @@ prototype(Sheaf, 'writeBranch', cadence(function (async, page, suffix) {
 
 prototype(Sheaf, 'readBranch', cadence(function (async, page) {
     async(function () {
-        this.io('read', this.filename(page.address), async())
+        this.io('read', this._filename(page.address, 0), async())
     }, function (fd, stat, read) {
         this.replay(fd, stat, read, page, 0, async())
     })
@@ -1757,8 +1760,8 @@ prototype(Strata, 'open', cadence(function (async) {
         this.sheaf.fs.readdir(this.sheaf.directory, async())
     }, function (files) {
         files.forEach(function (file) {
-            if (/^\d+$/.test(file)) {
-                this.sheaf.nextAddress = Math.max(+(file) + 1, this.sheaf.nextAddress)
+            if (/^\d+\.\d+$/.test(file)) {
+                this.sheaf.nextAddress = Math.max(+(file.split('.').shift()) + 1, this.sheaf.nextAddress)
             }
         }, this)
     })

@@ -8,7 +8,7 @@ require('./proof')(1, function (async, assert) {
     }, function () {
         strata.close(async())
     }, function () {
-        fs.readFile(path.join(tmp, '0'), 'utf8', async())
+        fs.readFile(path.join(tmp, '0.0'), 'utf8', async())
     }, function (body) {
         assert(+(body.split(/\n/)[0].split(/\s+/)[1]), 0, 'zero')
     })
