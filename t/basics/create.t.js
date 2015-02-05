@@ -17,7 +17,7 @@ function prove (async, assert) {
         vivify(tmp, async())
         load(__dirname + '/fixtures/create.after.json', async())
     }, function (actual, expected) {
-        assert.say(actual)
+        assert.say(actual[1])
         assert.say(expected)
 
         assert(actual, expected, 'written')

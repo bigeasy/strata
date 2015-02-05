@@ -159,7 +159,7 @@ function abstracted (dir) {
             position = 0
             dir[file].forEach(function (line, index) {
                 var json = line.header
-                if (json[0]) {
+                if (json[1]) {
                     ok(index + 1 == json[0], 'entry record is wrong')
                     if (json[1] > 0) {
                         record.log.push({ type: 'add', value: line.body })
@@ -168,7 +168,7 @@ function abstracted (dir) {
                     }
                 } else {
                     ok(index == 0, 'header not first entry')
-                    ok(json[1] == 1, 'header not first entry')
+                    ok(json[0] == 1, 'header not first entry')
                     if (json[2]) record.right = Math.abs(json[2])
                 }
             })
@@ -310,7 +310,7 @@ function directivize (json) {
                 position += length
                 return record
             })
-            directory[address].unshift({ header: [ 0, 1, object.right || 0 ]})
+            directory[address].unshift({ header: [ 1, 0, object.right || 0 ]})
         }
     }
 

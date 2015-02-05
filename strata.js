@@ -1498,7 +1498,7 @@ Sheaf.prototype.writeDelete = function (queue, page, index, callback) {
 }
 
 Sheaf.prototype.writeHeader = function (queue, page) {
-    var header = [ 0, ++page.entries, page.right ]
+    var header = [ ++page.entries, 0, page.right ]
     return this.writeEntry({ queue: queue, page: page, header: header, type: 'header' })
 }
 
@@ -1594,7 +1594,10 @@ prototype(Sheaf, 'replay', cadence(function (async, fd, stat, read, page, positi
                     page.position += length
                     var entry = this.readEntry(slice.slice(offset, offset + length), !leaf)
                     var header = this.readHeader(entry)
-                    if (entry.header[0]) {
+                    if (entry.header[1] == 0) {
+                        page.right = entry.header[2]
+                        page.entries++
+                    } else {
                         ok(header.entry == ++page.entries, 'entry count is off')
                         var index = header.index
                         if (leaf) {
@@ -1621,9 +1624,6 @@ prototype(Sheaf, 'replay', cadence(function (async, fd, stat, read, page, positi
                                 key: key, address: address, heft: heft
                             })
                         }
-                    } else {
-                        page.right = entry.header[2]
-                        page.entries++
                     }
                     i = offset = offset + length
                 }
