@@ -1453,7 +1453,7 @@ prototype(Sheaf, 'mergeBranches', function (key, heft, address, callback) {
 })
 
 prototype(Sheaf, 'fillRoot', cadence(function (async) {
-    var locker = this.createLocker(), descents = [], root, child
+    var locker = this.createLocker(), script = new Script(this), descents = [], root, child
 
     async([function () {
         descents.forEach(function (descent) { locker.unlock(descent.page) })
@@ -1475,15 +1475,9 @@ prototype(Sheaf, 'fillRoot', cadence(function (async) {
 
         this.splice(root.page, root.page.items.length, 0, cut)
 
-        this.writeBranch(root.page, this.filename2(root.page, '.pending'), async())
-    }, function () {
-        this._rename(child.page, 0, '', '.unlink', async())
-    }, function () {
-        this._rename(root.page, 0, '.pending', '.commit', async())
-    }, function () {
-        this._unlink(child.page, 0, '.unlink', async())
-    }, function () {
-        this.replace(root.page, '.commit', async())
+        script.writeBranch(root.page)
+        script.unlink(child.page)
+        script.commit(async())
     })
 }))
 
