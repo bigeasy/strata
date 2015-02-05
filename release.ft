@@ -14,6 +14,7 @@ The common utility functions are now exported globally. They may move into a uti
 
 ### Issue by Issue
 
+ * Use a `prove` named function in tests. #451.
  * Upgrade Splice to 0.0.11. #449.
  * Make default write stage leaf. #448.
  * Upgrade Journalist to 0.0.10. #447.

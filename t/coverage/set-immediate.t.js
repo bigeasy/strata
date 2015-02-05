@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (async, assert) {
+require('./proof')(1, prove)
+
+function prove (async, assert) {
     var strata
     async(function () {
         serialize(__dirname + '/../basics/fixtures/get.json', tmp, async())
@@ -18,4 +20,4 @@ require('./proof')(1, function (async, assert) {
         assert(cursor.get(cursor.offset).record, 'a', 'get')
         cursor.unlock(async())
     })
-})
+}

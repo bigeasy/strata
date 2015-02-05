@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (async, assert) {
+require('./proof')(1, prove)
+
+function prove (async, assert) {
     var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
     async(function () {
         serialize(__dirname + '/fixtures/left-singles.before.json', tmp, async())
@@ -40,4 +42,4 @@ require('./proof')(1, function (async, assert) {
     }, function () {
         strata.close(async())
     })
-})
+}

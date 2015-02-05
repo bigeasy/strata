@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
-require('./proof')(4, function (async, assert) {
+require('./proof')(4, prove)
+
+function prove (async, assert) {
     var strata
     async(function () {
         serialize(__dirname + '/fixtures/split.before.json', tmp, async())
@@ -37,4 +39,4 @@ require('./proof')(4, function (async, assert) {
 
         strata.close(async())
     })
-})
+}

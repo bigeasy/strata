@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
-require('./proof')(4, function (async, assert) {
+require('./proof')(4, prove)
+
+function prove (async, assert) {
     var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
     async(function () {
         serialize(__dirname + '/fixtures/merge.before.json', tmp, async())
@@ -33,4 +35,4 @@ require('./proof')(4, function (async, assert) {
         assert(actual, expected, 'after')
         strata.close(async())
     })
-})
+}

@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (async, assert) {
+require('./proof')(1, prove)
+
+function prove (async, assert) {
     var strata
     async(function () {
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
@@ -16,4 +18,4 @@ require('./proof')(1, function (async, assert) {
             strata.close(async())
         }
     })
-})
+}

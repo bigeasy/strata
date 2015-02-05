@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
-require('./proof')(2, function (async, assert) {
+require('./proof')(2, prove)
+
+function prove (async, assert) {
     var cadence = require('cadence'),
         strata, count = 0
 
@@ -62,4 +64,4 @@ require('./proof')(2, function (async, assert) {
         assert(actual, expected, 'split')
         strata.close(async())
     })
-})
+}

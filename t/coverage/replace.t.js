@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (async, assert) {
+require('./proof')(1, prove)
+
+function prove (async, assert) {
     function forward (name) {
         return function () { return fs[name].apply(fs, arguments) }
     }
@@ -25,4 +27,4 @@ require('./proof')(1, function (async, assert) {
     }, function (error) {
         assert(error.code, 'EACCES', 'unlink error')
     }])
-})
+}

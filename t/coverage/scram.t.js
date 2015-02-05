@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
-require('./proof')(2, function (async, assert) {
+require('./proof')(2, prove)
+
+function prove (async, assert) {
     var scram = require('../../scram'), entry = {
         scram: function (callback) {
             assert(1, 'called')
@@ -12,4 +14,4 @@ require('./proof')(2, function (async, assert) {
     }, function (error) {
         assert(error.message, 'abend', 'error thrown')
     })
-})
+}

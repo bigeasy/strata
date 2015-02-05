@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
-require('./proof')(2, function (async, assert) {
+require('./proof')(2, prove)
+
+function prove (async, assert) {
     var cadence = require('cadence'), strata, insert
 
     function tracer (type, object, callback) {
@@ -68,4 +70,4 @@ require('./proof')(2, function (async, assert) {
         assert(actual, expected, 'race right')
         strata.close(async())
     })
-})
+}

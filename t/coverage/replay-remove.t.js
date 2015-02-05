@@ -2,7 +2,9 @@
 
 // Asserts that log replay will add and remove a record.
 
-require('./proof')(1, function (async, assert) {
+require('./proof')(1, prove)
+
+function prove (async, assert) {
     var strata
     async(function () {
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
@@ -30,4 +32,4 @@ require('./proof')(1, function (async, assert) {
     }, function (cursor) {
         cursor.unlock(async())
     })
-})
+}

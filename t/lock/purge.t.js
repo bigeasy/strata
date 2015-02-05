@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
-require('./proof')(4, function (async, assert) {
+require('./proof')(4, prove)
+
+function prove (async, assert) {
     var strata, count = 0
 
     function tracer (type, object, callback) {
@@ -63,4 +65,4 @@ require('./proof')(4, function (async, assert) {
         assert(actual, expected, 'merge')
         strata.close(async())
     })
-})
+}

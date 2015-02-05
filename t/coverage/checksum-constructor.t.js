@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (async, assert) {
+require('./proof')(1, prove)
+
+function prove (async, assert) {
     var fs = require('fs'), crypto = require('crypto'), strata
     async(function () {
         fs.writeFile(tmp + '/.ignore', '', 'utf8', async())
@@ -25,4 +27,4 @@ require('./proof')(1, function (async, assert) {
     }, function () {
         strata.close(async())
     })
-})
+}

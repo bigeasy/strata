@@ -1,1 +1,1 @@
-require('../proof') (module, __dirname)
+require('../proof')(module, __dirname)

@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (async, assert) {
+require('./proof')(1, prove)
+
+function prove (async, assert) {
     var strata
     async(function () {
         serialize(__dirname + '/fixtures/vivify.json', tmp, async())
@@ -30,4 +32,4 @@ require('./proof')(1, function (async, assert) {
                  { address: 3, children: [ 'x', 'y', 'z' ], ghosts: 0 } ],
               key: 'r' } ], 'vivify')
     })
-})
+}

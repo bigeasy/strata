@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (async, assert) {
+require('./proof')(1, prove)
+
+function prove (async, assert) {
     function forward (name) { return function () { return fs[name].apply(fs, arguments) } }
 
     var fs = require('fs'), path = require('path'), proxy = {}
@@ -35,4 +37,4 @@ require('./proof')(1, function (async, assert) {
         assert.say(expected)
         assert(actual, expected, 'written')
     })
-})
+}

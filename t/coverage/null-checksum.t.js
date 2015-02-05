@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (async, assert) {
+require('./proof')(1, prove)
+
+function prove (async, assert) {
     var fs = require('fs'), path = require('path')
     var strata = new Strata({ directory: tmp, checksum: 'none' })
     async(function () {
@@ -12,4 +14,4 @@ require('./proof')(1, function (async, assert) {
     }, function (body) {
         assert(+(body.split(/\n/)[0].split(/\s+/)[1]), 0, 'zero')
     })
-})
+}

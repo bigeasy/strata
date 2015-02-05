@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
-require('./proof')(2, function (async, assert) {
+require('./proof')(2, prove)
+
+function prove (async, assert) {
     var strata
     async(function () {
         strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
@@ -14,4 +16,4 @@ require('./proof')(2, function (async, assert) {
         assert(strata.size, 0, 'json size')
         assert(strata.nextAddress, 2, 'next address')
     })
-})
+}

@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
-require('./proof')(2, function (async, assert) {
+require('./proof')(2, prove)
+
+function prove (async, assert) {
     var fs = require('fs'), strata
     async(function () {
         fs.writeFile(tmp + '/0.0', '6 x_x\n', 'utf8', async())
@@ -21,4 +23,4 @@ require('./proof')(2, function (async, assert) {
     }, function (error) {
         assert(error.message, 'corrupt line: invalid checksum', 'invalid checksum')
     }])
-})
+}

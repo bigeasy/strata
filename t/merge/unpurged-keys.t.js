@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
-require('./proof')(1, function (async, assert) {
+require('./proof')(1, prove)
+
+function prove (async, assert) {
     var path = require('path')
     script({
         file: path.join(__dirname, 'fixtures', 'unpurged-key.txt'),
@@ -8,4 +10,4 @@ require('./proof')(1, function (async, assert) {
         cadence: require('cadence'),
         assert: assert
     }, async())
-})
+}
