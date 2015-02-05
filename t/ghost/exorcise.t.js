@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(3, prove)
+require('./proof')(5, prove)
 
 function prove (async, assert) {
     var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
@@ -30,5 +30,18 @@ function prove (async, assert) {
     }, function (actual, expected) {
         assert(actual, expected, 'after')
         strata.close(async())
+    }, function () {
+        strata.open(async())
+    }, function () {
+        strata.iterator('a', async())
+    }, function (cursor) {
+        async(function () {
+            assert(cursor.right_, { key: 'd', address: 5 }, 'referring leaf updated')
+            cursor.next(async())
+        }, function () {
+            assert(cursor.get(0).key, 'd', 'key deleted')
+        }, function () {
+            cursor.unlock(async())
+        })
     })
 }

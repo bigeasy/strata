@@ -262,6 +262,10 @@ Cursor.prototype.__defineGetter__('right', function () {
     return this._page.right.address
 })
 
+Cursor.prototype.__defineGetter__('right_', function () {
+    return this._page.right
+})
+
 Cursor.prototype.__defineGetter__('ghosts', function () {
     return this._page.ghosts
 })
@@ -1746,7 +1750,7 @@ prototype(Sheaf, 'readLeaf', cadence(function (async, page) {
     }], function (fd, stat, read) {
         page.rotation = rotation++
         this.play(fd, stat, read, page, async())
-    })
+    })()
 }))
 
 prototype(Sheaf, 'play', cadence(function (async, fd, stat, read, page) {
@@ -1779,6 +1783,10 @@ prototype(Sheaf, 'play', cadence(function (async, fd, stat, read, page) {
                         page.right = {
                             address: entry.header[2],
                             key: entry.body || null
+                        }
+                        if (entry.header[3] == 0 && page.ghosts) {
+                            this.splice(page, 0, 1)
+                            page.ghosts = 0
                         }
                         page.entries++
                     } else {
