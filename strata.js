@@ -779,8 +779,6 @@ prototype(Sheaf, 'splitLeafAndUnlock', cadence(function (async, address, key, gh
     }, function () {
         this.writeBranch(penultimate.page, '.pending', async())
     }, function () {
-        this.tracer('splitLeafCommit', {}, async())
-    }, function () {
         this._rename(penultimate.page, 0, '.pending', '.commit', async())
     }, function () {
         async.forEach(function (page) {
