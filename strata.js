@@ -183,7 +183,7 @@ prototype(Cursor, 'next', cadence(function (async) {
     }
 
     async(function () {
-        this._locker.lock(this._page.right, this.exclusive, async())
+        this._locker.lock(this._page.right.address, this.exclusive, async())
     }, function (next) {
         this._locker.unlock(this._page)
 
@@ -204,11 +204,11 @@ prototype(Cursor, 'indexOf', cadence(function (async, key) {
         var unambiguous
         unambiguous = -1 < index
                    || ~ index < this._page.items.length
-                   || ! this._page.right
+                   || ! this._page.right.address
                    || this._searchKey.length && this._sheaf.comparator(this._searchKey[0], key) == 0
         if (!unambiguous) async(function () {
             if (!this._rightLeafKey) async(function () {
-                this._locker.lock(this._page.right, false, async())
+                this._locker.lock(this._page.right.address, false, async())
             }, function (rightLeafPage) {
                 async([function () {
                     this._locker.unlock(rightLeafPage)
@@ -258,7 +258,7 @@ Cursor.prototype.__defineGetter__('address', function () {
 })
 
 Cursor.prototype.__defineGetter__('right', function () {
-    return this._page.right
+    return this._page.right.address
 })
 
 Cursor.prototype.__defineGetter__('ghosts', function () {
@@ -494,7 +494,7 @@ prototype(Sheaf, '_node', cadence(function (async, locker, page) {
         var node = {
             key: entry.key,
             address: page.address,
-            rightAddress: page.right,
+            rightAddress: page.right.address,
             length: page.items.length - page.ghosts
         }
         this.ordered[node.address] = node
@@ -738,7 +738,6 @@ prototype(Sheaf, 'splitLeafAndUnlock', cadence(function (async, address, key, gh
             encached.push(page)
 
             page.right = right
-            right = page.address
 
             length = remainder-- > 0 ? records + 1 : records
             offset = split.items.length - length
@@ -758,6 +757,11 @@ prototype(Sheaf, 'splitLeafAndUnlock', cadence(function (async, address, key, gh
                 this.splice(page, page.items.length, 0, item)
 
                 index++
+            }
+
+            right = {
+                address: page.address,
+                key: page.items[0].key
             }
         }, function () {
             this.splice(split, offset, length)
@@ -1439,7 +1443,7 @@ Sheaf.prototype.createLeaf = function (override) {
         entries: 0,
         ghosts: 0,
         items: [],
-        right: 0,
+        right: { address: 0, key: null },
         queue: this.sequester.createQueue()
     }, override, 0)
 }
@@ -1498,8 +1502,10 @@ Sheaf.prototype.writeDelete = function (queue, page, index, callback) {
 }
 
 Sheaf.prototype.writeHeader = function (queue, page) {
-    var header = [ ++page.entries, 0, page.right ]
-    return this.writeEntry({ queue: queue, page: page, header: header, type: 'header' })
+    var header = [ ++page.entries, 0, page.right.address ]
+    return this.writeEntry({
+        queue: queue, page: page, header: header, isKey: true, body: page.right.key
+    })
 }
 
 prototype(Sheaf, 'io', cadence(function (async, direction, filename) {
@@ -1595,7 +1601,10 @@ prototype(Sheaf, 'replay', cadence(function (async, fd, stat, read, page, positi
                     var entry = this.readEntry(slice.slice(offset, offset + length), !leaf)
                     var header = this.readHeader(entry)
                     if (entry.header[1] == 0) {
-                        page.right = entry.header[2]
+                        page.right = {
+                            address: entry.header[2],
+                            key: entry.body || null
+                        }
                         page.entries++
                     } else {
                         ok(header.entry == ++page.entries, 'entry count is off')

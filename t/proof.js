@@ -310,7 +310,10 @@ function directivize (json) {
                 position += length
                 return record
             })
-            directory[address].unshift({ header: [ 1, 0, object.right || 0 ]})
+            directory[address].unshift({
+                header: [ 1, 0, object.right || 0 ],
+                body: object.right ? key(object.right) : null
+            })
         }
     }
 
