@@ -953,6 +953,7 @@ prototype(Sheaf, 'splitLeaf', cadence(function (async, address, key, ghosts) {
 
 prototype(Sheaf, 'splitBranchAndUnlock', cadence(function (async, address, key) {
     var locker = this.createLocker(),
+        script = new Script(this),
         descents = [],
         children = [],
         encached = [],
@@ -1003,21 +1004,13 @@ prototype(Sheaf, 'splitBranchAndUnlock', cadence(function (async, address, key) 
 
             this.splice(page, 0, 0, cut)
         }
-    }, function () {
+
         children.unshift(full.page)
-        async.forEach(function (page) {
-            this.writeBranch(page, this.filename2(page, '.replace'), async())
-        })(children)
-    }, function () {
-        this.writeBranch(parent.page, this.filename2(parent.page, '.pending'), async())
-    }, function () {
-        this._rename(parent.page, 0, '.pending', '.commit', async())
-    }, function () {
-        async.forEach(function (page) {
-            this.replace(page, '.replace', async())
-        })(children)
-    }, function () {
-        this.replace(parent.page, '.commit', async())
+        children.forEach(function (page) {
+            script.writeBranch(page)
+        })
+        script.writeBranch(parent.page)
+        script.commit(async())
     }, function () {
         return [ parent.page, key ]
     })
