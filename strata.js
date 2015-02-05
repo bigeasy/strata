@@ -2003,6 +2003,8 @@ prototype(Strata, 'create', cadence(function (async) {
 
     var locker = this.sheaf.createLocker(), count = 0, root, leaf, journal
 
+    var script = new Script(this.sheaf)
+
     async([function () {
         locker.dispose()
     }], function () {
@@ -2021,13 +2023,9 @@ prototype(Strata, 'create', cadence(function (async) {
         locker.unlock(leaf)
     }], function () {
         this.sheaf.splice(root, 0, 0, { address: leaf.address, heft: 0 })
-        this.sheaf.writeBranch(root, this.sheaf.filename2(root, '.replace'), async())
-    }, function () {
-        this.sheaf.rewriteLeaf(leaf, '.replace', async())
-    }, function () {
-        this.sheaf.replace(root, '.replace', async())
-    }, function branchReplaced () {
-        this.sheaf.replace(leaf, '.replace', async())
+        script.writeBranch(root)
+        script.rewriteLeaf(leaf)
+        script.commit(async())
     })
 }))
 
