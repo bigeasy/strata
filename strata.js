@@ -57,7 +57,10 @@ var __slice = [].slice
         console.log(require('util').inspect(args, false, null))
 }*/
 
-function compare (a, b) { return a < b ? -1 : a > b ? 1 : 0 }
+function compare (a, b) {
+    ok(a != null && b != null, 'null key')
+    return a < b ? -1 : a > b ? 1 : 0
+}
 
 function extract (a) { return a }
 
@@ -178,7 +181,7 @@ prototype(Cursor, 'next', cadence(function (async) {
     var next
     this._rightLeafKey = null
 
-    if (!this._page.right) {
+    if (this._page.right.address == 0) {
         // return [ async, false ] <- return immediately!
         return [ false ]
     }
@@ -1161,13 +1164,37 @@ prototype(Sheaf, 'deleteGhost', cadence(function (async, key) {
         }
         script.writeBranch(pivot.page)
         script.commit(async())
+    }, function () {
+        return [ leaf.page.items[0].key ]
     })
+}))
+
+prototype(Sheaf, 'referring', cadence(function (async, leftKey, descents, pivot, pages) {
+    var referring
+    console.log(leftKey)
+    if (leftKey != null && pages.referring == null) {
+        descents.push(referring = pages.referring = pivot.fork())
+        async(function () {
+            var key = referring.page.items[referring.index].key
+            if (this.comparator(leftKey, key) !== 0) {
+                referring.index--
+                referring.descend(referring.key(leftKey), referring.found([leftKey]), async())
+            }
+        }, function () {
+            var key = referring.page.items[referring.index].key
+            console.log([ leftKey, key, this.comparator(leftKey, key) ])
+            ok(this.comparator(leftKey, key) === 0, 'cannot find left key')
+            referring.index--
+            referring.descend(referring.right, referring.leaf, async())
+        })
+    }
 }))
 
 prototype(Sheaf, 'mergePagesAndUnlock', cadence(function (async, key, leftKey, stopper, merger, ghostly) {
     var locker = this.createLocker(),
         script = new Script(this),
-        descents = [], singles = { left: [], right: [] }, parents = {}, pages = {},
+        descents = [],
+        singles = { left: [], right: [] }, parents = {}, pages = {},
         ancestor, pivot, empties, ghosted, designation
 
     function createSingleUnlocker (singles) {
@@ -1191,9 +1218,11 @@ prototype(Sheaf, 'mergePagesAndUnlock', cadence(function (async, key, leftKey, s
     var merge = async([function () {
         descents.forEach(function (descent) { locker.unlock(descent.page) })
         ! [ 'left', 'right' ].forEach(function (direction) {
+            // todo: use `pages` array, these conditions are tricky,
+            // `parents[direction]` may not yet exist.
             if (singles[direction].length) {
                 singles[direction].forEach(function (page) { locker.unlock(page) })
-            } else {
+            } else if (parents[direction]) {
                 locker.unlock(parents[direction].page)
             }
         })
@@ -1209,12 +1238,16 @@ prototype(Sheaf, 'mergePagesAndUnlock', cadence(function (async, key, leftKey, s
             async(function () { // left above right
                 pivot.upgrade(async())
             }, function () {
+                this.referring(leftKey, descents, pivot, pages, async())
+            }, function () {
                 ghosted = { page: pivot.page, index: pivot.index }
                 descents.push(pivot = pivot.fork())
                 keys.pop()
                 pivot.descend(pivot.key(key), pivot.found(keys), async())
             })
         }
+    }, function () {
+        this.referring(leftKey, descents, pivot, pages, async())
     }, function () {
         parents.right = pivot.fork()
         parents.right.unlocker = createSingleUnlocker(singles.right)
@@ -1303,8 +1336,10 @@ prototype(Sheaf, 'mergeLeaves', function (key, leftKey, unbalanced, ghostly, cal
 
     var merger = cadence(function (async, script, leaves, ghosted) {
         ok(leftKey == null ||
-           this.comparator(leftKey, leaves.left.page.items[0].key)  == 0,
+           this.comparator(leftKey, leaves.left.page.items[0].key) == 0,
            'left key is not as expected')
+        ok(leftKey == null || leaves.referring != null, 'no referring page')
+        ok(leftKey != null || leaves.referring == null, 'referring page when leftmost')
 
         var left = (leaves.left.page.items.length - leaves.left.page.ghosts)
         var right = (leaves.right.page.items.length - leaves.right.page.ghosts)
@@ -1342,7 +1377,10 @@ prototype(Sheaf, 'mergeLeaves', function (key, leftKey, unbalanced, ghostly, cal
                 })()
             }, function () {
                 this.splice(leaves.right.page, 0, leaves.right.page.items.length)
-
+                if (leftKey) {
+                    leaves.referring.page.right.key = leaves.left.page.items[0].key
+                    script.rotate(leaves.referring.page)
+                }
                 script.rewriteLeaf(leaves.left.page)
             }, function () {
                 return [ true ]
