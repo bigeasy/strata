@@ -14,9 +14,7 @@ function prove (async, assert) {
         async(function () {
             cursor.insert('g', 'g', ~cursor.index, async())
         }, function () {
-            cursor.indexOf('d', async())
-        }, function (index) {
-            cursor.remove(index, async())
+            cursor.remove(cursor._indexOf('d'), async())
         }, function () {
             cursor.unlock(async())
         }, function () {

@@ -12,13 +12,9 @@ function prove (async, assert) {
         strata.mutator('h', async())
     }, function (cursor) {
         async(function () {
-            cursor.indexOf('h', async())
-        }, function (index) {
-            cursor.remove(index, async())
+            cursor.remove(cursor._indexOf('h'), async())
         }, function () {
-            cursor.indexOf('i', async())
-        }, function (index) {
-            cursor.remove(index, async())
+            cursor.remove(cursor._indexOf('i'), async())
         }, function () {
             cursor.unlock(async())
         })
@@ -26,13 +22,9 @@ function prove (async, assert) {
         strata.mutator('e', async())
     }, function (cursor) {
         async(function () {
-            cursor.indexOf('e', async())
-        }, function (index) {
-            cursor.remove(index, async())
+            cursor.remove(cursor._indexOf('e'), async())
         }, function () {
-            cursor.indexOf('g', async())
-        }, function (index) {
-            cursor.remove(index, async())
+            cursor.remove(cursor._indexOf('g'), async())
         }, function () {
             cursor.unlock(async())
         })
@@ -40,13 +32,9 @@ function prove (async, assert) {
         strata.mutator('m', async())
     }, function (cursor) {
         async(function () {
-            cursor.indexOf('m', async())
-        }, function (index) {
-            cursor.remove(index, async())
+            cursor.remove(cursor._indexOf('m'), async())
         }, function () {
-            cursor.indexOf('n', async())
-        }, function (index) {
-            cursor.remove(index, async())
+            cursor.remove(cursor._indexOf('n'), async())
         }, function () {
             cursor.unlock(async())
         })

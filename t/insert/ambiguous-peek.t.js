@@ -16,13 +16,11 @@ function prove (async, assert) {
         strata.mutator('a', async())
     }, function (cursor) {
         async(function () {
-            cursor.indexOf('b', async())
-        }, function (index) {
+            var index = cursor._indexOf('b')
             assert(~index <= cursor.length, 'unambiguous')
             cursor.insert('b', 'b', ~index, async())
         }, function () {
-            cursor.indexOf('c', async())
-        }, function (index) {
+            var index = cursor._indexOf('c')
             assert(~index <= cursor.length, 'unambiguous cached')
             cursor.insert('c', 'c', ~index, async())
         }, function (unambiguous) {

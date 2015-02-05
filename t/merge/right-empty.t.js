@@ -12,13 +12,9 @@ function prove (async, assert) {
         strata.mutator('c', async())
     }, function (cursor) {
         async(function () {
-            cursor.indexOf('c', async())
-        }, function (index) {
-            cursor.remove(index, async())
+            cursor.remove(cursor._indexOf('c'), async())
         }, function () {
-            cursor.indexOf('d', async())
-        }, function (index) {
-            cursor.remove(index, async())
+            cursor.remove(cursor._indexOf('d'), async())
         }, function () {
             cursor.unlock(async())
         })

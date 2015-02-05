@@ -201,34 +201,18 @@ prototype(Cursor, 'next', cadence(function (async) {
 }))
 
 // to user land
-prototype(Cursor, 'indexOf', cadence(function (async, key) {
-    async(function () {
-        return this._sheaf.find(this._page, key, this._page.ghosts)
-    }, function (index) {
-        var unambiguous
-        unambiguous = -1 < index
-                   || ~ index < this._page.items.length
-                   || ! this._page.right.address
-                   || this._searchKey.length && this._sheaf.comparator(this._searchKey[0], key) == 0
-        if (!unambiguous) async(function () {
-            if (!this._rightLeafKey) async(function () {
-                this._locker.lock(this._page.right.address, false, async())
-            }, function (rightLeafPage) {
-                async([function () {
-                    this._locker.unlock(rightLeafPage)
-                }], function (entry) {
-                    this._rightLeafKey = rightLeafPage.items[0].key
-                })
-            })
-        }, function  () {
-            if (this._sheaf.comparator(key, this._rightLeafKey) >= 0) {
-                return [ ~(this._page.items.length + 1) ]
-            } else {
-                return index
-            }
-        })
-    })
-}))
+Cursor.prototype._indexOf = function (key) {
+    var page = this._page
+    var index = this._sheaf.find(page, key, page.ghosts)
+    var unambiguous
+    unambiguous = -1 < index // <- todo: ?
+               || ~ index < this._page.items.length
+               || page.right.address == 0
+    if (!unambiguous && this._sheaf.comparator(key, page.right.key) >= 0) {
+        return [ ~(this._page.items.length + 1) ]
+    }
+    return index
+}
 
 // todo: pass an integer as the first argument to force the arity of the
 // return.
@@ -1171,7 +1155,6 @@ prototype(Sheaf, 'deleteGhost', cadence(function (async, key) {
 
 prototype(Sheaf, 'referring', cadence(function (async, leftKey, descents, pivot, pages) {
     var referring
-    console.log(leftKey)
     if (leftKey != null && pages.referring == null) {
         descents.push(referring = pages.referring = pivot.fork())
         async(function () {
@@ -1182,7 +1165,6 @@ prototype(Sheaf, 'referring', cadence(function (async, leftKey, descents, pivot,
             }
         }, function () {
             var key = referring.page.items[referring.index].key
-            console.log([ leftKey, key, this.comparator(leftKey, key) ])
             ok(this.comparator(leftKey, key) === 0, 'cannot find left key')
             referring.index--
             referring.descend(referring.right, referring.leaf, async())

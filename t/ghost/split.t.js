@@ -14,13 +14,11 @@ function prove (async, assert) {
         async(function () {
             cursor.remove(cursor.index, async())
         }, function () {
-            cursor.indexOf('g', async())
         }, function (index) {
-            cursor.insert('g', 'g', ~index, async())
+            cursor.insert('g', 'g', ~cursor._indexOf('g'), async())
         }, function () {
-            cursor.indexOf('h', async())
         }, function (index) {
-            cursor.insert('h', 'h', ~index, async())
+            cursor.insert('h', 'h', ~cursor._indexOf('h'), async())
         }, function () {
             cursor.unlock(async())
         }, function () {
