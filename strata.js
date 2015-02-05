@@ -1180,6 +1180,7 @@ prototype(Sheaf, 'deleteGhost', cadence(function (async, key) {
 
 prototype(Sheaf, 'mergePagesAndUnlock', cadence(function (async, key, leftKey, stopper, merger, ghostly) {
     var locker = this.createLocker(),
+        script = new Script(this),
         descents = [], singles = { left: [], right: [] }, parents = {}, pages = {},
         ancestor, pivot, empties, ghosted, designation
 
@@ -1261,11 +1262,9 @@ prototype(Sheaf, 'mergePagesAndUnlock', cadence(function (async, key, leftKey, s
         descents.push(pages.right = parents.right.fork())
         pages.right.descend(pages.right.left, pages.right.level(parents.right.depth + 1), async())
     }, function () {
-        merger.call(this, pages, ghosted, async())
+        merger.call(this, script, pages, ghosted, async())
     }, function (dirty) {
         if (!dirty) return [ merge, false ]
-    }, function () {
-        this._rename(pages.right.page, 0, '', '.unlink', async())
     }, function () {
         var index = parents.right.indexes[ancestor.address]
 
@@ -1286,23 +1285,12 @@ prototype(Sheaf, 'mergePagesAndUnlock', cadence(function (async, key, leftKey, s
             ok(index, 'expected ancestor to be non-zero')
         }
 
-        this.writeBranch(ancestor, this.filename2(ancestor, '.pending'), async())
-    }, function () {
-        async.forEach(function (page) {
-            this._rename(page, 0, '', '.unlink', async())
-        })(singles.right.slice(1))
-    }, function () {
-        this._rename(ancestor, 0, '.pending', '.commit', async())
-    }, function () {
-        async.forEach(function (page) {
-            this._unlink(page, 0, '.unlink', async())
-        })(singles.right.slice(1))
-    }, function () {
-        this.replace(pages.left.page, '.replace', async())
-    }, function () {
-        this._unlink(pages.right.page, 0, '.unlink', async())
-    }, function () {
-        this.replace(ancestor, '.commit', async())
+        script.unlink(pages.right.page)
+        script.writeBranch(ancestor)
+        singles.right.slice(1).forEach(function (page) {
+            script.unlink(page)
+        })
+        script.commit(async())
     }, function () {
         return [ merge, true, ancestor, designation.key ]
     })()
@@ -1327,7 +1315,7 @@ prototype(Sheaf, 'mergePages', cadence(function (async, key, leftKey, stopper, m
 prototype(Sheaf, 'mergeLeaves', function (key, leftKey, unbalanced, ghostly, callback) {
     function stopper (descent) { return descent.penultimate }
 
-    var merger = cadence(function (async, leaves, ghosted) {
+    var merger = cadence(function (async, script, leaves, ghosted) {
         ok(leftKey == null ||
            this.comparator(leftKey, leaves.left.page.items[0].key)  == 0,
            'left key is not as expected')
@@ -1369,7 +1357,7 @@ prototype(Sheaf, 'mergeLeaves', function (key, leftKey, unbalanced, ghostly, cal
             }, function () {
                 this.splice(leaves.right.page, 0, leaves.right.page.items.length)
 
-                this.rewriteLeaf(leaves.left.page, '.replace', async())
+                script.rewriteLeaf(leaves.left.page)
             }, function () {
                 return [ true ]
             })
@@ -1446,7 +1434,7 @@ prototype(Sheaf, 'mergeBranches', function (key, heft, address, callback) {
         return descent.child(address)
     }
 
-    var merger = cadence(function (async, pages, ghosted) {
+    var merger = cadence(function (async, script, pages, ghosted) {
         ok(address == pages.right.page.address, 'unexpected address')
 
         var cut = this.splice(pages.right.page, 0, pages.right.page.items.length)
@@ -1456,11 +1444,9 @@ prototype(Sheaf, 'mergeBranches', function (key, heft, address, callback) {
 
         this.splice(pages.left.page, pages.left.page.items.length, 0, cut)
 
-        async(function () {
-            this.writeBranch(pages.left.page, this.filename2(pages.left.page, '.replace'), async())
-        }, function () {
-            return [ true ]
-        })
+        script.writeBranch(pages.left.page)
+
+        return true
     })
 
     this.mergePages(key, null, stopper, merger, false, callback)
