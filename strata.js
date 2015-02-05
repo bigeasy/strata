@@ -1,6 +1,7 @@
 var Cache = require('magazine'),
     Journalist = require('journalist'),
     cadence = require('cadence/redux'),
+    fs = require('fs'),
     ok = require('assert').ok,
     path = require('path'),
     prototype = require('pointcut').prototype
@@ -272,7 +273,7 @@ Cursor.prototype.__defineGetter__('length', function () {
 prototype(Cursor, '_write', cadence(function (async) {
     var entry
     async(function () {
-        entry = this._journal.open(this._sheaf._filename(this._page.address, 0), this._page.position, this._page)
+        entry = this._journal.open(this._sheaf.filename2(this._page), this._page.position, this._page)
         this._sheaf.journalist.purge(async())
     }, function () {
         entry.ready(async())
@@ -471,6 +472,162 @@ prototype(Descent, 'descend', cadence(function (async, next, stop) {
             ok(this.page.items[0].key == null, 'first key is cached')
         }
     })()
+}))
+
+function Script (sheaf) {
+    this._sheaf = sheaf
+    this._journal = []
+    this._operations = []
+}
+
+Script.prototype.rotate = function (page) {
+    page.position = 0
+    page.rotation++
+    var queue = new Queue
+    this._sheaf.writeHeader(queue, page)
+    queue.finish()
+    this._operations.push({
+        name: '_rotate', page: page, queue: queue
+    })
+}
+
+Script.prototype.unlink = function (page) {
+    var rotations = []
+    for (var i = 0; i <= page.rotation; i++) {
+        rotations.push(this._sheaf._filename(page.address, i))
+    }
+    this._journal.push({
+        name: '_purge', rotations: rotations
+    })
+}
+
+Script.prototype.rewriteLeaf = function (page) {
+    this._operations.push({
+        name: '_rewriteLeaf', page: page
+    })
+}
+
+Script.prototype.writeBranch = function (page) {
+    this._operations.push({
+        name: '_writeBranch', page: page
+    })
+}
+
+prototype(Script, '_rotate', cadence(function (async, operation) {
+    var page = operation.page, queue = operation.queue, entry
+    var rotation = this._sheaf.filename2(page, '.replace')
+    this._journal.push({
+        name: '_replace', from: rotation, to: this._sheaf.filename2(page)
+    })
+    async(function () {
+        entry = this._sheaf.journal.leaf.open(rotation, page.position, page)
+        entry.ready(async())
+    }, function () {
+        page.position += queue.length
+        async.forEach(function (buffer) {
+            entry.write(buffer, async())
+        })(queue.buffers)
+    }, function () {
+    // todo: scram on failure.
+        entry.close('entry', async())
+    }, function () {
+        return [ rotation ]
+    })
+}))
+
+prototype(Script, '_writeBranch', cadence(function (async, operation) {
+    var page = operation.page
+    var file = this._sheaf.filename2(page, '.replace')
+    this._journal.push({
+        name: '_replace', from: file, to: this._sheaf.filename2(page)
+    })
+    this._sheaf.writeBranch(page, file, async())
+}))
+
+prototype(Script, '_rewriteLeaf', cadence(function (async, operation) {
+    var page = operation.page
+    this.unlink(page)
+    var file = this._sheaf._filename(page.address, 0, '.replace')
+    this._journal.push({
+        name: '_replace', from: file, to: this._sheaf._filename(page.address, 0)
+    })
+    this._sheaf.rewriteLeaf(page, '.replace', async())
+}))
+
+prototype(Script, 'commit', cadence(function (async) {
+    async(function () {
+        async.forEach(function (operation) {
+            this[operation.name](operation, async())
+        })(this._operations)
+    }, function () {
+        this._journal.push({ name: '_complete' })
+        var pending = path.join(this._sheaf.directory, 'journal.pending')
+        var comitted = path.join(this._sheaf.directory, 'journal')
+        async(function () {
+            var script = this._journal.map(function (operation) {
+                return JSON.stringify(operation)
+            }).join('\n') + '\n'
+            fs.writeFile(pending, script, 'utf8', async())
+        }, function () {
+            fs.rename(pending, comitted, async())
+        }, function () {
+            this.play(async())
+        })
+    })
+}))
+
+prototype(Script, 'play', cadence(function (async, page) {
+    async.forEach(function (operation) {
+        this[operation.name](operation, async())
+    })(this._journal)
+}))
+
+prototype(Script, '_replace', cadence(function (async, operation) {
+    async(function () {
+        var block = async([function () {
+            fs.stat(operation.from, async())
+        }, function (error) {
+            if (error.code !== 'ENOENT') {
+                throw error
+            }
+            return [ block ]
+        }], [function () {
+            fs.unlink(operation.to, async())
+        }, function (error) {
+            if (error.code !== 'ENOENT') {
+                throw error
+            }
+        }], function () {
+            fs.rename(operation.from, operation.to, async())
+        }, function () {
+            return [ block ]
+        })()
+    }, function () {
+        fs.stat(operation.to, async())
+    })
+}))
+
+prototype(Script, '_complete', cadence(function (async, operation) {
+    var journal = path.join(this._sheaf.directory, 'journal')
+    async([function () {
+        fs.unlink(journal, async())
+    }, function (error) {
+        if (error.code !== 'ENOENT') {
+            throw error
+        }
+    }])
+}))
+
+prototype(Script, '_purge', cadence(function (async, operation) {
+    async.forEach(function (file) {
+        async([function () {
+            fs.unlink(file, async())
+        }, function (error) {
+            if (error.code !== 'ENOENT') {
+                throw error
+            }
+        }])
+    })(operation.rotations)
 }))
 
 prototype(Sheaf, 'unbalanced', function (page, force) {
@@ -691,6 +848,7 @@ prototype(Sheaf, 'shouldSplitBranch', function (branch, key, callback) {
 
 prototype(Sheaf, 'splitLeafAndUnlock', cadence(function (async, address, key, ghosts) {
     var locker = this.createLocker(),
+        script = new Script(this),
         descents = [], replacements = [], encached = [],
         completed = 0,
         penultimate, leaf, split, pages, page,
@@ -765,27 +923,13 @@ prototype(Sheaf, 'splitLeafAndUnlock', cadence(function (async, address, key, gh
             }
         }, function () {
             this.splice(split, offset, length)
-
-            replacements.push(page)
-
-            this.rewriteLeaf(page, '.replace', async())
+            script.rewriteLeaf(page)
         })()
     }, function () {
         split.right = right
-
-        replacements.push(split)
-
-        this.rewriteLeaf(split, '.replace', async())
-    }, function () {
-        this.writeBranch(penultimate.page, '.pending', async())
-    }, function () {
-        this._rename(penultimate.page, 0, '.pending', '.commit', async())
-    }, function () {
-        async.forEach(function (page) {
-            this.replace(page, '.replace', async())
-        })(replacements)
-    }, function () {
-        this.replace(penultimate.page, '.commit', async())
+        script.rewriteLeaf(split)
+        script.writeBranch(penultimate.page)
+        script.commit(async())
     }, function () {
         this.unbalanced(leaf.page, true)
         this.unbalanced(page, true)
@@ -858,10 +1002,10 @@ prototype(Sheaf, 'splitBranchAndUnlock', cadence(function (async, address, key) 
     }, function () {
         children.unshift(full.page)
         async.forEach(function (page) {
-            this.writeBranch(page, '.replace', async())
+            this.writeBranch(page, this.filename2(page, '.replace'), async())
         })(children)
     }, function () {
-        this.writeBranch(parent.page, '.pending', async())
+        this.writeBranch(parent.page, this.filename2(parent.page, '.pending'), async())
     }, function () {
         this._rename(parent.page, 0, '.pending', '.commit', async())
     }, function () {
@@ -927,10 +1071,10 @@ prototype(Sheaf, 'drainRootAndUnlock', cadence(function (async) {
         this.splice(root, 0, 0, lift)
     }, function () {
         async.forEach(function (page) {
-            this.writeBranch(page, '.replace', async())
+            this.writeBranch(page, this.filename2(page, '.replace'), async())
         })(children)
     }, function () {
-        this.writeBranch(root, '.pending', async())
+        this.writeBranch(root, this.filename2(root, '.pending'), async())
     }, function () {
         this._rename(root, 0, '.pending', '.commit', async())
     }, function () {
@@ -951,6 +1095,23 @@ prototype(Sheaf, 'drainRoot', cadence(function (async) {
         if (root.items.length > this.options.branchSize) this.drainRoot(async())
     })
 }))
+
+Sheaf.prototype.exorcise2 = function (pivot, page, corporal) {
+    var entry
+
+    ok(page.ghosts, 'no ghosts')
+    ok(corporal.items.length - corporal.ghosts > 0, 'no replacement')
+
+    // todo: how is this not a race condition? I'm writing to the log, but I've
+    // not updated the pivot page, not rewritten during `deleteGhosts`.
+    this.splice(page, 0, 1, this.splice(corporal, corporal.ghosts, 1))
+    page.ghosts = 0
+
+    var item = this.splice(pivot.page, pivot.index, 1).shift()
+    item.key = page.items[0].key
+    item.heft = page.items[0].heft
+    this.splice(pivot.page, pivot.index, 0, item)
+}
 
 prototype(Sheaf, 'exorcise', cadence(function (async, pivot, page, corporal) {
     var entry
@@ -981,8 +1142,9 @@ prototype(Sheaf, 'exorcise', cadence(function (async, pivot, page, corporal) {
 
 prototype(Sheaf, 'deleteGhost', cadence(function (async, key) {
     var locker = this.createLocker(),
+        script = new Script(this),
         descents = [],
-        pivot, leaf, fd
+        pivot, leaf, reference
     async([function () {
         descents.forEach(function (descent) { locker.unlock(descent.page) })
         locker.dispose()
@@ -992,11 +1154,23 @@ prototype(Sheaf, 'deleteGhost', cadence(function (async, key) {
     }, function () {
         pivot.upgrade(async())
     }, function () {
+        if (pivot.index != 0) {
+            descents.push(reference = pivot.fork())
+            reference.index--
+            reference.descend(reference.right, reference.leaf, async())
+        }
+    }, function () {
         descents.push(leaf = pivot.fork())
-
         leaf.descend(leaf.key(key), leaf.leaf, async())
     }, function () {
-        this.exorcise(pivot, leaf.page, leaf.page, async())
+        this.exorcise2(pivot, leaf.page, leaf.page)
+        script.rotate(leaf.page)
+        if (reference) {
+            reference.page.right.key = leaf.page.items[0].key
+            script.rotate(reference.page)
+        }
+        script.writeBranch(pivot.page)
+        script.commit(async())
     })
 }))
 
@@ -1108,7 +1282,7 @@ prototype(Sheaf, 'mergePagesAndUnlock', cadence(function (async, key, leftKey, s
             ok(index, 'expected ancestor to be non-zero')
         }
 
-        this.writeBranch(ancestor, '.pending', async())
+        this.writeBranch(ancestor, this.filename2(ancestor, '.pending'), async())
     }, function () {
         async.forEach(function (page) {
             this._rename(page, 0, '', '.unlink', async())
@@ -1279,7 +1453,7 @@ prototype(Sheaf, 'mergeBranches', function (key, heft, address, callback) {
         this.splice(pages.left.page, pages.left.page.items.length, 0, cut)
 
         async(function () {
-            this.writeBranch(pages.left.page, '.replace', async())
+            this.writeBranch(pages.left.page, this.filename2(pages.left.page, '.replace'), async())
         }, function () {
             return [ true ]
         })
@@ -1311,7 +1485,7 @@ prototype(Sheaf, 'fillRoot', cadence(function (async) {
 
         this.splice(root.page, root.page.items.length, 0, cut)
 
-        this.writeBranch(root.page, '.pending', async())
+        this.writeBranch(root.page, this.filename2(root.page, '.pending'), async())
     }, function () {
         this._rename(child.page, 0, '', '.unlink', async())
     }, function () {
@@ -1395,14 +1569,19 @@ Sheaf.prototype.readEntry = function (buffer, isKey) {
     return entry
 }
 
+Sheaf.prototype.filename2 = function (page, suffix) {
+    return this._filename(page.address, page.rotation, suffix)
+}
+
 Sheaf.prototype._filename = function (address, rotation, suffix) {
     suffix || (suffix = '')
     return path.join(this.directory, address + '.' + rotation + suffix)
 }
 
 prototype(Sheaf, 'replace', cadence(function (async, page, suffix) {
-    var replacement = this._filename(page.address, 0, suffix),
-        permanent = this._filename(page.address, 0)
+    // todo: unlink all rotations
+    var replacement = this._filename(page.address, page.rotation, suffix),
+        permanent = this._filename(page.address, page.rotation)
 
     async(function () {
         this.fs.stat(replacement, async())
@@ -1437,6 +1616,7 @@ Sheaf.prototype.heft = function (page, s) {
 
 Sheaf.prototype.createLeaf = function (override) {
     return this.createPage({
+        rotation: 0,
         loaders: {},
         entries: 0,
         ghosts: 0,
@@ -1500,7 +1680,7 @@ Sheaf.prototype.writeDelete = function (queue, page, index, callback) {
 }
 
 Sheaf.prototype.writeHeader = function (queue, page) {
-    var header = [ ++page.entries, 0, page.right.address ]
+    var header = [ ++page.entries, 0, page.right.address, page.ghosts || 0 ]
     return this.writeEntry({
         queue: queue, page: page, header: header, isKey: true, body: page.right.key
     })
@@ -1555,22 +1735,21 @@ Sheaf.prototype.readFooter = function (entry) {
 }
 
 prototype(Sheaf, 'readLeaf', cadence(function (async, page) {
-    async(function () {
-        this.io('read', this._filename(page.address, 0), async())
-    }, function (fd, stat, read) {
-        async(function () {
-            page.entries = 0
-            page.ghosts = 0
-            return [ page, 0 ]
-        }, function (page, position) {
-            this.replay(fd, stat, read, page, position, async())
-        }, function () {
-            return [ page ]
-        })
+    page.entries = page.ghosts = page.position = 0
+    var rotation = 0, loop = async([function () {
+        this.io('read', this._filename(page.address, rotation), async())
+    }, function (error) {
+        if (rotation === 0 || error.code !== 'ENOENT') {
+            throw error
+        }
+        return [ loop, page ]
+    }], function (fd, stat, read) {
+        page.rotation = rotation++
+        this.play(fd, stat, read, page, async())
     })
 }))
 
-prototype(Sheaf, 'replay', cadence(function (async, fd, stat, read, page, position) {
+prototype(Sheaf, 'play', cadence(function (async, fd, stat, read, page) {
     var leaf = !!(page.address % 2),
         seen = {},
         buffer = new Buffer(this.options.readLeafStartLength || 1024),
@@ -1580,12 +1759,10 @@ prototype(Sheaf, 'replay', cadence(function (async, fd, stat, read, page, positi
     async([function () {
         this.fs.close(fd, async())
     }], function () {
-        page.position = 0
         var loop = async(function (buffer, position) {
             read(buffer, position, async())
         }, function (slice, start) {
             for (var offset = 0, i = 0, I = slice.length; i < I; i++) {
-                ok(!footer, 'data beyond footer')
                 if (slice[i] == 0x20) {
                     var sip = slice.toString('utf8', offset, i)
                     length = parseInt(sip)
@@ -1644,9 +1821,9 @@ prototype(Sheaf, 'replay', cadence(function (async, fd, stat, read, page, positi
                     read(buffer, start + offset, async())
                 }
             } else {
-                return [ loop, page, footer ]
+                return [ loop ]
             }
-        })(buffer, position)
+        })(buffer, 0)
     })
 }))
 
@@ -1662,6 +1839,7 @@ prototype(Sheaf, 'rewriteLeaf', cadence(function (async, page, suffix) {
         // todo: need an error close!
         out.scram(async())
     }], function () {
+        page.rotation = 0
         page.position = 0
         page.entries = 0
 
@@ -1707,6 +1885,7 @@ Sheaf.prototype.createBranch = function (override) {
     return this.createPage({
         items: [],
         entries: 0,
+        rotation: 0,
         penultimate: true,
         queue: this.sequester.createQueue()
     }, override, 1)
@@ -1733,7 +1912,7 @@ Sheaf.prototype.splice = function (page, offset, length, insert) {
     return removals
 }
 
-prototype(Sheaf, 'writeBranch', cadence(function (async, page, suffix) {
+prototype(Sheaf, 'writeBranch', cadence(function (async, page, file) {
     var items = page.items, out
 
     ok(items[0].key == null, 'key of first item must be null')
@@ -1746,7 +1925,7 @@ prototype(Sheaf, 'writeBranch', cadence(function (async, page, suffix) {
         page.entries = 0
         page.position = 0
 
-        out = this.journal.branch.open(this._filename(page.address, 0, suffix), 0, page)
+        out = this.journal.branch.open(file, 0, page)
         out.ready(async())
     }, [function () {
         out.scram(async())
@@ -1785,10 +1964,11 @@ prototype(Sheaf, 'writeBranch', cadence(function (async, page, suffix) {
 }))
 
 prototype(Sheaf, 'readBranch', cadence(function (async, page) {
+    page.position = page.entries = 0
     async(function () {
         this.io('read', this._filename(page.address, 0), async())
     }, function (fd, stat, read) {
-        this.replay(fd, stat, read, page, 0, async())
+        this.play(fd, stat, read, page, async())
     })
 }))
 
@@ -1860,7 +2040,7 @@ prototype(Strata, 'create', cadence(function (async) {
         locker.unlock(leaf)
     }], function () {
         this.sheaf.splice(root, 0, 0, { address: leaf.address, heft: 0 })
-        this.sheaf.writeBranch(root, '.replace', async())
+        this.sheaf.writeBranch(root, this.sheaf.filename2(root, '.replace'), async())
     }, function () {
         this.sheaf.rewriteLeaf(leaf, '.replace', async())
     }, function () {

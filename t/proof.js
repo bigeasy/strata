@@ -150,31 +150,49 @@ function serialize (segments, directory, callback) {
 function abstracted (dir) {
     var output = {}
     var position = 0
+    var grouped = {}
 
     for (var file in dir) {
         var address = file.split('.').shift()
+        var files = grouped[address]
+        if (!files) {
+            files = grouped[address] = []
+        }
+        files.push({ name: file, body: dir[file] })
+    }
+
+    for (var address in grouped) {
         var record
         if (address % 2) {
+            var files = grouped[address].sort(function (a, b) {
+                a = a.name.split('.').pop()
+                b = b.name.split('.').pop()
+                return +(a) - +(b)
+            })
+//            console.log(files.map(function (file) { return file.name }))
             record = { log: [] }
-            position = 0
-            dir[file].forEach(function (line, index) {
-                var json = line.header
-                if (json[1]) {
-                    ok(index + 1 == json[0], 'entry record is wrong')
-                    if (json[1] > 0) {
-                        record.log.push({ type: 'add', value: line.body })
+            var entry = 0
+            files.forEach(function (file) {
+                position = 0
+                file.body.forEach(function (line, index) {
+//                    console.log(line)
+                    var json = line.header
+                    ok(++entry == json[0], 'entry record is wrong')
+                    if (json[1]) {
+                        if (json[1] > 0) {
+                            record.log.push({ type: 'add', value: line.body })
+                        } else {
+                            record.log.push({ type: 'del', index: Math.abs(json[1]) - 1 })
+                        }
                     } else {
-                        record.log.push({ type: 'del', index: Math.abs(json[1]) - 1 })
+                        ok(index == 0, 'header not first entry')
+                        if (json[2]) record.right = Math.abs(json[2])
                     }
-                } else {
-                    ok(index == 0, 'header not first entry')
-                    ok(json[0] == 1, 'header not first entry')
-                    if (json[2]) record.right = Math.abs(json[2])
-                }
+                })
             })
         } else {
             var children = []
-            dir[file].forEach(function (json, index) {
+            grouped[address][0].body.forEach(function (json, index) {
                 if (json.header[1] > 0) {
                     children.splice(json.header[1] - 1, 0, json.header[2])
                 } else {
@@ -311,7 +329,7 @@ function directivize (json) {
                 return record
             })
             directory[address].unshift({
-                header: [ 1, 0, object.right || 0 ],
+                header: [ 1, 0, object.right || 0, 0 ],
                 body: object.right ? key(object.right) : null
             })
         }
