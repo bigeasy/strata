@@ -1033,6 +1033,7 @@ prototype(Sheaf, 'splitBranch', cadence(function (async, address, key) {
 
 prototype(Sheaf, 'drainRootAndUnlock', cadence(function (async) {
     var locker = this.createLocker(),
+        script = new Script(this),
         children = [], locks = [],
         root, pages, records, remainder
 
@@ -1073,20 +1074,12 @@ prototype(Sheaf, 'drainRootAndUnlock', cadence(function (async) {
         lift.reverse()
 
         this.splice(root, 0, 0, lift)
-    }, function () {
-        async.forEach(function (page) {
-            this.writeBranch(page, this.filename2(page, '.replace'), async())
-        })(children)
-    }, function () {
-        this.writeBranch(root, this.filename2(root, '.pending'), async())
-    }, function () {
-        this._rename(root, 0, '.pending', '.commit', async())
-    }, function () {
-        async.forEach(function (page) {
-            this.replace(page, '.replace', async())
-        })(children)
-    }, function () {
-        this.replace(root, '.commit', async())
+
+        children.forEach(function (page) {
+            script.writeBranch(page)
+        })
+        script.writeBranch(root)
+        script.commit(async())
     }, function () {
         return [ root ]
     })
