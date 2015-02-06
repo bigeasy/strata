@@ -26,6 +26,7 @@ var random = (function () {
 })()
 
 var runner = cadence(function (async) {
+    var start, insert, gather
     var directory = path.join(__dirname, 'tmp'), db, count = 0
     var extractor = function (record) { return record.key }
     var strata = new Strata({
@@ -35,39 +36,47 @@ var runner = cadence(function (async) {
         branchSize: 256,
         writeStage: 'leaf'
     })
+
+    var batches = []
+    for (var j = 0; j < 7; j++) {
+        var entries = []
+        var type, sha, buffer, value
+        for (var i = 0; i < 1024; i++) {
+            var value = random(1024)
+            sha = crypto.createHash('sha1')
+            buffer = new Buffer(4)
+            buffer.writeUInt32BE(value, 0)
+            sha.update(buffer)
+            entries.push({
+                key: sha.digest('hex'),
+                type: !! random(2) ? 'insert' : 'delete'
+            })
+        }
+        batches.push(entries)
+    }
     async(function () {
         rimraf(directory, async())
     }, function () {
         mkdirp(directory, async())
     }, function () {
+        start = Date.now()
         strata.create(async())
     }, function () {
-        var batch = 0
-        var loop = async(function () {
-            if (batch++ == 7) return [ loop ]
-            var entries = []
-            var type, sha, buffer, value
-            for (var i = 0; i < 1024; i++) {
-                var value = random(1024)
-                sha = crypto.createHash('sha1')
-                buffer = new Buffer(4)
-                buffer.writeUInt32BE(value, 0)
-                sha.update(buffer)
-                entries.push({
-                    key: sha.digest('hex'),
-                    type: !! random(2) ? 'insert' : 'delete'
-                })
-            }
-            var iterator = advance(entries, function (record, callback) {
+        var batch = 0, loop = async(function () {
+            if (batch === 7) return [ loop ]
+            var iterator = advance(batches[batch], function (record, callback) {
                 callback(null, record, record.key)
             })
             splice(function (incoming, existing) {
                 return incoming.record.type
             }, strata, iterator, async())
+            batch++
         })()
     }, function () {
         strata.close(async())
     }, function () {
+        insert = Date.now() - start
+        start = Date.now()
         strata.open(async())
     }, function () {
         var records = []
@@ -89,8 +98,10 @@ var runner = cadence(function (async) {
                 }
             })(true)
         }, function () {
-            console.log('count', records.length)
             strata.close(async())
+        }, function () {
+            gather = Date.now() - start
+            console.log('insert: ' + insert + ', gather: ' + gather)
         })
     })
 })
