@@ -57,10 +57,7 @@ var __slice = [].slice
         console.log(require('util').inspect(args, false, null))
 }*/
 
-function compare (a, b) {
-    ok(a != null && b != null, 'null key')
-    return a < b ? -1 : a > b ? 1 : 0
-}
+function compare (a, b) { return a < b ? -1 : a > b ? 1 : 0 }
 
 function extract (a) { return a }
 
