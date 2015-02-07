@@ -1,5 +1,4 @@
 var cadence = require('cadence/redux')
-var prototype = require('pointcut').prototype
 var Locker = require('./locker')
 var ok = require('assert').ok
 var extend = require('./extend')
@@ -53,7 +52,7 @@ Descent.prototype.exclude = function () {
     this.exclusive = true
 }
 
-prototype(Descent, 'upgrade', cadence(function (async) {
+Descent.prototype.upgrade = cadence(function (async) {
     async([function () {
         this.locker.unlock(this.page)
         this.locker.lock(this.page.address, this.exclusive = true, async())
@@ -67,7 +66,7 @@ prototype(Descent, 'upgrade', cadence(function (async) {
     }], function (locked) {
         this.page = locked
     })
-}))
+})
 
 Descent.prototype.key = function (key) {
     return function () {
@@ -107,7 +106,7 @@ Descent.prototype.unlocker = function (parent) {
     this.locker.unlock(parent)
 }
 
-prototype(Descent, 'descend', cadence(function (async, next, stop) {
+Descent.prototype.descend = cadence(function (async, next, stop) {
     var loop = async(function () {
         if (stop.call(this)) {
             return [ loop, this.page, this.index ]
@@ -136,6 +135,6 @@ prototype(Descent, 'descend', cadence(function (async, next, stop) {
             ok(this.page.items[0].key == null, 'first key is cached')
         }
     })()
-}))
+})
 
 module.exports = Descent

@@ -1,5 +1,4 @@
 var cadence = require('cadence/redux')
-var prototype = require('pointcut').prototype
 var ok = require('assert').ok
 
 function Locker (sheaf, magazine) {
@@ -10,7 +9,7 @@ function Locker (sheaf, magazine) {
     this._magazine = magazine
 }
 
-prototype(Locker, 'lock', cadence(function (async, address, exclusive) {
+Locker.prototype.lock = cadence(function (async, address, exclusive) {
     var cartridge = this._magazine.hold(address, {}),
         page = cartridge.value.page, locks = []
 
@@ -66,7 +65,7 @@ prototype(Locker, 'lock', cadence(function (async, address, exclusive) {
         })
         throw error
     }])
-}))
+})
 
 Locker.prototype.encache = function (page) {
     this._magazine.hold(page.address, { page: page })

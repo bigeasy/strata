@@ -1,5 +1,4 @@
 var cadence = require('cadence/redux')
-var prototype = require('pointcut').prototype
 var ok = require('assert').ok
 var Queue = require('./queue')
 var scram = require('./scram')
@@ -23,7 +22,7 @@ Cursor.prototype.get = function (index) {
 }
 
 // to user land
-prototype(Cursor, 'next', cadence(function (async) {
+Cursor.prototype.next = cadence(function (async) {
     var next
     this._rightLeafKey = null
 
@@ -44,7 +43,7 @@ prototype(Cursor, 'next', cadence(function (async) {
 
         return [ true ]
     })
-}))
+})
 
 // to user land
 Cursor.prototype._indexOf = function (key) {
@@ -62,7 +61,7 @@ Cursor.prototype._indexOf = function (key) {
 
 // todo: pass an integer as the first argument to force the arity of the
 // return.
-prototype(Cursor, '_unlock', cadence(function (async) {
+Cursor.prototype._unlock = cadence(function (async) {
     async([function () {
         this._locker.unlock(this._page)
         this._locker.dispose()
@@ -78,12 +77,12 @@ prototype(Cursor, '_unlock', cadence(function (async) {
     }, function () {
         return []
     })
-}))
+})
 
-prototype(Cursor, 'unlock',  function (callback) {
+Cursor.prototype.unlock = function (callback) {
     ok(callback, 'unlock now requires a callback')
     this._unlock(callback)
-})
+}
 
 // note: exclusive, index, offset and length are public
 
@@ -107,7 +106,7 @@ Cursor.prototype.__defineGetter__('length', function () {
     return this._page.items.length
 })
 
-prototype(Cursor, '_write', cadence(function (async) {
+Cursor.prototype._write = cadence(function (async) {
     var entry
     async(function () {
         entry = this._journal.open(this._sheaf.filename2(this._page), this._page.position, this._page)
@@ -131,9 +130,9 @@ prototype(Cursor, '_write', cadence(function (async) {
             })
         }), async())
     })
-}))
+})
 
-prototype(Cursor, 'insert', cadence(function (async, record, key, index) {
+Cursor.prototype.insert = cadence(function (async, record, key, index) {
     ok(this.exclusive, 'cursor is not exclusive')
     ok(index > 0 || this._page.address == 1)
 
@@ -154,9 +153,9 @@ prototype(Cursor, 'insert', cadence(function (async, record, key, index) {
     if (this.queue.buffers.length) {
         this._write(async())
     }
-}))
+})
 
-prototype(Cursor, 'remove', cadence(function (async, index) {
+Cursor.prototype.remove = cadence(function (async, index) {
     var ghost = this._page.address != 1 && index == 0, entry
     this._sheaf.unbalanced(this._page)
 
@@ -175,6 +174,6 @@ prototype(Cursor, 'remove', cadence(function (async, index) {
     if (this.queue.buffers.length) {
         this._write(async())
     }
-}))
+})
 
 module.exports = Cursor

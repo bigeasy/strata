@@ -1,5 +1,4 @@
 var cadence = require('cadence/redux')
-var prototype = require('pointcut').prototype
 var path = require('path')
 var fs = require('fs')
 var Queue = require('./queue')
@@ -43,7 +42,7 @@ Script.prototype.writeBranch = function (page) {
     })
 }
 
-prototype(Script, '_rotate', cadence(function (async, operation) {
+Script.prototype._rotate = cadence(function (async, operation) {
     var page = operation.page, queue = operation.queue, entry
     var rotation = this._sheaf.filename2(page, '.replace')
     this._journal.push({
@@ -63,18 +62,18 @@ prototype(Script, '_rotate', cadence(function (async, operation) {
     }, function () {
         return [ rotation ]
     })
-}))
+})
 
-prototype(Script, '_writeBranch', cadence(function (async, operation) {
+Script.prototype._writeBranch = cadence(function (async, operation) {
     var page = operation.page
     var file = this._sheaf.filename2(page, '.replace')
     this._journal.push({
         name: '_replace', from: file, to: this._sheaf.filename2(page)
     })
     this._sheaf.writeBranch(page, file, async())
-}))
+})
 
-prototype(Script, '_rewriteLeaf', cadence(function (async, operation) {
+Script.prototype._rewriteLeaf = cadence(function (async, operation) {
     var page = operation.page
     this.unlink(page)
     var file = this._sheaf._filename(page.address, 0, '.replace')
@@ -82,9 +81,9 @@ prototype(Script, '_rewriteLeaf', cadence(function (async, operation) {
         name: '_replace', from: file, to: this._sheaf._filename(page.address, 0)
     })
     this._sheaf.rewriteLeaf(page, '.replace', async())
-}))
+})
 
-prototype(Script, 'commit', cadence(function (async) {
+Script.prototype.commit = cadence(function (async) {
     async(function () {
         async.forEach(function (operation) {
             this[operation.name](operation, async())
@@ -104,15 +103,15 @@ prototype(Script, 'commit', cadence(function (async) {
             this.play(async())
         })
     })
-}))
+})
 
-prototype(Script, 'play', cadence(function (async, page) {
+Script.prototype.play = cadence(function (async, page) {
     async.forEach(function (operation) {
         this[operation.name](operation, async())
     })(this._journal)
-}))
+})
 
-prototype(Script, '_replace', cadence(function (async, operation) {
+Script.prototype._replace = cadence(function (async, operation) {
     async(function () {
         var block = async([function () {
             fs.stat(operation.from, async())
@@ -135,9 +134,9 @@ prototype(Script, '_replace', cadence(function (async, operation) {
     }, function () {
         fs.stat(operation.to, async())
     })
-}))
+})
 
-prototype(Script, '_complete', cadence(function (async, operation) {
+Script.prototype._complete = cadence(function (async, operation) {
     var journal = path.join(this._sheaf.directory, 'journal')
     async([function () {
         fs.unlink(journal, async())
@@ -146,9 +145,9 @@ prototype(Script, '_complete', cadence(function (async, operation) {
             throw error
         }
     }])
-}))
+})
 
-prototype(Script, '_purge', cadence(function (async, operation) {
+Script.prototype._purge = cadence(function (async, operation) {
     async.forEach(function (file) {
         async([function () {
             fs.unlink(file, async())
@@ -158,6 +157,6 @@ prototype(Script, '_purge', cadence(function (async, operation) {
             }
         }])
     })(operation.rotations)
-}))
+})
 
 module.exports = Script

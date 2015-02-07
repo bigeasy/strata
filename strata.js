@@ -10,8 +10,7 @@ var Cache = require('magazine'),
     Locker = require('./locker'),
     Player = require('./player'),
     ok = require('assert').ok,
-    path = require('path'),
-    prototype = require('pointcut').prototype
+    path = require('path')
 
 require('cadence/loops')
 
@@ -37,7 +36,7 @@ Strata.prototype.__defineGetter__('nextAddress', function () {
 })
 
 // to user land
-prototype(Strata, 'create', cadence(function (async) {
+Strata.prototype.create = cadence(function (async) {
     this.sheaf.createMagazine()
 
     var locker = this.sheaf.createLocker(), count = 0, root, leaf, journal
@@ -66,10 +65,10 @@ prototype(Strata, 'create', cadence(function (async) {
         script.rewriteLeaf(leaf)
         script.commit(async())
     })
-}))
+})
 
 // to user land
-prototype(Strata, 'open', cadence(function (async) {
+Strata.prototype.open = cadence(function (async) {
     this.sheaf.createMagazine()
 
     // todo: instead of rescue, you might try/catch the parts that you know
@@ -91,10 +90,10 @@ prototype(Strata, 'open', cadence(function (async) {
             }
         }, this)
     })
-}))
+})
 
 // to user land
-prototype(Strata, 'close', cadence(function (async) {
+Strata.prototype.close = cadence(function (async) {
     var cartridge = this.sheaf.magazine.get(-2), lock = cartridge.value.page.lock
     async(function () {
         this.sheaf.createJournal().close('tree', async())
@@ -114,23 +113,23 @@ prototype(Strata, 'close', cadence(function (async) {
 
         ok(!this.sheaf.magazine.count, 'pages still held by cache')
     })
-}))
+})
 
-prototype(Strata, 'left', function (descents, exclusive, callback) {
+Strata.prototype.left = function (descents, exclusive, callback) {
     this.toLeaf(descents[0].left, descents, null, exclusive, callback)
-})
+}
 
-prototype(Strata, 'right', function (descents, exclusive, callback) {
+Strata.prototype.right = function (descents, exclusive, callback) {
     this.toLeaf(descents[0].right, descents, null, exclusive, callback)
-})
+}
 
-prototype(Strata, 'key', function (key) {
+Strata.prototype.key = function (key) {
     return function (descents, exclusive, callback) {
         this.toLeaf(descents[0].key(key), descents, null, exclusive, callback)
     }
-})
+}
 
-prototype(Strata, 'leftOf', function (key) {
+Strata.prototype.leftOf = function (key) {
     return cadence(function (async, descents, exclusive) {
         var conditions = [ descents[0].leaf, descents[0].found([key]) ]
         async(function () {
@@ -148,9 +147,9 @@ prototype(Strata, 'leftOf', function (key) {
             }
         })
     })
-})
+}
 
-prototype(Strata, 'toLeaf', cadence(function (async, sought, descents, key, exclusive) {
+Strata.prototype.toLeaf = cadence(function (async, sought, descents, key, exclusive) {
     async(function () {
         descents[0].descend(sought, descents[0].penultimate, async())
     }, function () {
@@ -159,10 +158,10 @@ prototype(Strata, 'toLeaf', cadence(function (async, sought, descents, key, excl
     }, function () {
         return [ new Cursor(this.sheaf, this.sheaf.createJournal(), descents, exclusive, key) ]
     })
-}))
+})
 
 // to user land
-prototype(Strata, 'cursor', cadence(function (async, key, exclusive) {
+Strata.prototype.cursor = cadence(function (async, key, exclusive) {
     var descents = [ new Descent(this.sheaf, this.sheaf.createLocker()) ]
     async([function () {
         if (descents.length) {
@@ -178,23 +177,23 @@ prototype(Strata, 'cursor', cadence(function (async, key, exclusive) {
     }, function (cursor) {
         return [ cursor ]
     })
-}))
+})
 
-prototype(Strata, 'iterator', function (key, callback) {
+Strata.prototype.iterator = function (key, callback) {
     this.cursor(key, false, callback)
-})
+}
 
-prototype(Strata, 'mutator', function (key, callback) {
+Strata.prototype.mutator = function (key, callback) {
     this.cursor(key, true, callback)
-})
+}
 
 // to user land
-prototype(Strata, 'balance', function (callback) {
+Strata.prototype.balance = function (callback) {
     this.sheaf.balance(callback)
-})
+}
 
 // to user land
-prototype(Strata, 'vivify', cadence(function (async) {
+Strata.prototype.vivify = cadence(function (async) {
     var locker = this.sheaf.createLocker(), root
 
     function record (item) {
@@ -251,7 +250,7 @@ prototype(Strata, 'vivify', cadence(function (async) {
             return [ block, pages ]
         })()
     })
-}))
+})
 
 Strata.prototype.purge = function (downTo) {
     var purge = this.sheaf.magazine.purge()
