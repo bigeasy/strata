@@ -81,7 +81,6 @@ Locker.prototype.checkCacheSize = function (page) {
 }
 
 Locker.prototype.unlock = function (page) {
-    console.log(page)
     this.checkCacheSize(page)
     this._locks[page.address].unlock(null, page)
     if (!this._locks[page.address].count) {
@@ -96,7 +95,6 @@ Locker.prototype.increment = function (page) {
 }
 
 Locker.prototype.dispose = function () {
-    console.log(this._locks)
     ok(!Object.keys(this._locks).length, 'locks outstanding')
     this._locks = null
 }
