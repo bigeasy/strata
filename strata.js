@@ -8,6 +8,7 @@ var Cache = require('magazine'),
     Sheaf = require('./sheaf'),
     Descent = require('./descent'),
     Locker = require('./locker'),
+    Player = require('./player'),
     ok = require('assert').ok,
     path = require('path'),
     prototype = require('pointcut').prototype
@@ -23,6 +24,7 @@ function extend(to, from) {
 }
 
 function Strata (options) {
+    options.player = new Player
     this.sheaf = new Sheaf(options)
 }
 

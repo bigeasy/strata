@@ -12,55 +12,58 @@ function Locker (sheaf, magazine) {
 
 prototype(Locker, 'lock', cadence(function (async, address, exclusive) {
     var cartridge = this._magazine.hold(address, {}),
-        page = cartridge.value.page,
-        locked
+        page = cartridge.value.page, locks = []
 
     ok(address != null, 'x' + address)
     ok(!this._locks[address], 'address already locked by this locker')
 
-    if (!page)  {
-        if (address % 2) {
-            page = this._sheaf.createLeaf({ address: address })
-        } else {
-            page = this._sheaf.createBranch({ address: address })
-        }
-        cartridge.value.page = page
-        var loaded = function (error) {
-            if (error) {
-                cartridge.value.page = null
-                cartridge.adjustHeft(-cartridge.heft)
-            }
-            this._locks[page.address].unlock(error, page)
-        }.bind(this)
-        this._locks[page.address] = page.queue.createLock()
-        this._locks[page.address].exclude(function () {
-            if (page.address % 2) {
-                this._sheaf.readLeaf(page, loaded)
-            } else {
-                this._sheaf.readBranch(page, loaded)
-            }
-        }.bind(this))
-    } else {
-        this._locks[page.address] = page.queue.createLock()
-    }
-
     async([function () {
         async(function () {
-            this._locks[page.address][exclusive ? 'exclude' : 'share'](async())
-        },
-        function () {
-            this._sheaf.tracer('lock', { address: address, exclusive: exclusive }, async())
-        }, function () {
-            locked = true
-            return [ page ]
+            if (page == null) {
+                // Note: This catch block is only good for catching read errors.
+                // It untestable to catch errors in the first step that locks
+                // the page, which is all tested, synchronous code. Instead of
+                // throwing the error, we give it to the lock. The primary lock
+                // sub-cadence will receive the error and raise it to be caught
+                // by the final external catch block.
+                async([function () {
+                    async(function () {
+                        // todo: does there need to be differnt types anymore?
+                        if (address % 2) {
+                            page = this._sheaf.createLeaf({ address: address })
+                        } else {
+                            page = this._sheaf.createBranch({ address: address })
+                        }
+                        cartridge.value.page = page
+                        locks.push(this._locks[address] = page.queue.createLock())
+                        locks[0].exclude(async())
+                    }, function () {
+                        this._sheaf.player.read(this._sheaf, page, async())
+                    }, function () {
+                        locks[0].unlock()
+                    })
+                }, function (error) {
+                    cartridge.value.page = null
+                    cartridge.adjustHeft(-cartridge.heft)
+                    locks[0].unlock(error)
+                }])
+            } else {
+                locks.push(this._locks[address] = page.queue.createLock())
+            }
+            async(function () {
+                this._locks[page.address][exclusive ? 'exclude' : 'share'](async())
+            }, function () {
+                this._sheaf.tracer('lock', { address: address, exclusive: exclusive }, async())
+            }, function () {
+                return [ page ]
+            })
         })
     }, function (error) {
-        // todo: if you don't return something, then the return is the
-        // error, but what else could it be? Document that behavior, or
-        // set a reasonable default.
-        this._magazine.get(page.address).release()
-        this._locks[page.address].unlock(error)
+        cartridge.release()
         delete this._locks[page.address]
+        locks.forEach(function (lock) {
+            lock.unlock(error)
+        })
         throw error
     }])
 }))
@@ -78,6 +81,7 @@ Locker.prototype.checkCacheSize = function (page) {
 }
 
 Locker.prototype.unlock = function (page) {
+    console.log(page)
     this.checkCacheSize(page)
     this._locks[page.address].unlock(null, page)
     if (!this._locks[page.address].count) {
@@ -92,6 +96,7 @@ Locker.prototype.increment = function (page) {
 }
 
 Locker.prototype.dispose = function () {
+    console.log(this._locks)
     ok(!Object.keys(this._locks).length, 'locks outstanding')
     this._locks = null
 }
