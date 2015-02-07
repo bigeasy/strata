@@ -20,6 +20,52 @@ function compare (a, b) { return a < b ? -1 : a > b ? 1 : 0 }
 
 function extract (a) { return a }
 
+function Sheaf (options) {
+    this.fs = options.fs || require('fs')
+    this.nextAddress = 0
+    this.directory = options.directory
+    this.journal = {
+        branch: new Journalist({ stage: 'entry' }).createJournal(),
+        leaf: new Journalist({ stage: 'entry' }).createJournal()
+    }
+    this.journalist = new Journalist({
+        count: options.fileHandleCount || 64,
+        stage: options.writeStage || 'leaf',
+        cache: options.jouralistCache || new Cache()
+    })
+    this.cache = options.cache || (new Cache)
+    this.options = options
+    this.tracer = options.tracer || function () { arguments[2]() }
+    this.sequester = options.sequester || require('sequester')
+    this.extractor = options.extractor || extract
+    this.comparator = options.comparator || compare
+    this.checksum = (function () {
+        if (typeof options.checksum == 'function') return options.checksum
+        var algorithm
+        switch (algorithm = options.checksum || 'sha1') {
+        case 'none':
+            return function () {
+                return {
+                    update: function () {},
+                    digest: function () { return '0' }
+                }
+            }
+        default:
+            var crypto = require('crypto')
+            return function (m) { return crypto.createHash(algorithm) }
+        }
+    })()
+    this.serialize = options.serialize || function (object) { return new Buffer(JSON.stringify(object)) }
+    this.deserialize = options.deserialize || function (buffer) { return JSON.parse(buffer.toString()) }
+    this.createJournal = (options.writeStage == 'tree' ? (function () {
+        var journal = this.journalist.createJournal()
+        return function () { return journal }
+    }).call(this) : function () {
+        return this.journalist.createJournal()
+    })
+    this.lengths = {}
+}
+
 prototype(Sheaf, 'unbalanced', function (page, force) {
     if (force) {
         this.lengths[page.address] = this.options.leafSize
@@ -885,52 +931,6 @@ prototype(Sheaf, 'fillRoot', cadence(function (async) {
         script.commit(async())
     })
 }))
-
-function Sheaf (options) {
-    this.fs = options.fs || require('fs')
-    this.nextAddress = 0
-    this.directory = options.directory
-    this.journal = {
-        branch: new Journalist({ stage: 'entry' }).createJournal(),
-        leaf: new Journalist({ stage: 'entry' }).createJournal()
-    }
-    this.journalist = new Journalist({
-        count: options.fileHandleCount || 64,
-        stage: options.writeStage || 'leaf',
-        cache: options.jouralistCache || new Cache()
-    })
-    this.cache = options.cache || (new Cache)
-    this.options = options
-    this.tracer = options.tracer || function () { arguments[2]() }
-    this.sequester = options.sequester || require('sequester')
-    this.extractor = options.extractor || extract
-    this.comparator = options.comparator || compare
-    this.checksum = (function () {
-        if (typeof options.checksum == 'function') return options.checksum
-        var algorithm
-        switch (algorithm = options.checksum || 'sha1') {
-        case 'none':
-            return function () {
-                return {
-                    update: function () {},
-                    digest: function () { return '0' }
-                }
-            }
-        default:
-            var crypto = require('crypto')
-            return function (m) { return crypto.createHash(algorithm) }
-        }
-    })()
-    this.serialize = options.serialize || function (object) { return new Buffer(JSON.stringify(object)) }
-    this.deserialize = options.deserialize || function (buffer) { return JSON.parse(buffer.toString()) }
-    this.createJournal = (options.writeStage == 'tree' ? (function () {
-        var journal = this.journalist.createJournal()
-        return function () { return journal }
-    }).call(this) : function () {
-        return this.journalist.createJournal()
-    })
-    this.lengths = {}
-}
 
 Sheaf.prototype.readEntry = function (buffer, isKey) {
     for (var count = 2, i = 0, I = buffer.length; i < I && count; i++) {
