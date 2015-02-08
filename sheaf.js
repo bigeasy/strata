@@ -198,18 +198,6 @@ Sheaf.prototype.writeHeader = function (queue, page) {
     })
 }
 
-Sheaf.prototype.readFooter = function (entry) {
-    var footer = entry.header
-    return {
-        entry:      footer[0],
-        right:      footer[1],
-        position:   footer[2],
-        entries:    footer[3],
-        ghosts:     footer[4],
-        records:    footer[5]
-    }
-}
-
 Sheaf.prototype.rewriteLeaf = cadence(function (async, page, suffix) {
     var index = 0, out
 
