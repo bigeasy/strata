@@ -86,7 +86,7 @@ Player.prototype.readHeader = function (entry) {
 Player.prototype.play = cadence(function (async, sheaf, fd, stat, read, page) {
     var leaf = !!(page.address % 2),
         seen = {},
-        buffer = new Buffer(sheaf.options.readLeafStartLength || 1024),
+        buffer = new Buffer(sheaf.options.readLeafStartLength || 1024 * 1024),
         footer, length
 
     // todo: really want to register a cleanup without an indent.
