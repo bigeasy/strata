@@ -1,3 +1,4 @@
+// todo: redux
 require('proof')(3, require('cadence')(prove))
 
 function prove (async, assert) {

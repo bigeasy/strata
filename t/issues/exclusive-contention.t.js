@@ -10,14 +10,12 @@ function prove (async, assert) {
         strata.mutator('a', async())
     }, function (a) {
         async(function () {
-            a.insert('a', 'a', ~ a.index, async())
-        }, function () {
+            a.insert('a', 'a', ~a.index)
             strata.mutator('b', async())
             a.unlock(async())
         }, function (b) {
             async(function () {
-                b.insert('b', 'b', ~ b.index, async())
-            }, function () {
+                b.insert('b', 'b', ~b.index)
                 b.unlock(async())
             }, function () {
                 gather(strata, async())

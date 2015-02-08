@@ -15,26 +15,20 @@ function prove (async, assert) {
     }, function () {
         strata.mutator('g', async())
     }, function (cursor) {
-        async(function () {
-            cursor.remove(cursor.index, async())
-        }, function () {
-            cursor.unlock(async())
-        }, function () {
-            gather(strata, async())
-        })
+        cursor.remove(cursor.index)
+        cursor.unlock(async())
+    }, function () {
+        gather(strata, async())
     }, function (records) {
         assert(records, [ 'a', 'd', 'f', 'h', 'i', 'l', 'm', 'n' ], 'records after delete')
         strata.mutator('j', async())
     }, function (cursor) {
-        async(function () {
-            var index = cursor._indexOf('j')
-            assert(~index <= cursor.length, 'unambiguous')
-            cursor.insert('j', 'j', ~cursor.index, async())
-        }, function () {
-            cursor.unlock(async())
-        }, function () {
-            gather(strata, async())
-        })
+        var index = cursor.indexOf('j', cursor.ghosts)
+        assert(~index <= cursor.length, 'unambiguous')
+        cursor.insert('j', 'j', ~cursor.index)
+        cursor.unlock(async())
+    }, function () {
+        gather(strata, async())
     }, function (records) {
         assert(records, [ 'a', 'd', 'f', 'h', 'i', 'j', 'l', 'm', 'n' ], 'records after insert')
     }, function() {

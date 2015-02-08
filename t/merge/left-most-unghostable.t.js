@@ -11,12 +11,9 @@ function prove (async, assert) {
     }, function () {
         strata.mutator('a', async())
     }, function (cursor) {
-        async(function () {
-            cursor.remove(cursor.index, async())
-        }, function () {
-            assert(cursor.index, 0, 'unghostable')
-            cursor.unlock(async())
-        })
+        cursor.remove(cursor.index)
+        assert(cursor.index, 0, 'unghostable')
+        cursor.unlock(async())
     }, function () {
         gather(strata, async())
     }, function (records) {

@@ -12,11 +12,8 @@ function prove (async, assert) {
                 async(function () {
                     strata.mutator(insert, async())
                 }, function (cursor) {
-                    async(function () {
-                        cursor.insert(insert, insert, ~cursor.index, async())
-                    }, function () {
-                        cursor.unlock(async())
-                    })
+                    cursor.insert(insert, insert, ~cursor.index)
+                    cursor.unlock(async())
                 })
             })(callback)
             break
@@ -33,11 +30,8 @@ function prove (async, assert) {
     }, function () {
         strata.mutator('b', async())
     }, function (cursor) {
-        async(function () {
-            cursor.remove(cursor.index, async())
-        }, function () {
-            cursor.unlock(async())
-        })
+        cursor.remove(cursor.index)
+        cursor.unlock(async())
     }, function () {
         insert = 'b'
         strata.balance(async())
@@ -55,11 +49,8 @@ function prove (async, assert) {
     }, function () {
         strata.mutator('d', async())
     }, function (cursor) {
-        async(function () {
-            cursor.remove(cursor.index, async())
-        }, function () {
-            cursor.unlock(async())
-        })
+        cursor.remove(cursor.index)
+        cursor.unlock(async())
     }, function () {
         insert = 'd'
         strata.balance(async())

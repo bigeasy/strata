@@ -12,12 +12,10 @@ function prove (async, assert) {
         strata.mutator('b', async())
     }, function (cursor) {
         async(function () {
-            cursor.remove(cursor.index, async())
-        }, function () {
+            cursor.remove(cursor.index)
             cursor.next(async())
         }, function () {
-            cursor.remove(cursor._indexOf('d'), async())
-        }, function () {
+            cursor.remove(cursor.indexOf('d', cursor.ghosts))
             cursor.unlock(async())
         })
     }, function () {

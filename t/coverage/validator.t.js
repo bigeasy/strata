@@ -9,6 +9,7 @@ function prove (async, assert) {
         assert(/is not a directory.$/.test(error.message), 'thrown')
     })
 
+    // todo: dubious
     strata = createStrata({  directory: tmp, fs: {
         stat: function (file, callback) { callback(new Error('errored')) }
     }})

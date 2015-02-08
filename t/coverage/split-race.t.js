@@ -15,12 +15,9 @@ function prove (async, assert) {
                         strata.mutator('b', async())
                     }, function (cursor) {
                         async(function () {
-                            cursor.remove(cursor.index, async())
-                        }, function () {
-                            cursor.remove(cursor._indexOf('c'), async())
-                        }, function () {
-                            cursor.remove(cursor._indexOf('d'), async())
-                        }, function () {
+                            cursor.remove(cursor.index)
+                            cursor.remove(cursor.indexOf('c', cursor.ghosts))
+                            cursor.remove(cursor.indexOf('d', cursor.ghosts))
                             cursor.unlock(async())
                         })
                     })
@@ -41,8 +38,7 @@ function prove (async, assert) {
         strata.mutator('d', async())
     }, function (cursor) {
         async(function () {
-            cursor.insert('d', 'd', ~ cursor.index, async())
-        }, function () {
+            cursor.insert('d', 'd', ~ cursor.index)
             cursor.unlock(async())
         }, function () {
             gather(strata, async())

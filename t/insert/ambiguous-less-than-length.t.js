@@ -15,15 +15,12 @@ function prove (async, assert) {
     }, function () {
         strata.mutator('d', async())
     }, function (cursor) {
-        async(function () {
-            var index = cursor._indexOf('e')
-            assert(index <= cursor.length, 'unambiguous')
-            cursor.insert('e', 'e', ~index, async())
-        }, function () {
-            cursor.unlock(async())
-        }, function () {
-            gather(strata, async())
-        })
+        var index = cursor.indexOf('e', cursor.ghosts)
+        assert(index <= cursor.length, 'unambiguous')
+        cursor.insert('e', 'e', ~index)
+        cursor.unlock(async())
+    }, function () {
+        gather(strata, async())
     }, function (records) {
         assert(records, [ 'a', 'd', 'e', 'f', 'g', 'h', 'i', 'l', 'm', 'n' ], 'records after insert')
     }, function() {

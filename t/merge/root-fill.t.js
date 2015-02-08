@@ -11,33 +11,21 @@ function prove (async, assert) {
     }, function () {
         strata.mutator('h', async())
     }, function (cursor) {
-        async(function () {
-            cursor.remove(cursor._indexOf('h'), async())
-        }, function () {
-            cursor.remove(cursor._indexOf('i'), async())
-        }, function () {
-            cursor.unlock(async())
-        })
+        cursor.remove(cursor.indexOf('h', cursor.ghosts))
+        cursor.remove(cursor.indexOf('i', cursor.ghosts))
+        cursor.unlock(async())
     }, function () {
         strata.mutator('e', async())
     }, function (cursor) {
-        async(function () {
-            cursor.remove(cursor._indexOf('e'), async())
-        }, function () {
-            cursor.remove(cursor._indexOf('g'), async())
-        }, function () {
-            cursor.unlock(async())
-        })
+        cursor.remove(cursor.indexOf('e', cursor.ghosts))
+        cursor.remove(cursor.indexOf('g', cursor.ghosts))
+        cursor.unlock(async())
     }, function () {
         strata.mutator('m', async())
     }, function (cursor) {
-        async(function () {
-            cursor.remove(cursor._indexOf('m'), async())
-        }, function () {
-            cursor.remove(cursor._indexOf('n'), async())
-        }, function () {
-            cursor.unlock(async())
-        })
+        cursor.remove(cursor.indexOf('m', cursor.ghosts))
+        cursor.remove(cursor.indexOf('n', cursor.ghosts))
+        cursor.unlock(async())
     }, function () {
         gather(strata, async())
     }, function (records) {

@@ -80,8 +80,7 @@ function insert (async, strata, values) {
         strata.mutator(values[0], async())
     }, function (cursor) {
         async(function () {
-            cursor.insert(values[0], values[0], ~ cursor.index, async())
-        }, function () {
+            cursor.insert(values[0], values[0], ~ cursor.index)
             cursor.unlock(async())
         })
     })
@@ -362,7 +361,7 @@ var invoke = cadence(function (async, tmp, assert, test) {
         assert.global('tmp', tmp)
         assert.global('load', load)
         assert.global('stringify', stringify)
-        assert.global('insert', insert)
+        assert.global('_insert', insert)
         assert.global('serialize', serialize)
         assert.global('gather', gather)
         assert.global('vivify', vivify)
@@ -464,12 +463,11 @@ function script (options, callback) {
             strata.mutator(action.values[0], async())
         }, function (cursor) {
             var loop = async(function () {
-                cursor.indexOf(action.values[0], async())
+                cursor.indexOf(action.values[0], cursor.ghosts)
             }, function (index) {
                 ok(index < 0)
-                cursor.insert(action.values[0], action.values[0], ~ index, async())
+                cursor.insert(action.values[0], action.values[0], ~index)
                 action.values.shift()
-            }, function () {
                 if (!action.values.length) {
                     async(function () {
                         cursor.unlock(async())
@@ -489,7 +487,7 @@ function script (options, callback) {
         }, function (cursor) {
             action.values.shift()
             async(function () {
-                if (cursor.index >= 0) cursor.remove(cursor.index, async())
+                if (cursor.index >= 0) cursor.remove(cursor.index)
             }, function () {
                 cursor.unlock(async())
             })

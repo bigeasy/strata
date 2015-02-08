@@ -16,7 +16,7 @@ function prove (async, assert) {
         strata.mutator('a', async())
     }, function (cursor) {
         var page = async(function () {
-            var index = cursor._indexOf('z')
+            var index = cursor.indexOf('z', cursor.ghosts)
             ambiguity.unshift(cursor.length < ~index)
             if (ambiguity[0]) {
                 async(function () {
@@ -26,8 +26,7 @@ function prove (async, assert) {
                 })
             } else {
                 async(function () {
-                    cursor.insert('z', 'z', ~index, async())
-                }, function () {
+                    cursor.insert('z', 'z', ~index)
                     assert(ambiguity, [ 0, 1, 1, 1 ], 'unambiguous')
                     cursor.unlock(async())
                 })

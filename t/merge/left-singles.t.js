@@ -11,21 +11,14 @@ function prove (async, assert) {
     }, function () {
         strata.mutator('bt', async())
     }, function (cursor) {
-        async(function () {
-            cursor.remove(cursor._indexOf('bt'), async())
-        }, function () {
-            cursor.remove(cursor._indexOf('bu'), async())
-        }, function () {
-            cursor.unlock(async())
-        })
+        cursor.remove(cursor.indexOf('bt', cursor.ghosts))
+        cursor.remove(cursor.indexOf('bu', cursor.ghosts))
+        cursor.unlock(async())
     }, function () {
         strata.mutator('bw', async())
     }, function (cursor) {
-        async(function () {
-            cursor.remove(cursor._indexOf('bw'), async())
-        }, function () {
-            cursor.unlock(async())
-        })
+        cursor.remove(cursor.indexOf('bw', cursor.ghosts))
+        cursor.unlock(async())
     }, function () {
         strata.balance(async())
     }, function () {

@@ -11,11 +11,8 @@ function prove (async, assert) {
     }, function () {
         strata.mutator('eu', async())
     }, function (cursor) {
-        async(function () {
-            cursor.remove(cursor.index, async())
-        }, function () {
-            cursor.unlock(async())
-        })
+        cursor.remove(cursor.index)
+        cursor.unlock(async())
     }, function () {
         strata.balance(async())
     }, function () {

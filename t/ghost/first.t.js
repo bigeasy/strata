@@ -11,11 +11,8 @@ function prove (async, assert) {
     }, function () {
         strata.mutator('a', async())
     }, function (cursor) {
-        async(function () {
-            cursor.remove(cursor.index, async())
-        }, function () {
-            cursor.unlock(async())
-        })
+        cursor.remove(cursor.index)
+        cursor.unlock(async())
     }, function () {
         vivify(tmp, async())
         load(__dirname + '/fixtures/first.after.json', async())

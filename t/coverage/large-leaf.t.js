@@ -11,11 +11,8 @@ function prove (async, assert) {
     }, function () {
         strata.mutator('_', async())
     }, function (cursor) {
-        async(function () {
-            cursor.insert('_', '_', ~ cursor.index, async())
-        }, function () {
-            cursor.unlock(async())
-        })
+        cursor.insert('_', '_', ~cursor.index)
+        cursor.unlock(async())
     }, function () {
         gather(strata, async())
     }, function (records) {

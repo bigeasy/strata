@@ -11,11 +11,8 @@ function prove (async, assert) {
     }, function () {
         strata.mutator('zz', async())
     }, function (cursor) {
-        async(function () {
-            cursor.insert('zz', 'zz', ~ cursor.index, async())
-        }, function () {
-            cursor.unlock(async())
-        })
+        cursor.insert('zz', 'zz', ~cursor.index)
+        cursor.unlock(async())
     }, function () {
         strata.balance(async())
     }, function () {

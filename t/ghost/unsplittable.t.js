@@ -11,15 +11,11 @@ function prove (async, assert) {
     }, function () {
         strata.mutator('g', async())
     }, function (cursor) {
-        async(function () {
-            cursor.insert('g', 'g', ~cursor.index, async())
-        }, function () {
-            cursor.remove(cursor._indexOf('d'), async())
-        }, function () {
-            cursor.unlock(async())
-        }, function () {
-            gather(strata, async())
-        })
+        cursor.insert('g', 'g', ~cursor.index)
+        cursor.remove(cursor.indexOf('d', cursor.ghosts))
+        cursor.unlock(async())
+    }, function () {
+        gather(strata, async())
     }, function (records) {
         assert(records, [ 'a', 'b', 'c', 'e', 'f', 'g' ], 'records')
         strata.balance(async())

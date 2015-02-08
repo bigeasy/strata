@@ -11,13 +11,11 @@ function prove (async, assert) {
     }, function() {
         strata.mutator('b', async())
     }, function (cursor) {
-        async(function () {
-            cursor.insert('b', 'b', ~ cursor.index,  async())
-        }, function () {
-            cursor.unlock(async())
-            vivify(tmp, async())
-            load(__dirname + '/fixtures/between.after.json', async())
-        })
+        cursor.insert('b', 'b', ~cursor.index)
+        cursor.unlock(async())
+    }, function () {
+        vivify(tmp, async())
+        load(__dirname + '/fixtures/between.after.json', async())
     }, function (actual, expected) {
         assert(actual, expected, 'insert')
         strata.close(async())

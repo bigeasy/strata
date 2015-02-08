@@ -15,13 +15,10 @@ function prove (async, assert) {
     }, function () {
         strata.mutator('c', async())
     }, function (cursor) {
-        async(function() {
-            cursor.remove(cursor._indexOf('c'), async())
-        }, function () {
-            cursor.unlock(async())
-        }, function () {
-            gather(strata, async())
-        })
+        cursor.remove(cursor.indexOf('c', cursor.ghosts))
+        cursor.unlock(async())
+    }, function () {
+        gather(strata, async())
     }, function (records) {
         assert(records, [ 'a', 'b', 'd' ], 'deleted')
         vivify(tmp, async())

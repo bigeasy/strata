@@ -13,8 +13,7 @@ function prove (async, assert) {
         strata.mutator('b', async())
     }, function (cursor) {
         async(function () {
-            cursor.remove(cursor.index, async())
-        }, function () {
+            cursor.remove(cursor.index)
             cursor.unlock(async())
         }, function () {
             gather(strata, async())

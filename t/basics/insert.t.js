@@ -11,13 +11,10 @@ function prove (async, assert) {
         strata.mutator('a', async())
     }, function (cursor) {
         assert(cursor.exclusive, 'exclusive')
-        async(function () {
-            cursor.insert('a', 'a', ~ cursor.index, async())
-        }, function () {
-            cursor.unlock(async())
-        }, function () {
+        cursor.insert('a', 'a', ~cursor.index)
+        cursor.unlock(async())
+    }, function () {
             assert(strata.size, 54, 'json size')
-        })
     }, function () {
         vivify(tmp, async())
         load(__dirname + '/fixtures/insert.json', async())

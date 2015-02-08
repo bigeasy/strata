@@ -44,9 +44,10 @@ Cursor.prototype.next = cadence(function (async) {
 })
 
 // to user land
-Cursor.prototype._indexOf = function (key) {
+Cursor.prototype.indexOf = function (key, index) {
+    ok(arguments.length == 2, 'index requires two arguments')
     var page = this._page
-    var index = this._sheaf.find(page, key, page.ghosts)
+    var index = this._sheaf.find(page, key, index)
     var unambiguous
     unambiguous = -1 < index // <- todo: ?
                || ~ index < this._page.items.length
@@ -112,7 +113,7 @@ Cursor.prototype.__defineGetter__('length', function () {
     return this._page.items.length
 })
 
-Cursor.prototype.insert = function (record, key, index, callback) {
+Cursor.prototype.insert = function (record, key, index) {
     ok(this.exclusive, 'cursor is not exclusive')
     ok(index > 0 || this._page.address == 1)
 
@@ -132,10 +133,9 @@ Cursor.prototype.insert = function (record, key, index, callback) {
     })
     this.length = this._page.items.length
     this._write()
-    callback()
 }
 
-Cursor.prototype.remove = function (index, callback) {
+Cursor.prototype.remove = function (index) {
     var ghost = this._page.address != 1 && index == 0, entry
     this._sheaf.unbalanced(this._page)
 
@@ -153,7 +153,6 @@ Cursor.prototype.remove = function (index, callback) {
         this._sheaf.splice(this._page, index, 1)
     }
     this._write()
-    callback()
 }
 
 module.exports = Cursor

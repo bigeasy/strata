@@ -20,12 +20,11 @@ function prove (async, assert) {
         async(function () {
             cursor.next(async())
         }, function () {
-            cursor.insert('e', 'e', ~cursor._indexOf('e'), async())
-        }, function () {
+            cursor.insert('e', 'e', ~cursor.indexOf('e', cursor.ghosts))
             cursor.unlock(async())
-        }, function () {
-            gather(strata, async())
         })
+    }, function () {
+        gather(strata, async())
     }, function (records) {
         assert(records, [ 'a', 'b', 'c', 'd', 'e' ], 'cached')
     }, function () {

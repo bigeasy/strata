@@ -10,11 +10,8 @@ function prove (async, assert) {
     }, function () {
         strata.mutator(value, async())
     }, function (cursor) {
-        async(function () {
-            cursor.insert(value, value, ~ cursor.index, async())
-        }, function (inserted) {
-            cursor.unlock(async())
-        })
+        cursor.insert(value, value, ~cursor.index)
+        cursor.unlock(async())
     }, function () {
         strata.close(async())
     }, function () {

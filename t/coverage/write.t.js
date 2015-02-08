@@ -26,7 +26,10 @@ function prove (async, assert) {
     }, function () {
         strata.open(async())
     }, function () {
-        insert(async, strata, [ 'b' ])
+        strata.mutator('b', async())
+    }, function (cursor) {
+        cursor.insert('b', 'b', ~cursor.index)
+        cursor.unlock(async())
     }, function () {
         strata.close(async())
     }, function () {
