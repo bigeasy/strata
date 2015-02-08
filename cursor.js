@@ -8,7 +8,6 @@ function Cursor (sheaf, journal, descents, exclusive, searchKey) {
     this._sheaf = sheaf
     this._locker = descents[0].locker
     this._page = descents[0].page
-    this._rightLeafKey = null
     this._searchKey = searchKey
     this.exclusive = exclusive
     this.index = descents[0].index
@@ -24,7 +23,6 @@ Cursor.prototype.get = function (index) {
 // to user land
 Cursor.prototype.next = cadence(function (async) {
     var next
-    this._rightLeafKey = null
 
     if (this._page.right.address == 0) {
         // return [ async, false ] <- return immediately!
