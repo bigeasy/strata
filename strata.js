@@ -6,6 +6,7 @@ var Cache = require('magazine'),
     Queue = require('./queue'),
     Script = require('./script'),
     Sheaf = require('./sheaf'),
+    Balancer = require('./balancer'),
     Descent = require('./descent'),
     Locker = require('./locker'),
     Player = require('./player'),
@@ -189,7 +190,7 @@ Strata.prototype.mutator = function (key, callback) {
 
 // to user land
 Strata.prototype.balance = function (callback) {
-    this.sheaf.balance(callback)
+    new Balancer().balance(this.sheaf, callback)
 }
 
 // to user land

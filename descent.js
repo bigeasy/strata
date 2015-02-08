@@ -1,9 +1,11 @@
 var cadence = require('cadence/redux')
 var Locker = require('./locker')
+var Sheaf = require('./sheaf')
 var ok = require('assert').ok
 var extend = require('./extend')
 
 function Descent (sheaf, locker, override) {
+    ok(sheaf instanceof Sheaf, 'sheaf')
     ok(locker instanceof Locker)
 
     override = override || {}
