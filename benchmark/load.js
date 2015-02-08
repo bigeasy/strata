@@ -8,7 +8,6 @@
   ___ usage ___
 */
 
-var advance = require('advance')
 var splice = require('splice')
 var cadence = require('cadence/redux')
 var path = require('path')
@@ -24,14 +23,15 @@ var random = (function () {
         return Math.floor(random() * max)
     }
 })()
+            function recordSort (a, b) {
+                return a.key < b.key ? -1 : a.key > b.key ? 1 : 0
+            }
 
 var runner = cadence(function (async) {
     var start, insert, gather
     var directory = path.join(__dirname, 'tmp'), db, count = 0
-    var extractor = function (record) { return record.key }
     var strata = new Strata({
         directory: directory,
-        extractor: extractor,
         leafSize: 256,
         branchSize: 256,
         writeStage: 'leaf'
@@ -47,9 +47,11 @@ var runner = cadence(function (async) {
             buffer = new Buffer(4)
             buffer.writeUInt32BE(value, 0)
             sha.update(buffer)
+            var digest = sha.digest('hex')
             entries.push({
-                key: sha.digest('hex'),
-                type: !! random(2) ? 'insert' : 'delete'
+                key: digest,
+                type: !! random(2) ? 'insert' : 'delete',
+                record: digest
             })
         }
         batches.push(entries)
@@ -62,14 +64,12 @@ var runner = cadence(function (async) {
         start = Date.now()
         strata.create(async())
     }, function () {
+        var time
         var batch = 0, loop = async(function () {
             if (batch === 7) return [ loop ]
-            var iterator = advance(batches[batch], function (record, callback) {
-                callback(null, record, record.key)
-            })
             splice(function (incoming, existing) {
-                return incoming.record.type
-            }, strata, iterator, async())
+                return incoming.type
+            }, strata, batches[batch], async())
             batch++
         })()
     }, function () {
@@ -108,8 +108,4 @@ var runner = cadence(function (async) {
 
 require('arguable/executable')(module, cadence(function (async, options) {
     runner(options, async())
-    return
-    AsyncProfile.profile(function () {
-        runner(options, function (error) { if (error) throw error })
-    })
 }))
