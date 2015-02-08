@@ -452,7 +452,7 @@ Balancer.prototype.drainRoot = cadence(function (async, sheaf) {
     })
 })
 
-Balancer.prototype.exorcise2 = function (sheaf, pivot, page, corporal) {
+Balancer.prototype.exorcise = function (sheaf, pivot, page, corporal) {
     var entry
 
     ok(page.ghosts, 'no ghosts')
@@ -468,33 +468,6 @@ Balancer.prototype.exorcise2 = function (sheaf, pivot, page, corporal) {
     item.heft = page.items[0].heft
     sheaf.splice(pivot.page, pivot.index, 0, item)
 }
-
-Balancer.prototype.exorcise = cadence(function (async, sheaf, pivot, page, corporal) {
-    var entry
-
-    ok(page.ghosts, 'no ghosts')
-    ok(corporal.items.length - corporal.ghosts > 0, 'no replacement')
-
-    // todo: how is this not a race condition? I'm writing to the log, but I've
-    // not updated the pivot page, not rewritten during `deleteGhosts`.
-    sheaf.splice(page, 0, 1, sheaf.splice(corporal, corporal.ghosts, 1))
-    page.ghosts = 0
-
-    var item = sheaf.splice(pivot.page, pivot.index, 1).shift()
-    item.key = page.items[0].key
-    item.heft = page.items[0].heft
-    sheaf.splice(pivot.page, pivot.index, 0, item)
-
-    async(function () {
-        entry = sheaf.journal.leaf.open(sheaf._filename(page.address, 0), page.position, page)
-        entry.ready(async())
-    }, function () {
-    // todo: close on failure.
-        entry.close('entry', async())
-    }, function () {
-        return []
-    })
-})
 
 Balancer.prototype.deleteGhost = cadence(function (async, sheaf, key) {
     var locker = sheaf.createLocker(),
@@ -519,7 +492,7 @@ Balancer.prototype.deleteGhost = cadence(function (async, sheaf, key) {
         descents.push(leaf = pivot.fork())
         leaf.descend(leaf.key(key), leaf.leaf, async())
     }, function () {
-        this.exorcise2(sheaf, pivot, leaf.page, leaf.page)
+        this.exorcise(sheaf, pivot, leaf.page, leaf.page)
         script.rotate(leaf.page)
         if (reference) {
             reference.page.right.key = leaf.page.items[0].key
@@ -709,7 +682,7 @@ Balancer.prototype.mergeLeaves = function (sheaf, key, leftKey, unbalanced, ghos
 
         sheaf.unbalanced(leaves.left.page, true)
 
-        var index
+        var index, referrantDirty
         if (left + right > sheaf.options.leafSize) {
             if (unbalanced[leaves.left.page.address]) {
                 sheaf.unbalanced(leaves.left.page, true)
@@ -721,11 +694,11 @@ Balancer.prototype.mergeLeaves = function (sheaf, key, leftKey, unbalanced, ghos
         } else {
             async(function () {
                 if (ghostly && left + right) {
-                    // todo: exorcise2
+                    referrantDirty = true
                     if (left) {
-                        this.exorcise(sheaf, ghosted, leaves.left.page, leaves.left.page, async())
+                        this.exorcise(sheaf, ghosted, leaves.left.page, leaves.left.page)
                     } else {
-                        this.exorcise(sheaf, ghosted, leaves.left.page, leaves.right.page, async())
+                        this.exorcise(sheaf, ghosted, leaves.left.page, leaves.right.page)
                     }
                 }
             }, function () {
