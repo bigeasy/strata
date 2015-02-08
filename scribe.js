@@ -2,7 +2,12 @@ var fs = require('fs')
 
 function Scribe (filename, flags) {
     this.operations = [ {} ]
-    fs.open(filename, flags, this._done.bind(this, '_opened'))
+    this.filename = filename
+    this.flags = flags
+}
+
+Scribe.prototype.open = function () {
+    fs.open(this.filename, this.flags, this._done.bind(this, '_opened'))
 }
 
 Scribe.prototype._done = function (method, error, result) {

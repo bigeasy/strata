@@ -10,14 +10,7 @@ function Script (sheaf) {
 }
 
 Script.prototype.rotate = function (page) {
-    page.position = 0
-    page.rotation++
-    var queue = new Queue
-    this._sheaf.writeHeader(queue, page)
-    queue.finish()
-    this._operations.push({
-        name: '_rotate', page: page, queue: queue
-    })
+    this._operations.push({ name: '_rotate', page: page })
 }
 
 Script.prototype.unlink = function (page) {
@@ -44,23 +37,12 @@ Script.prototype.writeBranch = function (page) {
 
 Script.prototype._rotate = cadence(function (async, operation) {
     var page = operation.page, queue = operation.queue, entry
-    var rotation = this._sheaf.filename2(page, '.replace')
-    this._journal.push({
-        name: '_replace', from: rotation, to: this._sheaf.filename2(page)
-    })
     async(function () {
-        entry = this._sheaf.journal.leaf.open(rotation, page.position, page)
-        entry.ready(async())
-    }, function () {
-        page.position += queue.length
-        async.forEach(function (buffer) {
-            entry.write(buffer, async())
-        })(queue.buffers)
-    }, function () {
-    // todo: scram on failure.
-        entry.close('entry', async())
-    }, function () {
-        return [ rotation ]
+        this._sheaf.logger.rotate(page, async())
+    }, function (from, to) {
+        this._journal.push({
+            name: '_replace', from: from, to: to
+        })
     })
 })
 
@@ -70,7 +52,7 @@ Script.prototype._writeBranch = cadence(function (async, operation) {
     this._journal.push({
         name: '_replace', from: file, to: this._sheaf.filename2(page)
     })
-    this._sheaf.writeBranch(page, file, async())
+    this._sheaf.logger.writeBranch(page, file, async())
 })
 
 Script.prototype._rewriteLeaf = cadence(function (async, operation) {
@@ -80,7 +62,7 @@ Script.prototype._rewriteLeaf = cadence(function (async, operation) {
     this._journal.push({
         name: '_replace', from: file, to: this._sheaf._filename(page.address, 0)
     })
-    this._sheaf.rewriteLeaf(page, '.replace', async())
+    this._sheaf.logger.rewriteLeaf(page, '.replace', async())
 })
 
 Script.prototype.commit = cadence(function (async) {

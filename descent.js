@@ -132,7 +132,7 @@ Descent.prototype.descend = cadence(function (async, next, stop) {
             this.index = index
         }
         this.indexes[this.page.address] = this.index
-        if (!(this.page.address % 2)) {
+        if (this.page.address % 2 === 0) {
             ok(this.page.items.length, 'page has addresses')
             ok(this.page.items[0].key == null, 'first key is cached')
         }

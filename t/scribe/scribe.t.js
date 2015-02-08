@@ -15,6 +15,7 @@ function prove (async, assert) {
         mkdirp(directory, async())
     }, function () {
         var scribe = new Scribe(file, 'w+')
+        scribe.open()
         async(function () {
             scribe.write(new Buffer('x'), 0, 1, 0)
             scribe.write(new Buffer('y'), 0, 1, 1, async())
@@ -30,6 +31,7 @@ function prove (async, assert) {
         assert(body, 'xyz', 'write')
         async([function () {
             var scribe = new Scribe(path.join(__dirname, 'missing', 'file'), 'w+')
+            scribe.open()
             scribe.write(new Buffer('x'), 0, 1, 0)
             scribe.close(async())
         }, function (_, error) {
@@ -40,6 +42,7 @@ function prove (async, assert) {
     }, function (fd) {
         async([function () {
             var scribe = new Scribe(path.join(directory, 'write'), 'w+')
+            scribe.open()
             async(function () {
                 scribe.write(new Buffer('y'), 0, 1, 0, async())
             }, function () {

@@ -1,5 +1,4 @@
 var Cache = require('magazine'),
-    Journalist = require('journalist'),
     cadence = require('cadence/redux'),
     Cursor = require('./cursor'),
     fs = require('fs'),
@@ -10,6 +9,7 @@ var Cache = require('magazine'),
     Descent = require('./descent'),
     Locker = require('./locker'),
     Player = require('./player'),
+    Logger = require('./logger'),
     ok = require('assert').ok,
     path = require('path')
 
@@ -25,7 +25,8 @@ function extend(to, from) {
 
 function Strata (options) {
     options.player = new Player
-    this.sheaf = new Sheaf(options)
+    options.logger = new Logger(this.sheaf)
+    options.logger._sheaf = this.sheaf = new Sheaf(options)
 }
 
 Strata.prototype.__defineGetter__('size', function () {
@@ -96,24 +97,21 @@ Strata.prototype.open = cadence(function (async) {
 // to user land
 Strata.prototype.close = cadence(function (async) {
     var cartridge = this.sheaf.magazine.get(-2), lock = cartridge.value.page.lock
-    async(function () {
-        this.sheaf.createJournal().close('tree', async())
-    }, function () {
-        lock.unlock()
-        // todo
-        lock.dispose()
 
-        cartridge.release()
+    lock.unlock()
+    // todo
+    lock.dispose()
 
-        var purge = this.sheaf.magazine.purge()
-        while (purge.cartridge) {
-            purge.cartridge.remove()
-            purge.next()
-        }
-        purge.release()
+    cartridge.release()
 
-        ok(!this.sheaf.magazine.count, 'pages still held by cache')
-    })
+    var purge = this.sheaf.magazine.purge()
+    while (purge.cartridge) {
+        purge.cartridge.remove()
+        purge.next()
+    }
+    purge.release()
+
+    ok(!this.sheaf.magazine.count, 'pages still held by cache')
 })
 
 Strata.prototype.left = function (descents, exclusive, callback) {
@@ -141,7 +139,7 @@ Strata.prototype.leftOf = function (key) {
             }, async())
         }, function (page, index) {
             if (descents[0].page.address % 2) {
-                return [ new Cursor(this.sheaf, this.sheaf.createJournal(), descents, false, key) ]
+                return [ new Cursor(this.sheaf, descents, false, key) ]
             } else {
                 descents[0].index--
                 this.toLeaf(descents[0].right, descents, null, exclusive, async())
@@ -157,7 +155,7 @@ Strata.prototype.toLeaf = cadence(function (async, sought, descents, key, exclus
         if (exclusive) descents[0].exclude()
         descents[0].descend(sought, descents[0].leaf, async())
     }, function () {
-        return [ new Cursor(this.sheaf, this.sheaf.createJournal(), descents, exclusive, key) ]
+        return [ new Cursor(this.sheaf, descents, exclusive, key) ]
     })
 })
 

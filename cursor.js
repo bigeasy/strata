@@ -1,10 +1,10 @@
 var cadence = require('cadence/redux')
 var ok = require('assert').ok
 var Queue = require('./queue')
+var Scribe = require('./scribe')
 var scram = require('./scram')
 
-function Cursor (sheaf, journal, descents, exclusive, searchKey) {
-    this._journal = journal
+function Cursor (sheaf, descents, exclusive, searchKey) {
     this._sheaf = sheaf
     this._locker = descents[0].locker
     this._page = descents[0].page
@@ -57,29 +57,37 @@ Cursor.prototype._indexOf = function (key) {
     return index
 }
 
-// todo: pass an integer as the first argument to force the arity of the
-// return.
 Cursor.prototype._unlock = cadence(function (async) {
     async([function () {
         this._locker.unlock(this._page)
         this._locker.dispose()
     }], function () {
-        if (this.queue) {
-            this.queue.finish()
-            if (this.queue.buffers.length) {
-                this._write(async())
-            }
-        }
-    }, function () {
-        this._journal.close('leaf', async())
-    }, function () {
-        return []
+        this.queue.finish()
+        this._write()
+        this.scribe.close(async())
     })
 })
 
+// todo: pass an integer as the first argument to force the arity of the
+// return.
 Cursor.prototype.unlock = function (callback) {
-    ok(callback, 'unlock now requires a callback')
-    this._unlock(callback)
+    if (this.scribe) {
+        this._unlock(callback)
+    } else {
+        this._locker.unlock(this._page)
+        this._locker.dispose()
+        callback()
+    }
+}
+
+Cursor.prototype._write = function () {
+    if (this.queue.buffers.length) {
+        this.queue.buffers.forEach(function (buffer) {
+            this.scribe.write(buffer, 0, buffer.length, this._page.position)
+            this._page.position += buffer.length
+        }, this)
+        this.queue.clear()
+    }
 }
 
 // note: exclusive, index, offset and length are public
@@ -104,33 +112,7 @@ Cursor.prototype.__defineGetter__('length', function () {
     return this._page.items.length
 })
 
-Cursor.prototype._write = cadence(function (async) {
-    var entry
-    async(function () {
-        entry = this._journal.open(this._sheaf.filename2(this._page), this._page.position, this._page)
-        this._sheaf.journalist.purge(async())
-    }, function () {
-        entry.ready(async())
-    }, function () {
-        this._page.position += this.queue.length
-        scram.call(this, entry, cadence(function (async) {
-            async(function () {
-                async.forEach(function (buffer) {
-                    entry.write(buffer, async())
-                })(this.queue.buffers)
-            }, function () {
-                this.queue.clear()
-                async(function () {
-                    entry.close('entry', async())
-                }, function () {
-                    return []
-                })
-            })
-        }), async())
-    })
-})
-
-Cursor.prototype.insert = cadence(function (async, record, key, index) {
+Cursor.prototype.insert = function (record, key, index, callback) {
     ok(this.exclusive, 'cursor is not exclusive')
     ok(index > 0 || this._page.address == 1)
 
@@ -138,40 +120,40 @@ Cursor.prototype.insert = cadence(function (async, record, key, index) {
 
     if (!this.queue) {
         this.queue = new Queue
+        this.scribe = new Scribe(this._sheaf.filename2(this._page), 'a')
+        this.scribe.open()
     }
 
-    var length = this._sheaf.writeInsert(this.queue, this._page, index, record)
+    var length = this._sheaf.logger.writeInsert(this.queue, this._page, index, record)
     this._sheaf.splice(this._page, index, 0, {
         key: key,
         record: record,
         heft: length
     })
     this.length = this._page.items.length
+    this._write()
+    callback()
+}
 
-    if (this.queue.buffers.length) {
-        this._write(async())
-    }
-})
-
-Cursor.prototype.remove = cadence(function (async, index) {
+Cursor.prototype.remove = function (index, callback) {
     var ghost = this._page.address != 1 && index == 0, entry
     this._sheaf.unbalanced(this._page)
 
     if (!this.queue) {
         this.queue = new Queue
+        this.scribe = new Scribe(this._sheaf.filename2(this._page), 'a')
+        this.scribe.open()
     }
 
-    this._sheaf.writeDelete(this.queue, this._page, index)
+    this._sheaf.logger.writeDelete(this.queue, this._page, index)
     if (ghost) {
         this._page.ghosts++
         this.offset || this.offset++
     } else {
         this._sheaf.splice(this._page, index, 1)
     }
-
-    if (this.queue.buffers.length) {
-        this._write(async())
-    }
-})
+    this._write()
+    callback()
+}
 
 module.exports = Cursor
