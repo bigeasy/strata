@@ -218,7 +218,7 @@ Balancer.prototype.shouldSplitBranch = function (sheaf, branch, key, callback) {
 
 Balancer.prototype.splitLeafAndUnlock = cadence(function (async, sheaf, address, key, ghosts) {
     var locker = sheaf.createLocker(),
-        script = new Script(sheaf),
+        script = sheaf.logger.createScript(),
         descents = [], replacements = [], encached = [],
         completed = 0,
         penultimate, leaf, split, pages, page,
@@ -319,7 +319,7 @@ Balancer.prototype.splitLeaf = cadence(function (async, sheaf, address, key, gho
 
 Balancer.prototype.splitBranchAndUnlock = cadence(function (async, sheaf, address, key) {
     var locker = sheaf.createLocker(),
-        script = new Script(sheaf),
+        script = sheaf.logger.createScript(),
         descents = [],
         children = [],
         encached = [],
@@ -392,7 +392,7 @@ Balancer.prototype.splitBranch = cadence(function (async, sheaf, address, key) {
 
 Balancer.prototype.drainRootAndUnlock = cadence(function (async, sheaf) {
     var locker = sheaf.createLocker(),
-        script = new Script(sheaf),
+        script = sheaf.logger.createScript(),
         children = [], locks = [],
         root, pages, records, remainder
 
@@ -471,7 +471,7 @@ Balancer.prototype.exorcise = function (sheaf, pivot, page, corporal) {
 
 Balancer.prototype.deleteGhost = cadence(function (async, sheaf, key) {
     var locker = sheaf.createLocker(),
-        script = new Script(sheaf),
+        script = sheaf.logger.createScript(),
         descents = [],
         pivot, leaf, reference
     async([function () {
@@ -528,7 +528,7 @@ Balancer.prototype.mergePagesAndUnlock = cadence(function (
     async, sheaf, key, leftKey, stopper, merger, ghostly
 ) {
     var locker = sheaf.createLocker(),
-        script = new Script(sheaf),
+        script = sheaf.logger.createScript(),
         descents = [],
         singles = { left: [], right: [] }, parents = {}, pages = {},
         ancestor, pivot, empties, ghosted, designation
@@ -814,7 +814,8 @@ Balancer.prototype.mergeBranches = function (sheaf, key, heft, address, callback
 }
 
 Balancer.prototype.fillRoot = cadence(function (async, sheaf) {
-    var locker = sheaf.createLocker(), script = new Script(sheaf), descents = [], root, child
+    var locker = sheaf.createLocker(), script = sheaf.logger.createScript(),
+        descents = [], root, child
 
     async([function () {
         descents.forEach(function (descent) { locker.unlock(descent.page) })

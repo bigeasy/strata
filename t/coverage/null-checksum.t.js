@@ -10,7 +10,7 @@ function prove (async, assert) {
     }, function () {
         strata.close(async())
     }, function () {
-        fs.readFile(path.join(tmp, '0.0'), 'utf8', async())
+        fs.readFile(path.join(tmp, 'pages', '0.0'), 'utf8', async())
     }, function (body) {
         assert(+(body.split(/\n/)[0].split(/\s+/)[1]), 0, 'zero')
     })

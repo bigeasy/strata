@@ -66,47 +66,6 @@ Sheaf.prototype.unbalanced = function (page, force) {
     }
 }
 
-Sheaf.prototype.filename2 = function (page, suffix) {
-    return this._filename(page.address, page.rotation, suffix)
-}
-
-Sheaf.prototype._filename = function (address, rotation, suffix) {
-    suffix || (suffix = '')
-    return path.join(this.directory, address + '.' + rotation + suffix)
-}
-
-Sheaf.prototype.replace = cadence(function (async, page, suffix) {
-    // todo: unlink all rotations
-    var replacement = this._filename(page.address, page.rotation, suffix),
-        permanent = this._filename(page.address, page.rotation)
-
-    async(function () {
-        this.fs.stat(replacement, async())
-    }, function (stat) {
-        ok(stat.isFile(), 'is not a file')
-        async([function () {
-            this.fs.unlink(permanent, async())
-        }, function (error) {
-            if (error.code != 'ENOENT') {
-                throw error
-            }
-        }])
-    }, function (ror) {
-        this.fs.rename(replacement, permanent, async())
-    })
-})
-
-Sheaf.prototype._rename = function (page, rotation, from, to, callback) {
-    this.fs.rename(
-        this._filename(page.address, rotation, from),
-        this._filename(page.address, rotation, to),
-        callback)
-}
-
-Sheaf.prototype._unlink = function (page, rotation, suffix, callback) {
-    this.fs.unlink(this._filename(page.address, rotation, suffix), callback)
-}
-
 Sheaf.prototype.heft = function (page, s) {
     this.magazine.get(page.address).adjustHeft(s)
 }

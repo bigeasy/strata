@@ -3,8 +3,8 @@ var path = require('path')
 var fs = require('fs')
 var Queue = require('./queue')
 
-function Script (sheaf) {
-    this._sheaf = sheaf
+function Script (logger) {
+    this._logger = logger
     this._journal = []
     this._operations = []
 }
@@ -16,7 +16,7 @@ Script.prototype.rotate = function (page) {
 Script.prototype.unlink = function (page) {
     var rotations = []
     for (var i = 0; i <= page.rotation; i++) {
-        rotations.push(this._sheaf._filename(page.address, i))
+        rotations.push(path.join(this._logger._directory, 'pages', page.address + '.' + i))
     }
     this._journal.push({
         name: '_purge', rotations: rotations
@@ -35,34 +35,35 @@ Script.prototype.writeBranch = function (page) {
     })
 }
 
-Script.prototype._rotate = cadence(function (async, operation) {
+Script.prototype._rotate = function (operation, callback) {
     var page = operation.page, queue = operation.queue, entry
-    async(function () {
-        this._sheaf.logger.rotate(page, async())
-    }, function (from, to) {
-        this._journal.push({
-            name: '_replace', from: from, to: to
-        })
+    page.rotation++
+    var from = this._logger.filename(page, true)
+    var to = this._logger.filename(page)
+    this._journal.push({
+        name: '_replace', from: from, to: to
     })
-})
+    this._logger.rotate(page, from, callback)
+}
 
 Script.prototype._writeBranch = cadence(function (async, operation) {
     var page = operation.page
-    var file = this._sheaf.filename2(page, '.replace')
+    var file = this._logger.filename(page, true)
     this._journal.push({
-        name: '_replace', from: file, to: this._sheaf.filename2(page)
+        name: '_replace', from: file, to: this._logger.filename(page)
     })
-    this._sheaf.logger.writeBranch(page, file, async())
+    this._logger.writeBranch(page, file, async())
 })
 
 Script.prototype._rewriteLeaf = cadence(function (async, operation) {
     var page = operation.page
     this.unlink(page)
-    var file = this._sheaf._filename(page.address, 0, '.replace')
+    page.rotation = 0
+    var file = this._logger.filename(page, true)
     this._journal.push({
-        name: '_replace', from: file, to: this._sheaf._filename(page.address, 0)
+        name: '_replace', from: file, to: this._logger.filename(page)
     })
-    this._sheaf.logger.rewriteLeaf(page, '.replace', async())
+    this._logger.rewriteLeaf(page, file, async())
 })
 
 Script.prototype.commit = cadence(function (async) {
@@ -72,8 +73,8 @@ Script.prototype.commit = cadence(function (async) {
         })(this._operations)
     }, function () {
         this._journal.push({ name: '_complete' })
-        var pending = path.join(this._sheaf.directory, 'journal.pending')
-        var comitted = path.join(this._sheaf.directory, 'journal')
+        var pending = path.join(this._logger._directory, 'journal.pending')
+        var comitted = path.join(this._logger._directory, 'journal')
         async(function () {
             var script = this._journal.map(function (operation) {
                 return JSON.stringify(operation)
@@ -119,7 +120,7 @@ Script.prototype._replace = cadence(function (async, operation) {
 })
 
 Script.prototype._complete = cadence(function (async, operation) {
-    var journal = path.join(this._sheaf.directory, 'journal')
+    var journal = path.join(this._logger._directory, 'journal')
     async([function () {
         fs.unlink(journal, async())
     }, function (error) {

@@ -63,31 +63,19 @@ Cursor.prototype._unlock = cadence(function (async) {
         this._locker.unlock(this._page)
         this._locker.dispose()
     }], function () {
-        this.queue.finish()
-        this._write()
-        this.scribe.close(async())
+        this._appender.close(async())
     })
 })
 
 // todo: pass an integer as the first argument to force the arity of the
 // return.
 Cursor.prototype.unlock = function (callback) {
-    if (this.scribe) {
+    if (this._appender) {
         this._unlock(callback)
     } else {
         this._locker.unlock(this._page)
         this._locker.dispose()
         callback()
-    }
-}
-
-Cursor.prototype._write = function () {
-    if (this.queue.buffers.length) {
-        this.queue.buffers.forEach(function (buffer) {
-            this.scribe.write(buffer, 0, buffer.length, this._page.position)
-            this._page.position += buffer.length
-        }, this)
-        this.queue.clear()
     }
 }
 
@@ -113,46 +101,47 @@ Cursor.prototype.__defineGetter__('length', function () {
     return this._page.items.length
 })
 
+Cursor.prototype._filename = function (page) {
+    return path.join(this._sheaf.directory, 'pages', pages.address + '.' + page.rotation)
+}
+
 Cursor.prototype.insert = function (record, key, index) {
     ok(this.exclusive, 'cursor is not exclusive')
     ok(index > 0 || this._page.address == 1)
 
     this._sheaf.unbalanced(this._page)
 
-    if (!this.queue) {
-        this.queue = new Queue
-        this.scribe = new Scribe(this._sheaf.filename2(this._page), 'a')
-        this.scribe.open()
+    if (this._appender == null) {
+        this._appender = this._sheaf.logger.createAppender(this._page)
     }
 
-    var length = this._sheaf.logger.writeInsert(this.queue, this._page, index, record)
+    var length = this._appender.writeInsert(index, record)
+
     this._sheaf.splice(this._page, index, 0, {
         key: key,
         record: record,
         heft: length
     })
+
     this.length = this._page.items.length
-    this._write()
 }
 
 Cursor.prototype.remove = function (index) {
     var ghost = this._page.address != 1 && index == 0, entry
     this._sheaf.unbalanced(this._page)
 
-    if (!this.queue) {
-        this.queue = new Queue
-        this.scribe = new Scribe(this._sheaf.filename2(this._page), 'a')
-        this.scribe.open()
+    if (this._appender == null) {
+        this._appender = this._sheaf.logger.createAppender(this._page)
     }
 
-    this._sheaf.logger.writeDelete(this.queue, this._page, index)
+    this._appender.writeDelete(index)
+
     if (ghost) {
         this._page.ghosts++
         this.offset || this.offset++
     } else {
         this._sheaf.splice(this._page, index, 1)
     }
-    this._write()
 }
 
 module.exports = Cursor

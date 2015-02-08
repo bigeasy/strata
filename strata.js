@@ -24,8 +24,8 @@ function extend(to, from) {
 }
 
 function Strata (options) {
-    options.player = new Player
-    options.logger = new Logger(this.sheaf)
+    options.player = new Player(options.directory)
+    options.logger = new Logger(options.directory, this.sheaf)
     options.logger._sheaf = this.sheaf = new Sheaf(options)
 }
 
@@ -40,28 +40,27 @@ Strata.prototype.__defineGetter__('nextAddress', function () {
 // to user land
 Strata.prototype.create = cadence(function (async) {
     this.sheaf.createMagazine()
-
     var locker = this.sheaf.createLocker(), count = 0, root, leaf, journal
-
-    var script = new Script(this.sheaf)
-
     async([function () {
         locker.dispose()
     }], function () {
         this.sheaf.fs.stat(this.sheaf.directory, async())
     }, function (stat) {
         ok(stat.isDirectory(), 'database ' + this.sheaf.directory + ' is not a directory.')
+    }, function () {
         this.sheaf.fs.readdir(this.sheaf.directory, async())
     }, function (files) {
         ok(!files.filter(function (f) { return ! /^\./.test(f) }).length,
               'database ' + this.sheaf.directory + ' is not empty.')
-
+        this.sheaf.logger.mkdir(async())
+    }, function () {
         root = locker.encache(this.sheaf.createBranch({ penultimate: true }))
         leaf = locker.encache(this.sheaf.createLeaf({}))
     }, [function () {
         locker.unlock(root)
         locker.unlock(leaf)
     }], function () {
+        var script = this.sheaf.logger.createScript()
         this.sheaf.splice(root, 0, 0, { address: leaf.address, heft: 0 })
         script.writeBranch(root)
         script.rewriteLeaf(leaf)
@@ -84,7 +83,7 @@ Strata.prototype.open = cadence(function (async) {
     async(function () {
         this.sheaf.fs.stat(this.sheaf.directory, async())
     }, function stat (error, stat) {
-        this.sheaf.fs.readdir(this.sheaf.directory, async())
+        this.sheaf.fs.readdir(path.join(this.sheaf.directory, 'pages'), async())
     }, function (files) {
         files.forEach(function (file) {
             if (/^\d+\.\d+$/.test(file)) {

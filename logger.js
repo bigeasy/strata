@@ -1,13 +1,22 @@
 var ok = require('assert').ok
 
+var fs = require('fs')
+var path = require('path')
+
 var cadence = require('cadence/redux')
 
 var Queue = require('./queue')
+var Script = require('./script')
 var Scribe = require('./scribe')
 
-function Logger (sheaf) {
+function Logger (directory, sheaf) {
+    this._directory = directory
     // todo: remove when page can slice
     this._sheaf = sheaf
+}
+
+Logger.prototype.filename = function (page, draft) {
+    return path.join(this._directory, draft ? 'drafts' : 'pages', page.address + '.' + page.rotation)
 }
 
 Logger.prototype.writeEntry = function (options) {
@@ -74,8 +83,8 @@ Logger.prototype.writeLeafEntry = function (queue, page, item) {
     this.writeInsert(queue, page, page.entries - 1, item.record)
 }
 
-Logger.prototype.rewriteLeaf = function (page, suffix, callback) {
-    this.writePage(page, this._sheaf._filename(page.address, 0, suffix), 'writeLeafEntry', callback)
+Logger.prototype.rewriteLeaf = function (page, file, callback) {
+    this.writePage(page, file, 'writeLeafEntry', callback)
 }
 
 Logger.prototype.writeBranchEntry = function (queue, page, item) {
@@ -106,7 +115,6 @@ Logger.prototype.writePage = function (page, file, writer, callback) {
 
     scribe.open()
 
-    page.rotation = 0
     page.entries = 0
     page.position = 0
 
@@ -136,14 +144,10 @@ Logger.prototype.writePage = function (page, file, writer, callback) {
     scribe.close(callback)
 }
 
-Logger.prototype.rotate = cadence(function (async, page) {
+Logger.prototype.rotate = function (page, file, callback) {
     page.position = 0
-    page.rotation++
 
-    var from = this._sheaf.filename2(page, '.replace')
-    var to = this._sheaf.filename2(page)
-
-    var scribe = new Scribe(from, 'a')
+    var scribe = new Scribe(file, 'a')
     scribe.open()
 
     var queue = new Queue
@@ -154,11 +158,61 @@ Logger.prototype.rotate = cadence(function (async, page) {
         page.position += buffer.length
     })
 
-    async(function () {
-        scribe.close(async())
-    }, function () {
-        return [ from, to ]
-    })
+    scribe.close(callback)
+}
+
+Logger.prototype.mkdir = cadence(function (async) {
+    async([function () {
+        fs.mkdir(path.join(this._directory, 'pages'), 0755, async())
+        fs.mkdir(path.join(this._directory, 'drafts'), 0755, async())
+    }, function (error) {
+        throw error
+    }])
 })
+
+Logger.prototype.createScript = function () {
+    return new Script(this)
+}
+
+Logger.prototype.createAppender = function (page) {
+    var scribe = new Scribe(this.filename(page), 'a')
+    scribe.open()
+    return new Appender(this, scribe, page)
+}
+
+function Appender (logger, scribe, page) {
+    this._logger = logger
+    this._scribe = scribe
+    this._page = page
+    this._queue = new Queue
+}
+
+Appender.prototype.writeInsert = function (index, record) {
+    var length = this._logger.writeInsert(this._queue, this._page, index, record)
+    this._write()
+    return length
+}
+
+Appender.prototype.writeDelete = function (index) {
+    var length = this._logger.writeDelete(this._queue, this._page, index)
+    this._write()
+    return length
+}
+
+Appender.prototype._write = function () {
+    if (this._queue.buffers.length) {
+        this._queue.buffers.forEach(function (buffer) {
+            this._scribe.write(buffer, 0, buffer.length, this._page.position)
+            this._page.position += buffer.length
+        }, this)
+        this._queue.clear()
+    }
+}
+
+Appender.prototype.close = function (callback) {
+    this._queue.finish()
+    this._write()
+    this._scribe.close(callback)
+}
 
 module.exports = Logger

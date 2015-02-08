@@ -1,8 +1,10 @@
 var ok = require('assert').ok
 var fs = require('fs')
+var path = require('path')
 var cadence = require('cadence/redux')
 
-function Player () {
+function Player (directory) {
+    this.directory = directory
 }
 
 // todo: outgoing
@@ -36,7 +38,8 @@ Player.prototype.io = cadence(function (async, direction, filename) {
 Player.prototype.read = cadence(function (async, sheaf, page) {
     page.entries = page.ghosts = page.position = 0
     var rotation = 0, loop = async([function () {
-        this.io('read', sheaf._filename(page.address, rotation), async())
+        var filename = path.join(this.directory, 'pages', page.address + '.' + rotation)
+        this.io('read', filename, async())
     }, function (error) {
         if (rotation === 0 || error.code !== 'ENOENT') {
             throw error

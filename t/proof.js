@@ -4,6 +4,7 @@ var fs = require('fs'),
     cadence = require('cadence/redux'),
     Strata = require('..'),
     rimraf = require('rimraf'),
+    path = require('path'),
     ok = require('assert').ok
 
 require('cadence/loops')
@@ -18,6 +19,7 @@ function check (callback, forward) {
 function vivify (directory, callback) {
     var files, dir = {}, lengths = {}, count = 0
 
+    directory = path.join(directory, 'pages')
     fs.readdir(directory, check(callback, list))
 
     function list ($1) {
@@ -109,16 +111,24 @@ var gather = cadence(function (async, strata) {
     })
 })
 
-function serialize (segments, directory, callback) {
-    if (typeof segments == 'string') load(segments, check(callback, write))
-    else write (segments)
-
-    function write (json) {
+var serialize = cadence(function (async, segments, directory) {
+    async([function () {
+        fs.mkdir(path.join(directory, 'drafts'), 0755, async())
+        directory = path.join(directory, 'pages')
+        fs.mkdir(directory, 0755, async())
+    }, function (error) {
+        if (error.code !== 'EEXIST') {
+            throw error
+        }
+    }], function () {
+        if (typeof segments == 'string') load(segments, async())
+        else return [ segments ]
+    }, function (json) {
         var dir = directivize(json)
         var files = Object.keys(dir)
         var count = 0
 
-        files.forEach(function (file) {
+        async.forEach(function (file) {
             var records = []
             dir[file].forEach(function (line) {
                 var record = [ JSON.stringify(line.header) ]
@@ -139,12 +149,10 @@ function serialize (segments, directory, callback) {
                 records.push(length + ' ' + record)
             })
             records = records.join('\n') + '\n'
-            fs.writeFile(path.resolve(directory, String(file) + '.0'), records, 'utf8', check(callback, written))
-        })
-
-        function written () { if (++count == files.length) callback(null) }
-    }
-}
+            fs.writeFile(path.resolve(directory, String(file) + '.0'), records, 'utf8', async())
+        })(files)
+    })
+})
 
 function abstracted (dir) {
     var output = {}
