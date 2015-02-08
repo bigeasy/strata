@@ -7,7 +7,7 @@ function prove (async, assert) {
     async(function () {
         serialize(__dirname + '/../basics/fixtures/get.json', tmp, async())
     }, function () {
-        strata = new Strata({
+        strata = createStrata({
             directory: tmp,
             leafSize: 3,
             branchSize: 3,

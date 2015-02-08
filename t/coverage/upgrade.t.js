@@ -20,7 +20,7 @@ function prove (async, assert) {
     async(function () {
         serialize(__dirname + '/fixtures/split-race.before.json', tmp, async())
     }, function () {
-        strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3, tracer: tracer })
+        strata = createStrata({ directory: tmp, leafSize: 3, branchSize: 3, tracer: tracer })
         strata.open(async())
     }, function () {
         strata.mutator('d', async())

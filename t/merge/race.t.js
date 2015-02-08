@@ -28,7 +28,7 @@ function prove (async, assert) {
     async(function () {
         serialize(__dirname + '/fixtures/race.before.json', tmp, async())
     }, function () {
-        strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3, tracer: tracer })
+        strata = createStrata({ directory: tmp, leafSize: 3, branchSize: 3, tracer: tracer })
         strata.open(async())
     }, function () {
         strata.mutator('b', async())
@@ -50,7 +50,7 @@ function prove (async, assert) {
     }, function () {
         serialize(__dirname + '/fixtures/race.before.json', tmp, async())
     }, function () {
-        strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3, tracer: tracer })
+        strata = createStrata({ directory: tmp, leafSize: 3, branchSize: 3, tracer: tracer })
         strata.open(async())
     }, function () {
         strata.mutator('d', async())

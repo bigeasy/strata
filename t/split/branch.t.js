@@ -3,7 +3,7 @@
 require('./proof')(4, prove)
 
 function prove (async, assert) {
-    var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
+    var strata = createStrata({ directory: tmp, leafSize: 3, branchSize: 3 })
     async(function () {
         serialize(__dirname + '/fixtures/branch.before.json', tmp, async())
     }, function () {
@@ -30,7 +30,7 @@ function prove (async, assert) {
         assert(strata.size, 0, 'purge completely')
         strata.close(async())
     }, function () {
-        strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
+        strata = createStrata({ directory: tmp, leafSize: 3, branchSize: 3 })
         strata.open(async())
     }, function () {
         gather(strata, async())

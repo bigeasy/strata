@@ -5,7 +5,7 @@ require('./proof')(1, prove)
 function prove (async, assert) {
     var strata
     async(function () {
-        strata = new Strata({
+        strata = createStrata({
             directory: tmp,
             serialize: function (string) { return new Buffer(string) },
             deserialize: function (buffer)  { return buffer.toString() }
@@ -22,7 +22,7 @@ function prove (async, assert) {
     }, function () {
         strata.close(async())
     }, function () {
-        strata = new Strata({
+        strata = createStrata({
             directory: tmp,
             serialize: function (string) { return new Buffer(string) },
             deserialize: function (buffer)  { return buffer.toString() }

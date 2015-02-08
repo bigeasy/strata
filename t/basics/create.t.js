@@ -7,7 +7,7 @@ function prove (async, assert) {
     async(function () {
         fs.writeFile(tmp + '/.ignore', '', 'utf8', async())
     }, function () {
-        strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
+        strata = createStrata({ directory: tmp, leafSize: 3, branchSize: 3 })
         strata.create(async())
     }, function () {
         assert(strata.size, 0, 'total heft')
@@ -22,7 +22,7 @@ function prove (async, assert) {
 
         assert(actual, expected, 'written')
 
-        strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
+        strata = createStrata({ directory: tmp, leafSize: 3, branchSize: 3 })
         strata.open(async())
     }, function () {
         strata.iterator('a', async())

@@ -3,13 +3,13 @@
 require('./proof')(2, prove)
 
 function prove (async, assert) {
-    var strata = new Strata({ directory: __filename })
+    var strata = createStrata({ directory: __filename })
 
     strata.create(function (error) {
         assert(/is not a directory.$/.test(error.message), 'thrown')
     })
 
-    strata = new Strata({  directory: tmp, fs: {
+    strata = createStrata({  directory: tmp, fs: {
         stat: function (file, callback) { callback(new Error('errored')) }
     }})
 

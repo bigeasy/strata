@@ -5,7 +5,7 @@ require('./proof')(4, prove)
 function prove (async, assert) {
     var strata
     async(function () {
-        strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
+        strata = createStrata({ directory: tmp, leafSize: 3, branchSize: 3 })
         strata.create(async())
     }, function () {
         strata.mutator('a', async())

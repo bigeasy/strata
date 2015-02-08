@@ -3,7 +3,7 @@
 require('./proof')(2, prove)
 
 function prove (async, assert) {
-    var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
+    var strata = createStrata({ directory: tmp, leafSize: 3, branchSize: 3 })
     async(function () {
         serialize(__dirname + '/fixtures/balancer-cached-right.json', tmp, async())
     }, function () {

@@ -7,7 +7,7 @@ function prove (async, assert) {
     async(function () {
         fs.writeFile(tmp + '/0.0', '6 x_x\n', 'utf8', async())
     }, function () {
-        strata = new Strata({ directory: tmp })
+        strata = createStrata({ directory: tmp })
         strata.open(async())
     }, [function () {
         strata.iterator('a', async())
@@ -16,7 +16,7 @@ function prove (async, assert) {
     }], function () {
         fs.writeFile(tmp + '/0.0', '6 x 0\n', 'utf8', async())
     }, function () {
-        strata = new Strata({ directory: tmp })
+        strata = createStrata({ directory: tmp })
         strata.open(async())
     }, [function () {
         strata.iterator('a', async())

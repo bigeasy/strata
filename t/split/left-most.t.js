@@ -3,7 +3,7 @@
 require('./proof')(3, prove)
 
 function prove (async, assert) {
-    var ok = require('assert').ok, strata = new Strata({
+    var ok = require('assert').ok, strata = createStrata({
         directory: tmp,
         leafSize: 3,
         branchSize: 3,

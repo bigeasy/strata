@@ -5,7 +5,7 @@ require('./proof')(1, prove)
 function prove (async, assert) {
     var strata, value = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTU'
     async(function () {
-        strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
+        strata = createStrata({ directory: tmp, leafSize: 3, branchSize: 3 })
         strata.create(async())
     }, function () {
         strata.mutator(value, async())
@@ -18,7 +18,7 @@ function prove (async, assert) {
     }, function () {
         strata.close(async())
     }, function () {
-        strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
+        strata = createStrata({ directory: tmp, leafSize: 3, branchSize: 3 })
         strata.open(async())
     }, function () {
         gather(strata, async())

@@ -20,7 +20,7 @@ function prove (async, assert) {
         }
     }
 
-    var strata = new Strata({ directory: tmp, fs: proxy, leafSize: 3 })
+    var strata = createStrata({ directory: tmp, fs: proxy, leafSize: 3 })
     async(function () {
         serialize(__dirname + '/../basics/fixtures/split.before.json', tmp, async())
     }, function () {

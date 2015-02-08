@@ -3,7 +3,7 @@
 require('./proof')(5, prove)
 
 function prove (async, assert) {
-    var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 }), records = []
+    var strata = createStrata({ directory: tmp, leafSize: 3, branchSize: 3 }), records = []
     async(function () {
         serialize(__dirname + '/fixtures/two.json', tmp, async())
     }, function () {

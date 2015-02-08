@@ -7,7 +7,7 @@ function prove (async, assert) {
     async(function () {
         serialize(__dirname + '/fixtures/merge.before.json', tmp, async())
     }, function () {
-        strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 })
+        strata = createStrata({ directory: tmp, leafSize: 3, branchSize: 3 })
         strata.open(async())
     }, function () {
         strata.mutator(strata.right, async())

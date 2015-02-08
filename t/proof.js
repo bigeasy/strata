@@ -338,6 +338,16 @@ function directivize (json) {
     return directory
 }
 
+function createStrata (options) {
+    if (!options.comparator) {
+        options.comparator = function (a, b) {
+            ok(a != null && b != null, 'key is null')
+            return a < b ? -1 : a > b ? 1 : 0
+        }
+    }
+    return new Strata(options)
+}
+
 var invoke = cadence(function (async, tmp, assert, test) {
     async(function () {
         rimraf(tmp, async())
@@ -348,7 +358,7 @@ var invoke = cadence(function (async, tmp, assert, test) {
             global[name] = value
             assert.leak(name)
         }
-        assert.global('Strata', Strata)
+        assert.global('createStrata', createStrata)
         assert.global('tmp', tmp)
         assert.global('load', load)
         assert.global('stringify', stringify)

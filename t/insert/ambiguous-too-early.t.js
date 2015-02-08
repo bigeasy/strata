@@ -3,7 +3,7 @@
 require('./proof')(3, prove)
 
 function prove (async, assert) {
-    var strata = new Strata({ directory: tmp, leafSize: 3, branchSize: 3 }), ambiguity = []
+    var strata = createStrata({ directory: tmp, leafSize: 3, branchSize: 3 }), ambiguity = []
     async(function () {
         serialize(__dirname + '/fixtures/ambiguous.before.json', tmp, async())
     }, function () {

@@ -4,7 +4,7 @@ require('./proof')(1, prove)
 
 function prove (async, assert) {
     var fs = require('fs'), path = require('path')
-    var strata = new Strata({ directory: tmp, checksum: 'none' })
+    var strata = createStrata({ directory: tmp, checksum: 'none' })
     async(function () {
         strata.create(async())
     }, function () {
