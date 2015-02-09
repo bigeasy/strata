@@ -70,8 +70,27 @@ Sheaf.prototype.heft = function (page, s) {
     this.magazine.get(page.address).adjustHeft(s)
 }
 
+function Page (sheaf, prototype, override, remainder) {
+    if (override.address == null) {
+        while (sheaf.nextAddress % 2 == remainder) sheaf.nextAddress++
+        override.address = sheaf.nextAddress++
+    }
+    extend(this, prototype)
+    extend(this, override || {})
+}
+
+Sheaf.prototype.createBranch = function (override) {
+    return new Page(this, {
+        items: [],
+        entries: 0,
+        rotation: 0,
+        penultimate: true,
+        queue: this.sequester.createQueue()
+    }, override, 1)
+}
+
 Sheaf.prototype.createLeaf = function (override) {
-    return this.createPage({
+    return new Page(this, {
         rotation: 0,
         loaders: {},
         entries: 0,
@@ -80,24 +99,6 @@ Sheaf.prototype.createLeaf = function (override) {
         right: { address: 0, key: null },
         queue: this.sequester.createQueue()
     }, override, 0)
-}
-
-Sheaf.prototype.createPage = function (page, override, remainder) {
-    if (override.address == null) {
-        while ((this.nextAddress % 2) == remainder) this.nextAddress++
-        override.address = this.nextAddress++
-    }
-    return extend(page, override)
-}
-
-Sheaf.prototype.createBranch = function (override) {
-    return this.createPage({
-        items: [],
-        entries: 0,
-        rotation: 0,
-        penultimate: true,
-        queue: this.sequester.createQueue()
-    }, override, 1)
 }
 
 Sheaf.prototype.splice = function (page, offset, length, insert) {
