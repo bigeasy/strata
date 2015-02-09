@@ -2,9 +2,11 @@ var ok = require('assert').ok
 var fs = require('fs')
 var path = require('path')
 var cadence = require('cadence/redux')
+var checksum = require('./checksum')
 
-function Player (directory) {
-    this.directory = directory
+function Player (options) {
+    this.directory = options.directory
+    this.checksum = checksum(options.checksum)
 }
 
 // todo: outgoing
@@ -60,7 +62,7 @@ Player.prototype.readEntry = function (sheaf, buffer, isKey) {
     }
     ok(!count, 'corrupt line: could not find end of line header')
     var fields = buffer.toString('utf8', 0, i - 1).split(' ')
-    var hash = sheaf.checksum(), body, length
+    var hash = this.checksum(), body, length
     hash.update(fields[2])
     if (buffer[i - 1] == 0x20) {
         body = buffer.slice(i, buffer.length - 1)
