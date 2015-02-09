@@ -25,7 +25,7 @@ function extend(to, from) {
 
 function Strata (options) {
     options.player = new Player(options)
-    options.logger = new Logger(options.directory, this.sheaf)
+    options.logger = new Logger(options, this.sheaf)
     options.logger._sheaf = this.sheaf = new Sheaf(options)
 }
 

@@ -28,22 +28,6 @@ function Sheaf (options) {
     this.comparator = options.comparator || compare
     this.player = options.player
     this.logger = options.logger
-    this.checksum = (function () {
-        if (typeof options.checksum == 'function') return options.checksum
-        var algorithm
-        switch (algorithm = options.checksum || 'sha1') {
-        case 'none':
-            return function () {
-                return {
-                    update: function () {},
-                    digest: function () { return '0' }
-                }
-            }
-        default:
-            var crypto = require('crypto')
-            return function (m) { return crypto.createHash(algorithm) }
-        }
-    })()
     this.serialize = options.serialize || function (object) { return new Buffer(JSON.stringify(object)) }
     this.deserialize = options.deserialize || function (buffer) { return JSON.parse(buffer.toString()) }
     this.lengths = {}

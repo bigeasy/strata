@@ -8,9 +8,11 @@ var cadence = require('cadence/redux')
 var Queue = require('./queue')
 var Script = require('./script')
 var Scribe = require('./scribe')
+var checksum = require('./checksum')
 
-function Logger (directory, sheaf) {
-    this._directory = directory
+function Logger (options, sheaf) {
+    this._directory = options.directory
+    this._checksum = checksum(options.checksum)
     // todo: remove when page can slice
     this._sheaf = sheaf
 }
@@ -27,7 +29,7 @@ Logger.prototype.writeEntry = function (options) {
 
     entry = options.header.slice()
     json = JSON.stringify(entry)
-    var hash = this._sheaf.checksum()
+    var hash = this._checksum()
     hash.update(json)
 
     length = 0
