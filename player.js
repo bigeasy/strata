@@ -86,12 +86,66 @@ Player.prototype.readHeader = function (entry) {
     }
 }
 
-Player.prototype.play = cadence(function (async, sheaf, fd, stat, read, page) {
-    var leaf = !!(page.address % 2),
-        seen = {},
-        buffer = new Buffer(sheaf.options.readLeafStartLength || 1024 * 1024),
-        footer, length
+Player.prototype._play = function (sheaf, slice, start, page) {
+    var leaf = page.address % 2 === 1, length
+    for (var offset = 0, i = 0, I = slice.length; i < I; i++) {
+        if (slice[i] == 0x20) {
+            var sip = slice.toString('utf8', offset, i)
+            length = parseInt(sip)
+            ok(String(length).length == sip.length, 'invalid length')
+            if (offset + length > slice.length) {
+                break
+            }
+            var position = start + offset
+            ok(length)
+            page.position += length
+            var entry = this.readEntry(sheaf, slice.slice(offset, offset + length), !leaf)
+            var header = this.readHeader(entry)
+            if (entry.header[1] == 0) {
+                page.right = {
+                    address: entry.header[2],
+                    key: entry.body || null
+                }
+                if (entry.header[3] == 0 && page.ghosts) {
+                    sheaf.splice(page, 0, 1)
+                    page.ghosts = 0
+                }
+                page.entries++
+            } else {
+                ok(header.entry == ++page.entries, 'entry count is off')
+                var index = header.index
+                if (leaf) {
+                    if (index > 0) {
+                        sheaf.splice(page, index - 1, 0, {
+                            key: sheaf.extractor(entry.body),
+                            record: entry.body,
+                            heft: length
+                        })
+                    } else if (~index == 0 && page.address != 1) {
+                        ok(!page.ghosts, 'double ghosts')
+                        page.ghosts++
+                    } else if (index < 0) {
+                        sheaf.splice(page, -(index + 1), 1)
+                    }
+                } else {
+                    var address = header.address, key = null, heft = 0
+                    if (index - 1) {
+                        key = entry.body
+                        heft = length
+                    }
+                    sheaf.splice(page, index - 1, 0, {
+                        key: key, address: address, heft: heft
+                    })
+                }
+            }
+            i = offset = offset + length
+        }
+    }
+    return offset
+}
 
+Player.prototype.play = cadence(function (async, sheaf, fd, stat, read, page) {
+    var buffer = new Buffer(sheaf.options.readLeafStartLength || 1024 * 1024)
     // todo: really want to register a cleanup without an indent.
     async([function () {
         fs.close(fd, async())
@@ -99,61 +153,7 @@ Player.prototype.play = cadence(function (async, sheaf, fd, stat, read, page) {
         var loop = async(function (buffer, position) {
             read(buffer, position, async())
         }, function (slice, start) {
-            for (var offset = 0, i = 0, I = slice.length; i < I; i++) {
-                if (slice[i] == 0x20) {
-                    var sip = slice.toString('utf8', offset, i)
-                    length = parseInt(sip)
-                    ok(String(length).length == sip.length, 'invalid length')
-                    if (offset + length > slice.length) {
-                        break
-                    }
-                    var position = start + offset
-                    ok(length)
-                    page.position += length
-                    var entry = this.readEntry(sheaf, slice.slice(offset, offset + length), !leaf)
-                    var header = this.readHeader(entry)
-                    if (entry.header[1] == 0) {
-                        page.right = {
-                            address: entry.header[2],
-                            key: entry.body || null
-                        }
-                        if (entry.header[3] == 0 && page.ghosts) {
-                            sheaf.splice(page, 0, 1)
-                            page.ghosts = 0
-                        }
-                        page.entries++
-                    } else {
-                        ok(header.entry == ++page.entries, 'entry count is off')
-                        var index = header.index
-                        if (leaf) {
-                            if (index > 0) {
-                                seen[position] = true
-                                sheaf.splice(page, index - 1, 0, {
-                                    key: sheaf.extractor(entry.body),
-                                    record: entry.body,
-                                    heft: length
-                                })
-                            } else if (~index == 0 && page.address != 1) {
-                                ok(!page.ghosts, 'double ghosts')
-                                page.ghosts++
-                            } else if (index < 0) {
-                                sheaf.splice(page, -(index + 1), 1)
-                            }
-                        } else {
-                            var address = header.address, key = null, heft = 0
-                            if (index - 1) {
-                                key = entry.body
-                                heft = length
-                            }
-                            sheaf.splice(page, index - 1, 0, {
-                                key: key, address: address, heft: heft
-                            })
-                        }
-                    }
-                    i = offset = offset + length
-                }
-            }
-
+            var offset = this._play(sheaf, slice, start, page)
             if (start + buffer.length < stat.size) {
                 if (offset == 0) {
                     buffer = new Buffer(buffer.length * 2)
