@@ -8,6 +8,7 @@ require('cadence/loops')
 var Cache = require('magazine')
 
 var Locker = require('./locker')
+var Page = require('./page')
 var Queue = require('./queue')
 var Script = require('./script')
 
@@ -64,49 +65,8 @@ Sheaf.prototype.unbalanced = function (page, force) {
     }
 }
 
-Sheaf.prototype.heft = function (page, s) {
-    this.magazine.get(page.address).adjustHeft(s)
-}
-
-function Page (sheaf, address, modulus) {
-    if (address == null) {
-        while (sheaf.nextAddress % 2 !== modulus) sheaf.nextAddress++
-        address = sheaf.nextAddress++
-    }
-    this.address = address
-    this.entries = 0
-    this.rotation = 0
-    this.items = []
-    this.queue = sheaf.sequester.createQueue()
-    if (modulus === 1) {
-        this.right = { address: 0, key: null }
-        this.ghosts = 0
-    }
-}
-
 Sheaf.prototype.createPage = function (modulus, address) {
     return new Page(this, address, modulus)
-}
-
-Sheaf.prototype.splice = function (page, offset, length, insert) {
-    ok(typeof page != 'string', 'page is string')
-    var items = page.items, heft, removals
-
-    if (length) {
-        removals = items.splice(offset, length)
-        heft = removals.reduce(function (heft, item) { return heft + item.heft }, 0)
-        this.heft(page, -heft)
-    } else {
-        removals = []
-    }
-
-    if (insert != null) {
-        if (! Array.isArray(insert)) insert = [ insert ]
-        heft = insert.reduce(function (heft, item) { return heft + item.heft }, 0)
-        this.heft(page, heft)
-        items.splice.apply(items, [ offset, 0 ].concat(insert))
-    }
-    return removals
 }
 
 Sheaf.prototype.createMagazine = function () {

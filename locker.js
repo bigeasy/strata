@@ -30,6 +30,7 @@ Locker.prototype.lock = cadence(function (async, address, exclusive) {
                         // todo: does there need to be differnt types anymore?
                         page = this._sheaf.createPage(address % 2, address)
                         cartridge.value.page = page
+                        page.cartridge = cartridge
                         locks.push(this._locks[address] = page.queue.createLock())
                         locks[0].exclude(async())
                     }, function () {
@@ -64,7 +65,8 @@ Locker.prototype.lock = cadence(function (async, address, exclusive) {
 })
 
 Locker.prototype.encache = function (page) {
-    this._magazine.hold(page.address, { page: page })
+    var cartridge = this._magazine.hold(page.address, { page: page })
+    page.cartridge = cartridge
     this._locks[page.address] = page.queue.createLock()
     this._locks[page.address].exclude(function () {})
     return page

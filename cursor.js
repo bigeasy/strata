@@ -117,7 +117,7 @@ Cursor.prototype.insert = function (record, key, index) {
 
     var length = this._appender.writeInsert(index, record)
 
-    this._sheaf.splice(this._page, index, 0, {
+    this._page.splice(index, 0, {
         key: key,
         record: record,
         heft: length
@@ -140,7 +140,7 @@ Cursor.prototype.remove = function (index) {
         this._page.ghosts++
         this.offset || this.offset++
     } else {
-        this._sheaf.splice(this._page, index, 1)
+        this._page.splice(index, 1)
     }
 }
 

@@ -61,7 +61,7 @@ Strata.prototype.create = cadence(function (async) {
         locker.unlock(leaf)
     }], function () {
         var script = this.sheaf.logger.createScript()
-        this.sheaf.splice(root, 0, 0, { address: leaf.address, heft: 0 })
+        root.splice(0, 0, { address: leaf.address, heft: 0 })
         script.writeBranch(root)
         script.rewriteLeaf(leaf)
         script.commit(async())

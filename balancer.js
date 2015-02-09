@@ -271,7 +271,7 @@ Balancer.prototype.splitLeafAndUnlock = cadence(function (async, sheaf, address,
             offset = split.items.length - length
             index = offset
 
-            sheaf.splice(penultimate.page, penultimate.index + 1, 0, {
+            penultimate.page.splice(penultimate.index + 1, 0, {
                 key: split.items[offset].key,
                 heft: sheaf.serialize(split.items[offset].key, true).length,
                 address: page.address
@@ -282,7 +282,7 @@ Balancer.prototype.splitLeafAndUnlock = cadence(function (async, sheaf, address,
 
                 ok(index < split.items.length)
 
-                sheaf.splice(page, page.items.length, 0, item)
+                page.splice(page.items.length, 0, item)
 
                 index++
             }
@@ -292,7 +292,7 @@ Balancer.prototype.splitLeafAndUnlock = cadence(function (async, sheaf, address,
                 key: page.items[0].key
             }
         }, function () {
-            sheaf.splice(split, offset, length)
+            split.splice(offset, length)
             script.rewriteLeaf(page)
         })()
     }, function () {
@@ -357,9 +357,9 @@ Balancer.prototype.splitBranchAndUnlock = cadence(function (async, sheaf, addres
             var length = remainder-- > 0 ? records + 1 : records
             var offset = split.items.length - length
 
-            var cut = sheaf.splice(split, offset, length)
+            var cut = split.splice(offset, length)
 
-            sheaf.splice(parent.page, parent.index + 1, 0, {
+            parent.page.splice(parent.index + 1, 0, {
                 key: cut[0].key,
                 address: page.address,
                 heft: cut[0].heft
@@ -368,7 +368,7 @@ Balancer.prototype.splitBranchAndUnlock = cadence(function (async, sheaf, addres
             delete cut[0].key
             cut[0].heft = 0
 
-            sheaf.splice(page, 0, 0, cut)
+            page.splice(0, 0, cut)
         }
 
         children.unshift(full.page)
@@ -415,7 +415,7 @@ Balancer.prototype.drainRootAndUnlock = cadence(function (async, sheaf) {
             var length = remainder-- > 0 ? records + 1 : records
             var offset = root.items.length - length
 
-            var cut = sheaf.splice(root, offset, length)
+            var cut = root.splice(offset, length)
 
             lift.push({
                 key: cut[0].key,
@@ -427,12 +427,12 @@ Balancer.prototype.drainRootAndUnlock = cadence(function (async, sheaf) {
             delete cut[0].key
             cut[0].heft = 0
 
-            sheaf.splice(page, 0, 0, cut)
+            page.splice(0, 0, cut)
         }
 
         lift.reverse()
 
-        sheaf.splice(root, 0, 0, lift)
+        root.splice(0, 0, lift)
 
         children.forEach(function (page) {
             script.writeBranch(page)
@@ -460,13 +460,13 @@ Balancer.prototype.exorcise = function (sheaf, pivot, page, corporal) {
 
     // todo: how is this not a race condition? I'm writing to the log, but I've
     // not updated the pivot page, not rewritten during `deleteGhosts`.
-    sheaf.splice(page, 0, 1, sheaf.splice(corporal, corporal.ghosts, 1))
+    page.splice(0, 1, corporal.splice(corporal.ghosts, 1))
     page.ghosts = 0
 
-    var item = sheaf.splice(pivot.page, pivot.index, 1).shift()
+    var item = pivot.page.splice(pivot.index, 1).shift()
     item.key = page.items[0].key
     item.heft = page.items[0].heft
-    sheaf.splice(pivot.page, pivot.index, 0, item)
+    pivot.page.splice(pivot.index, 0, item)
 }
 
 Balancer.prototype.deleteGhost = cadence(function (async, sheaf, key) {
@@ -623,19 +623,19 @@ Balancer.prototype.mergePagesAndUnlock = cadence(function (
     }, function () {
         var index = parents.right.indexes[ancestor.address]
 
-        designation = sheaf.splice(ancestor, index, 1).shift()
+        designation = ancestor.splice(index, 1).shift()
 
         if (pivot.page.address != ancestor.address) {
             ok(!index, 'expected ancestor to be removed from zero index')
             ok(ancestor.items[index], 'expected ancestor to have right sibling')
-            designation = sheaf.splice(ancestor, index, 1).shift()
-            var hoist = sheaf.splice(pivot.page, pivot.index, 1).shift()
-            sheaf.splice(pivot.page, pivot.index, 0, {
+            designation = ancestor.splice(index, 1).shift()
+            var hoist = pivot.page.splice(pivot.index, 1).shift()
+            pivot.page.splice(pivot.index, 0, {
                 key: designation.key,
                 address: hoist.address,
                 heft: designation.heft
             })
-            sheaf.splice(ancestor, index, 0, { address: designation.address, heft: 0 })
+            ancestor.splice(index, 0, { address: designation.address, heft: 0 })
         } else{
             ok(index, 'expected ancestor to be non-zero')
         }
@@ -709,11 +709,11 @@ Balancer.prototype.mergeLeaves = function (sheaf, key, leftKey, unbalanced, ghos
                 var loop = async(function () {
                     if (index == count) return [ loop ]
                     var item = leaves.right.page.items[index + ghosts]
-                    sheaf.splice(leaves.left.page, leaves.left.page.items.length, 0, item)
+                    leaves.left.page.splice(leaves.left.page.items.length, 0, item)
                     index++
                 })()
             }, function () {
-                sheaf.splice(leaves.right.page, 0, leaves.right.page.items.length)
+                leaves.right.page.splice(0, leaves.right.page.items.length)
                 if (leftKey) {
                     leaves.referring.page.right.key = leaves.left.page.items[0].key
                     script.rotate(leaves.referring.page)
@@ -798,12 +798,12 @@ Balancer.prototype.mergeBranches = function (sheaf, key, heft, address, callback
     var merger = cadence(function (async, script, pages, ghosted) {
         ok(address == pages.right.page.address, 'unexpected address')
 
-        var cut = sheaf.splice(pages.right.page, 0, pages.right.page.items.length)
+        var cut = pages.right.page.splice(0, pages.right.page.items.length)
 
         cut[0].key = key
         cut[0].heft = heft
 
-        sheaf.splice(pages.left.page, pages.left.page.items.length, 0, cut)
+        pages.left.page.splice(pages.left.page.items.length, 0, cut)
 
         script.writeBranch(pages.left.page)
 
@@ -831,11 +831,11 @@ Balancer.prototype.fillRoot = cadence(function (async, sheaf) {
         var cut
         ok(root.page.items.length == 1, 'only one address expected')
 
-        sheaf.splice(root.page, 0, root.page.items.length)
+        root.page.splice(0, root.page.items.length)
 
-        cut = sheaf.splice(child.page, 0, child.page.items.length)
+        cut = child.page.splice(0, child.page.items.length)
 
-        sheaf.splice(root.page, root.page.items.length, 0, cut)
+        root.page.splice(root.page.items.length, 0, cut)
 
         script.writeBranch(root.page)
         script.unlink(child.page)
