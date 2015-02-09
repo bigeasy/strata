@@ -54,8 +54,8 @@ Strata.prototype.create = cadence(function (async) {
               'database ' + this.sheaf.directory + ' is not empty.')
         this.sheaf.logger.mkdir(async())
     }, function () {
-        root = locker.encache(this.sheaf.createBranch({ penultimate: true }))
-        leaf = locker.encache(this.sheaf.createLeaf({}))
+        root = locker.encache(this.sheaf.createPage(0))
+        leaf = locker.encache(this.sheaf.createPage(1))
     }, [function () {
         locker.unlock(root)
         locker.unlock(leaf)

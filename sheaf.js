@@ -7,8 +7,6 @@ require('cadence/loops')
 
 var Cache = require('magazine')
 
-var extend = require('./extend')
-
 var Locker = require('./locker')
 var Queue = require('./queue')
 var Script = require('./script')
@@ -51,8 +49,8 @@ function Sheaf (options) {
 }
 
 Sheaf.prototype.create = function () {
-    var root = this.createBranch({ penultimate: true })
-    var leaf = this.createLeaf()
+    var root = this.createPage(0)
+    var leaf = this.createPage(1)
     this.splice(root, 0, 0, { address: leaf.address, heft: 0 })
     ok(root.address == 0, 'root not zero')
     return { root: root, leaf: leaf }
@@ -70,35 +68,24 @@ Sheaf.prototype.heft = function (page, s) {
     this.magazine.get(page.address).adjustHeft(s)
 }
 
-function Page (sheaf, prototype, override, remainder) {
-    if (override.address == null) {
-        while (sheaf.nextAddress % 2 == remainder) sheaf.nextAddress++
-        override.address = sheaf.nextAddress++
+function Page (sheaf, address, modulus) {
+    if (address == null) {
+        while (sheaf.nextAddress % 2 !== modulus) sheaf.nextAddress++
+        address = sheaf.nextAddress++
     }
-    extend(this, prototype)
-    extend(this, override || {})
+    this.address = address
+    this.entries = 0
+    this.rotation = 0
+    this.items = []
+    this.queue = sheaf.sequester.createQueue()
+    if (modulus === 1) {
+        this.right = { address: 0, key: null }
+        this.ghosts = 0
+    }
 }
 
-Sheaf.prototype.createBranch = function (override) {
-    return new Page(this, {
-        items: [],
-        entries: 0,
-        rotation: 0,
-        penultimate: true,
-        queue: this.sequester.createQueue()
-    }, override, 1)
-}
-
-Sheaf.prototype.createLeaf = function (override) {
-    return new Page(this, {
-        rotation: 0,
-        loaders: {},
-        entries: 0,
-        ghosts: 0,
-        items: [],
-        right: { address: 0, key: null },
-        queue: this.sequester.createQueue()
-    }, override, 0)
+Sheaf.prototype.createPage = function (modulus, address) {
+    return new Page(this, address, modulus)
 }
 
 Sheaf.prototype.splice = function (page, offset, length, insert) {

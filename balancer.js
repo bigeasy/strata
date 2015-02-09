@@ -262,7 +262,7 @@ Balancer.prototype.splitLeafAndUnlock = cadence(function (async, sheaf, address,
         var splits = 0
         var loop = async(function () {
             if (splits++ == pages - 1) return [ loop ]
-            page = locker.encache(sheaf.createLeaf({ loaded: true }))
+            page = locker.encache(sheaf.createPage(1))
             encached.push(page)
 
             page.right = right
@@ -349,7 +349,7 @@ Balancer.prototype.splitBranchAndUnlock = cadence(function (async, sheaf, addres
         offset = split.items.length
 
         for (var i = 0; i < pages - 1; i++ ) {
-            var page = locker.encache(sheaf.createBranch({}))
+            var page = locker.encache(sheaf.createPage(0))
 
             children.push(page)
             encached.push(page)
@@ -410,7 +410,7 @@ Balancer.prototype.drainRootAndUnlock = cadence(function (async, sheaf) {
         var lift = []
 
         for (var i = 0; i < pages; i++) {
-            var page = locker.encache(sheaf.createBranch({}))
+            var page = locker.encache(sheaf.createPage(0))
 
             var length = remainder-- > 0 ? records + 1 : records
             var offset = root.items.length - length

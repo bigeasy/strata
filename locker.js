@@ -28,11 +28,7 @@ Locker.prototype.lock = cadence(function (async, address, exclusive) {
                 async([function () {
                     async(function () {
                         // todo: does there need to be differnt types anymore?
-                        if (address % 2) {
-                            page = this._sheaf.createLeaf({ address: address })
-                        } else {
-                            page = this._sheaf.createBranch({ address: address })
-                        }
+                        page = this._sheaf.createPage(address % 2, address)
                         cartridge.value.page = page
                         locks.push(this._locks[address] = page.queue.createLock())
                         locks[0].exclude(async())
