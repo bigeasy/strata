@@ -273,7 +273,7 @@ Balancer.prototype.splitLeafAndUnlock = cadence(function (async, sheaf, address,
 
             penultimate.page.splice(penultimate.index + 1, 0, {
                 key: split.items[offset].key,
-                heft: sheaf.serialize(split.items[offset].key, true).length,
+                heft: 0,
                 address: page.address
             })
 

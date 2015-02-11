@@ -125,9 +125,12 @@ Logger.prototype.writePage = function (page, file, writer, callback) {
         this.writeHeader(queue, page)
     }
 
-    var i = 0, I = page.items.length
+    // cut the items out because some might be recently promoted keys that have
+    // zero heft, we calculate heft here and now.
+    var cut = page.splice(0, page.items.length), i = 0, I = cut.length
     while (i < I) {
         for (; i < I && queue.buffers.length == 0; i++) {
+            page.splice(i, 0, cut[i])
             this[writer](queue, page, page.items[i])
         }
         queue.buffers.forEach(function (buffer) {
