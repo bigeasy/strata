@@ -26,9 +26,6 @@ var random = (function () {
         return Math.floor(random() * max)
     }
 })()
-            function recordSort (a, b) {
-                return a.key < b.key ? -1 : a.key > b.key ? 1 : 0
-            }
 
 var runner = cadence(function (async) {
     var start, insert, gather
