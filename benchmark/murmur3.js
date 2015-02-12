@@ -83,9 +83,12 @@ function murmur (buffer, start, end) {
 
     hash = fmix32(hash) >>> 0
 
-    var buffer = new Buffer(4)
-    buffer.writeUInt32LE(hash, 0, true)
-    return buffer
+    return new Buffer([
+        hash >>> 24 & 0xff,
+        hash >>> 16 & 0xff,
+        hash >>> 8 & 0xff,
+        hash & 0xff
+    ])
 }
 
 module.exports = murmur

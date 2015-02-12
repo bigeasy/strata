@@ -57,7 +57,7 @@ Binary.prototype.deserialize = function (deserialize, buffer, offset, length) {
     if (checksum != null) {
         var digest = checksum(buffer, offset + this.checksumLength, end)
         for (var i = 0, I = digest.length; i < I; i++) {
-            if (buffer[offset++] != digest[i]) {
+            if (buffer[offset++] !== digest[i]) {
                 throw new Error('invalid checksum')
             }
         }

@@ -78,6 +78,7 @@ Player.prototype._play = function (sheaf, slice, start, page) {
             ok(header[0] === ++page.entries, 'entry count is off')
             var index = header[1]
             if (leaf) {
+                // todo: see if it is faster to perform the slices here directly.
                 if (index > 0) {
                     page.splice(index - 1, 0, {
                         key: sheaf.extractor(entry.body),

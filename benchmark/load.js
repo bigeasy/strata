@@ -16,6 +16,9 @@ var seedrandom = require('seedrandom')
 var rimraf = require('rimraf')
 var mkdirp = require('mkdirp')
 var Strata = require('..')
+var djb = require('./djb')
+var murmur3 = require('./murmur3')
+var fnv = require('./fnv')
 
 var random = (function () {
     var random = seedrandom(0)
@@ -29,12 +32,14 @@ var random = (function () {
 
 var runner = cadence(function (async) {
     var start, insert, gather
+    var Binary = require('../frame/binary')
     var directory = path.join(__dirname, 'tmp'), db, count = 0
     var strata = new Strata({
         directory: directory,
         leafSize: 256,
         branchSize: 256,
-        writeStage: 'leaf'
+        writeStage: 'leaf',
+        framer: new Binary(djb)
     })
 
     var batches = []
