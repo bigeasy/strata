@@ -28,8 +28,6 @@ function Sheaf (options) {
     this.comparator = options.comparator || compare
     this.player = options.player
     this.logger = options.logger
-    this.serialize = options.serialize || function (object) { return new Buffer(JSON.stringify(object)) }
-    this.deserialize = options.deserialize || function (buffer) { return JSON.parse(buffer.toString()) }
     this.lengths = {}
 }
 
