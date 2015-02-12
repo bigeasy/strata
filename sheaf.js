@@ -1,7 +1,9 @@
 var ok = require('assert').ok
 var path = require('path')
+var fs = require('fs')
 
 var cadence = require('cadence/redux')
+var sequester = require('sequester')
 
 require('cadence/loops')
 
@@ -9,25 +11,20 @@ var Cache = require('magazine')
 
 var Locker = require('./locker')
 var Page = require('./page')
-var Queue = require('./queue')
-var Script = require('./script')
 
 function compare (a, b) { return a < b ? -1 : a > b ? 1 : 0 }
 
 function extract (a) { return a }
 
 function Sheaf (options) {
-    this.fs = options.fs || require('fs')
     this.nextAddress = 0
     this.directory = options.directory
-    this.cache = options.cache || (new Cache)
+    this.cache = options.cache || new Cache()
     this.options = options
     this.tracer = options.tracer || function () { arguments[2]() }
-    this.sequester = options.sequester || require('sequester')
     this.extractor = options.extractor || extract
     this.comparator = options.comparator || compare
     this.player = options.player
-    this.logger = options.logger
     this.lengths = {}
 }
 
@@ -57,7 +54,7 @@ Sheaf.prototype.createMagazine = function () {
         page: {
             address: -2,
             items: [{ key: null, address: 0, heft: 0 }],
-            queue: this.sequester.createQueue()
+            queue: sequester.createQueue()
         }
     }).value.page
     dummy.lock = dummy.queue.createLock()

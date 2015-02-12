@@ -9,10 +9,10 @@ function prove (async, assert) {
         assert(/is not a directory.$/.test(error.message), 'thrown')
     })
 
+    var fs = require('fs')
+    fs.stat = function (file, callback) { callback(new Error('errored')) }
     // todo: dubious
-    strata = createStrata({  directory: tmp, fs: {
-        stat: function (file, callback) { callback(new Error('errored')) }
-    }})
+    strata = createStrata({  directory: tmp })
 
     strata.create(function (error) {
         assert(error.message, 'errored', 'called back')

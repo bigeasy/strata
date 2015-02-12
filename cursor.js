@@ -4,8 +4,9 @@ var Queue = require('./queue')
 var Scribe = require('./scribe')
 var scram = require('./scram')
 
-function Cursor (sheaf, descents, exclusive, searchKey) {
+function Cursor (sheaf, logger, descents, exclusive, searchKey) {
     this._sheaf = sheaf
+    this._logger = logger
     this._locker = descents[0].locker
     this._page = descents[0].page
     this._searchKey = searchKey
@@ -112,7 +113,7 @@ Cursor.prototype.insert = function (record, key, index) {
     this._sheaf.unbalanced(this._page)
 
     if (this._appender == null) {
-        this._appender = this._sheaf.logger.createAppender(this._page)
+        this._appender = this._logger.createAppender(this._page)
     }
 
     var length = this._appender.writeInsert(index, record)
@@ -131,7 +132,7 @@ Cursor.prototype.remove = function (index) {
     this._sheaf.unbalanced(this._page)
 
     if (this._appender == null) {
-        this._appender = this._sheaf.logger.createAppender(this._page)
+        this._appender = this._logger.createAppender(this._page)
     }
 
     this._appender.writeDelete(index)

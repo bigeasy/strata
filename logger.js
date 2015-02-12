@@ -9,10 +9,10 @@ var Queue = require('./queue')
 var Script = require('./script')
 var Scribe = require('./scribe')
 
-function Logger (options, sheaf) {
+function Logger (options) {
     this._directory = options.directory
     // todo: remove when page can slice
-    this._sheaf = sheaf
+    this._sheaf = options.sheaf
     this.framer = options.framer
     this.serializers = options.serializers
 }

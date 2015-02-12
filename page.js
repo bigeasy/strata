@@ -1,3 +1,5 @@
+var sequester = require('sequester')
+
 function Page (sheaf, address, modulus) {
     if (address == null) {
         while (sheaf.nextAddress % 2 !== modulus) sheaf.nextAddress++
@@ -7,7 +9,7 @@ function Page (sheaf, address, modulus) {
     this.entries = 0
     this.rotation = 0
     this.items = []
-    this.queue = sheaf.sequester.createQueue()
+    this.queue = sequester.createQueue()
     this.cartridge = null
     if (modulus === 1) {
         this.right = { address: 0, key: null }

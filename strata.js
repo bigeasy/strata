@@ -40,8 +40,8 @@ function Strata (options) {
         options.framer = new UTF8(options.checksum || 'sha1')
     }
     options.player = new Player(options)
-    options.logger = new Logger(options, this.sheaf)
-    options.logger._sheaf = this.sheaf = new Sheaf(options)
+    this.sheaf = options.sheaf = new Sheaf(options)
+    this.logger = new Logger(options)
 }
 
 Strata.prototype.__defineGetter__('size', function () {
@@ -59,15 +59,15 @@ Strata.prototype.create = cadence(function (async) {
     async([function () {
         locker.dispose()
     }], function () {
-        this.sheaf.fs.stat(this.sheaf.directory, async())
+        fs.stat(this.sheaf.directory, async())
     }, function (stat) {
         ok(stat.isDirectory(), 'database ' + this.sheaf.directory + ' is not a directory.')
     }, function () {
-        this.sheaf.fs.readdir(this.sheaf.directory, async())
+        fs.readdir(this.sheaf.directory, async())
     }, function (files) {
         ok(!files.filter(function (f) { return ! /^\./.test(f) }).length,
               'database ' + this.sheaf.directory + ' is not empty.')
-        this.sheaf.logger.mkdir(async())
+        this.logger.mkdir(async())
     }, function () {
         root = locker.encache(this.sheaf.createPage(0))
         leaf = locker.encache(this.sheaf.createPage(1))
@@ -75,7 +75,7 @@ Strata.prototype.create = cadence(function (async) {
         locker.unlock(root)
         locker.unlock(leaf)
     }], function () {
-        var script = this.sheaf.logger.createScript()
+        var script = this.logger.createScript()
         root.splice(0, 0, { address: leaf.address, heft: 0 })
         script.writeBranch(root)
         script.rewriteLeaf(leaf)
@@ -96,9 +96,9 @@ Strata.prototype.open = cadence(function (async) {
     // todo: or if you're using Cadence, doesn't the callback get wrapped
     // anyway?
     async(function () {
-        this.sheaf.fs.stat(this.sheaf.directory, async())
+        fs.stat(this.sheaf.directory, async())
     }, function stat (error, stat) {
-        this.sheaf.fs.readdir(path.join(this.sheaf.directory, 'pages'), async())
+        fs.readdir(path.join(this.sheaf.directory, 'pages'), async())
     }, function (files) {
         files.forEach(function (file) {
             if (/^\d+\.\d+$/.test(file)) {
@@ -153,7 +153,7 @@ Strata.prototype.leftOf = function (key) {
             }, async())
         }, function (page, index) {
             if (descents[0].page.address % 2) {
-                return [ new Cursor(this.sheaf, descents, false, key) ]
+                return [ new Cursor(this.sheaf, this.logger, descents, false, key) ]
             } else {
                 descents[0].index--
                 this.toLeaf(descents[0].right, descents, null, exclusive, async())
@@ -169,7 +169,7 @@ Strata.prototype.toLeaf = cadence(function (async, sought, descents, key, exclus
         if (exclusive) descents[0].exclude()
         descents[0].descend(sought, descents[0].leaf, async())
     }, function () {
-        return [ new Cursor(this.sheaf, descents, exclusive, key) ]
+        return [ new Cursor(this.sheaf, this.logger, descents, exclusive, key) ]
     })
 })
 
@@ -202,7 +202,7 @@ Strata.prototype.mutator = function (key, callback) {
 
 // to user land
 Strata.prototype.balance = function (callback) {
-    new Balancer().balance(this.sheaf, callback)
+    new Balancer(this.sheaf, this.logger).balance(callback)
 }
 
 // to user land
