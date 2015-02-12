@@ -16,22 +16,27 @@ function Page (sheaf, address, modulus) {
 }
 
 Page.prototype.splice = function (offset, length, insert) {
-    var items = this.items, cartridge = this.cartridge, heft, removals
+    var items = this.items, cartridge = this.cartridge, heft = 0, removals
 
     if (length) {
         removals = items.splice(offset, length)
-        heft = removals.reduce(function (heft, item) { return heft + item.heft }, 0)
-        cartridge.adjustHeft(-heft)
+        for (var i = 0, I = removals.length; i < I; i++) {
+            heft -= removals[i].heft
+        }
     } else {
         removals = []
     }
 
     if (insert != null) {
         if (! Array.isArray(insert)) insert = [ insert ]
-        heft = insert.reduce(function (heft, item) { return heft + item.heft }, 0)
-        cartridge.adjustHeft(heft)
+        for (var i = 0, I = insert.length; i < I; i++) {
+            heft += insert[i].heft
+        }
         items.splice.apply(items, [ offset, 0 ].concat(insert))
     }
+
+    cartridge.adjustHeft(heft)
+
     return removals
 }
 
