@@ -33,6 +33,14 @@ Binary.prototype.serialize = function (serializer, queue, header, body) {
     return length
 }
 
+Binary.prototype.length = function (buffer, offset) {
+    var remaining = buffer.length - offset
+    if (remaining < 4) {
+        return null
+    }
+    return buffer.readUInt32BE(offset, true)
+}
+
 Binary.prototype.deserialize = function (deserialize, buffer, offset) {
     var start = offset
     var remaining = buffer.length - offset

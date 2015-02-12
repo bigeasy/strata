@@ -57,6 +57,16 @@ UTF8.prototype.serialize = function (serializer, queue, header, body) {
     return length
 }
 
+UTF8.prototype.length = function (buffer, offset) {
+    for (var i = offset, I = buffer.length; i < I; i++) {
+        if (buffer[i] == 0x20) break
+    }
+    if (buffer[i] != 0x20) {
+        return null
+    }
+    return parseInt(buffer.toString('utf8', offset, i))
+}
+
 UTF8.prototype.deserialize = function (deserialize, buffer, offset) {
     for (var i = offset, I = buffer.length; i < I; i++) {
         if (buffer[i] == 0x20) break
