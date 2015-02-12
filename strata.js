@@ -24,6 +24,21 @@ function extend(to, from) {
 }
 
 function Strata (options) {
+    if (!options.serializers) {
+        var json = require('./json')
+        options.serializers = {
+            key: json.serializer,
+            record: json.serializer
+        }
+        options.deserializers = {
+            key: json.deserialize,
+            record: json.deserialize
+        }
+    }
+    if (!options.framer) {
+        var UTF8 = require('./frame/utf8')
+        options.framer = new UTF8(options.checksum || 'sha1')
+    }
     options.player = new Player(options)
     options.logger = new Logger(options, this.sheaf)
     options.logger._sheaf = this.sheaf = new Sheaf(options)

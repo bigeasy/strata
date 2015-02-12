@@ -57,49 +57,51 @@ UTF8.prototype.serialize = function (serializer, queue, header, body) {
     return length
 }
 
-UTF8.prototype.length = function (buffer, offset) {
-    for (var i = offset, I = buffer.length; i < I; i++) {
+UTF8.prototype.length = function (buffer, i, I) {
+    var start = i
+    for (; i < I; i++) {
         if (buffer[i] == 0x20) break
     }
     if (buffer[i] != 0x20) {
         return null
     }
-    return parseInt(buffer.toString('utf8', offset, i))
+    return parseInt(buffer.toString('utf8', start, i))
 }
 
-UTF8.prototype.deserialize = function (deserialize, buffer, offset) {
-    for (var i = offset, I = buffer.length; i < I; i++) {
+UTF8.prototype.deserialize = function (deserialize, buffer, i, I) {
+    var start = i
+    for (; i < I; i++) {
         if (buffer[i] == 0x20) break
     }
     if (buffer[i] != 0x20) {
         return null
     }
-    var size = parseInt(buffer.toString('utf8', offset, i))
-    if (buffer.length - offset < size) {
+    var size = parseInt(buffer.toString('utf8', start, i))
+    if (I - start < size) {
         return null
     }
-    for (var count = 2, i = offset, I = buffer.length; i < I && count; i++) {
+    for (var count = 2, i = start; i < I && count; i++) {
         if (buffer[i] == 0x20) count--
     }
     if (count) {
-        throw new Error('invalid record')
+        throw new Error('corrupt line: could not find end of line header')
     }
     var checksumStart = i
     for (count = 1; i < I && count; i++) {
         if (buffer[i] == 0x20 || buffer[i] == 0x0a) count--
     }
     if (count) {
-        throw new Error('invalid record')
+        throw new Error('couldn not find end of line header record')
     }
-    var fields = buffer.toString('utf8', 0, i - 1).split(' ')
+    var fields = buffer.toString('utf8', start, i - 1).split(' ')
     var checksum = this.checksum
     if (checksum) {
-        var digest = checksum(buffer, checksumStart, offset + size - 1)
+        var digest = checksum(buffer, checksumStart, start + size - 1)
         ok(fields[1] == '-' || digest == fields[1], 'corrupt line: invalid checksum')
     }
     var body, length
     if (buffer[i - 1] == 0x20) {
-        body = buffer.slice(i, offset + size - 1)
+        body = buffer.slice(i, start + size - 1)
         length = body.length
     }
     if (buffer[i - 1] == 0x20) {
@@ -108,7 +110,7 @@ UTF8.prototype.deserialize = function (deserialize, buffer, offset) {
     }
     var entry = {
         heft: length || null,
-        length: i - offset,
+        length: i - start,
         header: JSON.parse(fields[2]),
         body: body || null
     }

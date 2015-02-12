@@ -136,6 +136,7 @@ var serialize = cadence(function (async, segments, directory) {
                 hash.update(record[0])
                 if (line.body) {
                     var body = JSON.stringify(line.body)
+                    hash.update(' ', 'utf8')
                     hash.update(body)
                     record.push(body)
                 }

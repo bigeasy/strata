@@ -16,7 +16,11 @@ function prove (async, assert) {
             directory: tmp,
             leafSize: 3,
             branchSize: 3,
-            checksum: function () { return crypto.createHash('sha1') }
+            checksum: function (buffer, start, end) {
+                var hash = crypto.createHash('sha1')
+                hash.update(buffer.slice(start, end))
+                return hash.digest('hex')
+            }
         })
         strata.open(async())
     }, function () {

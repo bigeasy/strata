@@ -8,13 +8,13 @@ var cadence = require('cadence/redux')
 var Queue = require('./queue')
 var Script = require('./script')
 var Scribe = require('./scribe')
-var checksum = require('./checksum')
 
 function Logger (options, sheaf) {
     this._directory = options.directory
-    this._checksum = checksum(options.checksum)
     // todo: remove when page can slice
     this._sheaf = sheaf
+    this.framer = options.framer
+    this.serializers = options.serializers
 }
 
 Logger.prototype.filename = function (page, draft) {
@@ -22,56 +22,18 @@ Logger.prototype.filename = function (page, draft) {
 }
 
 Logger.prototype.writeEntry = function (options) {
-    var entry, buffer, json, line, length
-
-    ok(options.page.position != null, 'page has not been positioned: ' + options.page.position)
-    ok(options.header.every(function (n) { return typeof n == 'number' }), 'header values must be numbers')
-
-    entry = options.header.slice()
-    json = JSON.stringify(entry)
-    var hash = this._checksum()
-    hash.update(json)
-
-    length = 0
-
-    var separator = ''
-    if (options.body != null) {
-        var body = this._sheaf.serialize(options.body, options.isKey)
-        separator = ' '
-        length += body.length
-        hash.update(body)
-    }
-
-    line = hash.digest('hex') + ' ' + json + separator
-
-    length += Buffer.byteLength(line, 'utf8') + 1
-
-    var entire = length + String(length).length + 1
-    if (entire < length + String(entire).length + 1) {
-        length = length + String(entire).length + 1
-    } else {
-        length = entire
-    }
-
-    buffer = options.queue.slice(length)
-
-    buffer.write(String(length) + ' ' + line)
-    if (options.body != null) {
-        body.copy(buffer, buffer.length - 1 - body.length)
-    }
-    buffer[length - 1] = 0x0A
-
-    return length
+    var serializer = options.isKey ? this.serializers.key : this.serializers.record
+    return this.framer.serialize(serializer, options.queue, options.header, options.body)
 }
 
 Logger.prototype.writeInsert = function (queue, page, index, record) {
     var header = [ ++page.entries, index + 1 ]
-    return this.writeEntry({ queue: queue, page: page, header: header, body: record, type: 'insert' })
+    return this.writeEntry({ queue: queue, page: page, header: header, body: record })
 }
 
 Logger.prototype.writeDelete = function (queue, page, index, callback) {
     var header = [ ++page.entries, -(index + 1) ]
-    this.writeEntry({ queue: queue, page: page, header: header, type: 'delete' })
+    this.writeEntry({ queue: queue, page: page, header: header })
 }
 
 Logger.prototype.writeHeader = function (queue, page) {
