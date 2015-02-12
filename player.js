@@ -79,15 +79,6 @@ Player.prototype.readEntry = function (sheaf, buffer, isKey) {
     return entry
 }
 
-Player.prototype.readHeader = function (entry) {
-    var header = entry.header
-    return {
-        entry:      header[0],
-        index:      header[1],
-        address:    header[2]
-    }
-}
-
 Player.prototype._play = function (sheaf, slice, start, page) {
     var leaf = page.address % 2 === 1, length
     for (var offset = 0, i = 0, I = slice.length; i < I; i++) {
@@ -101,21 +92,21 @@ Player.prototype._play = function (sheaf, slice, start, page) {
             var position = start + offset
             ok(length)
             page.position += length
-            var entry = this.readEntry(sheaf, slice.slice(offset, offset + length), !leaf)
-            var header = this.readHeader(entry)
-            if (entry.header[1] == 0) {
+            var entry = this.readEntry(sheaf, slice.slice(offset, offset + length), !leaf),
+                header = entry.header
+            if (header[1] === 0) {
                 page.right = {
-                    address: entry.header[2],
+                    address: header[2],
                     key: entry.body || null
                 }
-                if (entry.header[3] == 0 && page.ghosts) {
+                if (header[3] === 0 && page.ghosts) {
                     page.splice(0, 1)
                     page.ghosts = 0
                 }
                 page.entries++
             } else {
-                ok(header.entry == ++page.entries, 'entry count is off')
-                var index = header.index
+                ok(header[0] === ++page.entries, 'entry count is off')
+                var index = header[1]
                 if (leaf) {
                     if (index > 0) {
                         page.splice(index - 1, 0, {
@@ -123,14 +114,14 @@ Player.prototype._play = function (sheaf, slice, start, page) {
                             record: entry.body,
                             heft: length
                         })
-                    } else if (~index == 0 && page.address != 1) {
+                    } else if (~index === 0 && page.address !== 1) {
                         ok(!page.ghosts, 'double ghosts')
                         page.ghosts++
                     } else if (index < 0) {
                         page.splice(-(index + 1), 1)
                     }
                 } else {
-                    var address = header.address, key = null, heft = 0
+                    var address = header[2], key = null, heft = 0
                     if (index - 1) {
                         key = entry.body
                         heft = length
