@@ -23,7 +23,7 @@ Logger.prototype.filename = function (page, draft) {
 
 Logger.prototype.writeEntry = function (options) {
     var serializer = options.isKey ? this.serializers.key : this.serializers.record
-    return this.framer.serialize(serializer, options.queue, options.header, options.body)
+    return this.framer.serialize(options.queue, options.header, options.body, serializer)
 }
 
 Logger.prototype.writeInsert = function (queue, page, index, record) {

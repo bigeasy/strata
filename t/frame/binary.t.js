@@ -8,7 +8,7 @@ function prove (assert) {
     var Framer = require('../../frame/binary')
     var framer = new Framer('sha1')
     var queue = new Queue
-    var length = framer.serialize(json.serializer, queue, [ 1, 2, 3 ], { a: 1 })
+    var length = framer.serialize(queue, [ 1, 2, 3 ], { a: 1 }, json.serializer)
     assert(length, 51, 'bodied length')
     queue.finish()
     var buffer = queue.buffers.shift()
@@ -16,7 +16,7 @@ function prove (assert) {
     var entry = framer.deserialize(json.deserialize, buffer, 0, buffer.length)
     assert(entry, { length: 51, heft: 7, header: [ 1, 2, 3 ], body: { a: 1 } }, 'bodied')
     var queue = new Queue
-    var length = framer.serialize(json.serializer, queue, [ 1, 2, 3 ])
+    var length = framer.serialize(queue, [ 1, 2, 3 ])
     assert(length, 44, 'unbodied length')
     queue.finish()
     var buffer = queue.buffers.shift()

@@ -6,7 +6,7 @@ function UTF8 (checksum) {
     this.dummyDigest = checksum ? checksum(new Buffer(0), 0, 0) : '0'
 }
 
-UTF8.prototype.serialize = function (serializer, queue, header, body) {
+UTF8.prototype.serialize = function (queue, header, body, serializer) {
     var checksum = this.checksum, digest = this.dummyDigest,
         entry, buffer, json, line, length
 

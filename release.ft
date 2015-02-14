@@ -14,6 +14,7 @@ The common utility functions are now exported globally. They may move into a uti
 
 ### Issue by Issue
 
+ * Make serializer last argument to `Frame.serialize`. #488.
  * Use new Advance interface in benchmark. #487.
  * Add record length sip to frame serializers. #484.
  * Remove `Player.readHeader`. #483.

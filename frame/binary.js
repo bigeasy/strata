@@ -5,7 +5,7 @@ function Binary (checksum) {
     this.checksumLength = checksum ? checksum(new Buffer(0), 0, 0).length : 0
 }
 
-Binary.prototype.serialize = function (serializer, queue, header, body) {
+Binary.prototype.serialize = function (queue, header, body, serializer) {
     var bodyLength = 0
     if (body) {
         var body = serializer.serialize(body)
