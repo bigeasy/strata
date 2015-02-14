@@ -21,30 +21,28 @@ Logger.prototype.filename = function (page, draft) {
     return path.join(this._directory, draft ? 'drafts' : 'pages', page.address + '.' + page.rotation)
 }
 
-Logger.prototype.writeEntry = function (options) {
-    var serializer = options.isKey ? this.serializers.key : this.serializers.record
-    return this.framer.serialize(options.queue, options.header, options.body, serializer)
+Logger.prototype.writeEntry = function (queue, header, body, serializer) {
+    console.log(header)
+    return this.framer.serialize(queue, header, body, serializer)
 }
 
 Logger.prototype.writeInsert = function (queue, page, index, record) {
     var header = [ ++page.entries, index + 1 ]
-    return this.writeEntry({ queue: queue, page: page, header: header, body: record })
+    return this.writeEntry(queue, header, record, this.serializers.key)
 }
 
 Logger.prototype.writeDelete = function (queue, page, index, callback) {
     var header = [ ++page.entries, -(index + 1) ]
-    this.writeEntry({ queue: queue, page: page, header: header })
+    this.writeEntry(queue, header)
 }
 
 Logger.prototype.writeHeader = function (queue, page) {
     var header = [ ++page.entries, 0, page.right.address, page.ghosts || 0 ]
-    return this.writeEntry({
-        queue: queue, page: page, header: header, isKey: true, body: page.right.key
-    })
+    return this.writeEntry(queue, header, page.right.key, this.serializers.key)
 }
 
 Logger.prototype.writeLeafEntry = function (queue, page, item) {
-    this.writeInsert(queue, page, page.entries - 1, item.record)
+    this.writeInsert(queue, page, page.entries - 1, item.record, this.serializers.record)
 }
 
 Logger.prototype.rewriteLeaf = function (page, file, callback) {
@@ -54,13 +52,7 @@ Logger.prototype.rewriteLeaf = function (page, file, callback) {
 Logger.prototype.writeBranchEntry = function (queue, page, item) {
     page.entries++
     var header = [ page.entries, page.entries, item.address ]
-    this.writeEntry({
-        queue: queue,
-        page: page,
-        header: header,
-        body: page.entries == 1 ? null : item.key,
-        isKey: true
-    })
+    this.writeEntry(queue, header, page.entries == 1 ? null : item.key, this.serializers.key)
 }
 
 Logger.prototype.writeBranch = function (page, file, callback) {
