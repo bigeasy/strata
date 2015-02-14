@@ -22,7 +22,6 @@ Logger.prototype.filename = function (page, draft) {
 }
 
 Logger.prototype.writeEntry = function (queue, header, body, serializer) {
-    console.log(header)
     return this.framer.serialize(queue, header, body, serializer)
 }
 
@@ -154,6 +153,13 @@ Appender.prototype.writeInsert = function (index, record) {
 
 Appender.prototype.writeDelete = function (index) {
     var length = this._logger.writeDelete(this._queue, this._page, index)
+    this._write()
+    return length
+}
+
+Appender.prototype.writeUserRecord = function (header, body) {
+    header = [ ++this._page.entries, 0 ].concat(header)
+    var length = this._logger.writeEntry(this._queue, header, body, this._logger.serializers.record)
     this._write()
     return length
 }

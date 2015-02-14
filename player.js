@@ -7,6 +7,7 @@ function Player (options) {
     this.directory = options.directory
     this.framer = options.framer
     this.deserializers = options.deserializers
+    this.userRecordHandler = options.userRecordHandler
 }
 
 // todo: outgoing
@@ -38,7 +39,7 @@ Player.prototype.io = cadence(function (async, direction, filename) {
 })
 
 Player.prototype.read = cadence(function (async, sheaf, page) {
-    page.entries = page.ghosts = page.position = 0
+    page.entries = page.ghosts = 0
     var rotation = 0, loop = async([function () {
         var filename = path.join(this.directory, 'pages', page.address + '.' + rotation)
         this.io('read', filename, async())
@@ -48,6 +49,7 @@ Player.prototype.read = cadence(function (async, sheaf, page) {
         }
         return [ loop, page ]
     }], function (fd, stat, read) {
+        page.position = 0
         page.rotation = rotation++
         this.play(sheaf, fd, stat, read, page, async())
     })()
@@ -62,18 +64,23 @@ Player.prototype._play = function (sheaf, slice, start, page) {
         if (entry == null) {
             return i
         }
-        page.position += entry.length
         var header = entry.header
         if (header[1] === 0) {
-            page.right = {
-                address: header[2],
-                key: entry.body || null
+            if (page.position === 0) {
+                page.right = {
+                    address: header[2],
+                    key: entry.body || null
+                }
+                if (header[3] === 0 && page.ghosts) {
+                    page.splice(0, 1)
+                    page.ghosts = 0
+                }
+                page.entries++
+            } else if (this.userRecordHandler != null) {
+                var handler = this.userRecordHandler
+                entry.header.splice(0, 2)
+                handler(entry)
             }
-            if (header[3] === 0 && page.ghosts) {
-                page.splice(0, 1)
-                page.ghosts = 0
-            }
-            page.entries++
         } else {
             ok(header[0] === ++page.entries, 'entry count is off')
             var index = header[1]
@@ -102,6 +109,7 @@ Player.prototype._play = function (sheaf, slice, start, page) {
                 })
             }
         }
+        page.position += entry.length
     }
     return i
 }
