@@ -19,6 +19,7 @@ var Strata = require('..')
 var djb = require('./djb')
 var murmur3 = require('./murmur3')
 var fnv = require('./fnv')
+var Advance = require('advance')
 
 var random = (function () {
     var random = seedrandom(0)
@@ -71,7 +72,7 @@ var runner = cadence(function (async) {
             if (batch === 7) return [ loop ]
             splice(function (incoming, existing) {
                 return incoming.type
-            }, strata, batches[batch], async())
+            }, strata, new Advance(batches[batch]), async())
             batch++
         })()
     }, function () {
