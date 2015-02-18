@@ -21,7 +21,7 @@ Balancer.prototype._node = cadence(function (async, locker, page) {
         var node = {
             key: entry.key,
             address: page.address,
-            rightAddress: page.right._address,
+            rightAddress: page.right.address,
             length: page.items.length - page.ghosts
         }
         this.ordered[node.address] = node
@@ -290,7 +290,7 @@ Balancer.prototype.splitLeafAndUnlock = cadence(function (async, address, key, g
             }
 
             right = {
-                _address: page.address,
+                address: page.address,
                 key: page.items[0].key
             }
         }, function () {

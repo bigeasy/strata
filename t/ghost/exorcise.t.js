@@ -33,7 +33,7 @@ function prove (async, assert) {
         strata.iterator('a', async())
     }, function (cursor) {
         async(function () {
-            assert(cursor.right, { key: 'd', _address: 5 }, 'referring leaf updated')
+            assert(cursor.right, { key: 'd', address: 5 }, 'referring leaf updated')
             cursor.next(async())
         }, function () {
             assert(cursor.get(0).key, 'd', 'key deleted')

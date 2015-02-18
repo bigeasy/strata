@@ -68,7 +68,7 @@ Player.prototype._play = function (sheaf, slice, start, page) {
         if (header[1] === 0) {
             if (page.position === 0) {
                 page.right = {
-                    _address: header[2] || null,
+                    address: header[2] || null,
                     key: entry.body || null
                 }
                 if (header[3] === 0 && page.ghosts) {
