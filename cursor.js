@@ -24,13 +24,13 @@ Cursor.prototype.get = function (index) {
 Cursor.prototype.next = cadence(function (async) {
     var next
 
-    if (this._page.right.address == 0) {
+    if (this._page.right._address === null) {
         // return [ async, false ] <- return immediately!
         return [ false ]
     }
 
     async(function () {
-        this._locker.lock(this._page.right.address, this.exclusive, async())
+        this._locker.lock(this._page.right._address, this.exclusive, async())
     }, function (next) {
         this._locker.unlock(this._page)
 
@@ -51,7 +51,7 @@ Cursor.prototype.indexOf = function (key, index) {
     var unambiguous
     unambiguous = -1 < index // <- todo: ?
                || ~ index < this._page.items.length
-               || page.right.address == 0
+               || page.right._address === null
     if (!unambiguous && this._sheaf.comparator(key, page.right.key) >= 0) {
         return [ ~(this._page.items.length + 1) ]
     }

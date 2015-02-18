@@ -12,7 +12,7 @@ function Page (sheaf, address, modulus) {
     this.queue = sequester.createQueue()
     this.cartridge = null
     if (modulus === 1) {
-        this.right = { address: 0, key: null }
+        this.right = { _address: null, key: null }
         this.ghosts = 0
     }
 }

@@ -13,7 +13,7 @@ function prove (async, assert) {
         strata.mutator(strata.leftOf('c'), async())
     }, function (cursor) {
         assert(cursor.exclusive, 'exclusive')
-        right = cursor.right.address
+        right = cursor.right._address
         assert(cursor.get(0).record, 'a', 'go left')
         cursor.unlock(async())
     }, function () {
