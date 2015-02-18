@@ -12,8 +12,7 @@ function Cursor (sheaf, logger, descents, exclusive, searchKey) {
     this._searchKey = searchKey
     this.exclusive = exclusive
     this.index = descents[0].index
-    this.offset = this.index < 0 ? ~ this.index : this.index
-
+    this.offset = this.index < 0 ? ~this.index : this.index
     descents.shift()
 }
 
@@ -87,10 +86,6 @@ Cursor.prototype.__defineGetter__('address', function () {
 })
 
 Cursor.prototype.__defineGetter__('right', function () {
-    return this._page.right.address
-})
-
-Cursor.prototype.__defineGetter__('right_', function () {
     return this._page.right
 })
 
