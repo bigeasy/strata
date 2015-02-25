@@ -54,7 +54,10 @@ UTF8.prototype.serialize = function (queue, header, body, serializer) {
         buffer.write(digest, String(length).length + 1)
     }
 
-    return length
+    return {
+        heft: body == null ? 0 : bodyLength,
+        length: length
+    }
 }
 
 UTF8.prototype.length = function (buffer, i, I) {
@@ -106,10 +109,11 @@ UTF8.prototype.deserialize = function (deserialize, buffer, i, I) {
     }
     if (buffer[i - 1] == 0x20) {
         i += body.length + 1
+        var bodyLength = body.length
         body = deserialize(body, 0, body.length)
     }
     var entry = {
-        heft: length || null,
+        heft: body ? bodyLength : 0,
         length: i - start,
         header: JSON.parse(fields[2]),
         body: body || null

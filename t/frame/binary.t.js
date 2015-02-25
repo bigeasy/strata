@@ -9,7 +9,7 @@ function prove (assert) {
     var framer = new Framer('sha1')
     var queue = new Queue
     var length = framer.serialize(queue, [ 1, 2, 3 ], { a: 1 }, json.serializer)
-    assert(length, 51, 'bodied length')
+    assert(length, { length: 51, heft: 7 }, 'bodied length')
     queue.finish()
     var buffer = queue.buffers.shift()
     assert(framer.length(buffer, 0, buffer.length), 51, 'bodied read length')
@@ -17,7 +17,7 @@ function prove (assert) {
     assert(entry, { length: 51, heft: 7, header: [ 1, 2, 3 ], body: { a: 1 } }, 'bodied')
     var queue = new Queue
     var length = framer.serialize(queue, [ 1, 2, 3 ])
-    assert(length, 44, 'unbodied length')
+    assert(length, { length: 44, heft: 0 }, 'unbodied length')
     queue.finish()
     var buffer = queue.buffers.shift()
     assert(framer.length(buffer, 0, buffer.length), 44, 'unbodied read length')

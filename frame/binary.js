@@ -30,7 +30,10 @@ Binary.prototype.serialize = function (queue, header, body, serializer) {
         var digest = checksum(buffer, payloadStart, buffer.length)
         digest.copy(buffer, 8, 0, digest.length)
     }
-    return length
+    return {
+        heft: body == null ? 0 : bodyLength,
+        length: length
+    }
 }
 
 Binary.prototype.length = function (buffer, i, I) {

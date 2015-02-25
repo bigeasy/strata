@@ -111,12 +111,12 @@ Cursor.prototype.insert = function (record, key, index) {
         this._appender = this._logger.createAppender(this._page)
     }
 
-    var length = this._appender.writeInsert(index, record)
+    var heft = this._appender.writeInsert(index, record).heft
 
     this._page.splice(index, 0, {
         key: key,
         record: record,
-        heft: length
+        heft: heft
     })
 
     this.length = this._page.items.length
