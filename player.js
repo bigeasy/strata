@@ -65,6 +65,7 @@ Player.prototype._play = function (sheaf, slice, start, page) {
             return i
         }
         var header = entry.header
+        ok(header[0] === ++page.entries, 'entry count is off')
         if (header[1] === 0) {
             if (page.position === 0) {
                 page.right = {
@@ -75,14 +76,12 @@ Player.prototype._play = function (sheaf, slice, start, page) {
                     page.splice(0, 1)
                     page.ghosts = 0
                 }
-                page.entries++
             } else if (this.userRecordHandler != null) {
                 var handler = this.userRecordHandler
                 entry.header.splice(0, 2)
                 handler(entry)
             }
         } else {
-            ok(header[0] === ++page.entries, 'entry count is off')
             var index = header[1]
             if (leaf) {
                 // todo: see if it is faster to perform the slices here directly.
