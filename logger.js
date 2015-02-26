@@ -27,7 +27,7 @@ Logger.prototype.writeEntry = function (queue, header, body, serializer) {
 
 Logger.prototype.writeInsert = function (queue, page, index, record) {
     var header = [ ++page.entries, index + 1 ]
-    return this.writeEntry(queue, header, record, this.serializers.key)
+    return this.writeEntry(queue, header, record, this.serializers.record)
 }
 
 Logger.prototype.writeDelete = function (queue, page, index, callback) {

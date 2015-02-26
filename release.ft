@@ -14,6 +14,7 @@ The common utility functions are now exported globally. They may move into a uti
 
 ### Issue by Issue
 
+ * User record serializer in `writeInsert`. #495.
  * Correctly increment entry number in `Player`. #493.
  * Use same value for heft on insert. #491.
  * Simplify `Logger.writeEntry` parameters. #489.
