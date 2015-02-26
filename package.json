@@ -33,8 +33,8 @@
                         "proof": "0.0.50",
                         "rimraf": "~2.2",
                         "mkdirp": "~0.3",
-                        "advance": "0.0.10",
-                        "splice": "0.0.17",
+                        "advance": "0.0.13",
+                        "splice": "0.0.18",
                         "arguable": "0.0.22"
     },
     "licenses":
