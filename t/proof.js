@@ -185,7 +185,7 @@ function abstracted (dir) {
                 file.body.forEach(function (line, index) {
 //                    console.log(line)
                     var json = line.header
-                    ok(++entry == json[0], 'entry record is wrong')
+                    ok(++entry == Math.abs(json[0]), 'entry record is wrong')
                     if (json[1]) {
                         if (json[1] > 0) {
                             record.log.push({ type: 'add', value: line.body })
@@ -193,6 +193,7 @@ function abstracted (dir) {
                             record.log.push({ type: 'del', index: Math.abs(json[1]) - 1 })
                         }
                     } else {
+                        ok(json[0] < 0, 'meta records should have negative entry')
                         ok(index == 0, 'header not first entry')
                         if (json[2]) record.right = Math.abs(json[2])
                     }
@@ -337,7 +338,7 @@ function directivize (json) {
                 return record
             })
             directory[address].unshift({
-                header: [ 1, 0, object.right || 0, 0 ],
+                header: [ -1, 0, object.right || 0, 0 ],
                 body: object.right ? key(object.right) : null
             })
         }

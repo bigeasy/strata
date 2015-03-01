@@ -36,7 +36,7 @@ Logger.prototype.writeDelete = function (queue, page, index, callback) {
 }
 
 Logger.prototype.writeHeader = function (queue, page) {
-    var header = [ ++page.entries, 0, page.right.address || 0, page.ghosts || 0 ]
+    var header = [ -(++page.entries), 0, page.right.address || 0, page.ghosts || 0 ]
     return this.writeEntry(queue, header, page.right.key, this.serializers.key)
 }
 
