@@ -46,9 +46,8 @@ Cursor.prototype.next = cadence(function (async) {
 // to user land
 Cursor.prototype.indexOf = function (key, index) {
     ok(arguments.length == 2, 'index requires two arguments')
-    ok(index === 0 || index === 1, 'unexpected index')
     var page = this._page
-    var index = this._sheaf.find(page, key, 0)
+    var index = this._sheaf.find(page, key, index)
     var unambiguous
     unambiguous = -1 < index // <- todo: ?
                || ~ index < this._page.items.length
@@ -104,7 +103,7 @@ Cursor.prototype._filename = function (page) {
 
 Cursor.prototype.insert = function (record, key, index) {
     ok(this.exclusive, 'cursor is not exclusive')
-    ok(index > 0 || this._page.address == 1 || this._page.ghosts === 1, 'insert at ghost')
+    ok(index > 0 || this._page.address == 1)
 
     this._sheaf.unbalanced(this._page)
 
@@ -113,13 +112,8 @@ Cursor.prototype.insert = function (record, key, index) {
     }
 
     var heft = this._appender.writeInsert(index, record).heft
-    var replace = 0
-    if (index === 0) {
-        this._page.ghosts--
-        replace = 1
-    }
 
-    this._page.splice(index, replace, {
+    this._page.splice(index, 0, {
         key: key,
         record: record,
         heft: heft
