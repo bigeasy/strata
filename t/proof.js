@@ -177,13 +177,14 @@ function abstracted (dir) {
                 b = b.name.split('.').pop()
                 return +(a) - +(b)
             })
-//            console.log(files.map(function (file) { return file.name }))
+            console.log(files.map(function (file) { return file.name }))
             record = { log: [] }
             var entry = 0
             files.forEach(function (file) {
                 position = 0
+                console.log(file)
                 file.body.forEach(function (line, index) {
-//                    console.log(line)
+                    console.log(line)
                     var json = line.header
                     ok(++entry == json[0], 'entry record is wrong')
                     if (json[1]) {
