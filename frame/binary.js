@@ -1,4 +1,4 @@
-var createChecksum = require('../_checksum')
+var createChecksum = require('../checksum')
 
 function Binary (checksum) {
     checksum = this.checksum = createChecksum(checksum, true)

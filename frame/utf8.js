@@ -1,5 +1,5 @@
 var ok = require('assert').ok
-var createChecksum = require('../_checksum')
+var createChecksum = require('../checksum')
 
 function UTF8 (checksum) {
     var checksum = this.checksum = createChecksum(checksum)
