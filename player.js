@@ -66,7 +66,7 @@ Player.prototype._play = function (sheaf, slice, start, page) {
         }
         var header = entry.header
         ok(Math.abs(header[0]) === ++page.entries, 'entry count is off')
-        if (header[1] === 0) {
+        if (header[0] < 0) {
             if (page.position === 0) {
                 page.right = {
                     address: header[2] || null,

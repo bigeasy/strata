@@ -158,7 +158,7 @@ Appender.prototype.writeDelete = function (index) {
 }
 
 Appender.prototype.writeUserRecord = function (header, body) {
-    header = [ ++this._page.entries, 0 ].concat(header)
+    header = [ -(++this._page.entries), 0 ].concat(header)
     var length = this._logger.writeEntry(this._queue, header, body, this._logger.serializers.record)
     this._write()
     return length
