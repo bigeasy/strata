@@ -69,16 +69,16 @@ Player.prototype._play = function (sheaf, slice, start, page) {
         if (header[0] < 0) {
             if (page.position === 0) {
                 page.right = {
-                    address: header[2] || null,
+                    address: header[1] || null,
                     key: entry.body || null
                 }
-                if (header[3] === 0 && page.ghosts) {
+                if (header[2] === 0 && page.ghosts) {
                     page.splice(0, 1)
                     page.ghosts = 0
                 }
             } else if (this.userRecordHandler != null) {
                 var handler = this.userRecordHandler
-                entry.header.splice(0, 2)
+                entry.header.shift()
                 handler(entry)
             }
         } else {

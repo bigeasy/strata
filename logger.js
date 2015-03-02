@@ -36,7 +36,7 @@ Logger.prototype.writeDelete = function (queue, page, index, callback) {
 }
 
 Logger.prototype.writeHeader = function (queue, page) {
-    var header = [ -(++page.entries), 0, page.right.address || 0, page.ghosts || 0 ]
+    var header = [ -(++page.entries), page.right.address || 0, page.ghosts || 0 ]
     return this.writeEntry(queue, header, page.right.key, this.serializers.key)
 }
 
@@ -158,7 +158,7 @@ Appender.prototype.writeDelete = function (index) {
 }
 
 Appender.prototype.writeUserRecord = function (header, body) {
-    header = [ -(++this._page.entries), 0 ].concat(header)
+    header = [ -(++this._page.entries) ].concat(header)
     var length = this._logger.writeEntry(this._queue, header, body, this._logger.serializers.record)
     this._write()
     return length
