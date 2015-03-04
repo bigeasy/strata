@@ -82,11 +82,16 @@ Player.prototype._play = function (sheaf, slice, start, page) {
                 handler(entry)
             }
         } else {
-            var index = header[1]
+            var index = header[1], replace = 0
             if (leaf) {
                 // todo: see if it is faster to perform the slices here directly.
                 if (index > 0) {
-                    page.splice(index - 1, 0, {
+                    index--
+                    if (index === 0 && page.ghosts) {
+                        page.ghosts--
+                        replace = 1
+                    }
+                    page.splice(index, replace, {
                         key: sheaf.extractor(entry.body),
                         record: entry.body,
                         heft: entry.heft

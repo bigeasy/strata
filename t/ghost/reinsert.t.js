@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('./proof')(4, prove)
+require('./proof')(5, prove)
 
 function prove (async, assert) {
     var strata = createStrata({ directory: tmp, leafSize: 3, branchSize: 3 })
@@ -32,5 +32,11 @@ function prove (async, assert) {
     }, function (actual, expected) {
         assert(actual, expected, 'balanced tree')
         strata.close(async())
+    }, function () {
+        strata.open(async())
+    }, function () {
+        gather(strata, async())
+    }, function (records) {
+        assert(records, [ 'a', 'b', 'c', 'd', 'e', 'f' ], 'balanced records')
     })
 }
