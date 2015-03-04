@@ -115,7 +115,7 @@ Cursor.prototype.insert = function (record, key, index) {
         this._appender = this._logger.createAppender(this._page)
     }
 
-    var heft = this._appender.writeInsert(index, record).heft
+    var heft = this._appender.writeInsert(index, record).length
     var replace = 0
     if (index === 0 && this._page.ghosts) {
         this._page.ghosts--

@@ -94,7 +94,7 @@ Player.prototype._play = function (sheaf, slice, start, page) {
                     page.splice(index, replace, {
                         key: sheaf.extractor(entry.body),
                         record: entry.body,
-                        heft: entry.heft
+                        heft: entry.length
                     })
                 } else if (~index === 0 && page.address !== 1) {
                     ok(!page.ghosts, 'double ghosts')
@@ -106,7 +106,7 @@ Player.prototype._play = function (sheaf, slice, start, page) {
                 var address = header[2], key = null, heft = 0
                 if (index - 1) {
                     key = entry.body
-                    heft = entry.heft
+                    heft = entry.length
                 }
                 page.splice(index - 1, 0, {
                     key: key, address: address, heft: heft

@@ -20,8 +20,8 @@ function prove (async, assert) {
             var item = cursor.get(cursor.offset)
             assert(item.record, 'a', 'get record')
             assert(item.key, 'a', 'get key')
-            assert(strata.size, 3, 'json size after read')
-            assert(item.heft, 3, 'record size')
+            assert(strata.size, 54, 'json size after read')
+            assert(item.heft, 54, 'record size')
 
             cursor.unlock(async())
         }, function () {

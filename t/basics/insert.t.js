@@ -14,7 +14,7 @@ function prove (async, assert) {
         cursor.insert('a', 'a', ~cursor.index)
         cursor.unlock(async())
     }, function () {
-        assert(strata.size, 3, 'json size')
+        assert(strata.size, 54, 'json size')
     }, function () {
         vivify(tmp, async())
         load(__dirname + '/fixtures/insert.json', async())
