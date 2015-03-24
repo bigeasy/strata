@@ -34,7 +34,7 @@
                         "rimraf": "~2.2",
                         "mkdirp": "~0.3",
                         "advance": "0.0.14",
-                        "splice": "0.0.19",
+                        "splice": "0.0.20",
                         "arguable": "0.0.22"
     },
     "licenses":
