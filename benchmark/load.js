@@ -72,7 +72,7 @@ var runner = cadence(function (async) {
             if (batch === 7) return [ loop ]
             splice(function (incoming, existing) {
                 return incoming.type
-            }, strata, advance.forward(null, null, batches[batch]), async())
+            }, strata, advance.forward(null, batches[batch]), async())
             batch++
         })()
     }, function () {
