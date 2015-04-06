@@ -14,6 +14,7 @@ The common utility functions are now exported globally. They may move into a uti
 
 ### Issue by Issue
 
+ * Upgrade Splice to 0.0.21. #511.
  * Upgrade Advance to 0.0.15. #510.
  * Upgrade Splice to 0.0.20. #509.
  * Upgrade Advance to 0.0.14. #508.
