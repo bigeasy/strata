@@ -625,7 +625,7 @@ I'm concerned that a leaf page might grow so large and spotty that it will be
 difficult, unpleasant to load all the leaves. This is why I created the notion
 of a positions array. The positions array can be cached at the end of the leaf.
 It will contain an array of all the entries in the leaf, so you don't have to
-laod the entires until you need them.
+load the entires until you need them.
 
 But, the moment I test Locket, I find that it is far too slow, so now I loathe
 trips to the drive. I don't want large leaves. I start thinking about how I
@@ -640,5 +640,5 @@ application that goes to different spots in the tree, leaves not expensive to
 keep tidy, they are small, and penultimate nodes are expensive to keep tidy, but
 only if the key is very large, and only at balance time.
 
-We could also get really agressive with the lookup table, instead of writing it
+We could also get really aggressive with the lookup table, instead of writing it
 into the body, write it into the footer.
