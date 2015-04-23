@@ -217,7 +217,7 @@ remove the page from the cache on error, then it can be reread, which ought to
 be interesting, because their might be a truncated last line or some such.
 
 In that case, we'd want some way of marking the page as broken, dirty, and not
-writing to it. Makes me wonder what other databases do when problems arrise.
+writing to it. Makes me wonder what other databases do when problems arise.
 
 For now, I just need to get an error to come up and out of Strata and someplace
 where someone can email it to me, where I can begin to see the possible failure
