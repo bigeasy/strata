@@ -1,5 +1,5 @@
 var ok = require('assert').ok
-var cadence = require('cadence/redux')
+var cadence = require('./cadence')
 var Script = require('./script')
 var Descent = require('./descent')
 
@@ -250,7 +250,7 @@ Balancer.prototype.splitLeafAndUnlock = cadence(function (async, address, key, g
         split = leaf.page
         if (split.items.length - split.ghosts <= this.sheaf.options.leafSize) {
             this.sheaf.unbalanced(split, true)
-            return [ splitter, false ]
+            return [ splitter.break, false ]
         }
     }, function () {
         pages = Math.ceil(split.items.length / this.sheaf.options.leafSize)
@@ -263,7 +263,7 @@ Balancer.prototype.splitLeafAndUnlock = cadence(function (async, address, key, g
 
         var splits = 0
         var loop = async(function () {
-            if (splits++ == pages - 1) return [ loop ]
+            if (splits++ == pages - 1) return [ loop.break ]
             page = locker.encache(this.sheaf.createPage(1))
             encached.push(page)
 
@@ -305,7 +305,7 @@ Balancer.prototype.splitLeafAndUnlock = cadence(function (async, address, key, g
     }, function () {
         this.sheaf.unbalanced(leaf.page, true)
         this.sheaf.unbalanced(page, true)
-        return [ splitter, true, penultimate.page, encached[0].items[0].key ]
+        return [ splitter.break, true, penultimate.page, encached[0].items[0].key ]
     })()
 })
 
@@ -621,7 +621,7 @@ Balancer.prototype.mergePagesAndUnlock = cadence(function (
     }, function () {
         merger.call(this, script, pages, ghosted, async())
     }, function (dirty) {
-        if (!dirty) return [ merge, false ]
+        if (!dirty) return [ merge.break, false ]
     }, function () {
         var index = parents.right.indexes[ancestor.address]
 
@@ -649,7 +649,7 @@ Balancer.prototype.mergePagesAndUnlock = cadence(function (
         })
         script.commit(async())
     }, function () {
-        return [ merge, true, ancestor, designation.key ]
+        return [ merge.break, true, ancestor, designation.key ]
     })()
 })
 
@@ -709,7 +709,7 @@ Balancer.prototype.mergeLeaves = function (key, leftKey, unbalanced, ghostly, ca
                 var count = leaves.right.page.items.length - leaves.right.page.ghosts
                 var index = 0
                 var loop = async(function () {
-                    if (index == count) return [ loop ]
+                    if (index == count) return [ loop.break ]
                     var item = leaves.right.page.items[index + ghosts]
                     leaves.left.page.splice(leaves.left.page.items.length, 0, item)
                     index++
@@ -774,11 +774,11 @@ Balancer.prototype.chooseBranchesToMergeAndUnlock = cadence(function (async, key
                 designator.index = 0
                 designator.descend(designator.left, designator.leaf, async())
             } else {
-                return [ choose , false ]
+                return [ choose.break, false ]
             }
         }, function () {
             var item = designator.page.items[0]
-            return [ choose, true, item.key, item.heft, choice.page.address ]
+            return [ choose.break, true, item.key, item.heft, choice.page.address ]
         })
     })()
 })
