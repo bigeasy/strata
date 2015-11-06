@@ -1,7 +1,7 @@
 var fs = require('fs'),
     path = require('path'),
     crypto = require('crypto'),
-    cadence = require('../cadence'),
+    cadence = require('cadence'),
     Strata = require('..'),
     rimraf = require('rimraf'),
     path = require('path'),

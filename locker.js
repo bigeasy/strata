@@ -1,4 +1,4 @@
-var cadence = require('./cadence')
+var cadence = require('cadence')
 var ok = require('assert').ok
 
 function Locker (sheaf, magazine) {

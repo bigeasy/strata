@@ -1,5 +1,5 @@
 var ok = require('assert').ok
-var cadence = require('./cadence')
+var cadence = require('cadence')
 var Script = require('./script')
 var Descent = require('./descent')
 

@@ -3,7 +3,7 @@
 require('./proof')(2, prove)
 
 function prove (async, assert) {
-    var cadence = require('../../cadence'),
+    var cadence = require('cadence'),
         strata, count = 0
 
     function tracer (type, object, callback) {

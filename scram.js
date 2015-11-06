@@ -1,5 +1,5 @@
 // bogus function to get 100 test coverage.
-var cadence = require('./cadence')
+var cadence = require('cadence')
 
 module.exports = cadence(function (async, entry, f) {
     async([function () {

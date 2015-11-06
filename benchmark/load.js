@@ -9,7 +9,7 @@
 */
 
 var splice = require('splice')
-var cadence = require('../cadence')
+var cadence = require('cadence')
 var path = require('path')
 var crypto = require('crypto')
 var seedrandom = require('seedrandom')

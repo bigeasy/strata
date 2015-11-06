@@ -7,7 +7,7 @@ function prove (async, assert) {
     script({
         file: path.join(__dirname, 'fixtures', 'unpurged-key.txt'),
         directory: tmp,
-        cadence: require('../../cadence'),
+        cadence: require('cadence'),
         assert: assert
     }, async())
 }

@@ -1,7 +1,7 @@
 var ok = require('assert').ok
 var fs = require('fs')
 var path = require('path')
-var cadence = require('./cadence')
+var cadence = require('cadence')
 
 function Player (options) {
     this.directory = options.directory

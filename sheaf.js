@@ -2,7 +2,7 @@ var ok = require('assert').ok
 var path = require('path')
 var fs = require('fs')
 
-var cadence = require('./cadence')
+var cadence = require('cadence')
 var sequester = require('sequester')
 
 var Cache = require('magazine')

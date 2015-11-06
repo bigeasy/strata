@@ -1,5 +1,5 @@
 var Cache = require('magazine'),
-    cadence = require('./cadence'),
+    cadence = require('cadence'),
     Cursor = require('./cursor'),
     fs = require('fs'),
     Queue = require('./queue'),

@@ -1,4 +1,4 @@
-var cadence = require('./cadence')
+var cadence = require('cadence')
 var path = require('path')
 var fs = require('fs')
 var Queue = require('./queue')

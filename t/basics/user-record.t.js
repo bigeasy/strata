@@ -7,7 +7,7 @@ function prove (async, assert) {
     var Queue = require('../../queue')
     var Scribe = require('../../scribe')
     var json = require('../../json')
-    var cadence = require('../../cadence')
+    var cadence = require('cadence')
 
     var writeUserRecord = cadence(function (async, strata) {
         var locker = strata.sheaf.createLocker()

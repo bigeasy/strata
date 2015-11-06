@@ -3,7 +3,7 @@ var ok = require('assert').ok
 var fs = require('fs')
 var path = require('path')
 
-var cadence = require('./cadence')
+var cadence = require('cadence')
 
 var Queue = require('./queue')
 var Script = require('./script')
