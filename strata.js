@@ -1,5 +1,5 @@
 var Cache = require('magazine'),
-    cadence = require('cadence/redux'),
+    cadence = require('./cadence'),
     Cursor = require('./cursor'),
     fs = require('fs'),
     Queue = require('./queue'),
@@ -12,8 +12,6 @@ var Cache = require('magazine'),
     Logger = require('./logger'),
     ok = require('assert').ok,
     path = require('path')
-
-require('cadence/loops')
 
 // todo: temporary
 var scram = require('./scram')
@@ -231,10 +229,13 @@ Strata.prototype.vivify = cadence(function (async) {
                 async(function () {
                     locker.lock(address, false, async())
                 }, [function (page) {
+                    console.log('foo', page)
                     locker.unlock(page)
-                }])
+                }], function (page) {
+                    return page
+                })
             } else {
-                return [ block, pages ]
+                return [ block.break, pages ]
             }
         }, function (page) {
             if (page.address % 2 == 0) {
@@ -260,7 +261,7 @@ Strata.prototype.vivify = cadence(function (async) {
                 })
             }
         }, function () {
-            return [ block, pages ]
+            return [ block.break, pages ]
         })()
     })
 })

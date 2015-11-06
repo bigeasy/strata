@@ -1,11 +1,11 @@
 // bogus function to get 100 test coverage.
-var cadence = require('cadence/redux')
+var cadence = require('./cadence')
 
-module.exports = cadence(function (step, entry, f) {
-    step([function () {
-        f.call(this, step())
+module.exports = cadence(function (async, entry, f) {
+    async([function () {
+        f.call(this, async())
     }, function (error) {
-        entry.scram(step())
+        entry.scram(async())
         throw error
     }])
 })

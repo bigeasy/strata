@@ -22,7 +22,7 @@ function prove (async, assert) {
                 async(function () {
                     cursor.next(async())
                 }, function () {
-                    return [ page() ]
+                    return [ page.continue ]
                 })
             } else {
                 async(function () {
@@ -32,7 +32,7 @@ function prove (async, assert) {
                 })
             }
         }, function () {
-            return [ page ]
+            return [ page.break ]
         })()
     }, function () {
         gather(strata, async())

@@ -1,4 +1,4 @@
-var cadence = require('cadence/redux')
+var cadence = require('./cadence')
 var Locker = require('./locker')
 var Sheaf = require('./sheaf')
 var ok = require('assert').ok
@@ -111,7 +111,7 @@ Descent.prototype.unlocker = function (parent) {
 Descent.prototype.descend = cadence(function (async, next, stop) {
     var loop = async(function () {
         if (stop.call(this)) {
-            return [ loop, this.page, this.index ]
+            return [ loop.break, this.page, this.index ]
         } else {
             if (this.index + 1 < this.page.items.length) {
                 this.greater = this.page.address

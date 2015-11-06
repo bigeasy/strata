@@ -9,7 +9,7 @@
 */
 
 var splice = require('splice')
-var cadence = require('cadence/redux')
+var cadence = require('../cadence')
 var path = require('path')
 var crypto = require('crypto')
 var seedrandom = require('seedrandom')
@@ -69,7 +69,7 @@ var runner = cadence(function (async) {
     }, function () {
         var time
         var batch = 0, loop = async(function () {
-            if (batch === 7) return [ loop ]
+            if (batch === 7) return [ loop.break ]
             splice(function (incoming, existing) {
                 return incoming.type
             }, strata, advance.forward(null, batches[batch]), async())
@@ -91,7 +91,7 @@ var runner = cadence(function (async) {
                     async(function () {
                         cursor.unlock(async())
                     }, function () {
-                        return [ loop, records ]
+                        return [ loop.break, records ]
                     })
                 } else {
                     for (var i = cursor.offset, I = cursor.length; i < I; i++) {

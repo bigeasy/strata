@@ -1,4 +1,4 @@
-var cadence = require('cadence/redux')
+var cadence = require('./cadence')
 var path = require('path')
 var fs = require('fs')
 var Queue = require('./queue')
@@ -102,7 +102,7 @@ Script.prototype._replace = cadence(function (async, operation) {
             if (error.code !== 'ENOENT') {
                 throw error
             }
-            return [ block ]
+            return [ block.break ]
         }], [function () {
             fs.unlink(operation.to, async())
         }, function (error) {
@@ -112,7 +112,7 @@ Script.prototype._replace = cadence(function (async, operation) {
         }], function () {
             fs.rename(operation.from, operation.to, async())
         }, function () {
-            return [ block ]
+            return [ block.break ]
         })()
     }, function () {
         fs.stat(operation.to, async())

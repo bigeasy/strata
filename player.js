@@ -1,7 +1,7 @@
 var ok = require('assert').ok
 var fs = require('fs')
 var path = require('path')
-var cadence = require('cadence/redux')
+var cadence = require('./cadence')
 
 function Player (options) {
     this.directory = options.directory
@@ -29,7 +29,7 @@ Player.prototype.io = cadence(function (async, direction, filename) {
                         offset += count
                         fs[direction](fd, slice, offset, slice.length - offset, position + offset, async())
                     } else {
-                        return [ loop, slice, position ]
+                        return [ loop.break, slice, position ]
                     }
                 })(0)
             })
@@ -47,7 +47,7 @@ Player.prototype.read = cadence(function (async, sheaf, page) {
         if (rotation === 0 || error.code !== 'ENOENT') {
             throw error
         }
-        return [ loop, page ]
+        return [ loop.break, page ]
     }], function (fd, stat, read) {
         page.position = 0
         page.rotation = rotation++
@@ -136,7 +136,7 @@ Player.prototype.play = cadence(function (async, sheaf, fd, stat, read, page) {
                     read(buffer, start + offset, async())
                 }
             } else {
-                return [ loop ]
+                return [ loop.break ]
             }
         })(buffer, 0)
     })

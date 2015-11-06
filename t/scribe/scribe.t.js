@@ -1,5 +1,5 @@
 // todo: redux
-require('proof')(3, require('cadence')(prove))
+require('proof')(3, require('../../cadence')(prove))
 
 function prove (async, assert) {
     var path = require('path')
@@ -35,7 +35,7 @@ function prove (async, assert) {
             scribe.open()
             scribe.write(new Buffer('x'), 0, 1, 0)
             scribe.close(async())
-        }, function (_, error) {
+        }, function (error) {
             assert(error.code, 'ENOENT', 'immediate error')
         }])
     }, function () {
@@ -54,7 +54,7 @@ function prove (async, assert) {
                 scribe.write(new Buffer('z'), 0, 1, 2)
                 scribe.close(async())
             })
-        }, function (_, error) {
+        }, function (error) {
             assert(error.code, 'EBADF', 'later error')
         }])
     }, function () {
