@@ -1,4 +1,4 @@
-var cadence = require('cadence/redux')
+var cadence = require('./cadence')
 var ok = require('assert').ok
 var Queue = require('./queue')
 var Scribe = require('./scribe')
