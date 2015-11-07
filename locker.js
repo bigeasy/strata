@@ -53,7 +53,7 @@ Locker.prototype.lock = cadence(function (async, address, exclusive) {
             }, function () {
                 return [ page ]
             })
-        })
+        }) // todo: unecessary cadence
     }, function (error) {
         cartridge.release()
         delete this._locks[page.address]
@@ -65,8 +65,7 @@ Locker.prototype.lock = cadence(function (async, address, exclusive) {
 })
 
 Locker.prototype.encache = function (page) {
-    var cartridge = this._magazine.hold(page.address, { page: page })
-    page.cartridge = cartridge
+    page.cartridge = this._magazine.hold(page.address, { page: page })
     this._locks[page.address] = page.queue.createLock()
     this._locks[page.address].exclude(function () {})
     return page
@@ -74,7 +73,7 @@ Locker.prototype.encache = function (page) {
 
 Locker.prototype.checkCacheSize = function (page) {
     var heft = page.items.reduce(function (heft, item) { return heft + item.heft }, 0)
-    ok(heft == this._magazine.get(page.address).heft, 'sizes are wrong')
+    ok(heft == page.cartridge.heft, 'sizes are wrong')
 }
 
 Locker.prototype.unlock = function (page) {
@@ -83,7 +82,7 @@ Locker.prototype.unlock = function (page) {
     if (!this._locks[page.address].count) {
         delete this._locks[page.address]
     }
-    this._magazine.get(page.address).release()
+    page.cartridge.release()
 }
 
 Locker.prototype.increment = function (page) {

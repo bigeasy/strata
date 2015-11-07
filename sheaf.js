@@ -48,15 +48,18 @@ Sheaf.prototype.createPage = function (modulus, address) {
 
 Sheaf.prototype.createMagazine = function () {
     var magazine = this.cache.createMagazine()
-    var dummy = magazine.hold(-2, {
+    var cartridge = magazine.hold(-2, {
         page: {
             address: -2,
             items: [{ key: null, address: 0, heft: 0 }],
             queue: sequester.createQueue()
         }
-    }).value.page
-    dummy.lock = dummy.queue.createLock()
-    dummy.lock.share(function () {})
+    })
+    var metaRoot = cartridge.value.page
+    metaRoot.cartridge = cartridge
+    metaRoot.lock = metaRoot.queue.createLock()
+    metaRoot.lock.share(function () {})
+    this.metaRoot = metaRoot
     this.magazine = magazine
 }
 

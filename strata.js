@@ -108,7 +108,8 @@ Strata.prototype.open = cadence(function (async) {
 
 // to user land
 Strata.prototype.close = cadence(function (async) {
-    var cartridge = this.sheaf.magazine.get(-2), lock = cartridge.value.page.lock
+    // todo: that's a lot of indirection.
+    var cartridge = this.sheaf.metaRoot.cartridge, lock = cartridge.value.page.lock
 
     lock.unlock()
     // todo
