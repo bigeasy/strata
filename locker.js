@@ -10,6 +10,7 @@ function Locker (sheaf, magazine) {
 }
 
 Locker.prototype.lock = cadence(function (async, address, exclusive) {
+    // todo: locks does not appear to need to be an array.
     var cartridge = this._magazine.hold(address, {}),
         page = cartridge.value.page, locks = []
 
