@@ -2,26 +2,24 @@
 
 /*
 
-    ___ usage: en_US ___
+    ___ usage ___ en_US ___
     stratify [options]
 
     options:
 
     -d, --directory         [name]  Name of directory to store database.
 
-    ___ usage ___
+    ___ . ___
 
   */
 
-require('arguable').parse(__filename, process.argv.slice(2), function (options) {
-    require('./t/proof').script({
-        directory: options.params.directory,
+require('arguable')(module, require('cadence')(function (async, program) {
+    require('../t/proof').script({
+        directory: program.param.directory,
         cadence: require('cadence'),
-        file: options.argv.shift(),
+        file: program.argv.shift(),
         deepEqual: require('assert').deepEqual
-    }, function (error) {
-        if (error) throw error
-    })
-})
+    }, async())
+}))
 
 /* vim: set ts=2 sw=2: */
