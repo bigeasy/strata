@@ -31,7 +31,7 @@
     {
                         "seedrandom": "2.3.10",
                         "proof": "0.0.50",
-                        "rimraf": "~2.2",
+                        "rimraf": "2.4.3",
                         "mkdirp": "0.5.1",
                         "advance": "0.0.15",
                         "splice": "0.0.21",
