@@ -34,7 +34,7 @@
                         "rimraf": "2.4.3",
                         "mkdirp": "0.5.1",
                         "advance": "0.0.16",
-                        "splice": "0.0.21",
+                        "splice": "0.0.22",
                         "arguable": "0.0.37"
     },
     "license":          "MIT",
