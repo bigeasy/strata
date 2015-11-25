@@ -5,7 +5,7 @@ The Wave by [Rick Z.](http://www.flickr.com/people/rickz/).
 
 An Evented I/O B-tree for Node.js.
 
-## Purpose
+___
 
 Strata is part of a collection of database primitives that you can use to design
 your own distributed databases for your Node.js applications. I call this
@@ -20,36 +20,15 @@ organized in large pages on disk.
 
 By **concurrent** I mean that multiple queries can make progress on a descent of
 the b&#x2011;tree. Multiple reads can all navigate the b&#x2011;tree
-simultaneously, of course. Multiple reads can also make progress in the presence
-of a write, so long as they are not reading a page that is being written. This
-is the equivalence to "threading" in other database engines, but evented for
-Node.js.
+simultaneously. Multiple reads can also make progress in the presence of a
+write, so long as they are not reading a page that is being written. This is the
+equivalence to "threading" in other database engines, but evented for Node.js.
 
 Strata is a database **primitive**, it is not supposed to be used a as a general
-purpose database by it's lonesome, but an interface to a b&#x2011;tree and it's
-concepts that you can use to create different types database strategies.
-
-### Brace Yourself
-
-The interface to Strata is *not* an API, it is a programmer's interface to
-b&#x2011;tree concepts. It is easy to use, if you know how a b&#x2011;tree works,
-but please don't complain about encapsulation; it is not a database engine, it
-is a b&#x2011;tree structure and the *details are supposed to be exposed*.
-
-The Strata b&#x2011;tree interface describes a b&#x2011;tree as a collection of
-actors, not a collection of objects. A b&#x2011;tree isn't all about "pages."
-It's about descending, navigating, appending, and balancing a tree. When you
-read the code, you're going to find these people-named classes who do things.
-
-Finally, Strata is an ancient project of mine, that began before I really know
-how a Node.js library is supposed to look, so I used closure based objects,
-which is a way to go, but most noders use prototype based objects. That's what
-I'd do I was to do it all over again, or maybe not; because I like the way the
-code turned out.
-
-I'm going to cut this whinging in the final `README.md`. It's here to vent my
-defensiveness and remind of who my audience is; people who are experimenting
-with their own database structure for their own domain-specific database.
+purpose database by it's lonesome. Strata an implementation of a b&#x2011;tree
+and it's interface exposes b&#x2011;concepts. If you're using Strata you're
+either implementing a database engine, or your taking your indexes and queries
+into your own hands.
 
 ### A Note on Examples
 
@@ -139,13 +118,13 @@ mutator is a superset of the iterator so let's start there.
 ```javascript
 var hasKey = cadence(function (async, strata, sought) {
     async(function () {
-        strata.iterator(sought, check(atLeaf))
+        strata.iterator(sought, async())
     }, function (cursor) {
         found = cursor.index >= 0
         async(function () {
             cursor.unlock(async())
         }, function () {
-            return [ found ]
+            return true
         })
     })
 }
