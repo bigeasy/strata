@@ -11,20 +11,20 @@ function prove (async, assert) {
     }, function () {
         strata.mutator('h', async())
     }, function (cursor) {
-        cursor.remove(cursor.indexOf('h', cursor.ghosts))
-        cursor.remove(cursor.indexOf('i', cursor.ghosts))
+        cursor.remove(cursor.indexOf('h', cursor.page.ghosts))
+        cursor.remove(cursor.indexOf('i', cursor.page.ghosts))
         cursor.unlock(async())
     }, function () {
         strata.mutator('e', async())
     }, function (cursor) {
-        cursor.remove(cursor.indexOf('e', cursor.ghosts))
-        cursor.remove(cursor.indexOf('g', cursor.ghosts))
+        cursor.remove(cursor.indexOf('e', cursor.page.ghosts))
+        cursor.remove(cursor.indexOf('g', cursor.page.ghosts))
         cursor.unlock(async())
     }, function () {
         strata.mutator('m', async())
     }, function (cursor) {
-        cursor.remove(cursor.indexOf('m', cursor.ghosts))
-        cursor.remove(cursor.indexOf('n', cursor.ghosts))
+        cursor.remove(cursor.indexOf('m', cursor.page.ghosts))
+        cursor.remove(cursor.indexOf('n', cursor.page.ghosts))
         cursor.unlock(async())
     }, function () {
         gather(strata, async())

@@ -15,11 +15,11 @@ function prove (async, assert) {
     }, function () {
         strata.mutator('a', async())
     }, function (cursor) {
-        var index = cursor.indexOf('b', cursor.ghosts)
-        assert(~index <= cursor.length, 'unambiguous')
+        var index = cursor.indexOf('b', cursor.page.ghosts)
+        assert(~index <= cursor.page.items.length, 'unambiguous')
         cursor.insert('b', 'b', ~index)
-        var index = cursor.indexOf('c', cursor.ghosts)
-        assert(~index <= cursor.length, 'unambiguous cached')
+        var index = cursor.indexOf('c', cursor.page.ghosts)
+        assert(~index <= cursor.page.items.length, 'unambiguous cached')
         cursor.insert('c', 'c', ~index)
         cursor.unlock(async())
     }, function () {

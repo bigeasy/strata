@@ -20,7 +20,7 @@ function prove (async, assert) {
         async(function () {
             cursor.next(async())
         }, function () {
-            cursor.insert('e', 'e', ~cursor.indexOf('e', cursor.ghosts))
+            cursor.insert('e', 'e', ~cursor.indexOf('e', cursor.page.ghosts))
             cursor.unlock(async())
         })
     }, function () {

@@ -100,7 +100,7 @@ var gather = cadence(function (async, strata) {
                     return [ loop.break, records ]
                 })
             } else {
-                for (var i = cursor.offset; i < cursor.length; i ++) {
+                for (var i = cursor.offset; i < cursor.page.items.length; i ++) {
                     records.push(cursor.get(i).record)
                 }
                 cursor.next(async())

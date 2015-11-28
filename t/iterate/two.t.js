@@ -14,7 +14,7 @@ function prove (async, assert) {
         async(function () {
             assert(cursor.index, 0, 'found')
             assert(cursor.offset, 0, 'found')
-            assert(cursor.length, 2, 'length')
+            assert(cursor.page.items.length, 2, 'length')
             var record = cursor.get(cursor.index).record
             records.push(record)
             assert(cursor.index, 0, 'same index')

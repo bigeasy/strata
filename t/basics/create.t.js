@@ -27,7 +27,7 @@ function prove (async, assert) {
     }, function () {
         strata.iterator('a', async())
     }, function (cursor) {
-        assert(cursor.length - cursor.offset, 0, 'empty')
+        assert(cursor.page.items.length - cursor.offset, 0, 'empty')
 
         cursor.unlock(async())
     }, function () {

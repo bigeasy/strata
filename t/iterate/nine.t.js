@@ -13,7 +13,7 @@ function prove (async, assert) {
     }, function (cursor) {
         assert(cursor.index, 0, 'index')
         assert(cursor.offset, 0, 'offset')
-        assert(cursor.length, 3, 'length')
+        assert(cursor.page.items.length, 3, 'length')
         cursor.unlock(async())
     }, function () {
         gather(strata, async())

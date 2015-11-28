@@ -14,8 +14,8 @@ function prove (async, assert) {
         async(function () {
             assert(cursor.index, 0, 'found')
             assert(cursor.offset, 0, 'offset')
-            assert(cursor.ghosts, 0, 'ghosts')
-            assert(cursor.length, 1, 'length')
+            assert(cursor.page.ghosts, 0, 'ghosts')
+            assert(cursor.page.items.length, 1, 'length')
             assert(cursor.get(cursor.index).record, 'a', 'records')
             cursor.unlock(async())
         }, function () {

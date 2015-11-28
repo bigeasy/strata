@@ -13,13 +13,13 @@ function prove (async, assert) {
         strata.mutator(strata.leftOf('c'), async())
     }, function (cursor) {
         assert(cursor.exclusive, 'exclusive')
-        right = cursor.right.address
+        right = cursor.page.right.address
         assert(cursor.get(0).record, 'a', 'go left')
         cursor.unlock(async())
     }, function () {
         strata.mutator(strata.leftOf('d'), async())
     }, function (cursor) {
-        assert(cursor.address, right, 'address and right')
+        assert(cursor.page.address, right, 'address and right')
         assert(!cursor.exclusive, 'shared')
         assert(cursor.get(0).record, 'c', 'go left missing')
         cursor.unlock(async())

@@ -16,8 +16,8 @@ function prove (async, assert) {
         strata.mutator('a', async())
     }, function (cursor) {
         var page = async(function () {
-            var index = cursor.indexOf('z', cursor.ghosts)
-            ambiguity.unshift(cursor.length < ~index)
+            var index = cursor.indexOf('z', cursor.page.ghosts)
+            ambiguity.unshift(cursor.page.items.length < ~index)
             if (ambiguity[0]) {
                 async(function () {
                     cursor.next(async())

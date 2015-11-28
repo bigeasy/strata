@@ -23,8 +23,8 @@ function prove (async, assert) {
         assert(records, [ 'a', 'd', 'f', 'h', 'i', 'l', 'm', 'n' ], 'records after delete')
         strata.mutator('j', async())
     }, function (cursor) {
-        var index = cursor.indexOf('j', cursor.ghosts)
-        assert(~index <= cursor.length, 'unambiguous')
+        var index = cursor.indexOf('j', cursor.page.ghosts)
+        assert(~index <= cursor.page.items.length, 'unambiguous')
         cursor.insert('j', 'j', ~cursor.index)
         cursor.unlock(async())
     }, function () {

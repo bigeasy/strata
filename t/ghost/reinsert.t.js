@@ -12,7 +12,7 @@ function prove (async, assert) {
         strata.mutator('d', async())
     }, function (cursor) {
         cursor.remove(cursor.index)
-        cursor.insert('d', 'd', ~cursor.indexOf('d', cursor.ghosts))
+        cursor.insert('d', 'd', ~cursor.indexOf('d', cursor.page.ghosts))
         cursor.unlock(async())
     }, function () {
         gather(strata, async())

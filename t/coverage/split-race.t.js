@@ -16,8 +16,8 @@ function prove (async, assert) {
                     }, function (cursor) {
                         async(function () {
                             cursor.remove(cursor.index)
-                            cursor.remove(cursor.indexOf('c', cursor.ghosts))
-                            cursor.remove(cursor.indexOf('d', cursor.ghosts))
+                            cursor.remove(cursor.indexOf('c', cursor.page.ghosts))
+                            cursor.remove(cursor.indexOf('d', cursor.page.ghosts))
                             cursor.unlock(async())
                         })
                     })

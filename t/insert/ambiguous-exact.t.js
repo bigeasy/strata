@@ -15,8 +15,8 @@ function prove (async, assert) {
     }, function () {
         strata.mutator('c', async())
     }, function (cursor) {
-        var index = cursor.indexOf('c', cursor.ghosts)
-        assert(~index <= cursor.length, 'unambiguous')
+        var index = cursor.indexOf('c', cursor.page.ghosts)
+        assert(~index <= cursor.page.items.length, 'unambiguous')
         cursor.insert('c', 'c', ~cursor.index)
         cursor.unlock(async())
     }, function () {
