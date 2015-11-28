@@ -6,14 +6,15 @@ echo ""
 
 (proof run t/*/*.t.js | tee .proof.out | proof progress) || (proof errors < .proof.out) || exit 1
 
-if [ "$TRAVIS_SECURE_ENV_VARS" = "true" ]; then
+if [ "$TRAVIS" = "true" ]; then
+  echo ""
   echo "running with coverage"
   t/cover
+  node_modules/.bin/istanbul report --format text
+  echo ""
 
   echo "submitting to coveralls.io"
   (cat coverage/lcov.info | node_modules/.bin/coveralls) > /dev/null 2>&1
-
-  curl 'https://www.prettyrobots.com/travisty' | sh
 fi
 
 echo ""
