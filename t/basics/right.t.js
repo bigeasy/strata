@@ -13,7 +13,7 @@ function prove (async, assert) {
         strata.mutator(strata.right, async())
     }, function (cursor) {
         assert(cursor.exclusive, 'exclusive')
-        assert(cursor.get(0).record, 'c', 'right')
+        assert(cursor.page.items[0].record, 'c', 'right')
         cursor.unlock(async())
     }, function () {
         strata.close(async())

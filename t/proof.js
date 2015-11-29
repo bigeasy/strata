@@ -101,7 +101,7 @@ var gather = cadence(function (async, strata) {
                 })
             } else {
                 for (var i = cursor.offset; i < cursor.page.items.length; i ++) {
-                    records.push(cursor.get(i).record)
+                    records.push(cursor.page.items[i].record)
                 }
                 cursor.next(async())
             }

@@ -15,7 +15,7 @@ function prove (async, assert) {
         strata.mutator('h', async())
         cursor.unlock(async())
     }, function (cursor) {
-        assert(cursor.get(cursor.offset).record, 'h', 'got')
+        assert(cursor.page.items[cursor.offset].record, 'h', 'got')
         cursor.unlock(async())
     }, function() {
         strata.close(async())

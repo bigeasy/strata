@@ -28,7 +28,7 @@ function prove (async, assert) {
     }, function () {
         strata.iterator('a', async())
     }, function (cursor) {
-        assert(cursor.get(cursor.index).record, 'a', 'inserted binary')
+        assert(cursor.page.items[cursor.index].record, 'a', 'inserted binary')
         cursor.unlock(async())
     }, function () {
         strata.close(async())

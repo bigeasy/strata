@@ -14,14 +14,14 @@ function prove (async, assert) {
     }, function (cursor) {
         assert(cursor.exclusive, 'exclusive')
         right = cursor.page.right.address
-        assert(cursor.get(0).record, 'a', 'go left')
+        assert(cursor.page.items[0].record, 'a', 'go left')
         cursor.unlock(async())
     }, function () {
         strata.mutator(strata.leftOf('d'), async())
     }, function (cursor) {
         assert(cursor.page.address, right, 'address and right')
         assert(!cursor.exclusive, 'shared')
-        assert(cursor.get(0).record, 'c', 'go left missing')
+        assert(cursor.page.items[0].record, 'c', 'go left missing')
         cursor.unlock(async())
     }, function () {
         strata.close(async())

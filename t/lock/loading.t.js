@@ -13,9 +13,9 @@ function prove (async, assert) {
         strata.iterator('h', async())
         strata.iterator('h', async())
     }, function (first, second) {
-        assert(first.get(first.offset).record, 'h', 'first')
+        assert(first.page.items[first.offset].record, 'h', 'first')
         first.unlock(async())
-        assert(second.get(second.offset).record, 'h', 'second')
+        assert(second.page.items[second.offset].record, 'h', 'second')
         second.unlock(async())
     }, function() {
         strata.close(async())

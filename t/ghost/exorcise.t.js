@@ -36,7 +36,7 @@ function prove (async, assert) {
             assert(cursor.page.right, { key: 'd', address: 5 }, 'referring leaf updated')
             cursor.next(async())
         }, function () {
-            assert(cursor.get(0).key, 'd', 'key deleted')
+            assert(cursor.page.items[0].key, 'd', 'key deleted')
         }, function () {
             cursor.unlock(async())
         })

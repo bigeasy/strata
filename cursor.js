@@ -16,10 +16,6 @@ function Cursor (sheaf, logger, descents, exclusive, searchKey) {
     descents.shift()
 }
 
-Cursor.prototype.get = function (index) {
-    return this.page.items[index]
-}
-
 // to user land
 Cursor.prototype.next = cadence(function (async) {
     var next

@@ -17,7 +17,7 @@ function prove (async, assert) {
     }, function () {
         strata.iterator('a', async())
     }, function (cursor) {
-        assert(cursor.get(cursor.offset).record, 'a', 'get')
+        assert(cursor.page.items[cursor.offset].record, 'a', 'get')
         cursor.unlock(async())
     })
 }

@@ -17,7 +17,7 @@ function prove (async, assert) {
             assert(! cursor.exclusive, 'shared')
             assert(cursor.index, 0, 'index')
             assert(cursor.offset, 0, 'offset')
-            var item = cursor.get(cursor.offset)
+            var item = cursor.page.items[cursor.offset]
             assert(item.record, 'a', 'get record')
             assert(item.key, 'a', 'get key')
             assert(strata.size, 54, 'json size after read')

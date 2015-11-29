@@ -12,7 +12,7 @@ function prove (async, assert) {
     }, function () {
         strata.iterator('b', async())
     }, function (cursor) {
-        assert(cursor.get(cursor.index).record, 'b', 'loaded')
+        assert(cursor.page.items[cursor.index].record, 'b', 'loaded')
         cursor.unlock(async())
     }, function () {
         strata.close(async())

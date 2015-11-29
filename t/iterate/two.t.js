@@ -15,10 +15,10 @@ function prove (async, assert) {
             assert(cursor.index, 0, 'found')
             assert(cursor.offset, 0, 'found')
             assert(cursor.page.items.length, 2, 'length')
-            var record = cursor.get(cursor.index).record
+            var record = cursor.page.items[cursor.index].record
             records.push(record)
             assert(cursor.index, 0, 'same index')
-            var record = cursor.get(cursor.index + 1).record
+            var record = cursor.page.items[cursor.index + 1].record
             records.push(record)
             assert(records, [ 'a', 'b' ], 'records')
             cursor.unlock(async())
