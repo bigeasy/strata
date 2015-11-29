@@ -17,7 +17,7 @@ function Descent (sheaf, locker, override) {
     this.greater = override.greater
     this.lesser = override.lesser
     this.page = override.page
-    this._index = override.index == null ? 0 : override.index
+    this.index = override.index == null ? 0 : override.index
     this.locker = locker
     this.descent = {}
 
@@ -32,13 +32,9 @@ function Descent (sheaf, locker, override) {
     }
 }
 
-Descent.prototype.__defineSetter__('index', function (i) {
-    this.indexes[this.page.address] = this._index = i
-})
-
-Descent.prototype.__defineGetter__('index', function () {
-    return this._index
-})
+Descent.prototype.setIndex = function (i) {
+    this.indexes[this.page.address] = this.index = i
+}
 
 Descent.prototype.fork = function () {
     return new Descent(this.sheaf, this.locker, {
@@ -127,9 +123,9 @@ Descent.prototype.descend = cadence(function (async, next, stop) {
         this.page = locked
         var index = next.call(this)
         if (!(this.page.address % 2) && index < 0) {
-            this.index = (~index) - 1
+            this.setIndex((~index) - 1)
         } else {
-            this.index = index
+            this.setIndex(index)
         }
         this.indexes[this.page.address] = this.index
         if (this.page.address % 2 === 0) {

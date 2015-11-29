@@ -67,7 +67,7 @@ Balancer.prototype.balance = cadence(function balance (async, sheaf) {
                 async(function () {
                     descent.descend(descent.key(node.key), descent.found([node.key]), async())
                 }, function () {
-                    descent.index--
+                    descent.setIndex(descent.index - 1)
                     descent.descend(descent.right, descent.leaf, async())
                 }, function () {
                     var left
@@ -487,7 +487,7 @@ Balancer.prototype.deleteGhost = cadence(function (async, key) {
     }, function () {
         if (pivot.index != 0) {
             descents.push(reference = pivot.fork())
-            reference.index--
+            reference.setIndex(reference.index - 1)
             reference.descend(reference.right, reference.leaf, async())
         }
     }, function () {
@@ -514,13 +514,13 @@ Balancer.prototype.referring = cadence(function (async, leftKey, descents, pivot
         async(function () {
             var key = referring.page.items[referring.index].key
             if (this.sheaf.comparator(leftKey, key) !== 0) {
-                referring.index--
+                referring.setIndex(referring.index - 1)
                 referring.descend(referring.key(leftKey), referring.found([leftKey]), async())
             }
         }, function () {
             var key = referring.page.items[referring.index].key
             ok(this.sheaf.comparator(leftKey, key) === 0, 'cannot find left key')
-            referring.index--
+            referring.setIndex(referring.index - 1)
             referring.descend(referring.right, referring.leaf, async())
         })
     }
@@ -592,7 +592,7 @@ Balancer.prototype.mergePagesAndUnlock = cadence(function (
         parents.right.descend(parents.right.key(key), stopper(parents.right), async())
     }, function () {
         parents.left = pivot.fork()
-        parents.left.index--
+        parents.left.setIndex(parents.left.index - 1)
         parents.left.unlocker = createSingleUnlocker(singles.left)
         parents.left.descend(parents.left.right,
                              parents.left.level(parents.right.depth),
@@ -740,7 +740,7 @@ Balancer.prototype.chooseBranchesToMergeAndUnlock = cadence(function (async, key
             descents.push(descent)
             descent.descend(descent.key(key), descent.address(address), async())
         }, function () {
-            descent.index += direction == 'left' ? 1 : -1
+            descent.setIndex(descent.index + (direction == 'left' ? 1 : -1))
                                         // ^^^ This ain't broke.
             descent.descend(descent[direction], descent.level(center.depth), async())
         })
@@ -771,7 +771,7 @@ Balancer.prototype.chooseBranchesToMergeAndUnlock = cadence(function (async, key
 
             if (choice) {
                 descents.push(designator = choice.fork())
-                designator.index = 0
+                designator.setIndex(0)
                 designator.descend(designator.left, designator.leaf, async())
             } else {
                 return [ choose.break, false ]

@@ -154,7 +154,7 @@ Strata.prototype.leftOf = function (key) {
             if (descents[0].page.address % 2) {
                 return [ new Cursor(this.sheaf, this.logger, descents, false, key) ]
             } else {
-                descents[0].index--
+                descents[0].setIndex(descents[0].index - 1)
                 this.toLeaf(descents[0].right, descents, null, exclusive, async())
             }
         })
