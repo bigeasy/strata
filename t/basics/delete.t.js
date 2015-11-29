@@ -23,7 +23,7 @@ function prove (async, assert) {
         assert(records, [ 'a', 'd' ], 'records')
 
         strata.purge(0)
-        assert(strata.size, 0, 'purged')
+        assert(strata.sheaf.magazine.heft, 0, 'purged')
 
         strata.close(async())
     })

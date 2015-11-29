@@ -14,7 +14,7 @@ function prove (async, assert) {
         cursor.insert('a', 'a', ~cursor.index)
         cursor.unlock(async())
     }, function () {
-        assert(strata.size, 54, 'json size')
+        assert(strata.sheaf.magazine.heft, 54, 'json size')
     }, function () {
         vivify(tmp, async())
         load(__dirname + '/fixtures/insert.json', async())
@@ -27,7 +27,7 @@ function prove (async, assert) {
         assert.say(expected.segment00000001)
 
         strata.purge(0)
-        assert(strata.size, 0, 'purged')
+        assert(strata.sheaf.magazine.heft, 0, 'purged')
 
         strata.close(async())
     })

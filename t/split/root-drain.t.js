@@ -24,7 +24,7 @@ function prove (async, assert) {
     }, function (actual, expected) {
         assert(actual, expected, 'split')
         strata.purge(0)
-        assert(strata.size, 0, 'purged completely')
+        assert(strata.sheaf.magazine.heft, 0, 'purged completely')
         strata.close(async())
     }, function () {
         strata = createStrata({ directory: tmp, leafSize: 3, branchSize: 3 })

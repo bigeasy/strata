@@ -13,7 +13,7 @@ function prove (async, assert) {
         strata = createStrata({ directory: tmp, leafSize: 3, branchSize: 3 })
         strata.open(async())
     }, function () {
-        assert(strata.size, 0, 'json size')
-        assert(strata.nextAddress, 2, 'next address')
+        assert(strata.sheaf.magazine.heft, 0, 'json size')
+        assert(strata.sheaf.nextAddress, 2, 'next address')
     })
 }

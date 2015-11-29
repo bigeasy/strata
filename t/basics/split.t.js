@@ -30,9 +30,9 @@ function prove (async, assert) {
         assert(actual, expected, 'split')
 
         strata.purge(0)
-        assert(strata.size, 0, 'purged')
+        assert(strata.sheaf.magazine.heft, 0, 'purged')
 
-        assert(!strata.balanced, 'not balanced')
+        assert(Object.keys(strata.sheaf.lengths).length, 'not balanced')
 
         strata.close(async())
     })

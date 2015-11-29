@@ -10,7 +10,7 @@ function prove (async, assert) {
         strata = createStrata({ directory: tmp, leafSize: 3, branchSize: 3 })
         strata.open(async())
     }, function () {
-        assert(strata.size, 0, 'json size before read')
+        assert(strata.sheaf.magazine.heft, 0, 'json size before read')
         strata.iterator('a', async())
     }, function (cursor) {
         async(function () {
@@ -20,13 +20,13 @@ function prove (async, assert) {
             var item = cursor.page.items[cursor.offset]
             assert(item.record, 'a', 'get record')
             assert(item.key, 'a', 'get key')
-            assert(strata.size, 54, 'json size after read')
+            assert(strata.sheaf.magazine.heft, 54, 'json size after read')
             assert(item.heft, 54, 'record size')
 
             cursor.unlock(async())
         }, function () {
             strata.purge(0)
-            assert(strata.size, 0, 'page')
+            assert(strata.sheaf.magazine.heft, 0, 'page')
 
             strata.close(async())
         })

@@ -12,9 +12,9 @@ function prove (async, assert) {
     }, function () {
         strata.mutator('h', async())
     }, function (cursor) {
-        assert(strata.size, 277, 'before purge')
+        assert(strata.sheaf.magazine.heft, 277, 'before purge')
         strata.purge(0)
-        assert(strata.size, 108, 'after purge')
+        assert(strata.sheaf.magazine.heft, 108, 'after purge')
         cursor.unlock(async())
     }, function() {
         strata.close(async())

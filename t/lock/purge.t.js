@@ -9,9 +9,9 @@ function prove (async, assert) {
         switch (type) {
         case 'reference':
             if (++count == 2) {
-                assert(strata.size > 2, 'unpurged')
+                assert(strata.sheaf.magazine.heft > 2, 'unpurged')
                 strata.purge(0)
-                assert(strata.size, 0, 'purged')
+                assert(strata.sheaf.magazine.heft, 0, 'purged')
             }
             callback()
             break

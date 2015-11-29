@@ -10,7 +10,7 @@ function prove (async, assert) {
         strata = createStrata({ directory: tmp, leafSize: 3, branchSize: 3 })
         strata.create(async())
     }, function () {
-        assert(strata.size, 0, 'total heft')
+        assert(strata.sheaf.magazine.heft, 0, 'total heft')
         strata.close(async())
     }, function () {
         assert(1, 'created')
@@ -32,7 +32,7 @@ function prove (async, assert) {
         cursor.unlock(async())
     }, function () {
         strata.purge(0)
-        assert(strata.size, 0, 'purged')
+        assert(strata.sheaf.magazine.heft, 0, 'purged')
 
         strata.close(async())
     })

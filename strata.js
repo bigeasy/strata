@@ -42,14 +42,6 @@ function Strata (options) {
     this.logger = new Logger(options)
 }
 
-Strata.prototype.__defineGetter__('size', function () {
-    return this.sheaf.magazine.heft
-})
-
-Strata.prototype.__defineGetter__('nextAddress', function () {
-    return this.sheaf.nextAddress
-})
-
 // to user land
 Strata.prototype.create = cadence(function (async) {
     this.sheaf.createMagazine()
@@ -277,6 +269,7 @@ Strata.prototype.purge = function (downTo) {
 }
 
 Strata.prototype.__defineGetter__('balanced', function () {
+    ok(false)
     return ! Object.keys(this.sheaf.lengths).length
 })
 
