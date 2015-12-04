@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 // Asserts that log replay will add and remove a record.
 
 require('./proof')(1, prove)

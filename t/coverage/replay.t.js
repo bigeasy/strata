@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 // Asserts that log replay will skip over the positions array.
 
 require('./proof')(1, prove)

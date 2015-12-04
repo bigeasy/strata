@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 // Same test as unpurged key, which covered the uncovered condition of
 // determining how to merge a branch page that has no left sibliing.
 
