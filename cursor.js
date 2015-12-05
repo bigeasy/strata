@@ -16,8 +16,6 @@ function Cursor (sheaf, logger, descents, exclusive, searchKey) {
     descents.shift()
 }
 
-// TODO get rid of comments like this one
-// to user land
 Cursor.prototype.next = cadence(function (async) {
     var next
 
@@ -40,7 +38,6 @@ Cursor.prototype.next = cadence(function (async) {
     })
 })
 
-// to user land
 Cursor.prototype.indexOf = function (key, index) {
     ok(arguments.length == 2, 'index requires two arguments')
     var page = this.page

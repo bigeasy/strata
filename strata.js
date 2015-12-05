@@ -42,7 +42,6 @@ function Strata (options) {
     this.logger = new Logger(options)
 }
 
-// to user land
 Strata.prototype.create = cadence(function (async) {
     this.sheaf.createMagazine()
     var locker = this.sheaf.createLocker(), count = 0, root, leaf, journal
@@ -73,7 +72,6 @@ Strata.prototype.create = cadence(function (async) {
     })
 })
 
-// to user land
 Strata.prototype.open = cadence(function (async) {
     this.sheaf.createMagazine()
 
@@ -98,7 +96,6 @@ Strata.prototype.open = cadence(function (async) {
     })
 })
 
-// to user land
 Strata.prototype.close = cadence(function (async) {
     // TODO that's a lot of indirection.
     var cartridge = this.sheaf.metaRoot.cartridge, lock = cartridge.value.page.lock
@@ -164,7 +161,6 @@ Strata.prototype.toLeaf = cadence(function (async, sought, descents, key, exclus
     })
 })
 
-// to user land
 Strata.prototype.cursor = cadence(function (async, key, exclusive) {
     var descents = [ new Descent(this.sheaf, this.sheaf.createLocker()) ]
     async([function () {
@@ -191,12 +187,10 @@ Strata.prototype.mutator = function (key, callback) {
     this.cursor(key, true, callback)
 }
 
-// to user land
 Strata.prototype.balance = function (callback) {
     new Balancer(this.sheaf, this.logger).balance(callback)
 }
 
-// to user land
 Strata.prototype.vivify = cadence(function (async) {
     var locker = this.sheaf.createLocker(), root
 

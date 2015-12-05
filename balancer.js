@@ -44,7 +44,6 @@ Balancer.prototype._nodify = cadence(function (async, locker, page) {
     })
 })
 
-// to user land
 Balancer.prototype.balance = cadence(function balance (async, sheaf) {
     var locker = this.sheaf.createLocker(), operations = [], address, length
 
