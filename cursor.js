@@ -16,6 +16,7 @@ function Cursor (sheaf, logger, descents, exclusive, searchKey) {
     descents.shift()
 }
 
+// TODO get rid of comments like this one
 // to user land
 Cursor.prototype.next = cadence(function (async) {
     var next
@@ -45,7 +46,7 @@ Cursor.prototype.indexOf = function (key, index) {
     var page = this.page
     var index = this.sheaf.find(page, key, index)
     var unambiguous
-    unambiguous = -1 < index // <- todo: ?
+    unambiguous = -1 < index // <- TODO ?
                || ~ index < this.page.items.length
                || page.right.address === null
     if (!unambiguous && this.sheaf.comparator(key, page.right.key) >= 0) {
@@ -63,7 +64,7 @@ Cursor.prototype._unlock = cadence(function (async) {
     })
 })
 
-// todo: pass an integer as the first argument to force the arity of the
+// TODO pass an integer as the first argument to force the arity of the
 // return.
 Cursor.prototype.unlock = function (callback) {
     if (this._appender) {

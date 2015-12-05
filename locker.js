@@ -10,7 +10,7 @@ function Locker (sheaf, magazine) {
 }
 
 Locker.prototype.lock = cadence(function (async, address, exclusive) {
-    // todo: locks does not appear to need to be an array.
+    // TODO locks does not appear to need to be an array.
     var cartridge = this._magazine.hold(address, {}),
         page = cartridge.value.page, locks = []
 
@@ -28,7 +28,7 @@ Locker.prototype.lock = cadence(function (async, address, exclusive) {
                 // by the final external catch block.
                 async([function () {
                     async(function () {
-                        // todo: does there need to be differnt types anymore?
+                        // TODO does there need to be differnt types anymore?
                         page = this._sheaf.createPage(address % 2, address)
                         cartridge.value.page = page
                         page.cartridge = cartridge
@@ -54,7 +54,7 @@ Locker.prototype.lock = cadence(function (async, address, exclusive) {
             }, function () {
                 return [ page ]
             })
-        }) // todo: unecessary cadence
+        }) // TODO unecessary cadence
     }, function (error) {
         cartridge.release()
         delete this._locks[page.address]

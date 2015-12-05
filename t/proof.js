@@ -55,7 +55,7 @@ function vivify (directory, callback) {
     }
 }
 
-// todo: pretty print should be in here, so I can use it from stratify and the
+// TODO pretty print should be in here, so I can use it from stratify and the
 // stringify utility.
 function stringify (directory, callback) {
     vivify(directory, check(callback, segments))
@@ -73,7 +73,7 @@ function load (segments, callback) {
     }
 }
 
-// todo: do not accept async, make a real function.
+// TODO do not accept async, make a real function.
 function insert (async, strata, values) {
     async(function () {
         values.sort()

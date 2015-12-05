@@ -10,7 +10,7 @@ function Player (options) {
     this.userRecordHandler = options.userRecordHandler
 }
 
-// todo: outgoing
+// TODO outgoing
 Player.prototype.io = cadence(function (async, direction, filename) {
     async(function () {
         fs.open(filename, direction[0], async())
@@ -84,7 +84,7 @@ Player.prototype._play = function (sheaf, slice, start, page) {
         } else {
             var index = header[1]
             if (leaf) {
-                // todo: see if it is faster to perform the slices here directly.
+                // TODO see if it is faster to perform the slices here directly.
                 if (index > 0) {
                     page.splice(index - 1, 0, {
                         key: sheaf.extractor(entry.body),
@@ -115,7 +115,7 @@ Player.prototype._play = function (sheaf, slice, start, page) {
 
 Player.prototype.play = cadence(function (async, sheaf, fd, stat, read, page) {
     var buffer = new Buffer(sheaf.options.readLeafStartLength || 1024 * 1024)
-    // todo: really want to register a cleanup without an indent.
+    // TODO really want to register a cleanup without an indent.
     async([function () {
         fs.close(fd, async())
     }], function () {

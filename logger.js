@@ -11,7 +11,7 @@ var Scribe = require('./scribe')
 
 function Logger (options) {
     this._directory = options.directory
-    // todo: remove when page can slice
+    // TODO remove when page can slice
     this._sheaf = options.sheaf
     this.framer = options.framer
     this.serializers = options.serializers

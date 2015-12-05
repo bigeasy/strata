@@ -13,7 +13,7 @@ var Cache = require('magazine'),
     ok = require('assert').ok,
     path = require('path')
 
-// todo: temporary
+// TODO temporary
 var scram = require('./scram')
 
 function extend(to, from) {
@@ -77,13 +77,13 @@ Strata.prototype.create = cadence(function (async) {
 Strata.prototype.open = cadence(function (async) {
     this.sheaf.createMagazine()
 
-    // todo: instead of rescue, you might try/catch the parts that you know
+    // TODO instead of rescue, you might try/catch the parts that you know
     // are likely to cause errors and raise an error of a Strata type.
 
-    // todo: or you might need some way to catch a callback error. Maybe an
+    // TODO or you might need some way to catch a callback error. Maybe an
     // outer most catch block?
 
-    // todo: or if you're using Cadence, doesn't the callback get wrapped
+    // TODO or if you're using Cadence, doesn't the callback get wrapped
     // anyway?
     async(function () {
         fs.stat(this.sheaf.directory, async())
@@ -100,11 +100,11 @@ Strata.prototype.open = cadence(function (async) {
 
 // to user land
 Strata.prototype.close = cadence(function (async) {
-    // todo: that's a lot of indirection.
+    // TODO that's a lot of indirection.
     var cartridge = this.sheaf.metaRoot.cartridge, lock = cartridge.value.page.lock
 
     lock.unlock()
-    // todo
+    // TODO
     lock.dispose()
 
     cartridge.release()

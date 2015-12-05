@@ -114,6 +114,7 @@ Balancer.prototype.balance = cadence(function balance (async, sheaf) {
             _gather.call(this, +address, lengths[address], async())
         })(addresses)
     }, function () {
+        // TODO permeate('bigeasy.strata.plan', {}, async())
         this.sheaf.tracer('plan', {}, async())
     }, function () {
         var address, node, difference, addresses
@@ -460,7 +461,7 @@ Balancer.prototype.exorcise = function (pivot, page, corporal) {
     ok(page.ghosts, 'no ghosts')
     ok(corporal.items.length - corporal.ghosts > 0, 'no replacement')
 
-    // todo: how is this not a race condition? I'm writing to the log, but I've
+    // TODO how is this not a race condition? I'm writing to the log, but I've
     // not updated the pivot page, not rewritten during `deleteGhosts`.
     page.splice(0, 1, corporal.splice(corporal.ghosts, 1))
     page.ghosts = 0
@@ -556,7 +557,7 @@ Balancer.prototype.mergePagesAndUnlock = cadence(function (
     var merge = async([function () {
         descents.forEach(function (descent) { locker.unlock(descent.page) })
         ! [ 'left', 'right' ].forEach(function (direction) {
-            // todo: use `pages` array, these conditions are tricky,
+            // TODO use `pages` array, these conditions are tricky,
             // `parents[direction]` may not yet exist.
             if (singles[direction].length) {
                 singles[direction].forEach(function (page) { locker.unlock(page) })
