@@ -1,3 +1,4 @@
+// TODO Use `hash.djb` or other libraries.
 var createChecksum = require('../checksum')
 
 function Binary (checksum) {
