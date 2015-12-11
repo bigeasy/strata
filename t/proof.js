@@ -1,3 +1,5 @@
+// TODO Outgoing. We're going to use a new version of Proof that does not have
+// this sort of thing.
 var fs = require('fs'),
     path = require('path'),
     crypto = require('crypto'),
