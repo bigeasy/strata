@@ -218,9 +218,7 @@ Strata.prototype.vivify = cadence(function (async) {
                 }, [function (page) {
                     console.log('foo', page)
                     locker.unlock(page)
-                }], function (page) {
-                    return page
-                })
+                }])
             } else {
                 return [ block.break, pages ]
             }
