@@ -75,19 +75,6 @@ function load (segments, callback) {
     }
 }
 
-// TODO do not accept async, make a real function.
-function insert (async, strata, values) {
-    async(function () {
-        values.sort()
-        strata.mutator(values[0], async())
-    }, function (cursor) {
-        async(function () {
-            cursor.insert(values[0], values[0], ~ cursor.index)
-            cursor.unlock(async())
-        })
-    })
-}
-
 var gather = cadence(function (async, strata) {
     var records = [], page, item
     if (typeof strata == 'function') throw new Error
@@ -371,7 +358,6 @@ var invoke = cadence(function (async, tmp, assert, test) {
         assert.global('tmp', tmp)
         assert.global('load', load)
         assert.global('stringify', stringify)
-        assert.global('_insert', insert)
         assert.global('serialize', serialize)
         assert.global('gather', gather)
         assert.global('vivify', vivify)
