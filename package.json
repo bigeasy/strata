@@ -23,7 +23,7 @@
     "main":             "strata.js",
     "dependencies":
     {
-                        "magazine": "0.0.16",
+                        "magazine": "1.0.x",
                         "sequester": "1.0.x",
                         "cadence": "1.0.x"
     },
