@@ -372,9 +372,45 @@ var invoke = cadence(function (async, tmp, assert, test) {
 
 module.exports = function (module, dirname) {
     var tmp = dirname + '/tmp'
-    return require('proof')(module, function (body, assert, callback) {
-        invoke(tmp, assert, cadence(body), callback)
-    })
+    module.exports = function (count, test) {
+        require('proof')(count, cadence(function (async, assert) {
+            assert.global = function (name, value) {
+                global[name] = value
+                assert.leak(name)
+            }
+            assert.global('createStrata', createStrata)
+            assert.global('tmp', tmp)
+            assert.global('load', load)
+            assert.global('stringify', stringify)
+            assert.global('serialize', serialize)
+            assert.global('gather', gather)
+            assert.global('vivify', vivify)
+            assert.global('script', script)
+            async(function () {
+                rimraf(tmp, async())
+            }, function () {
+                fs.mkdir(tmp, 0755, async())
+            }, function () {
+                cadence(test)(assert, {
+                    createStrata: createStrata,
+                    tmp: tmp,
+                    load: load,
+                    stringify: stringify,
+                    serialize: serialize,
+                    gather: gather,
+                    vivify: vivify,
+                    script: script,
+                    tidy: cadence(function (async) {
+                        rimraf(tmp, async())
+                    })
+                }, async())
+            }, function () {
+                if (!('UNTIDY' in process.env)) {
+                    rimraf(tmp, async())
+                }
+            })
+        }))
+    }
 }
 
 function pretty (json) {
