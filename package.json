@@ -35,7 +35,7 @@
                         "mkdirp": "0.5.1",
                         "advance": "1.0.x",
                         "splice": "0.0.22",
-                        "arguable": "1.0.x"
+                        "arguable": "1.x"
     },
     "license":          "MIT",
     "scripts":
