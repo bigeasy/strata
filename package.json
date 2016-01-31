@@ -24,7 +24,7 @@
     "dependencies":
     {
                         "magazine": "1.0.x",
-                        "sequester": "1.0.x",
+                        "sequester": "1.x",
                         "cadence": "1.x"
     },
     "devDependencies":
