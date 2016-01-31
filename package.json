@@ -33,7 +33,7 @@
                         "proof": "1.0.x",
                         "rimraf": "2.5.1",
                         "mkdirp": "0.5.1",
-                        "advance": "0.0.16",
+                        "advance": "1.0.x",
                         "splice": "0.0.22",
                         "arguable": "1.0.x"
     },
