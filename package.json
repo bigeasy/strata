@@ -23,19 +23,19 @@
     "main":             "strata.js",
     "dependencies":
     {
-                        "magazine": "1.x",
-                        "sequester": "1.x",
-                        "cadence": "1.x"
+                        "magazine":     "1.x",
+                        "sequester":    "1.x",
+                        "cadence":      "1.x"
     },
     "devDependencies":
     {
-                        "seedrandom": "2.4.2",
-                        "proof": "1.x",
-                        "rimraf": "2.5.1",
-                        "mkdirp": "0.5.1",
-                        "advance": "1.x",
-                        "splice": "1.x",
-                        "arguable": "1.x"
+                        "advance":      "1.x",
+                        "arguable":     "1.x",
+                        "mkdirp":       "0.5.1",
+                        "proof":        "1.x",
+                        "rimraf":       "2.5.1",
+                        "seedrandom":   "2.4.2",
+                        "splice":       "1.x"
     },
     "license":          "MIT",
     "scripts":
