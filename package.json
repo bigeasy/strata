@@ -30,7 +30,6 @@
     "devDependencies":
     {
                             "advance":                      "1.x",
-                            "arguable":                     "1.x",
                             "mkdirp":                       "0.5.1",
                             "proof":                        "1.x",
                             "rimraf":                       "2.5.1",
