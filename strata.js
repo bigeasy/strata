@@ -21,6 +21,7 @@ function extend(to, from) {
     return to
 }
 
+// TODO Branch and leaf size, can we just sort that out in a call to balance?
 function Strata (options) {
     if (!options.serializers) {
         var json = require('./json')
