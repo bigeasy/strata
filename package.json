@@ -1,26 +1,26 @@
 {
     "name":                 "b-tree",
     "version":              "1.0.0",
-    "author":               "Alan Gutierrez <alan@prettyrobots.com>",
     "description":          "Evented I/O B-tree in pure JavaScript for Node.js.",
     "keywords":
     [
                             "btree", "database", "json", "b-tree", "leveldb", "levelup"
     ],
-    "homepage":             "https://github.com/bigeasy/strata",
-    "bugs":                 "https://github.com/bigeasy/strata/issues",
-    "repository":
-    {
-                            "type": "git",
-                            "url": "http://github.com/bigeasy/strata.git"
-    },
+    "author":               "Alan Gutierrez <alan@prettyrobots.com>",
     "contributors":
     [{
                             "name":   "Demarius Chrite",
                             "email":  "chrite.demarius@gmail.com",
                             "web":    "https://github.com/demarius"
     }],
-    "main":                 "strata.js",
+    "homepage":             "https://github.com/bigeasy/strata",
+    "bugs":                 "https://github.com/bigeasy/strata/issues",
+    "license":              "MIT",
+    "repository":
+    {
+                            "type": "git",
+                            "url": "http://github.com/bigeasy/strata.git"
+    },
     "dependencies":
     {
                             "magazine":                     "1.x",
@@ -36,7 +36,7 @@
                             "seedrandom":                   "2.4.2",
                             "splice":                       "1.x"
     },
-    "license":              "MIT",
+    "main":                 "strata.js",
     "scripts":
     {
                             "test": "proof platform win32 && proof test */*/*.t.js || t/test"
