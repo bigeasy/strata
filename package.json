@@ -23,18 +23,18 @@
     },
     "dependencies":
     {
-                            "magazine":                     "1.x",
-                            "sequester":                    "1.x",
-                            "cadence":                      "1.x"
+                            "magazine":                     "1.0.x",
+                            "sequester":                    "1.0.x",
+                            "cadence":                      "1.0.x"
     },
     "devDependencies":
     {
-                            "advance":                      "1.x",
+                            "advance":                      "1.0.x",
                             "mkdirp":                       "0.5.1",
-                            "proof":                        "1.x",
+                            "proof":                        "1.0.x",
                             "rimraf":                       "2.5.4",
                             "seedrandom":                   "2.4.2",
-                            "splice":                       "1.x"
+                            "splice":                       "1.0.x"
     },
     "main":                 "strata.js",
     "scripts":
