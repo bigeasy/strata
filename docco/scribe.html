@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+  <title>scribe.js</title>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, target-densitydpi=160dpi, initial-scale=1.0; maximum-scale=1.0; user-scalable=0;">
+  <link rel="stylesheet" media="all" href="docco.css" />
+</head>
+<body>
+  <div id="container">
+    <div id="background"></div>
+
+      <ul id="jump_to">
+        <li>
+          <a class="large" href="javascript:void(0);">Jump To &hellip;</a>
+          <a class="small" href="javascript:void(0);">+</a>
+          <div id="jump_wrapper">
+          <div id="jump_page_wrapper">
+            <div id="jump_page">
+
+
+                <a class="source" href="balancer.html">
+                  balancer.js
+                </a>
+
+
+                <a class="source" href="checksum.html">
+                  checksum.js
+                </a>
+
+
+                <a class="source" href="cursor.html">
+                  cursor.js
+                </a>
+
+
+                <a class="source" href="descent.html">
+                  descent.js
+                </a>
+
+
+                <a class="source" href="extend.html">
+                  extend.js
+                </a>
+
+
+                <a class="source" href="json.html">
+                  json.js
+                </a>
+
+
+                <a class="source" href="locker.html">
+                  locker.js
+                </a>
+
+
+                <a class="source" href="logger.html">
+                  logger.js
+                </a>
+
+
+                <a class="source" href="page.html">
+                  page.js
+                </a>
+
+
+                <a class="source" href="player.html">
+                  player.js
+                </a>
+
+
+                <a class="source" href="queue.html">
+                  queue.js
+                </a>
+
+
+                <a class="source" href="scram.html">
+                  scram.js
+                </a>
+
+
+                <a class="source" href="scribe.html">
+                  scribe.js
+                </a>
+
+
+                <a class="source" href="script.html">
+                  script.js
+                </a>
+
+
+                <a class="source" href="sheaf.html">
+                  sheaf.js
+                </a>
+
+
+                <a class="source" href="strata.html">
+                  strata.js
+                </a>
+
+            </div>
+          </div>
+        </li>
+      </ul>
+
+    <ul class="sections">
+
+          <li id="title">
+              <div class="annotation">
+                  <h1>scribe.js</h1>
+              </div>
+          </li>
+
+
+
+        <li id="section-1">
+            <div class="annotation">
+
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-1">&#182;</a>
+              </div>
+
+            </div>
+
+            <div class="content"><div class='highlight'><pre><span class="hljs-keyword">var</span> fs = <span class="hljs-built_in">require</span>(<span class="hljs-string">'fs'</span>)
+
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">Scribe</span> (<span class="hljs-params">filename, flags</span>) </span>{
+    <span class="hljs-keyword">this</span>.operations = [ {} ]
+    <span class="hljs-keyword">this</span>.filename = filename
+    <span class="hljs-keyword">this</span>.flags = flags
+}
+
+Scribe.prototype.open = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+    fs.open(<span class="hljs-keyword">this</span>.filename, <span class="hljs-keyword">this</span>.flags, <span class="hljs-keyword">this</span>._done.bind(<span class="hljs-keyword">this</span>, <span class="hljs-string">'_opened'</span>))
+}
+
+Scribe.prototype._done = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">method, error, result</span>) </span>{
+    <span class="hljs-keyword">if</span> (error) {
+        <span class="hljs-keyword">while</span> (<span class="hljs-keyword">this</span>.operations.length) {
+            <span class="hljs-keyword">var</span> callback = <span class="hljs-keyword">this</span>.operations.shift().callback
+            <span class="hljs-keyword">if</span> (callback) {
+                callback(error)
+                <span class="hljs-keyword">return</span>
+            }
+        }
+        <span class="hljs-keyword">this</span>.error = error
+    } <span class="hljs-keyword">else</span> {
+        <span class="hljs-keyword">this</span>[method](result)
+        <span class="hljs-keyword">this</span>.operations.shift()
+        <span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.operations.length) {
+            <span class="hljs-keyword">this</span>[<span class="hljs-keyword">this</span>.operations[<span class="hljs-number">0</span>].method](<span class="hljs-keyword">this</span>.operations[<span class="hljs-number">0</span>])
+        }
+    }
+}
+
+Scribe.prototype._opened = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">fd</span>) </span>{
+    <span class="hljs-keyword">this</span>.fd = fd
+}
+
+Scribe.prototype.write = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">buffer, offset, length, position, callback</span>) </span>{
+    <span class="hljs-keyword">this</span>._push({
+        method: <span class="hljs-string">'_write'</span>,
+        buffer: buffer,
+        offset: offset,
+        length: length,
+        position: position,
+        callback: callback
+    })
+}
+
+Scribe.prototype._push = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">operation</span>) </span>{
+    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.error) {
+        <span class="hljs-keyword">var</span> callback = operation.callback
+        <span class="hljs-keyword">if</span> (callback) {
+            <span class="hljs-keyword">var</span> error = <span class="hljs-keyword">this</span>.error
+            <span class="hljs-keyword">delete</span> <span class="hljs-keyword">this</span>.error
+            callback(error)
+        }
+    } <span class="hljs-keyword">else</span> {
+        <span class="hljs-keyword">this</span>.operations.push(operation)
+        <span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.operations.length == <span class="hljs-number">1</span>) {
+            <span class="hljs-keyword">this</span>[<span class="hljs-keyword">this</span>.operations[<span class="hljs-number">0</span>].method](<span class="hljs-keyword">this</span>.operations[<span class="hljs-number">0</span>])
+        }
+    }
+}
+
+Scribe.prototype.close = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">callback</span>) </span>{
+    <span class="hljs-keyword">this</span>._push({ method: <span class="hljs-string">'_close'</span>, callback: callback })
+}
+
+Scribe.prototype._write = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">write</span>) </span>{
+    fs.write(<span class="hljs-keyword">this</span>.fd, write.buffer, write.offset, write.length,
+        write.position, <span class="hljs-keyword">this</span>._done.bind(<span class="hljs-keyword">this</span>, <span class="hljs-string">'_written'</span>))
+}
+
+Scribe.prototype._written = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">written, buffer</span>) </span>{
+    <span class="hljs-keyword">var</span> callback = <span class="hljs-keyword">this</span>.operations[<span class="hljs-number">0</span>].callback
+    <span class="hljs-keyword">if</span> (callback) {
+        callback(<span class="hljs-literal">null</span>, written, buffer)
+    }
+}
+
+Scribe.prototype._close = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">write</span>) </span>{
+    fs.close(<span class="hljs-keyword">this</span>.fd, write.callback)
+}
+
+<span class="hljs-built_in">module</span>.exports = Scribe
+
+</pre></div></div>
+
+        </li>
+
+    </ul>
+  </div>
+</body>
+</html>

@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+  <title>logger.js</title>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, target-densitydpi=160dpi, initial-scale=1.0; maximum-scale=1.0; user-scalable=0;">
+  <link rel="stylesheet" media="all" href="docco.css" />
+</head>
+<body>
+  <div id="container">
+    <div id="background"></div>
+
+      <ul id="jump_to">
+        <li>
+          <a class="large" href="javascript:void(0);">Jump To &hellip;</a>
+          <a class="small" href="javascript:void(0);">+</a>
+          <div id="jump_wrapper">
+          <div id="jump_page_wrapper">
+            <div id="jump_page">
+
+
+                <a class="source" href="balancer.html">
+                  balancer.js
+                </a>
+
+
+                <a class="source" href="checksum.html">
+                  checksum.js
+                </a>
+
+
+                <a class="source" href="cursor.html">
+                  cursor.js
+                </a>
+
+
+                <a class="source" href="descent.html">
+                  descent.js
+                </a>
+
+
+                <a class="source" href="extend.html">
+                  extend.js
+                </a>
+
+
+                <a class="source" href="json.html">
+                  json.js
+                </a>
+
+
+                <a class="source" href="locker.html">
+                  locker.js
+                </a>
+
+
+                <a class="source" href="logger.html">
+                  logger.js
+                </a>
+
+
+                <a class="source" href="page.html">
+                  page.js
+                </a>
+
+
+                <a class="source" href="player.html">
+                  player.js
+                </a>
+
+
+                <a class="source" href="queue.html">
+                  queue.js
+                </a>
+
+
+                <a class="source" href="scram.html">
+                  scram.js
+                </a>
+
+
+                <a class="source" href="scribe.html">
+                  scribe.js
+                </a>
+
+
+                <a class="source" href="script.html">
+                  script.js
+                </a>
+
+
+                <a class="source" href="sheaf.html">
+                  sheaf.js
+                </a>
+
+
+                <a class="source" href="strata.html">
+                  strata.js
+                </a>
+
+            </div>
+          </div>
+        </li>
+      </ul>
+
+    <ul class="sections">
+
+          <li id="title">
+              <div class="annotation">
+                  <h1>logger.js</h1>
+              </div>
+          </li>
+
+
+
+        <li id="section-1">
+            <div class="annotation">
+
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-1">&#182;</a>
+              </div>
+
+            </div>
+
+            <div class="content"><div class='highlight'><pre><span class="hljs-keyword">var</span> ok = <span class="hljs-built_in">require</span>(<span class="hljs-string">'assert'</span>).ok
+
+<span class="hljs-keyword">var</span> fs = <span class="hljs-built_in">require</span>(<span class="hljs-string">'fs'</span>)
+<span class="hljs-keyword">var</span> path = <span class="hljs-built_in">require</span>(<span class="hljs-string">'path'</span>)
+
+<span class="hljs-keyword">var</span> cadence = <span class="hljs-built_in">require</span>(<span class="hljs-string">'cadence'</span>)
+
+<span class="hljs-keyword">var</span> Queue = <span class="hljs-built_in">require</span>(<span class="hljs-string">'./queue'</span>)
+<span class="hljs-keyword">var</span> Script = <span class="hljs-built_in">require</span>(<span class="hljs-string">'./script'</span>)
+<span class="hljs-keyword">var</span> Scribe = <span class="hljs-built_in">require</span>(<span class="hljs-string">'./scribe'</span>)
+
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">Logger</span> (<span class="hljs-params">options</span>) </span>{
+    <span class="hljs-keyword">this</span>._directory = options.directory
+</pre></div></div>
+
+        </li>
+
+
+        <li id="section-2">
+            <div class="annotation">
+
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-2">&#182;</a>
+              </div>
+              <p>TODO remove when page can slice</p>
+
+            </div>
+
+            <div class="content"><div class='highlight'><pre>    <span class="hljs-keyword">this</span>._sheaf = options.sheaf
+    <span class="hljs-keyword">this</span>.framer = options.framer
+    <span class="hljs-keyword">this</span>.serializers = options.serializers
+}
+
+Logger.prototype.filename = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">page, draft</span>) </span>{
+    <span class="hljs-keyword">return</span> path.join(<span class="hljs-keyword">this</span>._directory, draft ? <span class="hljs-string">'drafts'</span> : <span class="hljs-string">'pages'</span>, page.address + <span class="hljs-string">'.'</span> + page.rotation)
+}
+
+Logger.prototype.writeEntry = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">queue, header, body, serializer</span>) </span>{
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.framer.serialize(queue, header, body, serializer)
+}
+
+Logger.prototype.writeInsert = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">queue, page, index, record</span>) </span>{
+    <span class="hljs-keyword">var</span> header = [ ++page.entries, index + <span class="hljs-number">1</span> ]
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.writeEntry(queue, header, record, <span class="hljs-keyword">this</span>.serializers.record)
+}
+
+Logger.prototype.writeDelete = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">queue, page, index, callback</span>) </span>{
+    <span class="hljs-keyword">var</span> header = [ ++page.entries, -(index + <span class="hljs-number">1</span>) ]
+    <span class="hljs-keyword">this</span>.writeEntry(queue, header)
+}
+
+Logger.prototype.writeHeader = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">queue, page</span>) </span>{
+    <span class="hljs-keyword">var</span> header = [ -(++page.entries), page.right.address || <span class="hljs-number">0</span>, page.ghosts || <span class="hljs-number">0</span> ]
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.writeEntry(queue, header, page.right.key, <span class="hljs-keyword">this</span>.serializers.key)
+}
+
+Logger.prototype.writeLeafEntry = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">queue, page, item</span>) </span>{
+    <span class="hljs-keyword">this</span>.writeInsert(queue, page, page.entries - <span class="hljs-number">1</span>, item.record, <span class="hljs-keyword">this</span>.serializers.record)
+}
+
+Logger.prototype.rewriteLeaf = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">page, file, callback</span>) </span>{
+    <span class="hljs-keyword">this</span>.writePage(page, file, <span class="hljs-string">'writeLeafEntry'</span>, callback)
+}
+
+Logger.prototype.writeBranchEntry = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">queue, page, item</span>) </span>{
+    page.entries++
+    <span class="hljs-keyword">var</span> header = [ page.entries, page.entries, item.address ]
+    <span class="hljs-keyword">this</span>.writeEntry(queue, header, page.entries == <span class="hljs-number">1</span> ? <span class="hljs-literal">null</span> : item.key, <span class="hljs-keyword">this</span>.serializers.key)
+}
+
+Logger.prototype.writeBranch = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">page, file, callback</span>) </span>{
+    <span class="hljs-keyword">var</span> items = page.items
+    ok(items[<span class="hljs-number">0</span>].key == <span class="hljs-literal">null</span>, <span class="hljs-string">'key of first item must be null'</span>)
+    ok(items[<span class="hljs-number">0</span>].heft == <span class="hljs-number">0</span>, <span class="hljs-string">'heft of first item must be zero'</span>)
+    ok(items.slice(<span class="hljs-number">1</span>).every(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">item</span>) </span>{ <span class="hljs-keyword">return</span> item.key != <span class="hljs-literal">null</span> }), <span class="hljs-string">'null keys'</span>)
+    <span class="hljs-keyword">this</span>.writePage(page, file, <span class="hljs-string">'writeBranchEntry'</span>, callback)
+}
+
+Logger.prototype.writePage = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">page, file, writer, callback</span>) </span>{
+    <span class="hljs-keyword">var</span> items = page.items, ou
+
+    <span class="hljs-keyword">var</span> queue = <span class="hljs-keyword">new</span> Queue
+    <span class="hljs-keyword">var</span> scribe = <span class="hljs-keyword">new</span> Scribe(file, <span class="hljs-string">'a'</span>)
+
+    scribe.open()
+
+    page.entries = <span class="hljs-number">0</span>
+    page.position = <span class="hljs-number">0</span>
+
+    <span class="hljs-keyword">var</span> leaf = page.address % <span class="hljs-number">2</span> === <span class="hljs-number">1</span>
+    <span class="hljs-keyword">if</span> (leaf) {
+        <span class="hljs-keyword">this</span>.writeHeader(queue, page)
+    }
+
+</pre></div></div>
+
+        </li>
+
+
+        <li id="section-3">
+            <div class="annotation">
+
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-3">&#182;</a>
+              </div>
+              <p>cut the items out because some might be recently promoted keys that have
+zero heft, we calculate heft here and now.</p>
+
+            </div>
+
+            <div class="content"><div class='highlight'><pre>    <span class="hljs-keyword">var</span> cut = page.splice(<span class="hljs-number">0</span>, page.items.length), i = <span class="hljs-number">0</span>, I = cut.length
+    <span class="hljs-keyword">while</span> (i &lt; I) {
+        <span class="hljs-keyword">for</span> (; i &lt; I &amp;&amp; queue.buffers.length == <span class="hljs-number">0</span>; i++) {
+            page.splice(i, <span class="hljs-number">0</span>, cut[i])
+            <span class="hljs-keyword">this</span>[writer](queue, page, page.items[i])
+        }
+        queue.buffers.forEach(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">buffer</span>) </span>{
+            scribe.write(buffer, <span class="hljs-number">0</span>, buffer.length, page.position)
+            page.position += buffer.length
+        })
+        queue.clear()
+    }
+
+    queue.finish()
+    queue.buffers.forEach(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">buffer</span>) </span>{
+        scribe.write(buffer, <span class="hljs-number">0</span>, buffer.length, page.position)
+        page.position += buffer.length
+    })
+
+    scribe.close(callback)
+}
+
+Logger.prototype.rotate = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">page, file, callback</span>) </span>{
+    page.position = <span class="hljs-number">0</span>
+
+    <span class="hljs-keyword">var</span> scribe = <span class="hljs-keyword">new</span> Scribe(file, <span class="hljs-string">'a'</span>)
+    scribe.open()
+
+    <span class="hljs-keyword">var</span> queue = <span class="hljs-keyword">new</span> Queue
+    <span class="hljs-keyword">this</span>.writeHeader(queue, page)
+    queue.finish()
+    queue.buffers.forEach(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">buffer</span>) </span>{
+        scribe.write(buffer, <span class="hljs-number">0</span>, buffer.length, page.position)
+        page.position += buffer.length
+    })
+
+    scribe.close(callback)
+}
+
+Logger.prototype.mkdir = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">async</span>) </span>{
+    <span class="hljs-keyword">async</span>([<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        fs.mkdir(path.join(<span class="hljs-keyword">this</span>._directory, <span class="hljs-string">'pages'</span>), <span class="hljs-number">0755</span>, <span class="hljs-keyword">async</span>())
+        fs.mkdir(path.join(<span class="hljs-keyword">this</span>._directory, <span class="hljs-string">'drafts'</span>), <span class="hljs-number">0755</span>, <span class="hljs-keyword">async</span>())
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">error</span>) </span>{
+        <span class="hljs-keyword">throw</span> error
+    }])
+})
+
+Logger.prototype.createScript = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Script(<span class="hljs-keyword">this</span>)
+}
+
+Logger.prototype.createAppender = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">page</span>) </span>{
+    <span class="hljs-keyword">var</span> scribe = <span class="hljs-keyword">new</span> Scribe(<span class="hljs-keyword">this</span>.filename(page), <span class="hljs-string">'a'</span>)
+    scribe.open()
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Appender(<span class="hljs-keyword">this</span>, scribe, page)
+}
+
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">Appender</span> (<span class="hljs-params">logger, scribe, page</span>) </span>{
+    <span class="hljs-keyword">this</span>._logger = logger
+    <span class="hljs-keyword">this</span>._scribe = scribe
+    <span class="hljs-keyword">this</span>._page = page
+    <span class="hljs-keyword">this</span>._queue = <span class="hljs-keyword">new</span> Queue
+}
+
+Appender.prototype.writeInsert = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">index, record</span>) </span>{
+    <span class="hljs-keyword">var</span> length = <span class="hljs-keyword">this</span>._logger.writeInsert(<span class="hljs-keyword">this</span>._queue, <span class="hljs-keyword">this</span>._page, index, record)
+    <span class="hljs-keyword">this</span>._write()
+    <span class="hljs-keyword">return</span> length
+}
+
+Appender.prototype.writeDelete = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">index</span>) </span>{
+    <span class="hljs-keyword">var</span> length = <span class="hljs-keyword">this</span>._logger.writeDelete(<span class="hljs-keyword">this</span>._queue, <span class="hljs-keyword">this</span>._page, index)
+    <span class="hljs-keyword">this</span>._write()
+    <span class="hljs-keyword">return</span> length
+}
+
+Appender.prototype.writeUserRecord = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">header, body</span>) </span>{
+    header = [ -(++<span class="hljs-keyword">this</span>._page.entries) ].concat(header)
+    <span class="hljs-keyword">var</span> length = <span class="hljs-keyword">this</span>._logger.writeEntry(<span class="hljs-keyword">this</span>._queue, header, body, <span class="hljs-keyword">this</span>._logger.serializers.record)
+    <span class="hljs-keyword">this</span>._write()
+    <span class="hljs-keyword">return</span> length
+}
+
+Appender.prototype._write = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>._queue.buffers.length) {
+        <span class="hljs-keyword">this</span>._queue.buffers.forEach(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">buffer</span>) </span>{
+            <span class="hljs-keyword">this</span>._scribe.write(buffer, <span class="hljs-number">0</span>, buffer.length, <span class="hljs-keyword">this</span>._page.position)
+            <span class="hljs-keyword">this</span>._page.position += buffer.length
+        }, <span class="hljs-keyword">this</span>)
+        <span class="hljs-keyword">this</span>._queue.clear()
+    }
+}
+
+Appender.prototype.close = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">callback</span>) </span>{
+    <span class="hljs-keyword">this</span>._queue.finish()
+    <span class="hljs-keyword">this</span>._write()
+    <span class="hljs-keyword">this</span>._scribe.close(callback)
+}
+
+<span class="hljs-built_in">module</span>.exports = Logger
+
+</pre></div></div>
+
+        </li>
+
+    </ul>
+  </div>
+</body>
+</html>

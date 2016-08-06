@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+  <title>descent.js</title>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, target-densitydpi=160dpi, initial-scale=1.0; maximum-scale=1.0; user-scalable=0;">
+  <link rel="stylesheet" media="all" href="docco.css" />
+</head>
+<body>
+  <div id="container">
+    <div id="background"></div>
+
+      <ul id="jump_to">
+        <li>
+          <a class="large" href="javascript:void(0);">Jump To &hellip;</a>
+          <a class="small" href="javascript:void(0);">+</a>
+          <div id="jump_wrapper">
+          <div id="jump_page_wrapper">
+            <div id="jump_page">
+
+
+                <a class="source" href="balancer.html">
+                  balancer.js
+                </a>
+
+
+                <a class="source" href="checksum.html">
+                  checksum.js
+                </a>
+
+
+                <a class="source" href="cursor.html">
+                  cursor.js
+                </a>
+
+
+                <a class="source" href="descent.html">
+                  descent.js
+                </a>
+
+
+                <a class="source" href="extend.html">
+                  extend.js
+                </a>
+
+
+                <a class="source" href="json.html">
+                  json.js
+                </a>
+
+
+                <a class="source" href="locker.html">
+                  locker.js
+                </a>
+
+
+                <a class="source" href="logger.html">
+                  logger.js
+                </a>
+
+
+                <a class="source" href="page.html">
+                  page.js
+                </a>
+
+
+                <a class="source" href="player.html">
+                  player.js
+                </a>
+
+
+                <a class="source" href="queue.html">
+                  queue.js
+                </a>
+
+
+                <a class="source" href="scram.html">
+                  scram.js
+                </a>
+
+
+                <a class="source" href="scribe.html">
+                  scribe.js
+                </a>
+
+
+                <a class="source" href="script.html">
+                  script.js
+                </a>
+
+
+                <a class="source" href="sheaf.html">
+                  sheaf.js
+                </a>
+
+
+                <a class="source" href="strata.html">
+                  strata.js
+                </a>
+
+            </div>
+          </div>
+        </li>
+      </ul>
+
+    <ul class="sections">
+
+          <li id="title">
+              <div class="annotation">
+                  <h1>descent.js</h1>
+              </div>
+          </li>
+
+
+
+        <li id="section-1">
+            <div class="annotation">
+
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-1">&#182;</a>
+              </div>
+
+            </div>
+
+            <div class="content"><div class='highlight'><pre><span class="hljs-keyword">var</span> cadence = <span class="hljs-built_in">require</span>(<span class="hljs-string">'cadence'</span>)
+<span class="hljs-keyword">var</span> Locker = <span class="hljs-built_in">require</span>(<span class="hljs-string">'./locker'</span>)
+<span class="hljs-keyword">var</span> Sheaf = <span class="hljs-built_in">require</span>(<span class="hljs-string">'./sheaf'</span>)
+<span class="hljs-keyword">var</span> ok = <span class="hljs-built_in">require</span>(<span class="hljs-string">'assert'</span>).ok
+<span class="hljs-keyword">var</span> extend = <span class="hljs-built_in">require</span>(<span class="hljs-string">'./extend'</span>)
+
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">Descent</span> (<span class="hljs-params">sheaf, locker, override</span>) </span>{
+    ok(sheaf <span class="hljs-keyword">instanceof</span> Sheaf, <span class="hljs-string">'sheaf'</span>)
+    ok(locker <span class="hljs-keyword">instanceof</span> Locker)
+
+    override = override || {}
+
+    <span class="hljs-keyword">this</span>. exclusive = override.exclusive || <span class="hljs-literal">false</span>
+    <span class="hljs-keyword">this</span>.depth = override.depth == <span class="hljs-literal">null</span> ? <span class="hljs-number">-1</span> : override.depth
+    <span class="hljs-keyword">this</span>.indexes = override.indexes || {}
+    <span class="hljs-keyword">this</span>.sheaf = sheaf
+    <span class="hljs-keyword">this</span>.greater = override.greater
+    <span class="hljs-keyword">this</span>.lesser = override.lesser
+    <span class="hljs-keyword">this</span>.page = override.page
+    <span class="hljs-keyword">this</span>.index = override.index == <span class="hljs-literal">null</span> ? <span class="hljs-number">0</span> : override.index
+    <span class="hljs-keyword">this</span>.locker = locker
+    <span class="hljs-keyword">this</span>.descent = {}
+
+    <span class="hljs-keyword">if</span> (!<span class="hljs-keyword">this</span>.page) {
+        <span class="hljs-keyword">this</span>.locker.lock(<span class="hljs-number">-2</span>, <span class="hljs-literal">false</span>, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">error, page</span>) </span>{
+            ok(!error, <span class="hljs-string">'impossible error'</span>)
+            <span class="hljs-keyword">this</span>.page = page
+        }.bind(<span class="hljs-keyword">this</span>))
+        ok(<span class="hljs-keyword">this</span>.page, <span class="hljs-string">'dummy page not in cache'</span>)
+    } <span class="hljs-keyword">else</span> {
+        <span class="hljs-keyword">this</span>.locker.increment(<span class="hljs-keyword">this</span>.page)
+    }
+}
+
+Descent.prototype.setIndex = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">i</span>) </span>{
+    <span class="hljs-keyword">this</span>.indexes[<span class="hljs-keyword">this</span>.page.address] = <span class="hljs-keyword">this</span>.index = i
+}
+
+Descent.prototype.fork = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Descent(<span class="hljs-keyword">this</span>.sheaf, <span class="hljs-keyword">this</span>.locker, {
+        page: <span class="hljs-keyword">this</span>.page,
+        exclusive: <span class="hljs-keyword">this</span>.exclusive,
+        depth: <span class="hljs-keyword">this</span>.depth,
+        index: <span class="hljs-keyword">this</span>.index,
+        indexes: extend({}, <span class="hljs-keyword">this</span>.indexes)
+    })
+}
+
+Descent.prototype.exclude = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+    <span class="hljs-keyword">this</span>.exclusive = <span class="hljs-literal">true</span>
+}
+
+Descent.prototype.upgrade = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">async</span>) </span>{
+    <span class="hljs-keyword">async</span>([<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        <span class="hljs-keyword">this</span>.locker.unlock(<span class="hljs-keyword">this</span>.page)
+        <span class="hljs-keyword">this</span>.locker.lock(<span class="hljs-keyword">this</span>.page.address, <span class="hljs-keyword">this</span>.exclusive = <span class="hljs-literal">true</span>, <span class="hljs-keyword">async</span>())
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">error</span>) </span>{
+        <span class="hljs-keyword">this</span>.locker.lock(<span class="hljs-number">-2</span>, <span class="hljs-literal">false</span>, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">error, locked</span>) </span>{
+            ok(!error, <span class="hljs-string">'impossible error'</span>)
+            <span class="hljs-keyword">this</span>.page = locked
+        }.bind(<span class="hljs-keyword">this</span>))
+        ok(<span class="hljs-keyword">this</span>.page, <span class="hljs-string">'dummy page not in cache'</span>)
+        <span class="hljs-keyword">throw</span> error
+    }], <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">locked</span>) </span>{
+        <span class="hljs-keyword">this</span>.page = locked
+    })
+})
+
+Descent.prototype.key = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">key</span>) </span>{
+    <span class="hljs-keyword">return</span> <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.sheaf.find(<span class="hljs-keyword">this</span>.page, key, <span class="hljs-keyword">this</span>.page.address % <span class="hljs-number">2</span> ? <span class="hljs-keyword">this</span>.page.ghosts : <span class="hljs-number">1</span>)
+    }
+}
+
+Descent.prototype.left = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+   <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.page.ghosts || <span class="hljs-number">0</span>
+}
+
+Descent.prototype.right = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.page.items.length - <span class="hljs-number">1</span>
+}
+
+Descent.prototype.found = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">keys</span>) </span>{
+    <span class="hljs-keyword">return</span> <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.page.items[<span class="hljs-number">0</span>].address != <span class="hljs-number">0</span> &amp;&amp; <span class="hljs-keyword">this</span>.index != <span class="hljs-number">0</span> &amp;&amp; keys.some(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">key</span>) </span>{
+            <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.sheaf.comparator(<span class="hljs-keyword">this</span>.page.items[<span class="hljs-keyword">this</span>.index].key,  key) == <span class="hljs-number">0</span>
+        }, <span class="hljs-keyword">this</span>)
+    }
+}
+
+Descent.prototype.child = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">address</span>) </span>{ <span class="hljs-keyword">return</span> <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{ <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.page.items[<span class="hljs-keyword">this</span>.index].address == address } }
+
+Descent.prototype.address = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">address</span>) </span>{ <span class="hljs-keyword">return</span> <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{ <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.page.address == address } }
+
+Descent.prototype.penultimate = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{ <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.page.items[<span class="hljs-number">0</span>].address % <span class="hljs-number">2</span> }
+
+Descent.prototype.leaf = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{ <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.page.address % <span class="hljs-number">2</span> }
+
+Descent.prototype.level = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">level</span>) </span>{
+    <span class="hljs-keyword">return</span> <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{ <span class="hljs-keyword">return</span> level == <span class="hljs-keyword">this</span>.depth }
+}
+
+Descent.prototype.unlocker = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">parent</span>) </span>{
+    <span class="hljs-keyword">this</span>.locker.unlock(parent)
+}
+
+Descent.prototype.descend = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">async, next, stop</span>) </span>{
+    <span class="hljs-keyword">var</span> loop = <span class="hljs-keyword">async</span>(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        <span class="hljs-keyword">if</span> (stop.call(<span class="hljs-keyword">this</span>)) {
+            <span class="hljs-keyword">return</span> [ loop.break, <span class="hljs-keyword">this</span>.page, <span class="hljs-keyword">this</span>.index ]
+        } <span class="hljs-keyword">else</span> {
+            <span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.index + <span class="hljs-number">1</span> &lt; <span class="hljs-keyword">this</span>.page.items.length) {
+                <span class="hljs-keyword">this</span>.greater = <span class="hljs-keyword">this</span>.page.address
+            }
+            <span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.index &gt; <span class="hljs-number">0</span>) {
+                <span class="hljs-keyword">this</span>.lesser = <span class="hljs-keyword">this</span>.page.address
+            }
+            <span class="hljs-keyword">this</span>.locker.lock(<span class="hljs-keyword">this</span>.page.items[<span class="hljs-keyword">this</span>.index].address, <span class="hljs-keyword">this</span>.exclusive, <span class="hljs-keyword">async</span>())
+        }
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">locked</span>) </span>{
+        <span class="hljs-keyword">this</span>.depth++
+        <span class="hljs-keyword">this</span>.unlocker(<span class="hljs-keyword">this</span>.page, locked)
+        <span class="hljs-keyword">this</span>.page = locked
+        <span class="hljs-keyword">var</span> index = next.call(<span class="hljs-keyword">this</span>)
+        <span class="hljs-keyword">if</span> (!(<span class="hljs-keyword">this</span>.page.address % <span class="hljs-number">2</span>) &amp;&amp; index &lt; <span class="hljs-number">0</span>) {
+            <span class="hljs-keyword">this</span>.setIndex((~index) - <span class="hljs-number">1</span>)
+        } <span class="hljs-keyword">else</span> {
+            <span class="hljs-keyword">this</span>.setIndex(index)
+        }
+        <span class="hljs-keyword">this</span>.indexes[<span class="hljs-keyword">this</span>.page.address] = <span class="hljs-keyword">this</span>.index
+        <span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.page.address % <span class="hljs-number">2</span> === <span class="hljs-number">0</span>) {
+            ok(<span class="hljs-keyword">this</span>.page.items.length, <span class="hljs-string">'page has addresses'</span>)
+            ok(<span class="hljs-keyword">this</span>.page.items[<span class="hljs-number">0</span>].key == <span class="hljs-literal">null</span>, <span class="hljs-string">'first key is cached'</span>)
+        }
+    })()
+})
+
+<span class="hljs-built_in">module</span>.exports = Descen
+
+</pre></div></div>
+
+        </li>
+
+    </ul>
+  </div>
+</body>
+</html>

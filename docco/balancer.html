@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+  <title>balancer.js</title>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, target-densitydpi=160dpi, initial-scale=1.0; maximum-scale=1.0; user-scalable=0;">
+  <link rel="stylesheet" media="all" href="docco.css" />
+</head>
+<body>
+  <div id="container">
+    <div id="background"></div>
+
+      <ul id="jump_to">
+        <li>
+          <a class="large" href="javascript:void(0);">Jump To &hellip;</a>
+          <a class="small" href="javascript:void(0);">+</a>
+          <div id="jump_wrapper">
+          <div id="jump_page_wrapper">
+            <div id="jump_page">
+
+
+                <a class="source" href="balancer.html">
+                  balancer.js
+                </a>
+
+
+                <a class="source" href="checksum.html">
+                  checksum.js
+                </a>
+
+
+                <a class="source" href="cursor.html">
+                  cursor.js
+                </a>
+
+
+                <a class="source" href="descent.html">
+                  descent.js
+                </a>
+
+
+                <a class="source" href="extend.html">
+                  extend.js
+                </a>
+
+
+                <a class="source" href="json.html">
+                  json.js
+                </a>
+
+
+                <a class="source" href="locker.html">
+                  locker.js
+                </a>
+
+
+                <a class="source" href="logger.html">
+                  logger.js
+                </a>
+
+
+                <a class="source" href="page.html">
+                  page.js
+                </a>
+
+
+                <a class="source" href="player.html">
+                  player.js
+                </a>
+
+
+                <a class="source" href="queue.html">
+                  queue.js
+                </a>
+
+
+                <a class="source" href="scram.html">
+                  scram.js
+                </a>
+
+
+                <a class="source" href="scribe.html">
+                  scribe.js
+                </a>
+
+
+                <a class="source" href="script.html">
+                  script.js
+                </a>
+
+
+                <a class="source" href="sheaf.html">
+                  sheaf.js
+                </a>
+
+
+                <a class="source" href="strata.html">
+                  strata.js
+                </a>
+
+            </div>
+          </div>
+        </li>
+      </ul>
+
+    <ul class="sections">
+
+          <li id="title">
+              <div class="annotation">
+                  <h1>balancer.js</h1>
+              </div>
+          </li>
+
+
+
+        <li id="section-1">
+            <div class="annotation">
+
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-1">&#182;</a>
+              </div>
+
+            </div>
+
+            <div class="content"><div class='highlight'><pre><span class="hljs-keyword">var</span> ok = <span class="hljs-built_in">require</span>(<span class="hljs-string">'assert'</span>).ok
+<span class="hljs-keyword">var</span> cadence = <span class="hljs-built_in">require</span>(<span class="hljs-string">'cadence'</span>)
+<span class="hljs-keyword">var</span> Script = <span class="hljs-built_in">require</span>(<span class="hljs-string">'./script'</span>)
+<span class="hljs-keyword">var</span> Descent = <span class="hljs-built_in">require</span>(<span class="hljs-string">'./descent'</span>)
+
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">Balancer</span> (<span class="hljs-params">sheaf, logger</span>) </span>{
+    <span class="hljs-keyword">this</span>.sheaf = sheaf
+    <span class="hljs-keyword">this</span>.logger = logger
+}
+
+Balancer.prototype._node = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">async, locker, page</span>) </span>{
+    <span class="hljs-keyword">async</span>([<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        locker.unlock(page)
+    }], <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        <span class="hljs-keyword">var</span> entry
+        ok(page.address % <span class="hljs-number">2</span>, <span class="hljs-string">'leaf page expected'</span>)
+
+        <span class="hljs-keyword">if</span> (page.address == <span class="hljs-number">1</span>) entry = {}
+        <span class="hljs-keyword">else</span> entry = page.items[<span class="hljs-number">0</span>]
+
+        <span class="hljs-keyword">var</span> node = {
+            key: entry.key,
+            address: page.address,
+            rightAddress: page.right.address,
+            length: page.items.length - page.ghosts
+        }
+        <span class="hljs-keyword">this</span>.ordered[node.address] = node
+        <span class="hljs-keyword">if</span> (page.ghosts) {
+            <span class="hljs-keyword">this</span>.ghosts[node.address] = node
+        }
+        <span class="hljs-keyword">return</span> [ node ]
+    })
+})
+
+Balancer.prototype._nodify = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">async, locker, page</span>) </span>{
+    <span class="hljs-keyword">async</span>(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        <span class="hljs-keyword">this</span>._node(locker, page, <span class="hljs-keyword">async</span>())
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">node</span>) </span>{
+        <span class="hljs-keyword">async</span>(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+            <span class="hljs-keyword">this</span>.sheaf.tracer(<span class="hljs-string">'reference'</span>, {}, <span class="hljs-keyword">async</span>())
+        }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+            <span class="hljs-keyword">return</span> node
+        })
+    })
+})
+
+Balancer.prototype.balance = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">balance</span> (<span class="hljs-params">async, sheaf</span>) </span>{
+    <span class="hljs-keyword">var</span> locker = <span class="hljs-keyword">this</span>.sheaf.createLocker(), operations = [], address, length
+
+    <span class="hljs-keyword">var</span> _gather = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">async, address, length</span>) </span>{
+        <span class="hljs-keyword">var</span> right, node
+        <span class="hljs-keyword">async</span>(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+            <span class="hljs-keyword">if</span> (node = <span class="hljs-keyword">this</span>.ordered[address]) {
+                <span class="hljs-keyword">return</span> [ node ]
+            } <span class="hljs-keyword">else</span> {
+                <span class="hljs-keyword">async</span>(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+                    locker.lock(address, <span class="hljs-literal">false</span>, <span class="hljs-keyword">async</span>())
+                }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">page</span>) </span>{
+                    <span class="hljs-keyword">this</span>._nodify(locker, page, <span class="hljs-keyword">async</span>())
+                })
+            }
+        }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">node</span>) </span>{
+            <span class="hljs-keyword">if</span> (!(node.length - length &lt; <span class="hljs-number">0</span>)) <span class="hljs-keyword">return</span>
+            <span class="hljs-keyword">if</span> (node.address != <span class="hljs-number">1</span> &amp;&amp; ! node.left) <span class="hljs-keyword">async</span>(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+                <span class="hljs-keyword">var</span> descent = <span class="hljs-keyword">new</span> Descent(<span class="hljs-keyword">this</span>.sheaf, locker)
+                <span class="hljs-keyword">async</span>(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+                    descent.descend(descent.key(node.key), descent.found([node.key]), <span class="hljs-keyword">async</span>())
+                }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+                    descent.setIndex(descent.index - <span class="hljs-number">1</span>)
+                    descent.descend(descent.right, descent.leaf, <span class="hljs-keyword">async</span>())
+                }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+                    <span class="hljs-keyword">var</span> lef
+                    <span class="hljs-keyword">if</span> (left = <span class="hljs-keyword">this</span>.ordered[descent.page.address]) {
+                        locker.unlock(descent.page)
+                        <span class="hljs-keyword">return</span> [ left ]
+                    } <span class="hljs-keyword">else</span> {
+                        <span class="hljs-keyword">this</span>._nodify(locker, descent.page, <span class="hljs-keyword">async</span>())
+                    }
+                }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">left</span>) </span>{
+                    left.right = node
+                    node.left = lef
+                })
+            })
+            <span class="hljs-keyword">if</span> (!node.right &amp;&amp; node.rightAddress) <span class="hljs-keyword">async</span>(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+                <span class="hljs-keyword">if</span> (right = <span class="hljs-keyword">this</span>.ordered[node.rightAddress]) <span class="hljs-keyword">return</span> [ right ]
+                <span class="hljs-keyword">else</span> <span class="hljs-keyword">async</span>(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+                    locker.lock(node.rightAddress, <span class="hljs-literal">false</span>, <span class="hljs-keyword">async</span>())
+                }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">page</span>) </span>{
+                    <span class="hljs-keyword">this</span>._nodify(locker, page, <span class="hljs-keyword">async</span>())
+                })
+            }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">right</span>) </span>{
+                node.right = righ
+                right.left = node
+            })
+        })
+    })
+
+    ok(!<span class="hljs-keyword">this</span>.sheaf.balancing, <span class="hljs-string">'already balancing'</span>)
+
+    <span class="hljs-keyword">var</span> lengths = <span class="hljs-keyword">this</span>.sheaf.lengths, addresses = <span class="hljs-built_in">Object</span>.keys(lengths)
+    <span class="hljs-keyword">if</span> (addresses.length == <span class="hljs-number">0</span>) {
+        <span class="hljs-keyword">return</span> [ <span class="hljs-keyword">async</span>, <span class="hljs-literal">true</span> ]
+    } <span class="hljs-keyword">else</span> {
+        <span class="hljs-keyword">this</span>.sheaf.lengths = {}
+        <span class="hljs-keyword">this</span>.operations = []
+        <span class="hljs-keyword">this</span>.ordered = {}
+        <span class="hljs-keyword">this</span>.ghosts = {}
+        <span class="hljs-keyword">this</span>.sheaf.balancing = <span class="hljs-literal">true</span>
+    }
+
+    <span class="hljs-keyword">async</span>(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        <span class="hljs-keyword">async</span>.forEach(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">address</span>) </span>{
+            _gather.call(<span class="hljs-keyword">this</span>, +address, lengths[address], <span class="hljs-keyword">async</span>())
+        })(addresses)
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+</pre></div></div>
+
+        </li>
+
+
+        <li id="section-2">
+            <div class="annotation">
+
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-2">&#182;</a>
+              </div>
+              <p>TODO permeate(‘bigeasy.strata.plan’, {}, async())</p>
+
+            </div>
+
+            <div class="content"><div class='highlight'><pre>        <span class="hljs-keyword">this</span>.sheaf.tracer(<span class="hljs-string">'plan'</span>, {}, <span class="hljs-keyword">async</span>())
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        <span class="hljs-keyword">var</span> address, node, difference, addresses
+
+        <span class="hljs-keyword">for</span> (address <span class="hljs-keyword">in</span> <span class="hljs-keyword">this</span>.ordered) {
+            node = <span class="hljs-keyword">this</span>.ordered[address]
+        }
+
+        <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">terminate</span> (<span class="hljs-params">node</span>) </span>{
+            <span class="hljs-keyword">var</span> righ
+            <span class="hljs-keyword">if</span> (node) {
+                <span class="hljs-keyword">if</span> (right = node.right) {
+                    node.right = <span class="hljs-literal">null</span>
+                    right.left = <span class="hljs-literal">null</span>
+                }
+            }
+            <span class="hljs-keyword">return</span> righ
+        }
+
+        <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">unlink</span> (<span class="hljs-params">node</span>) </span>{
+            terminate(node.left)
+            terminate(node)
+            <span class="hljs-keyword">return</span> node
+        }
+
+        <span class="hljs-keyword">for</span> (address <span class="hljs-keyword">in</span> lengths) {
+            length = lengths[address]
+            node = <span class="hljs-keyword">this</span>.ordered[address]
+            difference = node.length - length
+            <span class="hljs-keyword">if</span> (difference &gt; <span class="hljs-number">0</span> &amp;&amp; node.length &gt; <span class="hljs-keyword">this</span>.sheaf.options.leafSize) {
+                operations.unshift({
+                    method: <span class="hljs-string">'splitLeaf'</span>,
+                    parameters: [ node.address, node.key, <span class="hljs-keyword">this</span>.ghosts[node.address] ]
+                })
+                <span class="hljs-keyword">delete</span> <span class="hljs-keyword">this</span>.ghosts[node.address]
+                unlink(node)
+            }
+        }
+
+        <span class="hljs-keyword">for</span> (address <span class="hljs-keyword">in</span> <span class="hljs-keyword">this</span>.ordered) {
+            <span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.ordered[address].left) <span class="hljs-keyword">delete</span> <span class="hljs-keyword">this</span>.ordered[address]
+        }
+
+        <span class="hljs-keyword">for</span> (address <span class="hljs-keyword">in</span> <span class="hljs-keyword">this</span>.ordered) {
+            <span class="hljs-keyword">var</span> node = <span class="hljs-keyword">this</span>.ordered[address]
+            <span class="hljs-keyword">while</span> (node &amp;&amp; node.right) {
+                <span class="hljs-keyword">if</span> (node.length + node.right.length &gt; <span class="hljs-keyword">this</span>.sheaf.options.leafSize) {
+                    node = terminate(node)
+                    <span class="hljs-keyword">this</span>.ordered[node.address] = node
+                } <span class="hljs-keyword">else</span> {
+                    <span class="hljs-keyword">if</span> (node = terminate(node.right)) {
+                        <span class="hljs-keyword">this</span>.ordered[node.address] = node
+                    }
+                }
+            }
+        }
+
+        <span class="hljs-keyword">for</span> (address <span class="hljs-keyword">in</span> <span class="hljs-keyword">this</span>.ordered) {
+            node = <span class="hljs-keyword">this</span>.ordered[address]
+
+            <span class="hljs-keyword">if</span> (node.right) {
+                ok(!node.right.right, <span class="hljs-string">'merge pair still linked to sibling'</span>)
+                operations.unshift({
+                    method: <span class="hljs-string">'mergeLeaves'</span>,
+                    parameters: [
+                        node.right.key, node.key, lengths, !! <span class="hljs-keyword">this</span>.ghosts[node.address]
+                    ]
+                })
+                <span class="hljs-keyword">delete</span> <span class="hljs-keyword">this</span>.ghosts[node.address]
+                <span class="hljs-keyword">delete</span> <span class="hljs-keyword">this</span>.ghosts[node.right.address]
+            }
+        }
+
+        <span class="hljs-keyword">for</span> (address <span class="hljs-keyword">in</span> <span class="hljs-keyword">this</span>.ghosts) {
+            node = <span class="hljs-keyword">this</span>.ghosts[address]
+            <span class="hljs-keyword">if</span> (node.length) operations.unshift({
+                method: <span class="hljs-string">'deleteGhost'</span>,
+                parameters: [ node.key ]
+            })
+        }
+
+        <span class="hljs-keyword">async</span>(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+            <span class="hljs-keyword">async</span>.forEach(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">operation</span>) </span>{
+                <span class="hljs-keyword">this</span>[operation.method].apply(<span class="hljs-keyword">this</span>, operation.parameters.concat(<span class="hljs-keyword">async</span>()))
+            })(operations)
+        }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+            <span class="hljs-keyword">this</span>.sheaf.balancing = <span class="hljs-literal">false</span>
+            <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+        })
+    })
+})
+
+Balancer.prototype.shouldSplitBranch = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">branch, key, callback</span>) </span>{
+    <span class="hljs-keyword">if</span> (branch.items.length &gt; <span class="hljs-keyword">this</span>.sheaf.options.branchSize) {
+        <span class="hljs-keyword">if</span> (branch.address == <span class="hljs-number">0</span>) {
+            <span class="hljs-keyword">this</span>.drainRoot(callback)
+        } <span class="hljs-keyword">else</span> {
+            <span class="hljs-keyword">this</span>.splitBranch(branch.address, key, callback)
+        }
+    } <span class="hljs-keyword">else</span> {
+        callback(<span class="hljs-literal">null</span>)
+    }
+}
+
+Balancer.prototype.splitLeafAndUnlock = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">async, address, key, ghosts</span>) </span>{
+    <span class="hljs-keyword">var</span> locker = <span class="hljs-keyword">this</span>.sheaf.createLocker(),
+        script = <span class="hljs-keyword">this</span>.logger.createScript(),
+        descents = [], replacements = [], encached = [],
+        completed = <span class="hljs-number">0</span>,
+        penultimate, leaf, split, pages, page,
+        records, remainder, right, index, offset, length
+
+    <span class="hljs-keyword">var</span> splitter = <span class="hljs-keyword">async</span>([<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        encached.forEach(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">page</span>) </span>{ locker.unlock(page) })
+        descents.forEach(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">descent</span>) </span>{ locker.unlock(descent.page) })
+        locker.dispose()
+    }], <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        <span class="hljs-keyword">if</span> (address != <span class="hljs-number">1</span> &amp;&amp; ghosts) <span class="hljs-keyword">async</span>(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+            <span class="hljs-keyword">this</span>.deleteGhost(key, <span class="hljs-keyword">async</span>())
+        }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">rekey</span>) </span>{
+            key = rekey
+        })
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        descents.push(penultimate = <span class="hljs-keyword">new</span> Descent(<span class="hljs-keyword">this</span>.sheaf, locker))
+
+        penultimate.descend(address == <span class="hljs-number">1</span> ? penultimate.left : penultimate.key(key),
+                            penultimate.penultimate, <span class="hljs-keyword">async</span>())
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        penultimate.upgrade(<span class="hljs-keyword">async</span>())
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        descents.push(leaf = penultimate.fork())
+        leaf.descend(address == <span class="hljs-number">1</span> ? leaf.left : leaf.key(key), leaf.leaf, <span class="hljs-keyword">async</span>())
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        split = leaf.page
+        <span class="hljs-keyword">if</span> (split.items.length - split.ghosts &lt;= <span class="hljs-keyword">this</span>.sheaf.options.leafSize) {
+            <span class="hljs-keyword">this</span>.sheaf.unbalanced(split, <span class="hljs-literal">true</span>)
+            <span class="hljs-keyword">return</span> [ splitter.break, <span class="hljs-literal">false</span> ]
+        }
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        pages = <span class="hljs-built_in">Math</span>.ceil(split.items.length / <span class="hljs-keyword">this</span>.sheaf.options.leafSize)
+        records = <span class="hljs-built_in">Math</span>.floor(split.items.length / pages)
+        remainder = split.items.length % pages
+
+        right = split.righ
+
+        offset = split.items.length
+
+        <span class="hljs-keyword">var</span> splits = <span class="hljs-number">0</span>
+        <span class="hljs-keyword">var</span> loop = <span class="hljs-keyword">async</span>(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+            <span class="hljs-keyword">if</span> (splits++ == pages - <span class="hljs-number">1</span>) <span class="hljs-keyword">return</span> [ loop.break ]
+            page = locker.encache(<span class="hljs-keyword">this</span>.sheaf.createPage(<span class="hljs-number">1</span>))
+            encached.push(page)
+
+            page.right = righ
+
+            length = remainder-- &gt; <span class="hljs-number">0</span> ? records + <span class="hljs-number">1</span> : records
+            offset = split.items.length - length
+            index = offse
+
+            penultimate.page.splice(penultimate.index + <span class="hljs-number">1</span>, <span class="hljs-number">0</span>, {
+                key: split.items[offset].key,
+                heft: <span class="hljs-number">0</span>,
+                address: page.address
+            })
+
+            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">var</span> i = <span class="hljs-number">0</span>; i &lt; length; i++) {
+                <span class="hljs-keyword">var</span> item = split.items[index]
+
+                ok(index &lt; split.items.length)
+
+                page.splice(page.items.length, <span class="hljs-number">0</span>, item)
+
+                index++
+            }
+
+            right = {
+                address: page.address,
+                key: page.items[<span class="hljs-number">0</span>].key
+            }
+        }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+            split.splice(offset, length)
+            script.rewriteLeaf(page)
+        })()
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        split.right = righ
+        script.rewriteLeaf(split)
+        script.writeBranch(penultimate.page)
+        script.commit(<span class="hljs-keyword">async</span>())
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        <span class="hljs-keyword">this</span>.sheaf.unbalanced(leaf.page, <span class="hljs-literal">true</span>)
+        <span class="hljs-keyword">this</span>.sheaf.unbalanced(page, <span class="hljs-literal">true</span>)
+        <span class="hljs-keyword">return</span> [ splitter.break, <span class="hljs-literal">true</span>, penultimate.page, encached[<span class="hljs-number">0</span>].items[<span class="hljs-number">0</span>].key ]
+    })()
+})
+
+Balancer.prototype.splitLeaf = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">async, address, key, ghosts</span>) </span>{
+    <span class="hljs-keyword">async</span>(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        <span class="hljs-keyword">this</span>.splitLeafAndUnlock(address, key, ghosts, <span class="hljs-keyword">async</span>())
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">split, penultimate, partition</span>) </span>{
+        <span class="hljs-keyword">if</span> (split) {
+            <span class="hljs-keyword">this</span>.shouldSplitBranch(penultimate, partition, <span class="hljs-keyword">async</span>())
+        }
+    })
+})
+
+Balancer.prototype.splitBranchAndUnlock = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">async, address, key</span>) </span>{
+    <span class="hljs-keyword">var</span> locker = <span class="hljs-keyword">this</span>.sheaf.createLocker(),
+        script = <span class="hljs-keyword">this</span>.logger.createScript(),
+        descents = [],
+        children = [],
+        encached = [],
+        parent, full, split, pages,
+        records, remainder, offset,
+        unwritten, pending
+
+    <span class="hljs-keyword">async</span>([<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        encached.forEach(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">page</span>) </span>{ locker.unlock(page) })
+        descents.forEach(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">descent</span>) </span>{ locker.unlock(descent.page) })
+        locker.dispose()
+    }], <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        descents.push(parent = <span class="hljs-keyword">new</span> Descent(<span class="hljs-keyword">this</span>.sheaf, locker))
+        parent.descend(parent.key(key), parent.child(address), <span class="hljs-keyword">async</span>())
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        parent.upgrade(<span class="hljs-keyword">async</span>())
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        descents.push(full = parent.fork())
+        full.descend(full.key(key), full.level(full.depth + <span class="hljs-number">1</span>), <span class="hljs-keyword">async</span>())
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        split = full.page
+
+        pages = <span class="hljs-built_in">Math</span>.ceil(split.items.length / <span class="hljs-keyword">this</span>.sheaf.options.branchSize)
+        records = <span class="hljs-built_in">Math</span>.floor(split.items.length / pages)
+        remainder = split.items.length % pages
+
+        offset = split.items.length
+
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">var</span> i = <span class="hljs-number">0</span>; i &lt; pages - <span class="hljs-number">1</span>; i++ ) {
+            <span class="hljs-keyword">var</span> page = locker.encache(<span class="hljs-keyword">this</span>.sheaf.createPage(<span class="hljs-number">0</span>))
+
+            children.push(page)
+            encached.push(page)
+
+            <span class="hljs-keyword">var</span> length = remainder-- &gt; <span class="hljs-number">0</span> ? records + <span class="hljs-number">1</span> : records
+            <span class="hljs-keyword">var</span> offset = split.items.length - length
+
+            <span class="hljs-keyword">var</span> cut = split.splice(offset, length)
+
+            parent.page.splice(parent.index + <span class="hljs-number">1</span>, <span class="hljs-number">0</span>, {
+                key: cut[<span class="hljs-number">0</span>].key,
+                address: page.address,
+                heft: cut[<span class="hljs-number">0</span>].hef
+            })
+
+            <span class="hljs-keyword">delete</span> cut[<span class="hljs-number">0</span>].key
+            cut[<span class="hljs-number">0</span>].heft = <span class="hljs-number">0</span>
+
+            page.splice(<span class="hljs-number">0</span>, <span class="hljs-number">0</span>, cut)
+        }
+
+        children.unshift(full.page)
+        children.forEach(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">page</span>) </span>{
+            script.writeBranch(page)
+        })
+        script.writeBranch(parent.page)
+        script.commit(<span class="hljs-keyword">async</span>())
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        <span class="hljs-keyword">return</span> [ parent.page, key ]
+    })
+})
+
+Balancer.prototype.splitBranch = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">async, address, key</span>) </span>{
+    <span class="hljs-keyword">async</span>(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        <span class="hljs-keyword">this</span>.splitBranchAndUnlock(address, key, <span class="hljs-keyword">async</span>())
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">parent, key</span>) </span>{
+        <span class="hljs-keyword">this</span>.shouldSplitBranch(parent, key, <span class="hljs-keyword">async</span>())
+    })
+})
+
+Balancer.prototype.drainRootAndUnlock = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">async, sheaf</span>) </span>{
+    <span class="hljs-keyword">var</span> locker = <span class="hljs-keyword">this</span>.sheaf.createLocker(),
+        script = <span class="hljs-keyword">this</span>.logger.createScript(),
+        children = [], locks = [],
+        root, pages, records, remainder
+
+    <span class="hljs-keyword">async</span>([<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        children.forEach(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">page</span>) </span>{ locker.unlock(page) })
+        locks.forEach(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">page</span>) </span>{ locker.unlock(root) })
+        locker.dispose()
+    }], <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        locker.lock(<span class="hljs-number">0</span>, <span class="hljs-literal">true</span>, <span class="hljs-keyword">async</span>())
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">locked</span>) </span>{
+        locks.push(root = locked)
+        pages = <span class="hljs-built_in">Math</span>.ceil(root.items.length / <span class="hljs-keyword">this</span>.sheaf.options.branchSize)
+        records = <span class="hljs-built_in">Math</span>.floor(root.items.length / pages)
+        remainder = root.items.length % pages
+        <span class="hljs-keyword">var</span> lift = []
+
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">var</span> i = <span class="hljs-number">0</span>; i &lt; pages; i++) {
+            <span class="hljs-keyword">var</span> page = locker.encache(<span class="hljs-keyword">this</span>.sheaf.createPage(<span class="hljs-number">0</span>))
+
+            <span class="hljs-keyword">var</span> length = remainder-- &gt; <span class="hljs-number">0</span> ? records + <span class="hljs-number">1</span> : records
+            <span class="hljs-keyword">var</span> offset = root.items.length - length
+
+            <span class="hljs-keyword">var</span> cut = root.splice(offset, length)
+
+            lift.push({
+                key: cut[<span class="hljs-number">0</span>].key,
+                address: page.address,
+                heft: cut[<span class="hljs-number">0</span>].hef
+            })
+            children.push(page)
+
+            <span class="hljs-keyword">delete</span> cut[<span class="hljs-number">0</span>].key
+            cut[<span class="hljs-number">0</span>].heft = <span class="hljs-number">0</span>
+
+            page.splice(<span class="hljs-number">0</span>, <span class="hljs-number">0</span>, cut)
+        }
+
+        lift.reverse()
+
+        root.splice(<span class="hljs-number">0</span>, <span class="hljs-number">0</span>, lift)
+
+        children.forEach(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">page</span>) </span>{
+            script.writeBranch(page)
+        })
+        script.writeBranch(root)
+        script.commit(<span class="hljs-keyword">async</span>())
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        <span class="hljs-keyword">return</span> [ root ]
+    })
+})
+
+Balancer.prototype.drainRoot = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">async, sheaf</span>) </span>{
+    <span class="hljs-keyword">async</span>(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        <span class="hljs-keyword">this</span>.drainRootAndUnlock(<span class="hljs-keyword">async</span>())
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">root</span>) </span>{
+        <span class="hljs-keyword">if</span> (root.items.length &gt; <span class="hljs-keyword">this</span>.sheaf.options.branchSize) <span class="hljs-keyword">this</span>.drainRoot(<span class="hljs-keyword">async</span>())
+    })
+})
+
+Balancer.prototype.exorcise = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">pivot, page, corporal</span>) </span>{
+    <span class="hljs-keyword">var</span> entry
+
+    ok(page.ghosts, <span class="hljs-string">'no ghosts'</span>)
+    ok(corporal.items.length - corporal.ghosts &gt; <span class="hljs-number">0</span>, <span class="hljs-string">'no replacement'</span>)
+
+</pre></div></div>
+
+        </li>
+
+
+        <li id="section-3">
+            <div class="annotation">
+
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-3">&#182;</a>
+              </div>
+              <p>TODO how is this not a race condition? I’m writing to the log, but I’ve
+not updated the pivot page, not rewritten during <code>deleteGhosts</code>.</p>
+
+            </div>
+
+            <div class="content"><div class='highlight'><pre>    page.splice(<span class="hljs-number">0</span>, <span class="hljs-number">1</span>, corporal.splice(corporal.ghosts, <span class="hljs-number">1</span>))
+    page.ghosts = <span class="hljs-number">0</span>
+
+    <span class="hljs-keyword">var</span> item = pivot.page.splice(pivot.index, <span class="hljs-number">1</span>).shift()
+    item.key = page.items[<span class="hljs-number">0</span>].key
+    item.heft = page.items[<span class="hljs-number">0</span>].hef
+    pivot.page.splice(pivot.index, <span class="hljs-number">0</span>, item)
+}
+
+Balancer.prototype.deleteGhost = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">async, key</span>) </span>{
+    <span class="hljs-keyword">var</span> locker = <span class="hljs-keyword">this</span>.sheaf.createLocker(),
+        script = <span class="hljs-keyword">this</span>.logger.createScript(),
+        descents = [],
+        pivot, leaf, reference
+    <span class="hljs-keyword">async</span>([<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        descents.forEach(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">descent</span>) </span>{ locker.unlock(descent.page) })
+        locker.dispose()
+    }], <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        descents.push(pivot = <span class="hljs-keyword">new</span> Descent(<span class="hljs-keyword">this</span>.sheaf, locker))
+        pivot.descend(pivot.key(key), pivot.found([key]), <span class="hljs-keyword">async</span>())
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        pivot.upgrade(<span class="hljs-keyword">async</span>())
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        <span class="hljs-keyword">if</span> (pivot.index != <span class="hljs-number">0</span>) {
+            descents.push(reference = pivot.fork())
+            reference.setIndex(reference.index - <span class="hljs-number">1</span>)
+            reference.descend(reference.right, reference.leaf, <span class="hljs-keyword">async</span>())
+        }
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        descents.push(leaf = pivot.fork())
+        leaf.descend(leaf.key(key), leaf.leaf, <span class="hljs-keyword">async</span>())
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        <span class="hljs-keyword">this</span>.exorcise(pivot, leaf.page, leaf.page)
+        script.rotate(leaf.page)
+        <span class="hljs-keyword">if</span> (reference) {
+            reference.page.right.key = leaf.page.items[<span class="hljs-number">0</span>].key
+            script.rotate(reference.page)
+        }
+        script.writeBranch(pivot.page)
+        script.commit(<span class="hljs-keyword">async</span>())
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        <span class="hljs-keyword">return</span> [ leaf.page.items[<span class="hljs-number">0</span>].key ]
+    })
+})
+
+Balancer.prototype.referring = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">async, leftKey, descents, pivot, pages</span>) </span>{
+    <span class="hljs-keyword">var</span> referring
+    <span class="hljs-keyword">if</span> (leftKey != <span class="hljs-literal">null</span> &amp;&amp; pages.referring == <span class="hljs-literal">null</span>) {
+        descents.push(referring = pages.referring = pivot.fork())
+        <span class="hljs-keyword">async</span>(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+            <span class="hljs-keyword">var</span> key = referring.page.items[referring.index].key
+            <span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.sheaf.comparator(leftKey, key) !== <span class="hljs-number">0</span>) {
+                referring.setIndex(referring.index - <span class="hljs-number">1</span>)
+                referring.descend(referring.key(leftKey), referring.found([leftKey]), <span class="hljs-keyword">async</span>())
+            }
+        }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+            <span class="hljs-keyword">var</span> key = referring.page.items[referring.index].key
+            ok(<span class="hljs-keyword">this</span>.sheaf.comparator(leftKey, key) === <span class="hljs-number">0</span>, <span class="hljs-string">'cannot find left key'</span>)
+            referring.setIndex(referring.index - <span class="hljs-number">1</span>)
+            referring.descend(referring.right, referring.leaf, <span class="hljs-keyword">async</span>())
+        })
+    }
+})
+
+Balancer.prototype.mergePagesAndUnlock = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">
+    async, key, leftKey, stopper, merger, ghostly
+</span>) </span>{
+    <span class="hljs-keyword">var</span> locker = <span class="hljs-keyword">this</span>.sheaf.createLocker(),
+        script = <span class="hljs-keyword">this</span>.logger.createScript(),
+        descents = [],
+        singles = { left: [], right: [] }, parents = {}, pages = {},
+        ancestor, pivot, empties, ghosted, designation
+
+    <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">createSingleUnlocker</span> (<span class="hljs-params">singles</span>) </span>{
+        ok(singles != <span class="hljs-literal">null</span>, <span class="hljs-string">'null singles'</span>)
+        <span class="hljs-keyword">return</span> <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">parent, child</span>) </span>{
+            <span class="hljs-keyword">if</span> (child.items.length == <span class="hljs-number">1</span>) {
+                <span class="hljs-keyword">if</span> (singles.length == <span class="hljs-number">0</span>) singles.push(parent)
+                singles.push(child)
+            } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (singles.length) {
+                singles.forEach(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">page</span>) </span>{ locker.unlock(page) })
+                singles.length = <span class="hljs-number">0</span>
+            } <span class="hljs-keyword">else</span> {
+                locker.unlock(parent)
+            }
+        }
+    }
+
+    <span class="hljs-keyword">var</span> keys = [ key ]
+    <span class="hljs-keyword">if</span> (leftKey) keys.push(leftKey)
+
+    <span class="hljs-keyword">var</span> merge = <span class="hljs-keyword">async</span>([<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        descents.forEach(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">descent</span>) </span>{ locker.unlock(descent.page) })
+        ! [ <span class="hljs-string">'left'</span>, <span class="hljs-string">'right'</span> ].forEach(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">direction</span>) </span>{
+</pre></div></div>
+
+        </li>
+
+
+        <li id="section-4">
+            <div class="annotation">
+
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-4">&#182;</a>
+              </div>
+              <p>TODO use <code>pages</code> array, these conditions are tricky,
+<code>parents[direction]</code> may not yet exist.</p>
+
+            </div>
+
+            <div class="content"><div class='highlight'><pre>            <span class="hljs-keyword">if</span> (singles[direction].length) {
+                singles[direction].forEach(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">page</span>) </span>{ locker.unlock(page) })
+            } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (parents[direction]) {
+                locker.unlock(parents[direction].page)
+            }
+        })
+        locker.dispose()
+    }], <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        descents.push(pivot = <span class="hljs-keyword">new</span> Descent(<span class="hljs-keyword">this</span>.sheaf, locker))
+        pivot.descend(pivot.key(key), pivot.found(keys), <span class="hljs-keyword">async</span>())
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        <span class="hljs-keyword">var</span> found = pivot.page.items[pivot.index].key
+        <span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.sheaf.comparator(found, keys[<span class="hljs-number">0</span>]) == <span class="hljs-number">0</span>) {
+            pivot.upgrade(<span class="hljs-keyword">async</span>())
+        } <span class="hljs-keyword">else</span> {
+            <span class="hljs-keyword">async</span>(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{ <span class="hljs-comment">// left above right</span>
+                pivot.upgrade(<span class="hljs-keyword">async</span>())
+            }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+                <span class="hljs-keyword">this</span>.referring(leftKey, descents, pivot, pages, <span class="hljs-keyword">async</span>())
+            }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+                ghosted = { page: pivot.page, index: pivot.index }
+                descents.push(pivot = pivot.fork())
+                keys.pop()
+                pivot.descend(pivot.key(key), pivot.found(keys), <span class="hljs-keyword">async</span>())
+            })
+        }
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        <span class="hljs-keyword">this</span>.referring(leftKey, descents, pivot, pages, <span class="hljs-keyword">async</span>())
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        parents.right = pivot.fork()
+        parents.right.unlocker = createSingleUnlocker(singles.right)
+        parents.right.descend(parents.right.key(key), stopper(parents.right), <span class="hljs-keyword">async</span>())
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        parents.left = pivot.fork()
+        parents.left.setIndex(parents.left.index - <span class="hljs-number">1</span>)
+        parents.left.unlocker = createSingleUnlocker(singles.left)
+        parents.left.descend(parents.left.right,
+                             parents.left.level(parents.right.depth),
+                             <span class="hljs-keyword">async</span>())
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        <span class="hljs-keyword">if</span> (singles.right.length) {
+            ancestor = singles.right[<span class="hljs-number">0</span>]
+        } <span class="hljs-keyword">else</span> {
+            ancestor = parents.right.page
+        }
+
+        <span class="hljs-keyword">if</span> (leftKey &amp;&amp; !ghosted) {
+            <span class="hljs-keyword">if</span> (singles.left.length) {
+                ghosted = { page: singles.left[<span class="hljs-number">0</span>], index: parents.left.indexes[singles.left[<span class="hljs-number">0</span>].address] }
+            } <span class="hljs-keyword">else</span> {
+                ghosted = { page: parents.left.page, index: parents.left.index }
+                ok(parents.left.index == parents.left.indexes[parents.left.page.address], <span class="hljs-string">'TODO: ok to replace the above'</span>)
+            }
+        }
+
+        descents.push(pages.left = parents.left.fork())
+        pages.left.descend(pages.left.left, pages.left.level(parents.left.depth + <span class="hljs-number">1</span>), <span class="hljs-keyword">async</span>())
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        descents.push(pages.right = parents.right.fork())
+        pages.right.descend(pages.right.left, pages.right.level(parents.right.depth + <span class="hljs-number">1</span>), <span class="hljs-keyword">async</span>())
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        merger.call(<span class="hljs-keyword">this</span>, script, pages, ghosted, <span class="hljs-keyword">async</span>())
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">dirty</span>) </span>{
+        <span class="hljs-keyword">if</span> (!dirty) <span class="hljs-keyword">return</span> [ merge.break, <span class="hljs-literal">false</span> ]
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        <span class="hljs-keyword">var</span> index = parents.right.indexes[ancestor.address]
+
+        designation = ancestor.splice(index, <span class="hljs-number">1</span>).shift()
+
+        <span class="hljs-keyword">if</span> (pivot.page.address != ancestor.address) {
+            ok(!index, <span class="hljs-string">'expected ancestor to be removed from zero index'</span>)
+            ok(ancestor.items[index], <span class="hljs-string">'expected ancestor to have right sibling'</span>)
+            designation = ancestor.splice(index, <span class="hljs-number">1</span>).shift()
+            <span class="hljs-keyword">var</span> hoist = pivot.page.splice(pivot.index, <span class="hljs-number">1</span>).shift()
+            pivot.page.splice(pivot.index, <span class="hljs-number">0</span>, {
+                key: designation.key,
+                address: hoist.address,
+                heft: designation.hef
+            })
+            ancestor.splice(index, <span class="hljs-number">0</span>, { address: designation.address, heft: <span class="hljs-number">0</span> })
+        } <span class="hljs-keyword">else</span>{
+            ok(index, <span class="hljs-string">'expected ancestor to be non-zero'</span>)
+        }
+
+        script.unlink(pages.right.page)
+        script.writeBranch(ancestor)
+        singles.right.slice(<span class="hljs-number">1</span>).forEach(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">page</span>) </span>{
+            script.unlink(page)
+        })
+        script.commit(<span class="hljs-keyword">async</span>())
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        <span class="hljs-keyword">return</span> [ merge.break, <span class="hljs-literal">true</span>, ancestor, designation.key ]
+    })()
+})
+
+Balancer.prototype.mergePages = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">async, key, leftKey, stopper, merger, ghostly</span>) </span>{
+    <span class="hljs-keyword">async</span>(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        <span class="hljs-keyword">this</span>.mergePagesAndUnlock(key, leftKey, stopper, merger, ghostly, <span class="hljs-keyword">async</span>())
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">merged, ancestor, designation</span>) </span>{
+        <span class="hljs-keyword">if</span> (merged) {
+            <span class="hljs-keyword">if</span> (ancestor.address == <span class="hljs-number">0</span>) {
+                <span class="hljs-keyword">if</span> (ancestor.items.length == <span class="hljs-number">1</span> &amp;&amp; !(ancestor.items[<span class="hljs-number">0</span>].address % <span class="hljs-number">2</span>)) {
+                    <span class="hljs-keyword">this</span>.fillRoot(<span class="hljs-keyword">async</span>())
+                }
+            } <span class="hljs-keyword">else</span> {
+                <span class="hljs-keyword">this</span>.chooseBranchesToMerge(designation, ancestor.address, <span class="hljs-keyword">async</span>())
+            }
+        }
+    })
+})
+
+Balancer.prototype.mergeLeaves = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">key, leftKey, unbalanced, ghostly, callback</span>) </span>{
+    <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">stopper</span> (<span class="hljs-params">descent</span>) </span>{ <span class="hljs-keyword">return</span> descent.penultimate }
+
+    <span class="hljs-keyword">var</span> merger = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">async, script, leaves, ghosted</span>) </span>{
+        ok(leftKey == <span class="hljs-literal">null</span> ||
+           <span class="hljs-keyword">this</span>.sheaf.comparator(leftKey, leaves.left.page.items[<span class="hljs-number">0</span>].key) == <span class="hljs-number">0</span>,
+           <span class="hljs-string">'left key is not as expected'</span>)
+        ok(leftKey == <span class="hljs-literal">null</span> || leaves.referring != <span class="hljs-literal">null</span>, <span class="hljs-string">'no referring page'</span>)
+        ok(leftKey != <span class="hljs-literal">null</span> || leaves.referring == <span class="hljs-literal">null</span>, <span class="hljs-string">'referring page when leftmost'</span>)
+
+        <span class="hljs-keyword">var</span> left = (leaves.left.page.items.length - leaves.left.page.ghosts)
+        <span class="hljs-keyword">var</span> right = (leaves.right.page.items.length - leaves.right.page.ghosts)
+
+        <span class="hljs-keyword">this</span>.sheaf.unbalanced(leaves.left.page, <span class="hljs-literal">true</span>)
+
+        <span class="hljs-keyword">var</span> index, referrantDirty
+        <span class="hljs-keyword">if</span> (left + right &gt; <span class="hljs-keyword">this</span>.sheaf.options.leafSize) {
+            <span class="hljs-keyword">if</span> (unbalanced[leaves.left.page.address]) {
+                <span class="hljs-keyword">this</span>.sheaf.unbalanced(leaves.left.page, <span class="hljs-literal">true</span>)
+            }
+            <span class="hljs-keyword">if</span> (unbalanced[leaves.right.page.address]) {
+                <span class="hljs-keyword">this</span>.sheaf.unbalanced(leaves.right.page, <span class="hljs-literal">true</span>)
+            }
+            <span class="hljs-keyword">return</span> [ <span class="hljs-literal">false</span> ]
+        } <span class="hljs-keyword">else</span> {
+            <span class="hljs-keyword">async</span>(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+                <span class="hljs-keyword">if</span> (ghostly &amp;&amp; left + right) {
+                    referrantDirty = <span class="hljs-literal">true</span>
+                    <span class="hljs-keyword">if</span> (left) {
+                        <span class="hljs-keyword">this</span>.exorcise(ghosted, leaves.left.page, leaves.left.page)
+                    } <span class="hljs-keyword">else</span> {
+                        <span class="hljs-keyword">this</span>.exorcise(ghosted, leaves.left.page, leaves.right.page)
+                    }
+                }
+            }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+                leaves.left.page.right = leaves.right.page.righ
+                <span class="hljs-keyword">var</span> ghosts = leaves.right.page.ghosts
+                <span class="hljs-keyword">var</span> count = leaves.right.page.items.length - leaves.right.page.ghosts
+                <span class="hljs-keyword">var</span> index = <span class="hljs-number">0</span>
+                <span class="hljs-keyword">var</span> loop = <span class="hljs-keyword">async</span>(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+                    <span class="hljs-keyword">if</span> (index == count) <span class="hljs-keyword">return</span> [ loop.break ]
+                    <span class="hljs-keyword">var</span> item = leaves.right.page.items[index + ghosts]
+                    leaves.left.page.splice(leaves.left.page.items.length, <span class="hljs-number">0</span>, item)
+                    index++
+                })()
+            }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+                leaves.right.page.splice(<span class="hljs-number">0</span>, leaves.right.page.items.length)
+                <span class="hljs-keyword">if</span> (leftKey) {
+                    leaves.referring.page.right.key = leaves.left.page.items[<span class="hljs-number">0</span>].key
+                    script.rotate(leaves.referring.page)
+                }
+                script.rewriteLeaf(leaves.left.page)
+            }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+                <span class="hljs-keyword">return</span> [ <span class="hljs-literal">true</span> ]
+            })
+        }
+    })
+
+    <span class="hljs-keyword">this</span>.mergePages(key, leftKey, stopper, merger, ghostly, callback)
+}
+
+Balancer.prototype.chooseBranchesToMergeAndUnlock = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">async, key, address</span>) </span>{
+    <span class="hljs-keyword">var</span> locker = <span class="hljs-keyword">this</span>.sheaf.createLocker(),
+        descents = [],
+        designator, choice, lesser, greater, center
+
+    <span class="hljs-keyword">var</span> goToPage = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">async, descent, address, direction</span>) </span>{
+        <span class="hljs-keyword">async</span>(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+            descents.push(descent)
+            descent.descend(descent.key(key), descent.address(address), <span class="hljs-keyword">async</span>())
+        }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+            descent.setIndex(descent.index + (direction == <span class="hljs-string">'left'</span> ? <span class="hljs-number">1</span> : <span class="hljs-number">-1</span>))
+</pre></div></div>
+
+        </li>
+
+
+        <li id="section-5">
+            <div class="annotation">
+
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-5">&#182;</a>
+              </div>
+              <p>^^^ This ain’t broke.</p>
+
+            </div>
+
+            <div class="content"><div class='highlight'><pre>            descent.descend(descent[direction], descent.level(center.depth), <span class="hljs-keyword">async</span>())
+        })
+    })
+
+    <span class="hljs-keyword">var</span> choose = <span class="hljs-keyword">async</span>(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        <span class="hljs-keyword">async</span>([<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+            descents.forEach(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">descent</span>) </span>{ locker.unlock(descent.page) })
+            locker.dispose()
+        }], <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+            descents.push(center = <span class="hljs-keyword">new</span> Descent(<span class="hljs-keyword">this</span>.sheaf, locker))
+            center.descend(center.key(key), center.address(address), <span class="hljs-keyword">async</span>())
+        }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+            <span class="hljs-keyword">if</span> (center.lesser != <span class="hljs-literal">null</span>) {
+                goToPage(lesser = <span class="hljs-keyword">new</span> Descent(<span class="hljs-keyword">this</span>.sheaf, locker), center.lesser, <span class="hljs-string">'right'</span>, <span class="hljs-keyword">async</span>())
+            }
+        }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+            <span class="hljs-keyword">if</span> (center.greater != <span class="hljs-literal">null</span>) {
+                goToPage(greater = <span class="hljs-keyword">new</span> Descent(<span class="hljs-keyword">this</span>.sheaf, locker), center.greater, <span class="hljs-string">'left'</span>, <span class="hljs-keyword">async</span>())
+            }
+        }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+            <span class="hljs-keyword">if</span> (lesser &amp;&amp; lesser.page.items.length + center.page.items.length &lt;=
+            <span class="hljs-keyword">this</span>.sheaf.options.branchSize) {
+                choice = center
+            } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (greater &amp;&amp; greater.page.items.length + center.page.items.length &lt;= <span class="hljs-keyword">this</span>.sheaf.options.branchSize) {
+                choice = greater
+            }
+
+            <span class="hljs-keyword">if</span> (choice) {
+                descents.push(designator = choice.fork())
+                designator.setIndex(<span class="hljs-number">0</span>)
+                designator.descend(designator.left, designator.leaf, <span class="hljs-keyword">async</span>())
+            } <span class="hljs-keyword">else</span> {
+                <span class="hljs-keyword">return</span> [ choose.break, <span class="hljs-literal">false</span> ]
+            }
+        }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+            <span class="hljs-keyword">var</span> item = designator.page.items[<span class="hljs-number">0</span>]
+            <span class="hljs-keyword">return</span> [ choose.break, <span class="hljs-literal">true</span>, item.key, item.heft, choice.page.address ]
+        })
+    })()
+})
+
+Balancer.prototype.chooseBranchesToMerge = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">async, key, address</span>) </span>{
+    <span class="hljs-keyword">async</span>(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        <span class="hljs-keyword">this</span>.chooseBranchesToMergeAndUnlock(key, address, <span class="hljs-keyword">async</span>())
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">merge, key, heft, address</span>) </span>{
+        <span class="hljs-keyword">if</span> (merge) {
+            <span class="hljs-keyword">this</span>.mergeBranches(key, heft, address, <span class="hljs-keyword">async</span>())
+        }
+    })
+})
+
+Balancer.prototype.mergeBranches = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">key, heft, address, callback</span>) </span>{
+    <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">stopper</span> (<span class="hljs-params">descent</span>) </span>{
+        <span class="hljs-keyword">return</span> descent.child(address)
+    }
+
+    <span class="hljs-keyword">var</span> merger = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">async, script, pages, ghosted</span>) </span>{
+        ok(address == pages.right.page.address, <span class="hljs-string">'unexpected address'</span>)
+
+        <span class="hljs-keyword">var</span> cut = pages.right.page.splice(<span class="hljs-number">0</span>, pages.right.page.items.length)
+
+        cut[<span class="hljs-number">0</span>].key = key
+        cut[<span class="hljs-number">0</span>].heft = hef
+
+        pages.left.page.splice(pages.left.page.items.length, <span class="hljs-number">0</span>, cut)
+
+        script.writeBranch(pages.left.page)
+
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>
+    })
+
+    <span class="hljs-keyword">this</span>.mergePages(key, <span class="hljs-literal">null</span>, stopper, merger, <span class="hljs-literal">false</span>, callback)
+}
+
+Balancer.prototype.fillRoot = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">async, sheaf</span>) </span>{
+    <span class="hljs-keyword">var</span> locker = <span class="hljs-keyword">this</span>.sheaf.createLocker(), script = <span class="hljs-keyword">this</span>.logger.createScript(),
+        descents = [], root, child
+
+    <span class="hljs-keyword">async</span>([<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        descents.forEach(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">descent</span>) </span>{ locker.unlock(descent.page) })
+        locker.dispose()
+    }], <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        descents.push(root = <span class="hljs-keyword">new</span> Descent(<span class="hljs-keyword">this</span>.sheaf, locker))
+        root.exclude()
+        root.descend(root.left, root.level(<span class="hljs-number">0</span>), <span class="hljs-keyword">async</span>())
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        descents.push(child = root.fork())
+        child.descend(child.left, child.level(<span class="hljs-number">1</span>), <span class="hljs-keyword">async</span>())
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        <span class="hljs-keyword">var</span> cu
+        ok(root.page.items.length == <span class="hljs-number">1</span>, <span class="hljs-string">'only one address expected'</span>)
+
+        root.page.splice(<span class="hljs-number">0</span>, root.page.items.length)
+
+        cut = child.page.splice(<span class="hljs-number">0</span>, child.page.items.length)
+
+        root.page.splice(root.page.items.length, <span class="hljs-number">0</span>, cut)
+
+        script.writeBranch(root.page)
+        script.unlink(child.page)
+        script.commit(<span class="hljs-keyword">async</span>())
+    })
+})
+
+<span class="hljs-built_in">module</span>.exports = Balancer
+
+</pre></div></div>
+
+        </li>
+
+    </ul>
+  </div>
+</body>
+</html>

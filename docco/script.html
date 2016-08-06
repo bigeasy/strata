@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+  <title>script.js</title>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, target-densitydpi=160dpi, initial-scale=1.0; maximum-scale=1.0; user-scalable=0;">
+  <link rel="stylesheet" media="all" href="docco.css" />
+</head>
+<body>
+  <div id="container">
+    <div id="background"></div>
+
+      <ul id="jump_to">
+        <li>
+          <a class="large" href="javascript:void(0);">Jump To &hellip;</a>
+          <a class="small" href="javascript:void(0);">+</a>
+          <div id="jump_wrapper">
+          <div id="jump_page_wrapper">
+            <div id="jump_page">
+
+
+                <a class="source" href="balancer.html">
+                  balancer.js
+                </a>
+
+
+                <a class="source" href="checksum.html">
+                  checksum.js
+                </a>
+
+
+                <a class="source" href="cursor.html">
+                  cursor.js
+                </a>
+
+
+                <a class="source" href="descent.html">
+                  descent.js
+                </a>
+
+
+                <a class="source" href="extend.html">
+                  extend.js
+                </a>
+
+
+                <a class="source" href="json.html">
+                  json.js
+                </a>
+
+
+                <a class="source" href="locker.html">
+                  locker.js
+                </a>
+
+
+                <a class="source" href="logger.html">
+                  logger.js
+                </a>
+
+
+                <a class="source" href="page.html">
+                  page.js
+                </a>
+
+
+                <a class="source" href="player.html">
+                  player.js
+                </a>
+
+
+                <a class="source" href="queue.html">
+                  queue.js
+                </a>
+
+
+                <a class="source" href="scram.html">
+                  scram.js
+                </a>
+
+
+                <a class="source" href="scribe.html">
+                  scribe.js
+                </a>
+
+
+                <a class="source" href="script.html">
+                  script.js
+                </a>
+
+
+                <a class="source" href="sheaf.html">
+                  sheaf.js
+                </a>
+
+
+                <a class="source" href="strata.html">
+                  strata.js
+                </a>
+
+            </div>
+          </div>
+        </li>
+      </ul>
+
+    <ul class="sections">
+
+          <li id="title">
+              <div class="annotation">
+                  <h1>script.js</h1>
+              </div>
+          </li>
+
+
+
+        <li id="section-1">
+            <div class="annotation">
+
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-1">&#182;</a>
+              </div>
+
+            </div>
+
+            <div class="content"><div class='highlight'><pre><span class="hljs-keyword">var</span> cadence = <span class="hljs-built_in">require</span>(<span class="hljs-string">'cadence'</span>)
+<span class="hljs-keyword">var</span> path = <span class="hljs-built_in">require</span>(<span class="hljs-string">'path'</span>)
+<span class="hljs-keyword">var</span> fs = <span class="hljs-built_in">require</span>(<span class="hljs-string">'fs'</span>)
+<span class="hljs-keyword">var</span> Queue = <span class="hljs-built_in">require</span>(<span class="hljs-string">'./queue'</span>)
+
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">Script</span> (<span class="hljs-params">logger</span>) </span>{
+    <span class="hljs-keyword">this</span>._logger = logger
+    <span class="hljs-keyword">this</span>._journal = []
+    <span class="hljs-keyword">this</span>._operations = []
+}
+
+Script.prototype.rotate = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">page</span>) </span>{
+    <span class="hljs-keyword">this</span>._operations.push({ name: <span class="hljs-string">'_rotate'</span>, page: page })
+}
+
+Script.prototype.unlink = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">page</span>) </span>{
+    <span class="hljs-keyword">var</span> rotations = []
+    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">var</span> i = <span class="hljs-number">0</span>; i &lt;= page.rotation; i++) {
+        rotations.push(path.join(<span class="hljs-keyword">this</span>._logger._directory, <span class="hljs-string">'pages'</span>, page.address + <span class="hljs-string">'.'</span> + i))
+    }
+    <span class="hljs-keyword">this</span>._journal.push({
+        name: <span class="hljs-string">'_purge'</span>, rotations: rotations
+    })
+}
+
+Script.prototype.rewriteLeaf = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">page</span>) </span>{
+    <span class="hljs-keyword">this</span>._operations.push({
+        name: <span class="hljs-string">'_rewriteLeaf'</span>, page: page
+    })
+}
+
+Script.prototype.writeBranch = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">page</span>) </span>{
+    <span class="hljs-keyword">this</span>._operations.push({
+        name: <span class="hljs-string">'_writeBranch'</span>, page: page
+    })
+}
+
+Script.prototype._rotate = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">operation, callback</span>) </span>{
+    <span class="hljs-keyword">var</span> page = operation.page, queue = operation.queue, entry
+    page.rotation++
+    <span class="hljs-keyword">var</span> <span class="hljs-keyword">from</span> = <span class="hljs-keyword">this</span>._logger.filename(page, <span class="hljs-literal">true</span>)
+    <span class="hljs-keyword">var</span> to = <span class="hljs-keyword">this</span>._logger.filename(page)
+    <span class="hljs-keyword">this</span>._journal.push({
+        name: <span class="hljs-string">'_replace'</span>, <span class="hljs-keyword">from</span>: <span class="hljs-keyword">from</span>, to: to
+    })
+    <span class="hljs-keyword">this</span>._logger.rotate(page, <span class="hljs-keyword">from</span>, callback)
+}
+
+Script.prototype._writeBranch = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">async, operation</span>) </span>{
+    <span class="hljs-keyword">var</span> page = operation.page
+    <span class="hljs-keyword">var</span> file = <span class="hljs-keyword">this</span>._logger.filename(page, <span class="hljs-literal">true</span>)
+    <span class="hljs-keyword">this</span>._journal.push({
+        name: <span class="hljs-string">'_replace'</span>, <span class="hljs-keyword">from</span>: file, to: <span class="hljs-keyword">this</span>._logger.filename(page)
+    })
+    <span class="hljs-keyword">this</span>._logger.writeBranch(page, file, <span class="hljs-keyword">async</span>())
+})
+
+Script.prototype._rewriteLeaf = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">async, operation</span>) </span>{
+    <span class="hljs-keyword">var</span> page = operation.page
+    <span class="hljs-keyword">this</span>.unlink(page)
+    page.rotation = <span class="hljs-number">0</span>
+    <span class="hljs-keyword">var</span> file = <span class="hljs-keyword">this</span>._logger.filename(page, <span class="hljs-literal">true</span>)
+    <span class="hljs-keyword">this</span>._journal.push({
+        name: <span class="hljs-string">'_replace'</span>, <span class="hljs-keyword">from</span>: file, to: <span class="hljs-keyword">this</span>._logger.filename(page)
+    })
+    <span class="hljs-keyword">this</span>._logger.rewriteLeaf(page, file, <span class="hljs-keyword">async</span>())
+})
+
+Script.prototype.commit = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">async</span>) </span>{
+    <span class="hljs-keyword">async</span>(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        <span class="hljs-keyword">async</span>.forEach(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">operation</span>) </span>{
+            <span class="hljs-keyword">this</span>[operation.name](operation, <span class="hljs-keyword">async</span>())
+        })(<span class="hljs-keyword">this</span>._operations)
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        <span class="hljs-keyword">this</span>._journal.push({ name: <span class="hljs-string">'_complete'</span> })
+        <span class="hljs-keyword">var</span> pending = path.join(<span class="hljs-keyword">this</span>._logger._directory, <span class="hljs-string">'journal.pending'</span>)
+        <span class="hljs-keyword">var</span> comitted = path.join(<span class="hljs-keyword">this</span>._logger._directory, <span class="hljs-string">'journal'</span>)
+        <span class="hljs-keyword">async</span>(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+            <span class="hljs-keyword">var</span> script = <span class="hljs-keyword">this</span>._journal.map(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">operation</span>) </span>{
+                <span class="hljs-keyword">return</span> <span class="hljs-built_in">JSON</span>.stringify(operation)
+            }).join(<span class="hljs-string">'\n'</span>) + <span class="hljs-string">'\n'</span>
+            fs.writeFile(pending, script, <span class="hljs-string">'utf8'</span>, <span class="hljs-keyword">async</span>())
+        }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+            fs.rename(pending, comitted, <span class="hljs-keyword">async</span>())
+        }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+            <span class="hljs-keyword">this</span>.play(<span class="hljs-keyword">async</span>())
+        })
+    })
+})
+
+Script.prototype.play = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">async, page</span>) </span>{
+    <span class="hljs-keyword">async</span>.forEach(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">operation</span>) </span>{
+        <span class="hljs-keyword">this</span>[operation.name](operation, <span class="hljs-keyword">async</span>())
+    })(<span class="hljs-keyword">this</span>._journal)
+})
+
+Script.prototype._replace = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">async, operation</span>) </span>{
+    <span class="hljs-keyword">async</span>(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        <span class="hljs-keyword">var</span> block = <span class="hljs-keyword">async</span>([<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+            fs.stat(operation.from, <span class="hljs-keyword">async</span>())
+        }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">error</span>) </span>{
+            <span class="hljs-keyword">if</span> (error.code !== <span class="hljs-string">'ENOENT'</span>) {
+                <span class="hljs-keyword">throw</span> error
+            }
+            <span class="hljs-keyword">return</span> [ block.break ]
+        }], [<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+            fs.unlink(operation.to, <span class="hljs-keyword">async</span>())
+        }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">error</span>) </span>{
+            <span class="hljs-keyword">if</span> (error.code !== <span class="hljs-string">'ENOENT'</span>) {
+                <span class="hljs-keyword">throw</span> error
+            }
+        }], <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+            fs.rename(operation.from, operation.to, <span class="hljs-keyword">async</span>())
+        }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+            <span class="hljs-keyword">return</span> [ block.break ]
+        })()
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        fs.stat(operation.to, <span class="hljs-keyword">async</span>())
+    })
+})
+
+Script.prototype._complete = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">async, operation</span>) </span>{
+    <span class="hljs-keyword">var</span> journal = path.join(<span class="hljs-keyword">this</span>._logger._directory, <span class="hljs-string">'journal'</span>)
+    <span class="hljs-keyword">async</span>([<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+        fs.unlink(journal, <span class="hljs-keyword">async</span>())
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">error</span>) </span>{
+        <span class="hljs-keyword">if</span> (error.code !== <span class="hljs-string">'ENOENT'</span>) {
+            <span class="hljs-keyword">throw</span> error
+        }
+    }])
+})
+
+Script.prototype._purge = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">async, operation</span>) </span>{
+    <span class="hljs-keyword">async</span>.forEach(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">file</span>) </span>{
+        <span class="hljs-keyword">async</span>([<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+            fs.unlink(file, <span class="hljs-keyword">async</span>())
+        }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">error</span>) </span>{
+            <span class="hljs-keyword">if</span> (error.code !== <span class="hljs-string">'ENOENT'</span>) {
+                <span class="hljs-keyword">throw</span> error
+            }
+        }])
+    })(operation.rotations)
+})
+
+<span class="hljs-built_in">module</span>.exports = Scrip
+
+</pre></div></div>
+
+        </li>
+
+    </ul>
+  </div>
+</body>
+</html>
