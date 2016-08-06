@@ -40,6 +40,9 @@ endef
 export SAFARI_REFRESH
 export CHROME_REFRESH
 
+PATH  := "$(PATH):$(PWD)/node_modules/.bin"
+SHELL := env PATH=$(PATH) /bin/sh
+
 sources = docco/strata.html css/style.css index.html
 
 all: $(sources)
@@ -55,10 +58,10 @@ node_modules/.bin/lessc:
 	npm install less
 
 node_modules/.bin/edify:
-	npm install less edify edify.markdown edify.highlight
+	npm install less edify edify.markdown edify.highlight edify.include
 
 watch: all
-	fswatch --exclude '.' --include '\.html$$' --include '\.less$$' --include '\.js$$' pages css strata | while read line; \
+	fswatch --exclude '.' --include '\.html$$' --include '\.less$$' --include '\.md$$' --include '\.js$$' pages css strata *.md | while read line; \
 	do \
 		make --no-print-directory all; \
 		osascript -e "$$CHROME_REFRESH"; \
@@ -72,12 +75,15 @@ docco/%.html: strata/%.js node_modules/.bin/docco
 	node_modules/.bin/docco -o docco -c docco.css strata/*.js
 	sed -i '' -e 's/[ \t]*$$//' docco/*.html
 
+index.html: index.md
+
 %.html: pages/%.html node_modules/.bin/edify
 	@echo generating $@
-	@(node node_modules/.bin/edify markdown --select '.markdown' | \
+	@(node node_modules/.bin/edify include --select '.include' --type text | \
+	    node node_modules/.bin/edify markdown --select '.markdown' | \
 	    node node_modules/.bin/edify highlight --select '.lang-javascript' --language 'javascript') < $< > $@
 
-clea:
+clean:
 	rm $(sources)
 
 serve: node_modules/.bin/serve
