@@ -25,7 +25,7 @@ function prove (async, assert) {
             } else {
                 async(function () {
                     cursor.insert('z', 'z', ~index)
-                    assert(ambiguity, [ 0, 1, 1, 1 ], 'unambiguous')
+                    assert(ambiguity, [ false, true, true, true ], 'unambiguous')
                     cursor.unlock(async())
                 })
             }

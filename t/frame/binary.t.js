@@ -1,4 +1,4 @@
-require('proof')(6, prove)
+require('proof/redux')(6, prove)
 
 function prove (assert) {
     var json = require('../../json')

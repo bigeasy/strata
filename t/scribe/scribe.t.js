@@ -1,5 +1,5 @@
 // todo: redux
-require('proof')(3, require('cadence')(prove))
+require('proof/redux')(3, require('cadence')(prove))
 
 function prove (async, assert) {
     var path = require('path')
