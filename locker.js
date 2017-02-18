@@ -18,43 +18,41 @@ Locker.prototype.lock = cadence(function (async, address, exclusive) {
     ok(!this._locks[address], 'address already locked by this locker')
 
     async([function () {
+        if (page == null) {
+            // Note: This catch block is only good for catching read errors.
+            // It untestable to catch errors in the first step that locks
+            // the page, which is all tested, synchronous code. Instead of
+            // throwing the error, we give it to the lock. The primary lock
+            // sub-cadence will receive the error and raise it to be caught
+            // by the final external catch block.
+            async([function () {
+                async(function () {
+                    // TODO does there need to be differnt types anymore?
+                    page = this._sheaf.createPage(address % 2, address)
+                    cartridge.value.page = page
+                    page.cartridge = cartridge
+                    locks.push(this._locks[address] = page.queue.createLock())
+                    locks[0].exclude(async())
+                }, function () {
+                    this._sheaf.player.read(this._sheaf, page, async())
+                }, function () {
+                    locks[0].unlock()
+                })
+            }, function (error) {
+                cartridge.value.page = null
+                cartridge.adjustHeft(-cartridge.heft)
+                locks[0].unlock(error)
+            }])
+        } else {
+            locks.push(this._locks[address] = page.queue.createLock())
+        }
         async(function () {
-            if (page == null) {
-                // Note: This catch block is only good for catching read errors.
-                // It untestable to catch errors in the first step that locks
-                // the page, which is all tested, synchronous code. Instead of
-                // throwing the error, we give it to the lock. The primary lock
-                // sub-cadence will receive the error and raise it to be caught
-                // by the final external catch block.
-                async([function () {
-                    async(function () {
-                        // TODO does there need to be differnt types anymore?
-                        page = this._sheaf.createPage(address % 2, address)
-                        cartridge.value.page = page
-                        page.cartridge = cartridge
-                        locks.push(this._locks[address] = page.queue.createLock())
-                        locks[0].exclude(async())
-                    }, function () {
-                        this._sheaf.player.read(this._sheaf, page, async())
-                    }, function () {
-                        locks[0].unlock()
-                    })
-                }, function (error) {
-                    cartridge.value.page = null
-                    cartridge.adjustHeft(-cartridge.heft)
-                    locks[0].unlock(error)
-                }])
-            } else {
-                locks.push(this._locks[address] = page.queue.createLock())
-            }
-            async(function () {
-                this._locks[page.address][exclusive ? 'exclude' : 'share'](async())
-            }, function () {
-                this._sheaf.tracer('lock', { address: address, exclusive: exclusive }, async())
-            }, function () {
-                return [ page ]
-            })
-        }) // TODO unecessary cadence
+            this._locks[page.address][exclusive ? 'exclude' : 'share'](async())
+        }, function () {
+            this._sheaf.tracer('lock', { address: address, exclusive: exclusive }, async())
+        }, function () {
+            return [ page ]
+        })
     }, function (error) {
         cartridge.release()
         delete this._locks[page.address]
