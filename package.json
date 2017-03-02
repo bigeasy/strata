@@ -33,7 +33,7 @@
                             "arguable":                     "5.0.x",
                             "mkdirp":                       "0.5.1",
                             "proof":                        "1.2.x",
-                            "rimraf":                       "2.5.4",
+                            "rimraf":                       "2.6.1",
                             "seedrandom":                   "2.4.2",
                             "splice":                       "1.0.x"
     },
