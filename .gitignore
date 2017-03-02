@@ -1,3 +1,5 @@
+/.wiseguy
+/docs
 /node_modules
 /benchmark/tmp
 /.proof.out
