@@ -34,7 +34,7 @@
                             "mkdirp":                       "0.5.1",
                             "proof":                        "3.0.x",
                             "rimraf":                       "2.6.1",
-                            "seedrandom":                   "2.4.2",
+                            "seedrandom":                   "2.4.3",
                             "splice":                       "1.0.x"
     },
     "main":                 "strata.js",
