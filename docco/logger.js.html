@@ -20,82 +20,82 @@
             <div id="jump_page">
 
 
-                <a class="source" href="balancer.html">
+                <a class="source" href="balancer.js.html">
                   balancer.js
                 </a>
 
 
-                <a class="source" href="checksum.html">
+                <a class="source" href="checksum.js.html">
                   checksum.js
                 </a>
 
 
-                <a class="source" href="cursor.html">
+                <a class="source" href="cursor.js.html">
                   cursor.js
                 </a>
 
 
-                <a class="source" href="descent.html">
+                <a class="source" href="descent.js.html">
                   descent.js
                 </a>
 
 
-                <a class="source" href="extend.html">
+                <a class="source" href="extend.js.html">
                   extend.js
                 </a>
 
 
-                <a class="source" href="json.html">
+                <a class="source" href="json.js.html">
                   json.js
                 </a>
 
 
-                <a class="source" href="locker.html">
+                <a class="source" href="locker.js.html">
                   locker.js
                 </a>
 
 
-                <a class="source" href="logger.html">
+                <a class="source" href="logger.js.html">
                   logger.js
                 </a>
 
 
-                <a class="source" href="page.html">
+                <a class="source" href="page.js.html">
                   page.js
                 </a>
 
 
-                <a class="source" href="player.html">
+                <a class="source" href="player.js.html">
                   player.js
                 </a>
 
 
-                <a class="source" href="queue.html">
+                <a class="source" href="queue.js.html">
                   queue.js
                 </a>
 
 
-                <a class="source" href="scram.html">
+                <a class="source" href="scram.js.html">
                   scram.js
                 </a>
 
 
-                <a class="source" href="scribe.html">
+                <a class="source" href="scribe.js.html">
                   scribe.js
                 </a>
 
 
-                <a class="source" href="script.html">
+                <a class="source" href="script.js.html">
                   script.js
                 </a>
 
 
-                <a class="source" href="sheaf.html">
+                <a class="source" href="sheaf.js.html">
                   sheaf.js
                 </a>
 
 
-                <a class="source" href="strata.html">
+                <a class="source" href="strata.js.html">
                   strata.js
                 </a>
 
@@ -135,8 +135,7 @@
 <span class="hljs-keyword">var</span> Scribe = <span class="hljs-built_in">require</span>(<span class="hljs-string">'./scribe'</span>)
 
 <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">Logger</span> (<span class="hljs-params">options</span>) </span>{
-    <span class="hljs-keyword">this</span>._directory = options.directory
-</pre></div></div>
+    <span class="hljs-keyword">this</span>._directory = options.directory</pre></div></div>
 
         </li>
 
@@ -202,7 +201,7 @@ Logger.prototype.writeBranch = <span class="hljs-function"><span class="hljs-key
 }
 
 Logger.prototype.writePage = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">page, file, writer, callback</span>) </span>{
-    <span class="hljs-keyword">var</span> items = page.items, ou
+    <span class="hljs-keyword">var</span> items = page.items, out
 
     <span class="hljs-keyword">var</span> queue = <span class="hljs-keyword">new</span> Queue
     <span class="hljs-keyword">var</span> scribe = <span class="hljs-keyword">new</span> Scribe(file, <span class="hljs-string">'a'</span>)
@@ -215,9 +214,7 @@ Logger.prototype.writePage = <span class="hljs-function"><span class="hljs-keywo
     <span class="hljs-keyword">var</span> leaf = page.address % <span class="hljs-number">2</span> === <span class="hljs-number">1</span>
     <span class="hljs-keyword">if</span> (leaf) {
         <span class="hljs-keyword">this</span>.writeHeader(queue, page)
-    }
-
-</pre></div></div>
+    }</pre></div></div>
 
         </li>
 
@@ -333,9 +330,7 @@ Appender.prototype.close = <span class="hljs-function"><span class="hljs-keyword
     <span class="hljs-keyword">this</span>._scribe.close(callback)
 }
 
-<span class="hljs-built_in">module</span>.exports = Logger
-
-</pre></div></div>
+<span class="hljs-built_in">module</span>.exports = Logger</pre></div></div>
 
         </li>
 

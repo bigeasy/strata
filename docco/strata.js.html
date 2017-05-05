@@ -20,82 +20,82 @@
             <div id="jump_page">
 
 
-                <a class="source" href="balancer.html">
+                <a class="source" href="balancer.js.html">
                   balancer.js
                 </a>
 
 
-                <a class="source" href="checksum.html">
+                <a class="source" href="checksum.js.html">
                   checksum.js
                 </a>
 
 
-                <a class="source" href="cursor.html">
+                <a class="source" href="cursor.js.html">
                   cursor.js
                 </a>
 
 
-                <a class="source" href="descent.html">
+                <a class="source" href="descent.js.html">
                   descent.js
                 </a>
 
 
-                <a class="source" href="extend.html">
+                <a class="source" href="extend.js.html">
                   extend.js
                 </a>
 
 
-                <a class="source" href="json.html">
+                <a class="source" href="json.js.html">
                   json.js
                 </a>
 
 
-                <a class="source" href="locker.html">
+                <a class="source" href="locker.js.html">
                   locker.js
                 </a>
 
 
-                <a class="source" href="logger.html">
+                <a class="source" href="logger.js.html">
                   logger.js
                 </a>
 
 
-                <a class="source" href="page.html">
+                <a class="source" href="page.js.html">
                   page.js
                 </a>
 
 
-                <a class="source" href="player.html">
+                <a class="source" href="player.js.html">
                   player.js
                 </a>
 
 
-                <a class="source" href="queue.html">
+                <a class="source" href="queue.js.html">
                   queue.js
                 </a>
 
 
-                <a class="source" href="scram.html">
+                <a class="source" href="scram.js.html">
                   scram.js
                 </a>
 
 
-                <a class="source" href="scribe.html">
+                <a class="source" href="scribe.js.html">
                   scribe.js
                 </a>
 
 
-                <a class="source" href="script.html">
+                <a class="source" href="script.js.html">
                   script.js
                 </a>
 
 
-                <a class="source" href="sheaf.html">
+                <a class="source" href="sheaf.js.html">
                   sheaf.js
                 </a>
 
 
-                <a class="source" href="strata.html">
+                <a class="source" href="strata.js.html">
                   strata.js
                 </a>
 
@@ -136,9 +136,7 @@
     Player = <span class="hljs-built_in">require</span>(<span class="hljs-string">'./player'</span>),
     Logger = <span class="hljs-built_in">require</span>(<span class="hljs-string">'./logger'</span>),
     ok = <span class="hljs-built_in">require</span>(<span class="hljs-string">'assert'</span>).ok,
-    path = <span class="hljs-built_in">require</span>(<span class="hljs-string">'path'</span>)
-
-</pre></div></div>
+    path = <span class="hljs-built_in">require</span>(<span class="hljs-string">'path'</span>)</pre></div></div>
 
         </li>
 
@@ -158,9 +156,7 @@
 <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">extend</span>(<span class="hljs-params">to, from</span>) </span>{
     <span class="hljs-keyword">for</span> (<span class="hljs-keyword">var</span> key <span class="hljs-keyword">in</span> <span class="hljs-keyword">from</span>) to[key] = <span class="hljs-keyword">from</span>[key]
     <span class="hljs-keyword">return</span> to
-}
-
-</pre></div></div>
+}</pre></div></div>
 
         </li>
 
@@ -179,12 +175,12 @@
     <span class="hljs-keyword">if</span> (!options.serializers) {
         <span class="hljs-keyword">var</span> json = <span class="hljs-built_in">require</span>(<span class="hljs-string">'./json'</span>)
         options.serializers = {
-            key: json.serializer,
-            record: json.serializer
+            <span class="hljs-attr">key</span>: json.serializer,
+            <span class="hljs-attr">record</span>: json.serializer
         }
         options.deserializers = {
-            key: json.deserialize,
-            record: json.deserialize
+            <span class="hljs-attr">key</span>: json.deserialize,
+            <span class="hljs-attr">record</span>: json.deserialize
         }
     }
     <span class="hljs-keyword">if</span> (!options.framer) {
@@ -219,7 +215,7 @@ Strata.prototype.create = cadence(<span class="hljs-function"><span class="hljs-
         locker.unlock(leaf)
     }], <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
         <span class="hljs-keyword">var</span> script = <span class="hljs-keyword">this</span>.logger.createScript()
-        root.splice(<span class="hljs-number">0</span>, <span class="hljs-number">0</span>, { address: leaf.address, heft: <span class="hljs-number">0</span> })
+        root.splice(<span class="hljs-number">0</span>, <span class="hljs-number">0</span>, { <span class="hljs-attr">address</span>: leaf.address, <span class="hljs-attr">heft</span>: <span class="hljs-number">0</span> })
         script.writeBranch(root)
         script.rewriteLeaf(leaf)
         script.commit(<span class="hljs-keyword">async</span>())
@@ -227,9 +223,7 @@ Strata.prototype.create = cadence(<span class="hljs-function"><span class="hljs-
 })
 
 Strata.prototype.open = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">async</span>) </span>{
-    <span class="hljs-keyword">this</span>.sheaf.createMagazine()
-
-</pre></div></div>
+    <span class="hljs-keyword">this</span>.sheaf.createMagazine()</pre></div></div>
 
         </li>
 
@@ -286,8 +280,7 @@ anyway?</p>
     })
 })
 
-Strata.prototype.close = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">async</span>) </span>{
-</pre></div></div>
+Strata.prototype.close = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">async</span>) </span>{</pre></div></div>
 
         </li>
 
@@ -304,8 +297,7 @@ Strata.prototype.close = cadence(<span class="hljs-function"><span class="hljs-k
 
             <div class="content"><div class='highlight'><pre>    <span class="hljs-keyword">var</span> cartridge = <span class="hljs-keyword">this</span>.sheaf.metaRoot.cartridge, lock = cartridge.value.page.lock
 
-    lock.unlock()
-</pre></div></div>
+    lock.unlock()</pre></div></div>
 
         </li>
 
@@ -410,10 +402,10 @@ Strata.prototype.balance = <span class="hljs-function"><span class="hljs-keyword
 }
 
 Strata.prototype.vivify = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">async</span>) </span>{
-    <span class="hljs-keyword">var</span> locker = <span class="hljs-keyword">this</span>.sheaf.createLocker(), roo
+    <span class="hljs-keyword">var</span> locker = <span class="hljs-keyword">this</span>.sheaf.createLocker(), root
 
     <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">record</span> (<span class="hljs-params">item</span>) </span>{
-        <span class="hljs-keyword">return</span> { address: item.address }
+        <span class="hljs-keyword">return</span> { <span class="hljs-attr">address</span>: item.address }
     }
 
     <span class="hljs-keyword">async</span>(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
@@ -483,9 +475,7 @@ Strata.prototype.__defineGetter__(<span class="hljs-string">'balanced'</span>, <
     <span class="hljs-keyword">return</span> ! <span class="hljs-built_in">Object</span>.keys(<span class="hljs-keyword">this</span>.sheaf.lengths).length
 })
 
-<span class="hljs-built_in">module</span>.exports = Strata
-
-</pre></div></div>
+<span class="hljs-built_in">module</span>.exports = Strata</pre></div></div>
 
         </li>
 

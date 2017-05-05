@@ -20,82 +20,82 @@
             <div id="jump_page">
 
 
-                <a class="source" href="balancer.html">
+                <a class="source" href="balancer.js.html">
                   balancer.js
                 </a>
 
 
-                <a class="source" href="checksum.html">
+                <a class="source" href="checksum.js.html">
                   checksum.js
                 </a>
 
 
-                <a class="source" href="cursor.html">
+                <a class="source" href="cursor.js.html">
                   cursor.js
                 </a>
 
 
-                <a class="source" href="descent.html">
+                <a class="source" href="descent.js.html">
                   descent.js
                 </a>
 
 
-                <a class="source" href="extend.html">
+                <a class="source" href="extend.js.html">
                   extend.js
                 </a>
 
 
-                <a class="source" href="json.html">
+                <a class="source" href="json.js.html">
                   json.js
                 </a>
 
 
-                <a class="source" href="locker.html">
+                <a class="source" href="locker.js.html">
                   locker.js
                 </a>
 
 
-                <a class="source" href="logger.html">
+                <a class="source" href="logger.js.html">
                   logger.js
                 </a>
 
 
-                <a class="source" href="page.html">
+                <a class="source" href="page.js.html">
                   page.js
                 </a>
 
 
-                <a class="source" href="player.html">
+                <a class="source" href="player.js.html">
                   player.js
                 </a>
 
 
-                <a class="source" href="queue.html">
+                <a class="source" href="queue.js.html">
                   queue.js
                 </a>
 
 
-                <a class="source" href="scram.html">
+                <a class="source" href="scram.js.html">
                   scram.js
                 </a>
 
 
-                <a class="source" href="scribe.html">
+                <a class="source" href="scribe.js.html">
                   scribe.js
                 </a>
 
 
-                <a class="source" href="script.html">
+                <a class="source" href="script.js.html">
                   script.js
                 </a>
 
 
-                <a class="source" href="sheaf.html">
+                <a class="source" href="sheaf.js.html">
                   sheaf.js
                 </a>
 
 
-                <a class="source" href="strata.html">
+                <a class="source" href="strata.js.html">
                   strata.js
                 </a>
 
@@ -142,10 +142,9 @@
 }
 
 Cursor.prototype.next = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">async</span>) </span>{
-    <span class="hljs-keyword">var</span> nex
+    <span class="hljs-keyword">var</span> next
 
-    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.page.right.address === <span class="hljs-literal">null</span>) {
-</pre></div></div>
+    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.page.right.address === <span class="hljs-literal">null</span>) {</pre></div></div>
 
         </li>
 
@@ -168,7 +167,7 @@ Cursor.prototype.next = cadence(<span class="hljs-function"><span class="hljs-ke
     }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">next</span>) </span>{
         <span class="hljs-keyword">this</span>._locker.unlock(<span class="hljs-keyword">this</span>.page)
 
-        <span class="hljs-keyword">this</span>.page = nex
+        <span class="hljs-keyword">this</span>.page = next
 
         <span class="hljs-keyword">this</span>.offset = <span class="hljs-keyword">this</span>.page.ghosts
         <span class="hljs-keyword">this</span>.length = <span class="hljs-keyword">this</span>.page.items.length
@@ -198,9 +197,7 @@ Cursor.prototype._unlock = cadence(<span class="hljs-function"><span class="hljs
     }], <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
         <span class="hljs-keyword">this</span>._appender.close(<span class="hljs-keyword">async</span>())
     })
-})
-
-</pre></div></div>
+})</pre></div></div>
 
         </li>
 
@@ -238,9 +235,9 @@ Cursor.prototype.insert = <span class="hljs-function"><span class="hljs-keyword"
 
     <span class="hljs-keyword">var</span> heft = <span class="hljs-keyword">this</span>._appender.writeInsert(index, record).length
     <span class="hljs-keyword">this</span>.page.splice(index, <span class="hljs-number">0</span>, {
-        key: key,
-        record: record,
-        heft: hef
+        <span class="hljs-attr">key</span>: key,
+        <span class="hljs-attr">record</span>: record,
+        <span class="hljs-attr">heft</span>: heft
     })
 
     <span class="hljs-keyword">this</span>.length = <span class="hljs-keyword">this</span>.page.items.length
@@ -264,9 +261,7 @@ Cursor.prototype.remove = <span class="hljs-function"><span class="hljs-keyword"
     }
 }
 
-<span class="hljs-built_in">module</span>.exports = Cursor
-
-</pre></div></div>
+<span class="hljs-built_in">module</span>.exports = Cursor</pre></div></div>
 
         </li>
 

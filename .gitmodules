@@ -1,6 +1,0 @@
-[submodule "strata"]
-	path = strata
-	url = https://github.com/bigeasy/strata.git
-[submodule "vendor/lesshat"]
-	path = vendor/lesshat
-	url = https://github.com/madebysource/lesshat.git

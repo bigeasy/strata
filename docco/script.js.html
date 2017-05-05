@@ -20,82 +20,82 @@
             <div id="jump_page">
 
 
-                <a class="source" href="balancer.html">
+                <a class="source" href="balancer.js.html">
                   balancer.js
                 </a>
 
 
-                <a class="source" href="checksum.html">
+                <a class="source" href="checksum.js.html">
                   checksum.js
                 </a>
 
 
-                <a class="source" href="cursor.html">
+                <a class="source" href="cursor.js.html">
                   cursor.js
                 </a>
 
 
-                <a class="source" href="descent.html">
+                <a class="source" href="descent.js.html">
                   descent.js
                 </a>
 
 
-                <a class="source" href="extend.html">
+                <a class="source" href="extend.js.html">
                   extend.js
                 </a>
 
 
-                <a class="source" href="json.html">
+                <a class="source" href="json.js.html">
                   json.js
                 </a>
 
 
-                <a class="source" href="locker.html">
+                <a class="source" href="locker.js.html">
                   locker.js
                 </a>
 
 
-                <a class="source" href="logger.html">
+                <a class="source" href="logger.js.html">
                   logger.js
                 </a>
 
 
-                <a class="source" href="page.html">
+                <a class="source" href="page.js.html">
                   page.js
                 </a>
 
 
-                <a class="source" href="player.html">
+                <a class="source" href="player.js.html">
                   player.js
                 </a>
 
 
-                <a class="source" href="queue.html">
+                <a class="source" href="queue.js.html">
                   queue.js
                 </a>
 
 
-                <a class="source" href="scram.html">
+                <a class="source" href="scram.js.html">
                   scram.js
                 </a>
 
 
-                <a class="source" href="scribe.html">
+                <a class="source" href="scribe.js.html">
                   scribe.js
                 </a>
 
 
-                <a class="source" href="script.html">
+                <a class="source" href="script.js.html">
                   script.js
                 </a>
 
 
-                <a class="source" href="sheaf.html">
+                <a class="source" href="sheaf.js.html">
                   sheaf.js
                 </a>
 
 
-                <a class="source" href="strata.html">
+                <a class="source" href="strata.js.html">
                   strata.js
                 </a>
 
@@ -135,7 +135,7 @@
 }
 
 Script.prototype.rotate = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">page</span>) </span>{
-    <span class="hljs-keyword">this</span>._operations.push({ name: <span class="hljs-string">'_rotate'</span>, page: page })
+    <span class="hljs-keyword">this</span>._operations.push({ <span class="hljs-attr">name</span>: <span class="hljs-string">'_rotate'</span>, <span class="hljs-attr">page</span>: page })
 }
 
 Script.prototype.unlink = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">page</span>) </span>{
@@ -144,19 +144,19 @@ Script.prototype.unlink = <span class="hljs-function"><span class="hljs-keyword"
         rotations.push(path.join(<span class="hljs-keyword">this</span>._logger._directory, <span class="hljs-string">'pages'</span>, page.address + <span class="hljs-string">'.'</span> + i))
     }
     <span class="hljs-keyword">this</span>._journal.push({
-        name: <span class="hljs-string">'_purge'</span>, rotations: rotations
+        <span class="hljs-attr">name</span>: <span class="hljs-string">'_purge'</span>, <span class="hljs-attr">rotations</span>: rotations
     })
 }
 
 Script.prototype.rewriteLeaf = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">page</span>) </span>{
     <span class="hljs-keyword">this</span>._operations.push({
-        name: <span class="hljs-string">'_rewriteLeaf'</span>, page: page
+        <span class="hljs-attr">name</span>: <span class="hljs-string">'_rewriteLeaf'</span>, <span class="hljs-attr">page</span>: page
     })
 }
 
 Script.prototype.writeBranch = <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">page</span>) </span>{
     <span class="hljs-keyword">this</span>._operations.push({
-        name: <span class="hljs-string">'_writeBranch'</span>, page: page
+        <span class="hljs-attr">name</span>: <span class="hljs-string">'_writeBranch'</span>, <span class="hljs-attr">page</span>: page
     })
 }
 
@@ -166,7 +166,7 @@ Script.prototype._rotate = <span class="hljs-function"><span class="hljs-keyword
     <span class="hljs-keyword">var</span> <span class="hljs-keyword">from</span> = <span class="hljs-keyword">this</span>._logger.filename(page, <span class="hljs-literal">true</span>)
     <span class="hljs-keyword">var</span> to = <span class="hljs-keyword">this</span>._logger.filename(page)
     <span class="hljs-keyword">this</span>._journal.push({
-        name: <span class="hljs-string">'_replace'</span>, <span class="hljs-keyword">from</span>: <span class="hljs-keyword">from</span>, to: to
+        <span class="hljs-attr">name</span>: <span class="hljs-string">'_replace'</span>, <span class="hljs-attr">from</span>: <span class="hljs-keyword">from</span>, <span class="hljs-attr">to</span>: to
     })
     <span class="hljs-keyword">this</span>._logger.rotate(page, <span class="hljs-keyword">from</span>, callback)
 }
@@ -175,7 +175,7 @@ Script.prototype._writeBranch = cadence(<span class="hljs-function"><span class=
     <span class="hljs-keyword">var</span> page = operation.page
     <span class="hljs-keyword">var</span> file = <span class="hljs-keyword">this</span>._logger.filename(page, <span class="hljs-literal">true</span>)
     <span class="hljs-keyword">this</span>._journal.push({
-        name: <span class="hljs-string">'_replace'</span>, <span class="hljs-keyword">from</span>: file, to: <span class="hljs-keyword">this</span>._logger.filename(page)
+        <span class="hljs-attr">name</span>: <span class="hljs-string">'_replace'</span>, <span class="hljs-attr">from</span>: file, <span class="hljs-attr">to</span>: <span class="hljs-keyword">this</span>._logger.filename(page)
     })
     <span class="hljs-keyword">this</span>._logger.writeBranch(page, file, <span class="hljs-keyword">async</span>())
 })
@@ -186,7 +186,7 @@ Script.prototype._rewriteLeaf = cadence(<span class="hljs-function"><span class=
     page.rotation = <span class="hljs-number">0</span>
     <span class="hljs-keyword">var</span> file = <span class="hljs-keyword">this</span>._logger.filename(page, <span class="hljs-literal">true</span>)
     <span class="hljs-keyword">this</span>._journal.push({
-        name: <span class="hljs-string">'_replace'</span>, <span class="hljs-keyword">from</span>: file, to: <span class="hljs-keyword">this</span>._logger.filename(page)
+        <span class="hljs-attr">name</span>: <span class="hljs-string">'_replace'</span>, <span class="hljs-attr">from</span>: file, <span class="hljs-attr">to</span>: <span class="hljs-keyword">this</span>._logger.filename(page)
     })
     <span class="hljs-keyword">this</span>._logger.rewriteLeaf(page, file, <span class="hljs-keyword">async</span>())
 })
@@ -197,7 +197,7 @@ Script.prototype.commit = cadence(<span class="hljs-function"><span class="hljs-
             <span class="hljs-keyword">this</span>[operation.name](operation, <span class="hljs-keyword">async</span>())
         })(<span class="hljs-keyword">this</span>._operations)
     }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
-        <span class="hljs-keyword">this</span>._journal.push({ name: <span class="hljs-string">'_complete'</span> })
+        <span class="hljs-keyword">this</span>._journal.push({ <span class="hljs-attr">name</span>: <span class="hljs-string">'_complete'</span> })
         <span class="hljs-keyword">var</span> pending = path.join(<span class="hljs-keyword">this</span>._logger._directory, <span class="hljs-string">'journal.pending'</span>)
         <span class="hljs-keyword">var</span> comitted = path.join(<span class="hljs-keyword">this</span>._logger._directory, <span class="hljs-string">'journal'</span>)
         <span class="hljs-keyword">async</span>(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
@@ -267,9 +267,7 @@ Script.prototype._purge = cadence(<span class="hljs-function"><span class="hljs-
     })(operation.rotations)
 })
 
-<span class="hljs-built_in">module</span>.exports = Scrip
-
-</pre></div></div>
+<span class="hljs-built_in">module</span>.exports = Script</pre></div></div>
 
         </li>
 

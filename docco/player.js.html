@@ -20,82 +20,82 @@
             <div id="jump_page">
 
 
-                <a class="source" href="balancer.html">
+                <a class="source" href="balancer.js.html">
                   balancer.js
                 </a>
 
 
-                <a class="source" href="checksum.html">
+                <a class="source" href="checksum.js.html">
                   checksum.js
                 </a>
 
 
-                <a class="source" href="cursor.html">
+                <a class="source" href="cursor.js.html">
                   cursor.js
                 </a>
 
 
-                <a class="source" href="descent.html">
+                <a class="source" href="descent.js.html">
                   descent.js
                 </a>
 
 
-                <a class="source" href="extend.html">
+                <a class="source" href="extend.js.html">
                   extend.js
                 </a>
 
 
-                <a class="source" href="json.html">
+                <a class="source" href="json.js.html">
                   json.js
                 </a>
 
 
-                <a class="source" href="locker.html">
+                <a class="source" href="locker.js.html">
                   locker.js
                 </a>
 
 
-                <a class="source" href="logger.html">
+                <a class="source" href="logger.js.html">
                   logger.js
                 </a>
 
 
-                <a class="source" href="page.html">
+                <a class="source" href="page.js.html">
                   page.js
                 </a>
 
 
-                <a class="source" href="player.html">
+                <a class="source" href="player.js.html">
                   player.js
                 </a>
 
 
-                <a class="source" href="queue.html">
+                <a class="source" href="queue.js.html">
                   queue.js
                 </a>
 
 
-                <a class="source" href="scram.html">
+                <a class="source" href="scram.js.html">
                   scram.js
                 </a>
 
 
-                <a class="source" href="scribe.html">
+                <a class="source" href="scribe.js.html">
                   scribe.js
                 </a>
 
 
-                <a class="source" href="script.html">
+                <a class="source" href="script.js.html">
                   script.js
                 </a>
 
 
-                <a class="source" href="sheaf.html">
+                <a class="source" href="sheaf.js.html">
                   sheaf.js
                 </a>
 
 
-                <a class="source" href="strata.html">
+                <a class="source" href="strata.js.html">
                   strata.js
                 </a>
 
@@ -133,9 +133,7 @@
     <span class="hljs-keyword">this</span>.framer = options.framer
     <span class="hljs-keyword">this</span>.deserializers = options.deserializers
     <span class="hljs-keyword">this</span>.userRecordHandler = options.userRecordHandler
-}
-
-</pre></div></div>
+}</pre></div></div>
 
         </li>
 
@@ -165,7 +163,7 @@
 
                 <span class="hljs-keyword">var</span> loop = <span class="hljs-keyword">async</span>(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">count</span>) </span>{
                     <span class="hljs-keyword">if</span> (count &lt; slice.length - offset) {
-                        offset += coun
+                        offset += count
                         fs[direction](fd, slice, offset, slice.length - offset, position + offset, <span class="hljs-keyword">async</span>())
                     } <span class="hljs-keyword">else</span> {
                         <span class="hljs-keyword">return</span> [ loop.break, slice, position ]
@@ -208,8 +206,8 @@ Player.prototype._play = <span class="hljs-function"><span class="hljs-keyword">
         <span class="hljs-keyword">if</span> (header[<span class="hljs-number">0</span>] &lt; <span class="hljs-number">0</span>) {
             <span class="hljs-keyword">if</span> (page.position === <span class="hljs-number">0</span>) {
                 page.right = {
-                    address: header[<span class="hljs-number">1</span>] || <span class="hljs-literal">null</span>,
-                    key: entry.body || <span class="hljs-literal">null</span>
+                    <span class="hljs-attr">address</span>: header[<span class="hljs-number">1</span>] || <span class="hljs-literal">null</span>,
+                    <span class="hljs-attr">key</span>: entry.body || <span class="hljs-literal">null</span>
                 }
                 <span class="hljs-keyword">if</span> (header[<span class="hljs-number">2</span>] === <span class="hljs-number">0</span> &amp;&amp; page.ghosts) {
                     page.splice(<span class="hljs-number">0</span>, <span class="hljs-number">1</span>)
@@ -222,8 +220,7 @@ Player.prototype._play = <span class="hljs-function"><span class="hljs-keyword">
             }
         } <span class="hljs-keyword">else</span> {
             <span class="hljs-keyword">var</span> index = header[<span class="hljs-number">1</span>]
-            <span class="hljs-keyword">if</span> (leaf) {
-</pre></div></div>
+            <span class="hljs-keyword">if</span> (leaf) {</pre></div></div>
 
         </li>
 
@@ -240,9 +237,9 @@ Player.prototype._play = <span class="hljs-function"><span class="hljs-keyword">
 
             <div class="content"><div class='highlight'><pre>                <span class="hljs-keyword">if</span> (index &gt; <span class="hljs-number">0</span>) {
                     page.splice(index - <span class="hljs-number">1</span>, <span class="hljs-number">0</span>, {
-                        key: sheaf.extractor(entry.body),
-                        record: entry.body,
-                        heft: entry.length
+                        <span class="hljs-attr">key</span>: sheaf.extractor(entry.body),
+                        <span class="hljs-attr">record</span>: entry.body,
+                        <span class="hljs-attr">heft</span>: entry.length
                     })
                 } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (~index === <span class="hljs-number">0</span> &amp;&amp; page.address !== <span class="hljs-number">1</span>) {
                     ok(!page.ghosts, <span class="hljs-string">'double ghosts'</span>)
@@ -257,7 +254,7 @@ Player.prototype._play = <span class="hljs-function"><span class="hljs-keyword">
                     heft = entry.length
                 }
                 page.splice(index - <span class="hljs-number">1</span>, <span class="hljs-number">0</span>, {
-                    key: key, address: address, heft: hef
+                    <span class="hljs-attr">key</span>: key, <span class="hljs-attr">address</span>: address, <span class="hljs-attr">heft</span>: heft
                 })
             }
         }
@@ -267,8 +264,7 @@ Player.prototype._play = <span class="hljs-function"><span class="hljs-keyword">
 }
 
 Player.prototype.play = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">async, sheaf, fd, stat, read, page</span>) </span>{
-    <span class="hljs-keyword">var</span> buffer = <span class="hljs-keyword">new</span> Buffer(sheaf.options.readLeafStartLength || <span class="hljs-number">1024</span> * <span class="hljs-number">1024</span>)
-</pre></div></div>
+    <span class="hljs-keyword">var</span> buffer = <span class="hljs-keyword">new</span> Buffer(sheaf.options.readLeafStartLength || <span class="hljs-number">1024</span> * <span class="hljs-number">1024</span>)</pre></div></div>
 
         </li>
 
@@ -304,9 +300,7 @@ Player.prototype.play = cadence(<span class="hljs-function"><span class="hljs-ke
     })
 })
 
-<span class="hljs-built_in">module</span>.exports = Player
-
-</pre></div></div>
+<span class="hljs-built_in">module</span>.exports = Player</pre></div></div>
 
         </li>
 
