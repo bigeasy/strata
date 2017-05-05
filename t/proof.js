@@ -373,7 +373,7 @@ var invoke = cadence(function (async, tmp, assert, test) {
 module.exports = function (module, dirname) {
     var tmp = dirname + '/tmp'
     module.exports = function (count, test) {
-        require('proof/redux')(count, cadence(function (async, assert) {
+        require('proof')(count, cadence(function (async, assert) {
             assert.global = function (name, value) {
                 global[name] = value
                 assert.leak(name)
