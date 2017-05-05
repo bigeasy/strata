@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html>
+  <meta charset="utf-8">
+  <title>Strata</title>
+  <link href="https://fonts.googleapis.com/css?family=Cutive+Mono|Sorts+Mill+Goudy|Mate|Oxygen+Mono|Offside|Raleway:400,700" rel="stylesheet" type="text/css">
+  <link href="https://fonts.googleapis.com/css?family=Sorts+Mill+Goudy">
+  <link rel="stylesheet" type="text/css" href="css/ascetic.css">
+  <link rel="stylesheet" type="text/css" href="css/style.css">
+</html>
+<body><a href="https://github.com/bigeasy/strata/"><img style="position: fixed; top: 0; left: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_left_gray_6d6d6d.png" alt="Fork me on GitHub"></a>
+  <div class="container">
+    <div class="unit welcome">
+      <h1>Strata</h1>
+      <!-- todo: code font is too small for body text font-->
+    </div>
+    <div class="unit description markdown include" data-file="index.md"><p>An Evented I/O B-tree for Node.js.</p>
+<p>Strata is part of a collection of database primitives that you can use to design
+your own distributed databases for your Node.js applications. I call this
+collection the Strata Universe. It culimates in Locket, a pure-JavaScript
+implementation of LevelDB.</p>
+<p>Strata is a <strong>concurrent</strong>, <strong>b&#x2011;tree</strong> <strong>primitive</strong>, in
+<strong>pure-JavaScript</strong> for Node.js.</p>
+<p>A <strong>b&#x2011;tree</strong> is a data structure used by databases to store records
+organized in large pages on disk.</p>
+<p>By <strong>concurrent</strong> I mean that multiple queries can make progress on a descent of
+the b&#x2011;tree. Multiple reads can all navigate the b&#x2011;tree
+simultaneously. Multiple reads can also make progress in the presence of a
+write, so long as they are not reading a page that is being written. This is the
+equivalence to &quot;threading&quot; in other database engines, but evented for Node.js.</p>
+<p>Strata is a database <strong>primitive</strong>, it is not supposed to be used a as a general
+purpose database by it&apos;s lonesome. Strata an implementation of a b&#x2011;tree
+and it&apos;s interface exposes b&#x2011;concepts. If you&apos;re using Strata you&apos;re
+either implementing a database engine, or your taking your indexes and queries
+into your own hands.</p>
+<h2 id="installing">Installing</h2>
+<p>Install from NPM.</p>
+<pre><code class="lang-console">npm install b-tree
+</code></pre>
+<h2 id="b-tree-properties">B-Tree Properties</h2>
+<p><em>TK: Unique keys, but duplicate keys are super easy to fake.</em></p>
+<h2 id="creating-a-b-tree">Creating a B-Tree</h2>
+<p>You must create the b&#x2011;tree object first specifying a directory where
+records are stored.</p>
+<pre><code class="lang-javascript"><span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">createOpenClose</span> (<span class="hljs-params">directory, callback</span>) </span>{
+    <span class="hljs-keyword">var</span> strata
+
+    create()
+
+    <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">create</span> (<span class="hljs-params"></span>) </span>{
+        strata = <span class="hljs-keyword">new</span> Strata(directory)
+        strata.create(created)
+    }
+
+    <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">created</span> (<span class="hljs-params">error</span>) </span>{
+        <span class="hljs-keyword">if</span> (error) <span class="hljs-keyword">return</span> callback(error)
+
+        strata.close(reopen)
+    }
+
+    <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">reopen</span> (<span class="hljs-params">error</span>) </span>{
+        <span class="hljs-keyword">if</span> (error) <span class="hljs-keyword">return</span> callback(error)
+
+        strata = <span class="hljs-keyword">new</span> Strata(directory)
+        strata.open(opened)
+    }
+
+    <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">open</span> (<span class="hljs-params">error</span>) </span>{
+        <span class="hljs-keyword">if</span> (error) <span class="hljs-keyword">return</span> callback(error)
+
+        strata.close(callback)
+    }
+}
+
+createOpenClose(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">error</span>) </span>{ <span class="hljs-keyword">if</span> (error) <span class="hljs-keyword">throw</span> error })
+</code></pre>
+<h3 id="extractor-and-comparator">Extractor and Comparator</h3>
+<p>Strata will store any JSON object or value. By default it compares using the
+JavaScript comparison operators <code>&lt;</code> and <code>&gt;</code>. If you&apos;re string a <code>String</code> or a
+<code>Number</code> the default comparisions will work just fine.</p>
+<p>If you&apos;re storing objects you&apos;re going to want to order by one or more of the
+object&apos;s properties. To do this you specify an <code>extractor</code> property to extract
+the key properties from the object and a <code>comparator</code> to compare the extracted
+key.</p>
+<pre><code>function extractor (person) {
+    return {
+        firstName: person.firstName,
+        lastName: person.lastName
+    }
+}
+
+function comparator (left, right) {
+    var compare = left.lastName &lt; right.lastName
+                ? -1 : left.lastName &gt; right.lastName
+                     ? 1 : 0
+    if (compare != 0) {
+        return compare
+    }
+    return left.firstName &lt; right.firstName
+         ? -1 : left.firstName &gt; right.firstName
+              ? 1 : 0
+}
+
+var strata = new Strata({ extractor: extractor, comparator: comparator })
+</code></pre><p>Note that neither the <code>extractor</code> nor the <code>comparator</code> are stored in the Strata
+tree. You must provide them when you construct a <code>Strata</code> tree object both when
+you are creating a new Strata tree or opening an exiting one. That is, you need
+to know the type of data stored in the tree.</p>
+<p>Because Strata is not a general purpose data store, it is a b&#x2011;tree
+privitive.</p>
+<h3 id="searching-the-b-x2011-tree">Searching the B&#x2011;Tree</h3>
+<p>With Strata you either create read-only iterator, or a read/write mutator. The
+mutator is a superset of the iterator so let&apos;s start there.</p>
+<pre><code class="lang-javascript"><span class="hljs-comment">// Returns true if the key exists in the tree.</span>
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">hasKey</span> (<span class="hljs-params">strata, sought, callback</span>) </span>{
+    <span class="hljs-keyword">var</span> found
+
+    strata.iterator(sought, cursor)
+
+    <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">cursor</span> (<span class="hljs-params">error, cursor</span>) </span>{
+        <span class="hljs-keyword">if</span> (error) callback(error)
+        <span class="hljs-keyword">else</span> {
+            found = cursor.index &gt;= <span class="hljs-number">0</span>
+            cursor.unlock(unlocked)
+        }
+    }
+
+    <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">unlocked</span> (<span class="hljs-params">error</span>) </span>{
+        <span class="hljs-keyword">if</span> (error) callback(error)
+        <span class="hljs-keyword">else</span> callback(<span class="hljs-literal">null</span>, found)
+    }
+}
+
+hasKey(strata, <span class="hljs-string">&apos;c&apos;</span>, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">error, exists</span>) </span>{
+    <span class="hljs-keyword">if</span> (error) <span class="hljs-keyword">throw</span> error
+    <span class="hljs-keyword">if</span> (exists) <span class="hljs-built_in">console</span>.log(<span class="hljs-string">&apos;I found it.&apos;</span>)
+})
+</code></pre>
+<p>In the above, we create a read-only <code>Cursor</code> using the <code>Strata.iterator</code>
+function. That returns an iterator that holds a shared lock on the leaf page
+that either contains the records for the given key, or else would contain the
+record for the given key if it existed in the leaf page. The <code>Cursor</code> says that
+the record is here if it is in the tree, or it should go here if it&apos;s not.</p>
+<p>The default <code>Strata</code> b&#x2011;tree will have defaults for branch size and leaf
+size, but you can adjust those as well.</p>
+<p>Properties to the constructor...</p>
+<h4 id="-new-strata-location-options-"><code>new Strata(location[, options])</code>.</h4>
+<p>Constructs a new b-tree that stores its files in the directory provided by
+<code>location</code>. It does not open or close the b&#x2011;tree.</p>
+<h4 id="-options-"><code>options</code></h4>
+<p><code>new Strata()</code> takes an optional options object as its second argument; the
+following properties are accepted:</p>
+<ul>
+<li><code>extractor</code>: A function that extracts the key from the record.</li>
+<li><code>comparator</code>: A function that is used to compare keys.</li>
+<li><code>leafSize</code>: The maximum size in records of a leaf page before it is it split.</li>
+<li><code>branchSize</code>: The maximum size in child pages of a branch page before it is
+split.</li>
+<li><code>checksum</code>: A cryptographic algorithm to use as a hash, or a checksum
+function to validate each line in a leaf page, and the contents of a branch
+page.</li>
+</ul>
+<h4 id="-strata-open-callback-"><code>strata.open(callback)</code></h4>
+<p>Opens the b-tree.</p>
+<h4 id="-strata-create-callback-"><code>strata.create(callback)</code></h4>
+<p>Creates a new, empty b-tree. It will raise an exception if there is <em>anything</em>
+in the location directory.</p>
+<h2 id="searching-and-editing">Searching and Editing</h2>
+<p>You search and edit the b&#x2011; separate from editing it.</p>
+<p>If the <code>Cursor.index</code> property is zero or more, it is the index of the record in
+the leaf page. If the <code>Cursor.index</code> property is less than zero, then it&apos;s
+compliment is the index of where the record should go in the leaf page.</p>
+<p>In the <code>hasKey</code> function above we simply return whether or not the record exists
+based on the cursor index.</p>
+<h3 id="scanning-the-b-tree">Scanning the B-Tree</h3>
+<p><em>Ed: The following is stupid wrong and stupid.</em></p>
+<pre><code class="lang-javascript"><span class="hljs-keyword">var</span> range = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">async, strata, start, stop</span>) </span>{
+  strata.iterator(start, check(atLeaf));
+
+  <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">atLeaf</span> (<span class="hljs-params">cursor</span>) </span>{
+    fetch(cursor.index &amp;lt; <span class="hljs-number">0</span> ? ~cursor.index : cursor.index);
+
+    <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">fetch</span> (<span class="hljs-params">index</span>) </span>{
+      <span class="hljs-keyword">if</span> (index &amp;lt; cursor.length) {
+        cursor.get(index, check(push));
+      } <span class="hljs-keyword">else</span> {
+        cursor.next(check(advanced));
+      }
+    }
+
+    <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">push</span> (<span class="hljs-params">record</span>) </span>{
+      <span class="hljs-keyword">if</span> (record &amp;lt; stop) {
+        found.push(record);
+        fetch(index + <span class="hljs-number">1</span>);
+      } <span class="hljs-keyword">else</span> {
+        done();
+      }
+    }
+
+    <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">advanced</span> (<span class="hljs-params">success</span>) </span>{
+      <span class="hljs-keyword">if</span> (success) done();
+      <span class="hljs-keyword">else</span> fetch(<span class="hljs-number">0</span>);
+    }
+
+    <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">done</span> (<span class="hljs-params"></span>) </span>{
+      cursor.unlock();
+      callback(<span class="hljs-literal">null</span>, found);
+    }
+  }
+}
+
+range(strata, <span class="hljs-string">&apos;c&apos;</span>, <span class="hljs-string">&apos;i&apos;</span>, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">error, found</span>) </span>{
+  <span class="hljs-keyword">if</span> (error) <span class="hljs-keyword">throw</span> error;
+  <span class="hljs-built_in">console</span>.log(found);
+});
+</code></pre>
+<h3 id="a-note-on-examples">A Note on Examples</h3>
+<p>I use a control-flow library of my own creation called
+<a href="https://github.com/bigeasy/cadence">Cadence</a> that I&apos;m just crazy about.</p>
+<p>The primary benefit of Cadence it asynchronous try/catch error handling. This
+has made it very easy to create deeply nested asynchronous operations, yet have
+errors propagate up to the caller, the context that comes from maintaining a
+stack and unwinding it on error.</p>
+<p>Secondary benefit is that Cadence always uses a trampoline. This allows me to
+cache aggressively without having to worry about blowing the stack.</p>
+<p>Finally, Cadence is pure-JavaScript and old fashioned JavaScript. It doesn&apos;t
+depend on language features that have yet to drop. No transpilers.</p>
+</div>
+  </div>
+  <!-- todo: move into an edify plugin-->
+  <script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+    (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+    m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+    })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+    ga('create', 'UA-20388260-3', 'bigeasy.github.io');
+    ga('send', 'pageview');
+  </script>
+</body>
+<!-- vim: set ts=2 sw=2 nowrap:-->
