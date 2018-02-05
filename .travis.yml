@@ -12,6 +12,7 @@ branches:
     - master
     - travis-ci
 
-before_install:
-  - npm install
+install:
+  - npm install -g npm
+  - npm install --no-package-lock --no-save
   - npm install -g istanbul coveralls
