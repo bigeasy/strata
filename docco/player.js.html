@@ -133,7 +133,9 @@
     <span class="hljs-keyword">this</span>.framer = options.framer
     <span class="hljs-keyword">this</span>.deserializers = options.deserializers
     <span class="hljs-keyword">this</span>.userRecordHandler = options.userRecordHandler
-}</pre></div></div>
+}
+
+</pre></div></div>
 
         </li>
 
@@ -220,7 +222,8 @@ Player.prototype._play = <span class="hljs-function"><span class="hljs-keyword">
             }
         } <span class="hljs-keyword">else</span> {
             <span class="hljs-keyword">var</span> index = header[<span class="hljs-number">1</span>]
-            <span class="hljs-keyword">if</span> (leaf) {</pre></div></div>
+            <span class="hljs-keyword">if</span> (leaf) {
+</pre></div></div>
 
         </li>
 
@@ -264,7 +267,8 @@ Player.prototype._play = <span class="hljs-function"><span class="hljs-keyword">
 }
 
 Player.prototype.play = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">async, sheaf, fd, stat, read, page</span>) </span>{
-    <span class="hljs-keyword">var</span> buffer = <span class="hljs-keyword">new</span> Buffer(sheaf.options.readLeafStartLength || <span class="hljs-number">1024</span> * <span class="hljs-number">1024</span>)</pre></div></div>
+    <span class="hljs-keyword">var</span> buffer = <span class="hljs-keyword">new</span> Buffer(sheaf.options.readLeafStartLength || <span class="hljs-number">1024</span> * <span class="hljs-number">1024</span>)
+</pre></div></div>
 
         </li>
 
@@ -300,7 +304,9 @@ Player.prototype.play = cadence(<span class="hljs-function"><span class="hljs-ke
     })
 })
 
-<span class="hljs-built_in">module</span>.exports = Player</pre></div></div>
+<span class="hljs-built_in">module</span>.exports = Player
+
+</pre></div></div>
 
         </li>
 

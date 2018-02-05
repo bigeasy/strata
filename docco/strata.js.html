@@ -136,7 +136,9 @@
     Player = <span class="hljs-built_in">require</span>(<span class="hljs-string">'./player'</span>),
     Logger = <span class="hljs-built_in">require</span>(<span class="hljs-string">'./logger'</span>),
     ok = <span class="hljs-built_in">require</span>(<span class="hljs-string">'assert'</span>).ok,
-    path = <span class="hljs-built_in">require</span>(<span class="hljs-string">'path'</span>)</pre></div></div>
+    path = <span class="hljs-built_in">require</span>(<span class="hljs-string">'path'</span>)
+
+</pre></div></div>
 
         </li>
 
@@ -156,7 +158,9 @@
 <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">extend</span>(<span class="hljs-params">to, from</span>) </span>{
     <span class="hljs-keyword">for</span> (<span class="hljs-keyword">var</span> key <span class="hljs-keyword">in</span> <span class="hljs-keyword">from</span>) to[key] = <span class="hljs-keyword">from</span>[key]
     <span class="hljs-keyword">return</span> to
-}</pre></div></div>
+}
+
+</pre></div></div>
 
         </li>
 
@@ -223,7 +227,9 @@ Strata.prototype.create = cadence(<span class="hljs-function"><span class="hljs-
 })
 
 Strata.prototype.open = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">async</span>) </span>{
-    <span class="hljs-keyword">this</span>.sheaf.createMagazine()</pre></div></div>
+    <span class="hljs-keyword">this</span>.sheaf.createMagazine()
+
+</pre></div></div>
 
         </li>
 
@@ -280,7 +286,8 @@ anyway?</p>
     })
 })
 
-Strata.prototype.close = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">async</span>) </span>{</pre></div></div>
+Strata.prototype.close = cadence(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">async</span>) </span>{
+</pre></div></div>
 
         </li>
 
@@ -297,7 +304,8 @@ Strata.prototype.close = cadence(<span class="hljs-function"><span class="hljs-k
 
             <div class="content"><div class='highlight'><pre>    <span class="hljs-keyword">var</span> cartridge = <span class="hljs-keyword">this</span>.sheaf.metaRoot.cartridge, lock = cartridge.value.page.lock
 
-    lock.unlock()</pre></div></div>
+    lock.unlock()
+</pre></div></div>
 
         </li>
 
@@ -475,7 +483,9 @@ Strata.prototype.__defineGetter__(<span class="hljs-string">'balanced'</span>, <
     <span class="hljs-keyword">return</span> ! <span class="hljs-built_in">Object</span>.keys(<span class="hljs-keyword">this</span>.sheaf.lengths).length
 })
 
-<span class="hljs-built_in">module</span>.exports = Strata</pre></div></div>
+<span class="hljs-built_in">module</span>.exports = Strata
+
+</pre></div></div>
 
         </li>
 

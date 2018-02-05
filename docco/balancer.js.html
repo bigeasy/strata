@@ -237,7 +237,8 @@ Balancer.prototype.balance = cadence(<span class="hljs-function"><span class="hl
         <span class="hljs-keyword">async</span>.forEach(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">address</span>) </span>{
             _gather.call(<span class="hljs-keyword">this</span>, +address, lengths[address], <span class="hljs-keyword">async</span>())
         })(addresses)
-    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{</pre></div></div>
+    }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
+</pre></div></div>
 
         </li>
 
@@ -596,7 +597,9 @@ Balancer.prototype.exorcise = <span class="hljs-function"><span class="hljs-keyw
     <span class="hljs-keyword">var</span> entry
 
     ok(page.ghosts, <span class="hljs-string">'no ghosts'</span>)
-    ok(corporal.items.length - corporal.ghosts &gt; <span class="hljs-number">0</span>, <span class="hljs-string">'no replacement'</span>)</pre></div></div>
+    ok(corporal.items.length - corporal.ghosts &gt; <span class="hljs-number">0</span>, <span class="hljs-string">'no replacement'</span>)
+
+</pre></div></div>
 
         </li>
 
@@ -705,7 +708,8 @@ Balancer.prototype.mergePagesAndUnlock = cadence(<span class="hljs-function"><sp
 
     <span class="hljs-keyword">var</span> merge = <span class="hljs-keyword">async</span>([<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
         descents.forEach(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">descent</span>) </span>{ locker.unlock(descent.page) })
-        ! [ <span class="hljs-string">'left'</span>, <span class="hljs-string">'right'</span> ].forEach(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">direction</span>) </span>{</pre></div></div>
+        ! [ <span class="hljs-string">'left'</span>, <span class="hljs-string">'right'</span> ].forEach(<span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">direction</span>) </span>{
+</pre></div></div>
 
         </li>
 
@@ -903,7 +907,8 @@ Balancer.prototype.chooseBranchesToMergeAndUnlock = cadence(<span class="hljs-fu
             descents.push(descent)
             descent.descend(descent.key(key), descent.address(address), <span class="hljs-keyword">async</span>())
         }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params"></span>) </span>{
-            descent.setIndex(descent.index + (direction == <span class="hljs-string">'left'</span> ? <span class="hljs-number">1</span> : <span class="hljs-number">-1</span>))</pre></div></div>
+            descent.setIndex(descent.index + (direction == <span class="hljs-string">'left'</span> ? <span class="hljs-number">1</span> : <span class="hljs-number">-1</span>))
+</pre></div></div>
 
         </li>
 
@@ -1022,7 +1027,9 @@ Balancer.prototype.fillRoot = cadence(<span class="hljs-function"><span class="h
     })
 })
 
-<span class="hljs-built_in">module</span>.exports = Balancer</pre></div></div>
+<span class="hljs-built_in">module</span>.exports = Balancer
+
+</pre></div></div>
 
         </li>
 

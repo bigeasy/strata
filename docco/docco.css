@@ -262,7 +262,7 @@ ul.sections > li > div {
     line-height: 18px;
   }
   p, ul, ol {
-    margin: 0;
+    margin: 0 0 15px;
   }
 
 

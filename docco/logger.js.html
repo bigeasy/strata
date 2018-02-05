@@ -135,7 +135,8 @@
 <span class="hljs-keyword">var</span> Scribe = <span class="hljs-built_in">require</span>(<span class="hljs-string">'./scribe'</span>)
 
 <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">Logger</span> (<span class="hljs-params">options</span>) </span>{
-    <span class="hljs-keyword">this</span>._directory = options.directory</pre></div></div>
+    <span class="hljs-keyword">this</span>._directory = options.directory
+</pre></div></div>
 
         </li>
 
@@ -214,7 +215,9 @@ Logger.prototype.writePage = <span class="hljs-function"><span class="hljs-keywo
     <span class="hljs-keyword">var</span> leaf = page.address % <span class="hljs-number">2</span> === <span class="hljs-number">1</span>
     <span class="hljs-keyword">if</span> (leaf) {
         <span class="hljs-keyword">this</span>.writeHeader(queue, page)
-    }</pre></div></div>
+    }
+
+</pre></div></div>
 
         </li>
 
@@ -330,7 +333,9 @@ Appender.prototype.close = <span class="hljs-function"><span class="hljs-keyword
     <span class="hljs-keyword">this</span>._scribe.close(callback)
 }
 
-<span class="hljs-built_in">module</span>.exports = Logger</pre></div></div>
+<span class="hljs-built_in">module</span>.exports = Logger
+
+</pre></div></div>
 
         </li>
 
