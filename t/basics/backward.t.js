@@ -1,6 +1,6 @@
 require('./proof')(5, prove)
 
-function prove (async, assert) {
+function prove (async, okay) {
     var strata, right
     async(function () {
         serialize(__dirname + '/fixtures/merge.before.json', tmp, async())
@@ -10,16 +10,16 @@ function prove (async, assert) {
     }, function () {
         strata.mutator(strata.leftOf('c'), async())
     }, function (cursor) {
-        assert(cursor.exclusive, 'exclusive')
+        okay(cursor.exclusive, 'exclusive')
         right = cursor.page.right.address
-        assert(cursor.page.items[0].record, 'a', 'go left')
+        okay(cursor.page.items[0].record, 'a', 'go left')
         cursor.unlock(async())
     }, function () {
         strata.mutator(strata.leftOf('d'), async())
     }, function (cursor) {
-        assert(cursor.page.address, right, 'address and right')
-        assert(!cursor.exclusive, 'shared')
-        assert(cursor.page.items[0].record, 'c', 'go left missing')
+        okay(cursor.page.address, right, 'address and right')
+        okay(!cursor.exclusive, 'shared')
+        okay(cursor.page.items[0].record, 'c', 'go left missing')
         cursor.unlock(async())
     }, function () {
         strata.close(async())

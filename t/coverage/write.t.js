@@ -1,6 +1,6 @@
 require('./proof')(1, prove)
 
-function prove (async, assert) {
+function prove (async, okay) {
     function forward (name) { return function () { return fs[name].apply(fs, arguments) } }
 
     var fs = require('fs'), path = require('path'), proxy = {}
@@ -34,8 +34,8 @@ function prove (async, assert) {
         vivify(tmp, async())
         load(__dirname + '/fixtures/write.after.json', async())
     }, function (actual, expected) {
-        assert.say(actual)
-        assert.say(expected)
-        assert(actual, expected, 'written')
+        okay.say(actual)
+        okay.say(expected)
+        okay(actual, expected, 'written')
     })
 }

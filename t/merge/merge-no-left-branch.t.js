@@ -3,12 +3,12 @@
 
 require('./proof')(1, prove)
 
-function prove (async, assert) {
+function prove (async, okay) {
     var path = require('path')
     script({
         file: path.join(__dirname, 'fixtures', 'unpurged-key.txt'),
         directory: tmp,
         cadence: require('cadence'),
-        assert: assert
+        okay: okay
     }, async())
 }

@@ -1,6 +1,6 @@
 require('./proof')(3, prove)
 
-function prove (async, assert) {
+function prove (async, okay) {
     var strata = createStrata({ directory: tmp, leafSize: 3, branchSize: 3 })
     async(function () {
         serialize(__dirname + '/fixtures/split.before.json', tmp, async())
@@ -9,7 +9,7 @@ function prove (async, assert) {
     }, function () {
         gather(strata, async())
     }, function (records) {
-        assert(records, [ 'a', 'c', 'd' ], 'records')
+        okay(records, [ 'a', 'c', 'd' ], 'records')
     }, function () {
         strata.mutator('a', async())
     }, function (cursor) {
@@ -18,10 +18,10 @@ function prove (async, assert) {
     }, function () {
         gather(strata, async())
     }, function (records) {
-        assert(records, [ 'a', 'd' ], 'records')
+        okay(records, [ 'a', 'd' ], 'records')
 
         strata.purge(0)
-        assert(strata.sheaf.magazine.heft, 0, 'purged')
+        okay(strata.sheaf.magazine.heft, 0, 'purged')
 
         strata.close(async())
     })

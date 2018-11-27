@@ -1,6 +1,6 @@
 require('./proof')(2, prove)
 
-function prove (async, assert) {
+function prove (async, okay) {
     var strata
     async(function () {
         serialize(__dirname + '/../basics/fixtures/split.before.json', tmp, async())
@@ -17,12 +17,12 @@ function prove (async, assert) {
         async([function () {
             strata.balance(async())
         }, function (error) {
-            assert(error.message, 'already balancing', 'error')
+            okay(error.message, 'already balancing', 'error')
         }])
     }, function () {
         gather(strata, async())
     }, function (records) {
-        assert(records, [ 'a', 'b', 'c', 'd' ], 'records')
+        okay(records, [ 'a', 'b', 'c', 'd' ], 'records')
     }, function() {
         strata.close(async())
     })

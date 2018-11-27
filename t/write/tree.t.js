@@ -1,6 +1,6 @@
 require('./proof')(2, prove)
 
-function prove (async, assert) {
+function prove (async, okay) {
     var strata
     async(function () {
         serialize(__dirname + '/../basics/fixtures/merge.before.json', tmp, async())
@@ -24,7 +24,7 @@ function prove (async, assert) {
     }, function () {
         gather(strata, async())
     }, function (records) {
-        assert(records, [ 'a', 'b', 'c', 'd', 'e' ], 'cached')
+        okay(records, [ 'a', 'b', 'c', 'd', 'e' ], 'cached')
     }, function () {
         strata.close(async())
     }, function () {
@@ -38,6 +38,6 @@ function prove (async, assert) {
     }, function () {
         gather(strata, async())
     }, function (records) {
-        assert(records, [ 'a', 'b', 'c', 'd', 'e' ], 'flushed')
+        okay(records, [ 'a', 'b', 'c', 'd', 'e' ], 'flushed')
     })
 }

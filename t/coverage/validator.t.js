@@ -1,10 +1,10 @@
 require('./proof')(2, prove)
 
-function prove (async, assert) {
+function prove (async, okay) {
     var strata = createStrata({ directory: __filename })
 
     strata.create(function (error) {
-        assert(/is not a directory.$/.test(error.message), 'thrown')
+        okay(/is not a directory.$/.test(error.message), 'thrown')
     })
 
     var fs = require('fs')
@@ -13,6 +13,6 @@ function prove (async, assert) {
     strata = createStrata({  directory: tmp })
 
     strata.create(function (error) {
-        assert(error.message, 'errored', 'called back')
+        okay(error.message, 'errored', 'called back')
     })
 }

@@ -1,6 +1,6 @@
 require('./proof')(3, prove)
 
-function prove (async, assert) {
+function prove (async, okay) {
     var ok = require('assert').ok, strata = createStrata({
         directory: tmp,
         leafSize: 3,
@@ -22,14 +22,14 @@ function prove (async, assert) {
     }, function () {
         gather(strata, async())
     }, function (records) {
-        assert(records, [
+        okay(records, [
             'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p'
         ], 'records')
         strata.balance(async())
     }, function () {
         gather(strata, async())
     }, function (records) {
-        assert(records, [
+        okay(records, [
             'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p'
         ], 'records after balance')
         stringify(tmp, async())
@@ -37,7 +37,7 @@ function prove (async, assert) {
         vivify(tmp, async())
         load(__dirname + '/fixtures/left-most.after.json', async())
     }, function (actual, expected) {
-        assert(actual, expected, 'split')
+        okay(actual, expected, 'split')
     }, function() {
         strata.close(async())
     })

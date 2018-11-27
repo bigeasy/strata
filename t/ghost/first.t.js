@@ -1,6 +1,6 @@
 require('./proof')(2, prove)
 
-function prove (async, assert) {
+function prove (async, okay) {
     var strata = createStrata({ directory: tmp, leafSize: 3, branchSize: 3 })
     async(function () {
         serialize(__dirname + '/fixtures/first.before.json', tmp, async())
@@ -15,10 +15,10 @@ function prove (async, assert) {
         vivify(tmp, async())
         load(__dirname + '/fixtures/first.after.json', async())
     }, function (actual, expected) {
-        assert(actual, expected, 'after')
+        okay(actual, expected, 'after')
         strata.vivify(async())
     }, function (result) {
-        assert(result, [ { address: 1, children: [ 'b', 'c' ], ghosts: 0 } ], 'ghostbusters')
+        okay(result, [ { address: 1, children: [ 'b', 'c' ], ghosts: 0 } ], 'ghostbusters')
     }, function () {
         strata.close(async())
     })

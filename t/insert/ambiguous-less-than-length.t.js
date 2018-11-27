@@ -1,6 +1,6 @@
 require('./proof')(3, prove)
 
-function prove (async, assert) {
+function prove (async, okay) {
     var strata = createStrata({ directory: tmp, leafSize: 3, branchSize: 3 })
     async(function () {
         serialize(__dirname + '/fixtures/ambiguous.before.json', tmp, async())
@@ -9,18 +9,18 @@ function prove (async, assert) {
     }, function () {
         gather(strata, async())
     }, function (records) {
-        assert(records, [ 'a', 'd', 'f', 'g', 'h', 'i', 'l', 'm', 'n' ], 'records')
+        okay(records, [ 'a', 'd', 'f', 'g', 'h', 'i', 'l', 'm', 'n' ], 'records')
     }, function () {
         strata.mutator('d', async())
     }, function (cursor) {
         var index = cursor.indexOf('e', cursor.page.ghosts)
-        assert(index <= cursor.page.items.length, 'unambiguous')
+        okay(index <= cursor.page.items.length, 'unambiguous')
         cursor.insert('e', 'e', ~index)
         cursor.unlock(async())
     }, function () {
         gather(strata, async())
     }, function (records) {
-        assert(records, [ 'a', 'd', 'e', 'f', 'g', 'h', 'i', 'l', 'm', 'n' ], 'records after insert')
+        okay(records, [ 'a', 'd', 'e', 'f', 'g', 'h', 'i', 'l', 'm', 'n' ], 'records after insert')
     }, function() {
         strata.close(async())
     })

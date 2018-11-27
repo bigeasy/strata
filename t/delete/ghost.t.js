@@ -1,6 +1,6 @@
 require('./proof')(5, prove)
 
-function prove (async, assert) {
+function prove (async, okay) {
     var strata = createStrata({ directory: tmp, leafSize: 3, branchSize: 3 })
     async(function () {
         serialize(__dirname + '/fixtures/delete.json', tmp, async())
@@ -9,7 +9,7 @@ function prove (async, assert) {
     }, function () {
         gather(strata, async())
     }, function (records) {
-        assert(records, [ 'a', 'b', 'c', 'd' ], 'records')
+        okay(records, [ 'a', 'b', 'c', 'd' ], 'records')
     }, function () {
         strata.mutator('c', async())
     }, function (cursor) {
@@ -18,13 +18,13 @@ function prove (async, assert) {
     }, function () {
         gather(strata, async())
     }, function (records) {
-        assert(records, [ 'a', 'b', 'd' ], 'deleted')
+        okay(records, [ 'a', 'b', 'd' ], 'deleted')
         vivify(tmp, async())
         load(__dirname + '/fixtures/ghost.after.json', async())
     }, function (actual, expected) {
-        assert.say(expected)
-        assert.say(actual)
-        assert(actual, expected, 'directory')
+        okay.say(expected)
+        okay.say(actual)
+        okay(actual, expected, 'directory')
         strata.close(async())
     }, function () {
         strata = createStrata({ directory: tmp, leafSize: 3, branchSize: 3 })
@@ -35,13 +35,13 @@ function prove (async, assert) {
         async(function () {
             cursor.next(async())
         }, function (next) {
-            assert(cursor.offset, 1, 'ghosted')
+            okay(cursor.offset, 1, 'ghosted')
             cursor.unlock(async())
         })
     }, function () {
         gather(strata, async())
     }, function (records) {
-        assert(records, [ 'a', 'b', 'd' ], 'reopened')
+        okay(records, [ 'a', 'b', 'd' ], 'reopened')
         strata.close(async())
     })
 }

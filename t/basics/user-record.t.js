@@ -1,6 +1,6 @@
 require('./proof')(2, prove)
 
-function prove (async, assert) {
+function prove (async, okay) {
     var strata
     var Queue = require('../../queue')
     var Scribe = require('../../scribe')
@@ -26,8 +26,8 @@ function prove (async, assert) {
         strata = createStrata({
             directory: tmp, leafSize: 3, branchSize: 3,
             userRecordHandler: function (entry) {
-                assert(entry.header, [ 1 ], 'header')
-                assert(entry.body, { a: 1 }, 'body')
+                okay(entry.header, [ 1 ], 'header')
+                okay(entry.body, { a: 1 }, 'body')
             }
         })
         strata.open(async())

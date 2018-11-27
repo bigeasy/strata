@@ -1,6 +1,6 @@
 require('./proof')(1, prove)
 
-function prove (async, assert) {
+function prove (async, okay) {
     var strata = createStrata({ directory: tmp, leafSize: 3, branchSize: 3 })
     async(function () {
         serialize(__dirname + '/fixtures/empty.before.json', tmp, async())
@@ -29,7 +29,7 @@ function prove (async, assert) {
     }, function (actual, expected) {
         console.log(require('util').inspect(actual, false, null))
         console.log(require('util').inspect(expected, false, null))
-        assert(actual, expected, 'after balance')
+        okay(actual, expected, 'after balance')
         strata.close(async())
     })
 }

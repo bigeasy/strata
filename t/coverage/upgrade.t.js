@@ -1,6 +1,6 @@
 require('./proof')(1, prove)
 
-function prove (async, assert) {
+function prove (async, okay) {
     var strata
 
     function tracer (type, object, callback) {
@@ -30,7 +30,7 @@ function prove (async, assert) {
     }, [function (records) {
         strata.balance(async())
     }, function (error) {
-        assert(error.message, 'bogus', 'caught')
+        okay(error.message, 'bogus', 'caught')
     }], function(actual, expected) {
         strata.close(async())
     })

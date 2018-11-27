@@ -1,15 +1,15 @@
 require('./proof')(4, prove)
 
-function prove (async, assert) {
+function prove (async, okay) {
     var strata, count = 0
 
     function tracer (type, object, callback) {
         switch (type) {
         case 'reference':
             if (++count == 2) {
-                assert(strata.sheaf.magazine.heft > 2, 'unpurged')
+                okay(strata.sheaf.magazine.heft > 2, 'unpurged')
                 strata.purge(0)
-                assert(strata.sheaf.magazine.heft, 0, 'purged')
+                okay(strata.sheaf.magazine.heft, 0, 'purged')
             }
             callback()
             break
@@ -38,13 +38,13 @@ function prove (async, assert) {
     }, function () {
         gather(strata, async())
     }, function (records) {
-        assert(records, [ 'a', 'b', 'c', 'd',  'f', 'j', 'k', 'l', 'm', 'n' ], 'records')
+        okay(records, [ 'a', 'b', 'c', 'd',  'f', 'j', 'k', 'l', 'm', 'n' ], 'records')
         strata.balance(async())
     }, function () {
         vivify(tmp, async())
         load(__dirname + '/fixtures/tree.after.json', async())
     }, function (actual, expected) {
-        assert(actual, expected, 'merge')
+        okay(actual, expected, 'merge')
         strata.close(async())
     })
 }

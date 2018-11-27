@@ -1,6 +1,6 @@
 require('./proof')(1, prove)
 
-function prove (async, assert) {
+function prove (async, okay) {
     var fs = require('fs'), path = require('path')
     var strata = createStrata({ directory: tmp, checksum: 'none' })
     async(function () {
@@ -10,6 +10,6 @@ function prove (async, assert) {
     }, function () {
         fs.readFile(path.join(tmp, 'pages', '0.0'), 'utf8', async())
     }, function (body) {
-        assert(+(body.split(/\n/)[0].split(/\s+/)[1]), 0, 'zero')
+        okay(+(body.split(/\n/)[0].split(/\s+/)[1]), 0, 'zero')
     })
 }

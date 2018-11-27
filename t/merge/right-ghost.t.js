@@ -1,6 +1,6 @@
 require('./proof')(3, prove)
 
-function prove (async, assert) {
+function prove (async, okay) {
     var strata = createStrata({ directory: tmp, leafSize: 3, branchSize: 3 })
     async(function () {
         serialize(__dirname + '/fixtures/merge.before.json', tmp, async())
@@ -14,19 +14,19 @@ function prove (async, assert) {
     }, function () {
         gather(strata, async())
     }, function (records) {
-        assert(records, [ 'a', 'b', 'd' ], 'records')
+        okay(records, [ 'a', 'b', 'd' ], 'records')
         strata.balance(async())
     }, function () {
         gather(strata, async())
     }, function (records) {
-        assert(records, [ 'a', 'b', 'd' ], 'merged')
+        okay(records, [ 'a', 'b', 'd' ], 'merged')
         vivify(tmp, async())
         load(__dirname + '/fixtures/right-ghost.after.json', async())
     }, function (actual, expected) {
-        assert.say(expected)
-        assert.say(actual)
+        okay.say(expected)
+        okay.say(actual)
 
-        assert(actual, expected, 'after')
+        okay(actual, expected, 'after')
         strata.close(async())
     })
 }

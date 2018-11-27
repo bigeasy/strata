@@ -1,6 +1,6 @@
 require('./proof')(4, prove)
 
-function prove (async, assert) {
+function prove (async, okay) {
     var strata = createStrata({ directory: tmp, leafSize: 3, branchSize: 3 })
     async(function () {
         serialize(__dirname + '/fixtures/reinsert.before.json', tmp, async())
@@ -15,20 +15,20 @@ function prove (async, assert) {
     }, function () {
         gather(strata, async())
     }, function (records) {
-        assert(records, [ 'a', 'b', 'c', 'd', 'e', 'f' ], 'records')
+        okay(records, [ 'a', 'b', 'c', 'd', 'e', 'f' ], 'records')
         vivify(tmp, async())
         load(__dirname + '/fixtures/reinsert.after.json', async())
     }, function (actual, expected) {
-        assert(actual, expected, 'after tree')
+        okay(actual, expected, 'after tree')
         strata.balance(async())
     }, function () {
         gather(strata, async())
     }, function (records) {
-        assert(records, [ 'a', 'b', 'c', 'd', 'e', 'f' ], 'balanced records')
+        okay(records, [ 'a', 'b', 'c', 'd', 'e', 'f' ], 'balanced records')
         vivify(tmp, async())
         load(__dirname + '/fixtures/reinsert.balanced.json', async())
     }, function (actual, expected) {
-        assert(actual, expected, 'balanced tree')
+        okay(actual, expected, 'balanced tree')
         strata.close(async())
     })
 }

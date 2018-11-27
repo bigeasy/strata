@@ -344,25 +344,25 @@ function createStrata (options) {
     return new Strata(options)
 }
 
-var invoke = cadence(function (async, tmp, assert, test) {
+var invoke = cadence(function (async, tmp, okay, test) {
     async(function () {
         rimraf(tmp, async())
     }, function () {
         fs.mkdir(tmp, 0755, async())
     }, function () {
-        assert.global = function (name, value) {
+        okay.global = function (name, value) {
             global[name] = value
-            assert.leak(name)
+            okay.leak(name)
         }
-        assert.global('createStrata', createStrata)
-        assert.global('tmp', tmp)
-        assert.global('load', load)
-        assert.global('stringify', stringify)
-        assert.global('serialize', serialize)
-        assert.global('gather', gather)
-        assert.global('vivify', vivify)
-        assert.global('script', script)
-        test(assert, async())
+        okay.global('createStrata', createStrata)
+        okay.global('tmp', tmp)
+        okay.global('load', load)
+        okay.global('stringify', stringify)
+        okay.global('serialize', serialize)
+        okay.global('gather', gather)
+        okay.global('vivify', vivify)
+        okay.global('script', script)
+        test(okay, async())
     }, function () {
         if (!('UNTIDY' in process.env)) {
             rimraf(tmp, async())
@@ -373,25 +373,25 @@ var invoke = cadence(function (async, tmp, assert, test) {
 module.exports = function (module, dirname) {
     var tmp = dirname + '/tmp'
     module.exports = function (count, test) {
-        require('proof')(count, cadence(function (async, assert) {
-            assert.global = function (name, value) {
+        require('proof')(count, cadence(function (async, okay) {
+            okay.global = function (name, value) {
                 global[name] = value
-                assert.leak(name)
+                okay.leak(name)
             }
-            assert.global('createStrata', createStrata)
-            assert.global('tmp', tmp)
-            assert.global('load', load)
-            assert.global('stringify', stringify)
-            assert.global('serialize', serialize)
-            assert.global('gather', gather)
-            assert.global('vivify', vivify)
-            assert.global('script', script)
+            okay.global('createStrata', createStrata)
+            okay.global('tmp', tmp)
+            okay.global('load', load)
+            okay.global('stringify', stringify)
+            okay.global('serialize', serialize)
+            okay.global('gather', gather)
+            okay.global('vivify', vivify)
+            okay.global('script', script)
             async(function () {
                 rimraf(tmp, async())
             }, function () {
                 fs.mkdir(tmp, 0755, async())
             }, function () {
-                cadence(test)(assert, {
+                cadence(test)(okay, {
                     createStrata: createStrata,
                     tmp: tmp,
                     load: load,
@@ -578,7 +578,7 @@ function script (options, callback) {
             vivify(options.directory, async())
             load(action.file, async())
         }, function (actual, expected) {
-            options.assert(actual, expected, action.file)
+            options.okay(actual, expected, action.file)
         })
     })
 

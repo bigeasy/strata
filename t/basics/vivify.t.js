@@ -1,6 +1,6 @@
 require('./proof')(1, prove)
 
-function prove (async, assert) {
+function prove (async, okay) {
     var strata
     async(function () {
         serialize(__dirname + '/fixtures/vivify.json', tmp, async())
@@ -11,7 +11,7 @@ function prove (async, assert) {
         strata.vivify(async())
     }, function (result) {
         console.log(require('util').inspect(result, false, null))
-        assert(result,
+        okay(result,
           [ { address: 22,
               children:
                [ { address: 1, children: [ 'a', 'b' ], ghosts: 0 },

@@ -1,6 +1,6 @@
 require('./proof')(1, prove)
 
-function prove (async, assert) {
+function prove (async, okay) {
     var strata
     async(function () {
         strata = createStrata({ directory: tmp, leafSize: 3, branchSize: 3 })
@@ -12,7 +12,7 @@ function prove (async, assert) {
                 throw new Error('propagated')
             })
         } catch (e) {
-            assert(e.message, 'propagated', 'propagated error')
+            okay(e.message, 'propagated', 'propagated error')
             strata.close(async())
         }
     })

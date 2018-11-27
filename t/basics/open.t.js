@@ -1,6 +1,6 @@
 require('./proof')(2, prove)
 
-function prove (async, assert) {
+function prove (async, okay) {
     var strata
     async(function () {
         strata = createStrata({ directory: tmp, leafSize: 3, branchSize: 3 })
@@ -11,7 +11,7 @@ function prove (async, assert) {
         strata = createStrata({ directory: tmp, leafSize: 3, branchSize: 3 })
         strata.open(async())
     }, function () {
-        assert(strata.sheaf.magazine.heft, 0, 'json size')
-        assert(strata.sheaf.nextAddress, 2, 'next address')
+        okay(strata.sheaf.magazine.heft, 0, 'json size')
+        okay(strata.sheaf.nextAddress, 2, 'next address')
     })
 }

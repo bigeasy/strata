@@ -1,15 +1,15 @@
 require('./proof')(2, prove)
 
-function prove (async, assert) {
+function prove (async, okay) {
     var scram = require('../../scram'), entry = {
         scram: function (callback) {
-            assert(1, 'called')
+            okay('called')
             callback()
         }
     }
     scram(entry, function (callback) {
         callback(new Error('abend'))
     }, function (error) {
-        assert(error.message, 'abend', 'error thrown')
+        okay(error.message, 'abend', 'error thrown')
     })
 }

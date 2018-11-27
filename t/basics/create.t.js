@@ -1,6 +1,6 @@
 require('./proof')(5, prove)
 
-function prove (async, assert) {
+function prove (async, okay) {
     var fs = require('fs'), strata
     async(function () {
         fs.writeFile(tmp + '/.ignore', '', 'utf8', async())
@@ -8,29 +8,29 @@ function prove (async, assert) {
         strata = createStrata({ directory: tmp, leafSize: 3, branchSize: 3 })
         strata.create(async())
     }, function () {
-        assert(strata.sheaf.magazine.heft, 0, 'total heft')
+        okay(strata.sheaf.magazine.heft, 0, 'total heft')
         strata.close(async())
     }, function () {
-        assert(1, 'created')
+        okay('created')
         vivify(tmp, async())
         load(__dirname + '/fixtures/create.after.json', async())
     }, function (actual, expected) {
-        assert.say(actual[1])
-        assert.say(expected)
+        okay.say(actual[1])
+        okay.say(expected)
 
-        assert(actual, expected, 'written')
+        okay(actual, expected, 'written')
 
         strata = createStrata({ directory: tmp, leafSize: 3, branchSize: 3 })
         strata.open(async())
     }, function () {
         strata.iterator('a', async())
     }, function (cursor) {
-        assert(cursor.page.items.length - cursor.offset, 0, 'empty')
+        okay(cursor.page.items.length - cursor.offset, 0, 'empty')
 
         cursor.unlock(async())
     }, function () {
         strata.purge(0)
-        assert(strata.sheaf.magazine.heft, 0, 'purged')
+        okay(strata.sheaf.magazine.heft, 0, 'purged')
 
         strata.close(async())
     })

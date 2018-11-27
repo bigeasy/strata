@@ -1,6 +1,6 @@
 require('./proof')(4, prove)
 
-function prove (async, assert) {
+function prove (async, okay) {
     var strata
     async(function () {
         strata = createStrata({ directory: tmp, leafSize: 3, branchSize: 3 })
@@ -8,24 +8,24 @@ function prove (async, assert) {
     }, function () {
         strata.mutator('a', async())
     }, function (cursor) {
-        assert(cursor.exclusive, 'exclusive')
+        okay(cursor.exclusive, 'exclusive')
         cursor.insert('a', 'a', ~cursor.index)
         cursor.unlock(async())
     }, function () {
-        assert(strata.sheaf.magazine.heft, 54, 'json size')
+        okay(strata.sheaf.magazine.heft, 54, 'json size')
     }, function () {
         vivify(tmp, async())
         load(__dirname + '/fixtures/insert.json', async())
     }, function (actual, expected) {
-        assert.say(expected)
-        assert.say(actual)
+        okay.say(expected)
+        okay.say(actual)
 
-        assert(actual, expected, 'insert')
+        okay(actual, expected, 'insert')
 
-        assert.say(expected.segment00000001)
+        okay.say(expected.segment00000001)
 
         strata.purge(0)
-        assert(strata.sheaf.magazine.heft, 0, 'purged')
+        okay(strata.sheaf.magazine.heft, 0, 'purged')
 
         strata.close(async())
     })

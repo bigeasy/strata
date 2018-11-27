@@ -1,6 +1,6 @@
 require('./proof')(1, prove)
 
-function prove (async, assert) {
+function prove (async, okay) {
     var fs = require('fs'), crypto = require('crypto'), strata
     async(function () {
         fs.writeFile(tmp + '/.ignore', '', 'utf8', async())
@@ -24,7 +24,7 @@ function prove (async, assert) {
     }, function () {
         strata.iterator('a', async())
     }, function (cursor) {
-        assert(cursor.page.items.length - cursor.offset, 0, 'empty')
+        okay(cursor.page.items.length - cursor.offset, 0, 'empty')
         cursor.unlock(async())
     }, function () {
         strata.close(async())

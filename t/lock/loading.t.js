@@ -1,6 +1,6 @@
 require('./proof')(2, prove)
 
-function prove (async, assert) {
+function prove (async, okay) {
     var strata
     async(function () {
         serialize(__dirname + '/fixtures/tree.before.json', tmp, async())
@@ -11,9 +11,9 @@ function prove (async, assert) {
         strata.iterator('h', async())
         strata.iterator('h', async())
     }, function (first, second) {
-        assert(first.page.items[first.offset].record, 'h', 'first')
+        okay(first.page.items[first.offset].record, 'h', 'first')
         first.unlock(async())
-        assert(second.page.items[second.offset].record, 'h', 'second')
+        okay(second.page.items[second.offset].record, 'h', 'second')
         second.unlock(async())
     }, function() {
         strata.close(async())

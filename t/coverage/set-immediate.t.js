@@ -1,6 +1,6 @@
 require('./proof')(1, prove)
 
-function prove (async, assert) {
+function prove (async, okay) {
     var strata
     async(function () {
         serialize(__dirname + '/../basics/fixtures/get.json', tmp, async())
@@ -15,7 +15,7 @@ function prove (async, assert) {
     }, function () {
         strata.iterator('a', async())
     }, function (cursor) {
-        assert(cursor.page.items[cursor.offset].record, 'a', 'get')
+        okay(cursor.page.items[cursor.offset].record, 'a', 'get')
         cursor.unlock(async())
     })
 }

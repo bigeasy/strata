@@ -1,7 +1,7 @@
 // todo: redux
 require('proof')(3, require('cadence')(prove))
 
-function prove (async, assert) {
+function prove (async, okay) {
     var path = require('path')
     var rimraf = require('rimraf')
     var mkdirp = require('mkdirp')
@@ -29,14 +29,14 @@ function prove (async, assert) {
     }, function () {
         fs.readFile(file, 'utf8', async())
     }, function (body) {
-        assert(body, 'xyz', 'write')
+        okay(body, 'xyz', 'write')
         async([function () {
             var scribe = new Scribe(path.join(__dirname, 'missing', 'file'), 'w+')
             scribe.open()
             scribe.write(new Buffer('x'), 0, 1, 0)
             scribe.close(async())
         }, function (error) {
-            assert(error.code, 'ENOENT', 'immediate error')
+            okay(error.code, 'ENOENT', 'immediate error')
         }])
     }, function () {
         fs.open(file, 'r', async())
@@ -55,7 +55,7 @@ function prove (async, assert) {
                 scribe.close(async())
             })
         }, function (error) {
-            assert(error.code, 'EBADF', 'later error')
+            okay(error.code, 'EBADF', 'later error')
         }])
     }, function () {
         rimraf(directory, async())

@@ -1,6 +1,6 @@
 require('./proof')(1, prove)
 
-function prove (async, assert) {
+function prove (async, okay) {
     var strata = createStrata({ directory: tmp, leafSize: 3, branchSize: 3 })
     async(function () {
         strata.create(async())
@@ -20,7 +20,7 @@ function prove (async, assert) {
             })
         })
     }, function (records) {
-        assert(records, [ 'a', 'b' ], 'records')
+        okay(records, [ 'a', 'b' ], 'records')
         strata.close(async())
     })
 }

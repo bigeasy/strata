@@ -1,6 +1,6 @@
 require('./proof')(2, prove)
 
-function prove (async, assert) {
+function prove (async, okay) {
     var cadence = require('cadence'),
         strata, count = 0
 
@@ -42,7 +42,7 @@ function prove (async, assert) {
             gather(strata, async())
         })
     }, function (records) {
-        assert(records, [ 'a', 'b', 'c', 'd', 'e', 'f' ], 'records')
+        okay(records, [ 'a', 'b', 'c', 'd', 'e', 'f' ], 'records')
     }, function () {
         strata.balance(async())
     }, function () {
@@ -51,7 +51,7 @@ function prove (async, assert) {
         vivify(tmp, async())
         load(__dirname + '/fixtures/split-race.after.json', async())
     }, function(actual, expected) {
-        assert(actual, expected, 'split')
+        okay(actual, expected, 'split')
         strata.close(async())
     })
 }

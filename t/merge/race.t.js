@@ -1,6 +1,6 @@
 require('./proof')(2, prove)
 
-function prove (async, assert) {
+function prove (async, okay) {
     var cadence = require('cadence'), strata, insert
 
     function tracer (type, object, callback) {
@@ -37,7 +37,7 @@ function prove (async, assert) {
         vivify(tmp, async())
         load(__dirname + '/fixtures/race-left.after.json', async())
     }, function(actual, expected) {
-        assert(actual, expected, 'race left')
+        okay(actual, expected, 'race left')
         strata.close(async())
     }, function () {
         serialize(__dirname + '/fixtures/race.before.json', tmp, async())
@@ -56,7 +56,7 @@ function prove (async, assert) {
         vivify(tmp, async())
         load(__dirname + '/fixtures/race-right.after.json', async())
     }, function(actual, expected) {
-        assert(actual, expected, 'race right')
+        okay(actual, expected, 'race right')
         strata.close(async())
     })
 }
