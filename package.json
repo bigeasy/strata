@@ -23,7 +23,7 @@
     },
     "dependencies":
     {
-                            "magazine":                     "3.2.x",
+                            "magazine":                     "4.0.x",
                             "sequester":                    "1.0.x",
                             "cadence":                      "2.0.x"
     },
