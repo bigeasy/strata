@@ -68,9 +68,9 @@ Script.prototype._rewriteLeaf = cadence(function (async, operation) {
 
 Script.prototype.commit = cadence(function (async) {
     async(function () {
-        async.forEach(function (operation) {
+        async.forEach([ this._operations ], function (operation) {
             this[operation.name](operation, async())
-        })(this._operations)
+        })
     }, function () {
         this._journal.push({ name: '_complete' })
         var pending = path.join(this._logger._directory, 'journal.pending')
@@ -89,20 +89,20 @@ Script.prototype.commit = cadence(function (async) {
 })
 
 Script.prototype.play = cadence(function (async, page) {
-    async.forEach(function (operation) {
+    async.forEach([ this._journal ], function (operation) {
         this[operation.name](operation, async())
-    })(this._journal)
+    })
 })
 
 Script.prototype._replace = cadence(function (async, operation) {
     async(function () {
-        var block = async([function () {
+        async([function () {
             fs.stat(operation.from, async())
         }, function (error) {
             if (error.code !== 'ENOENT') {
                 throw error
             }
-            return [ block.break ]
+            return [ async.return ]
         }], [function () {
             fs.unlink(operation.to, async())
         }, function (error) {
@@ -111,9 +111,7 @@ Script.prototype._replace = cadence(function (async, operation) {
             }
         }], function () {
             fs.rename(operation.from, operation.to, async())
-        }, function () {
-            return [ block.break ]
-        })()
+        })
     }, function () {
         fs.stat(operation.to, async())
     })
@@ -131,7 +129,7 @@ Script.prototype._complete = cadence(function (async, operation) {
 })
 
 Script.prototype._purge = cadence(function (async, operation) {
-    async.forEach(function (file) {
+    async.forEach([ operation.rotations], function (file) {
         async([function () {
             fs.unlink(file, async())
         }, function (error) {
@@ -139,7 +137,7 @@ Script.prototype._purge = cadence(function (async, operation) {
                 throw error
             }
         }])
-    })(operation.rotations)
+    })
 })
 
 module.exports = Script

@@ -199,19 +199,8 @@ Strata.prototype.vivify = cadence(function (async) {
         return { address: item.address }
     }
 
-    async(function () {
-        locker.lock(0, false, async())
-    }, function (page) {
-        async([function () {
-            locker.unlock(page)
-            locker.dispose()
-        }], function () {
-            expand.call(this, page, root = page.items.map(record), 0, async())
-        })
-    })
-
     var expand = cadence(function (async, parent, pages, index) {
-        var block = async(function () {
+        async(function () {
             if (index < pages.length) {
                 var address = pages[index].address
                 async(function () {
@@ -221,7 +210,7 @@ Strata.prototype.vivify = cadence(function (async) {
                     locker.unlock(page)
                 }])
             } else {
-                return [ block.break, pages ]
+                return [ async.return, pages ]
             }
         }, function (page) {
             if (page.address % 2 == 0) {
@@ -247,8 +236,19 @@ Strata.prototype.vivify = cadence(function (async) {
                 })
             }
         }, function () {
-            return [ block.break, pages ]
-        })()
+            return [ pages ]
+        })
+    })
+
+    async(function () {
+        locker.lock(0, false, async())
+    }, function (page) {
+        async([function () {
+            locker.unlock(page)
+            locker.dispose()
+        }], function () {
+            expand.call(this, page, root = page.items.map(record), 0, async())
+        })
     })
 })
 

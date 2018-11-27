@@ -13,14 +13,14 @@ function prove (async, okay) {
     }, function () {
         strata.mutator('a', async())
     }, function (cursor) {
-        var page = async(function () {
+        async.loop([], function () {
             var index = cursor.indexOf('z', cursor.page.ghosts)
             ambiguity.unshift(cursor.page.items.length < ~index)
             if (ambiguity[0]) {
                 async(function () {
                     cursor.next(async())
                 }, function () {
-                    return [ page.continue ]
+                    return [ async.continue ]
                 })
             } else {
                 async(function () {
@@ -30,8 +30,8 @@ function prove (async, okay) {
                 })
             }
         }, function () {
-            return [ page.break ]
-        })()
+            return [ async.break ]
+        })
     }, function () {
         gather(strata, async())
     }, function (records) {

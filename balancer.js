@@ -109,9 +109,9 @@ Balancer.prototype.balance = cadence(function balance (async, sheaf) {
     }
 
     async(function () {
-        async.forEach(function (address) {
+        async.forEach([ addresses ], function (address) {
             _gather.call(this, +address, lengths[address], async())
-        })(addresses)
+        })
     }, function () {
         // TODO permeate('bigeasy.strata.plan', {}, async())
         this.sheaf.tracer('plan', {}, async())
@@ -196,9 +196,9 @@ Balancer.prototype.balance = cadence(function balance (async, sheaf) {
         }
 
         async(function () {
-            async.forEach(function (operation) {
+            async.forEach([ operations ], function (operation) {
                 this[operation.method].apply(this, operation.parameters.concat(async()))
-            })(operations)
+            })
         }, function () {
             this.sheaf.balancing = false
             return false
@@ -226,7 +226,7 @@ Balancer.prototype.splitLeafAndUnlock = cadence(function (async, address, key, g
         penultimate, leaf, split, pages, page,
         records, remainder, right, index, offset, length
 
-    var splitter = async([function () {
+    async.loop([], [function () {
         encached.forEach(function (page) { locker.unlock(page) })
         descents.forEach(function (descent) { locker.unlock(descent.page) })
         locker.dispose()
@@ -250,7 +250,7 @@ Balancer.prototype.splitLeafAndUnlock = cadence(function (async, address, key, g
         split = leaf.page
         if (split.items.length - split.ghosts <= this.sheaf.options.leafSize) {
             this.sheaf.unbalanced(split, true)
-            return [ splitter.break, false ]
+            return [ async.break, false ]
         }
     }, function () {
         pages = Math.ceil(split.items.length / this.sheaf.options.leafSize)
@@ -262,8 +262,8 @@ Balancer.prototype.splitLeafAndUnlock = cadence(function (async, address, key, g
         offset = split.items.length
 
         var splits = 0
-        var loop = async(function () {
-            if (splits++ == pages - 1) return [ loop.break ]
+        async.loop([], function () {
+            if (splits++ == pages - 1) return [ async.break ]
             page = locker.encache(this.sheaf.createPage(1))
             encached.push(page)
 
@@ -296,7 +296,7 @@ Balancer.prototype.splitLeafAndUnlock = cadence(function (async, address, key, g
         }, function () {
             split.splice(offset, length)
             script.rewriteLeaf(page)
-        })()
+        })
     }, function () {
         split.right = right
         script.rewriteLeaf(split)
@@ -305,8 +305,8 @@ Balancer.prototype.splitLeafAndUnlock = cadence(function (async, address, key, g
     }, function () {
         this.sheaf.unbalanced(leaf.page, true)
         this.sheaf.unbalanced(page, true)
-        return [ splitter.break, true, penultimate.page, encached[0].items[0].key ]
-    })()
+        return [ async.break, true, penultimate.page, encached[0].items[0].key ]
+    })
 })
 
 Balancer.prototype.splitLeaf = cadence(function (async, address, key, ghosts) {
@@ -553,7 +553,7 @@ Balancer.prototype.mergePagesAndUnlock = cadence(function (
     var keys = [ key ]
     if (leftKey) keys.push(leftKey)
 
-    var merge = async([function () {
+    async.loop([], [function () {
         descents.forEach(function (descent) { locker.unlock(descent.page) })
         ! [ 'left', 'right' ].forEach(function (direction) {
             // TODO use `pages` array, these conditions are tricky,
@@ -621,7 +621,7 @@ Balancer.prototype.mergePagesAndUnlock = cadence(function (
     }, function () {
         merger.call(this, script, pages, ghosted, async())
     }, function (dirty) {
-        if (!dirty) return [ merge.break, false ]
+        if (!dirty) return [ async.break, false ]
     }, function () {
         var index = parents.right.indexes[ancestor.address]
 
@@ -649,8 +649,8 @@ Balancer.prototype.mergePagesAndUnlock = cadence(function (
         })
         script.commit(async())
     }, function () {
-        return [ merge.break, true, ancestor, designation.key ]
-    })()
+        return [ async.break, true, ancestor, designation.key ]
+    })
 })
 
 Balancer.prototype.mergePages = cadence(function (async, key, leftKey, stopper, merger, ghostly) {
@@ -708,12 +708,12 @@ Balancer.prototype.mergeLeaves = function (key, leftKey, unbalanced, ghostly, ca
                 var ghosts = leaves.right.page.ghosts
                 var count = leaves.right.page.items.length - leaves.right.page.ghosts
                 var index = 0
-                var loop = async(function () {
-                    if (index == count) return [ loop.break ]
+                async.loop([], function () {
+                    if (index == count) return [ async.break ]
                     var item = leaves.right.page.items[index + ghosts]
                     leaves.left.page.splice(leaves.left.page.items.length, 0, item)
                     index++
-                })()
+                })
             }, function () {
                 leaves.right.page.splice(0, leaves.right.page.items.length)
                 if (leftKey) {
@@ -746,7 +746,7 @@ Balancer.prototype.chooseBranchesToMergeAndUnlock = cadence(function (async, key
         })
     })
 
-    var choose = async(function () {
+    async.loop([], function () {
         async([function () {
             descents.forEach(function (descent) { locker.unlock(descent.page) })
             locker.dispose()
@@ -774,13 +774,13 @@ Balancer.prototype.chooseBranchesToMergeAndUnlock = cadence(function (async, key
                 designator.setIndex(0)
                 designator.descend(designator.left, designator.leaf, async())
             } else {
-                return [ choose.break, false ]
+                return [ async.break, false ]
             }
         }, function () {
             var item = designator.page.items[0]
-            return [ choose.break, true, item.key, item.heft, choice.page.address ]
+            return [ async.break, true, item.key, item.heft, choice.page.address ]
         })
-    })()
+    })
 })
 
 Balancer.prototype.chooseBranchesToMerge = cadence(function (async, key, address) {

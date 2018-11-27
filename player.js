@@ -24,14 +24,14 @@ Player.prototype.io = cadence(function (async, direction, filename) {
                 var length = stat.size - position
                 var slice = length < buffer.length ? buffer.slice(0, length) : buffer
 
-                var loop = async(function (count) {
+                async.loop([ 0 ], function (count) {
                     if (count < slice.length - offset) {
                         offset += count
                         fs[direction](fd, slice, offset, slice.length - offset, position + offset, async())
                     } else {
-                        return [ loop.break, slice, position ]
+                        return [ async.break, slice, position ]
                     }
-                })(0)
+                })
             })
             return [ fd, stat, io ]
         })
@@ -40,19 +40,20 @@ Player.prototype.io = cadence(function (async, direction, filename) {
 
 Player.prototype.read = cadence(function (async, sheaf, page) {
     page.entries = page.ghosts = 0
-    var rotation = 0, loop = async([function () {
+    var rotation = 0
+    async.loop([], [function () {
         var filename = path.join(this.directory, 'pages', page.address + '.' + rotation)
         this.io('read', filename, async())
     }, function (error) {
         if (rotation === 0 || error.code !== 'ENOENT') {
             throw error
         }
-        return [ loop.break, page ]
+        return [ async.break, page ]
     }], function (fd, stat, read) {
         page.position = 0
         page.rotation = rotation++
         this.play(sheaf, fd, stat, read, page, async())
-    })()
+    })
 })
 
 Player.prototype._play = function (sheaf, slice, start, page) {
@@ -119,7 +120,7 @@ Player.prototype.play = cadence(function (async, sheaf, fd, stat, read, page) {
     async([function () {
         fs.close(fd, async())
     }], function () {
-        var loop = async(function (buffer, position) {
+        async.loop([ buffer, 0 ], function (buffer, position) {
             read(buffer, position, async())
         }, function (slice, start) {
             var offset = this._play(sheaf, slice, start, page)
@@ -131,9 +132,9 @@ Player.prototype.play = cadence(function (async, sheaf, fd, stat, read, page) {
                     read(buffer, start + offset, async())
                 }
             } else {
-                return [ loop.break ]
+                return [ async.break ]
             }
-        })(buffer, 0)
+        })
     })
 })
 

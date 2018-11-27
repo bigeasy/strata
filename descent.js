@@ -105,9 +105,9 @@ Descent.prototype.unlocker = function (parent) {
 }
 
 Descent.prototype.descend = cadence(function (async, next, stop) {
-    var loop = async(function () {
+    async.loop([], function () {
         if (stop.call(this)) {
-            return [ loop.break, this.page, this.index ]
+            return [ async.break, this.page, this.index ]
         } else {
             if (this.index + 1 < this.page.items.length) {
                 this.greater = this.page.address
@@ -132,7 +132,7 @@ Descent.prototype.descend = cadence(function (async, next, stop) {
             ok(this.page.items.length, 'page has addresses')
             ok(this.page.items[0].key == null, 'first key is cached')
         }
-    })()
+    })
 })
 
 module.exports = Descent
