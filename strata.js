@@ -13,7 +13,10 @@ var Cache = require('magazine'),
     ok = require('assert').ok,
     path = require('path')
 
+var Interrupt = require('interrupt').createInterrupter('b-tree')
 var Turnstile = require('turnstile')
+
+var Journalist = require('./journalist')
 
 // TODO temporary
 var scram = require('./scram')
@@ -48,36 +51,6 @@ function Strata (options) {
     this.housekeeper = new Turnstile
     this._journalist = new Journalist(options.directory)
 }
-
-var Staccato = require('staccato')
-var Interrupt = require('interrupt').createInterrupter('b-tree')
-
-function Journalist (directory) {
-    this._magazine = new Cache().createMagazine()
-    this._directory = directory
-}
-
-Journalist.prototype.hold = function (parts) {
-    var filename = path.resolve.apply(path, [ this._directory ].concat(parts))
-    var cartridge = this._magazine.hold(filename, null)
-    if (cartridge.value == null) {
-        var stream = fs.createWriteStream(filename, { flags: 'a' })
-        cartridge.value = new Staccato.Writable(stream)
-    }
-    return cartridge
-}
-
-Journalist.prototype.close = cadence(function (async, parts) {
-    var filename = path.resolve.apply(path, [ this._directory ].concat(parts))
-    var cartridge = this._magazine.hold(filename, null)
-    async(function () {
-        if (cartridge.value != null) {
-            cartridge.value.end(async())
-        }
-    }, function () {
-        cartridge.release()
-    })
-})
 
 Strata.prototype.create = cadence(function (async, options) {
     var directory = this.options.directory
