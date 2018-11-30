@@ -1,37 +1,35 @@
-require('./proof')(5, prove)
+require('proof')(1, require('cadence')(prove))
 
 function prove (async, okay) {
-    var fs = require('fs'), strata
+    var Strata = require('../..')
+
+    var rimraf = require('rimraf')
+    var mkdirp = require('mkdirp')
+    var path = require('path')
+    var directory = path.resolve(__dirname, '../tmp')
+
+    var utilities = require('../utilities')
+
+    var options = {
+        directory: directory,
+        branch: { split: 5, merge: 2 },
+        leaf: { split: 5, merge: 2 }
+    }
+    var strata = new Strata(options)
+
     async(function () {
-        fs.writeFile(tmp + '/.ignore', '', 'utf8', async())
+        rimraf(directory, async())
     }, function () {
-        strata = createStrata({ directory: tmp, leafSize: 3, branchSize: 3 })
-        strata.create(async())
+        mkdirp(directory, async())
     }, function () {
-        okay(strata.sheaf.magazine.heft, 0, 'total heft')
-        strata.close(async())
-    }, function () {
-        okay('created')
-        vivify(tmp, async())
-        load(__dirname + '/fixtures/create.after.json', async())
-    }, function (actual, expected) {
-        okay.say(actual[1])
-        okay.say(expected)
-
-        okay(actual, expected, 'written')
-
-        strata = createStrata({ directory: tmp, leafSize: 3, branchSize: 3 })
-        strata.open(async())
-    }, function () {
-        strata.iterator('a', async())
-    }, function (cursor) {
-        okay(cursor.page.items.length - cursor.offset, 0, 'empty')
-
-        cursor.unlock(async())
-    }, function () {
-        strata.purge(0)
-        okay(strata.sheaf.magazine.heft, 0, 'purged')
-
-        strata.close(async())
+        var strata = new Strata(options)
+        async(function () {
+            strata.create(async())
+        }, function () {
+            utilities.vivify(directory, async())
+        }, function (x) {
+            okay(x, require('./fixtures/created'), 'created')
+            strata.close(async())
+        })
     })
 }

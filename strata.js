@@ -13,6 +13,8 @@ var Cache = require('magazine'),
     ok = require('assert').ok,
     path = require('path')
 
+var Turnstile = require('turnstile')
+
 // TODO temporary
 var scram = require('./scram')
 
@@ -23,6 +25,7 @@ function extend(to, from) {
 
 // TODO Branch and leaf size, can we just sort that out in a call to balance?
 function Strata (options) {
+    this.options = options
     if (!options.serializers) {
         var json = require('./json')
         options.serializers = {
@@ -41,9 +44,73 @@ function Strata (options) {
     options.player = new Player(options)
     this.sheaf = options.sheaf = new Sheaf(options)
     this.logger = new Logger(options)
+
+    this.housekeeper = new Turnstile
+    this._journalist = new Journalist(options.directory)
 }
 
-Strata.prototype.create = cadence(function (async) {
+var Staccato = require('staccato')
+var Interrupt = require('interrupt').createInterrupter('b-tree')
+
+function Journalist (directory) {
+    this._magazine = new Cache().createMagazine()
+    this._directory = directory
+}
+
+Journalist.prototype.hold = function (parts) {
+    var filename = path.resolve.apply(path, [ this._directory ].concat(parts))
+    var cartridge = this._magazine.hold(filename, null)
+    if (cartridge.value == null) {
+        var stream = fs.createWriteStream(filename, { flags: 'a' })
+        cartridge.value = new Staccato.Writable(stream)
+    }
+    return cartridge
+}
+
+Journalist.prototype.close = cadence(function (async, parts) {
+    var filename = path.resolve.apply(path, [ this._directory ].concat(parts))
+    var cartridge = this._magazine.hold(filename, null)
+    async(function () {
+        if (cartridge.value != null) {
+            cartridge.value.end(async())
+        }
+    }, function () {
+        cartridge.release()
+    })
+})
+
+Strata.prototype.create = cadence(function (async, options) {
+    var directory = this.options.directory
+    async(function () {
+        fs.stat(directory, async())
+    }, function (stat) {
+        Interrupt.assert(stat.isDirectory(), 'create.not.directory', { directory: directory })
+        fs.readdir(this.sheaf.directory, async())
+    }, function (files) {
+        Interrupt.assert(files.filter(function (f) {
+            return ! /^\./.test(f)
+        }).length == 0, 'create.directory.not.empty', { directory: directory })
+    }, function () {
+        fs.mkdir(path.resolve(directory, 'pages'), 0755, async())
+    }, function () {
+        fs.writeFile(path.resolve(directory, 'instance'), '0\n', async())
+    }, function () {
+        async(function () {
+            var cartridge = this._journalist.hold([ 'pages', '0' ])
+            async([function () {
+                cartridge.release()
+            }], function () {
+                cartridge.value.write(JSON.stringify({ method: 'add', address: 1 }) + '\n', async())
+            })
+        }, function () {
+            this._journalist.close([ 'pages', '0' ], async())
+        }, function () {
+            this._journalist.hold([ 'pages', '1' ]).release()
+            this._journalist.close([ 'pages', '1' ], async())
+        })
+        console.log('---- created ---')
+    })
+    return []
     this.sheaf.createMagazine()
     var locker = this.sheaf.createLocker(), count = 0, root, leaf, journal
     async([function () {
@@ -98,6 +165,7 @@ Strata.prototype.open = cadence(function (async) {
 })
 
 Strata.prototype.close = cadence(function (async) {
+    return
     // TODO that's a lot of indirection.
     var cartridge = this.sheaf.metaRoot.cartridge, lock = cartridge.value.page.lock
 
