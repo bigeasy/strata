@@ -1,4 +1,4 @@
 module.exports = {
-    0: [{ method: 'add', address: 1 }],
+    0: [ 1 ],
     1: []
 }

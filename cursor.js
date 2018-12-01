@@ -4,16 +4,16 @@ var Queue = require('./queue')
 var Scribe = require('./scribe')
 var scram = require('./scram')
 
-function Cursor (sheaf, logger, descents, exclusive, searchKey) {
-    this.sheaf = sheaf
-    this.logger = logger
-    this._locker = descents[0].locker
-    this.page = descents[0].page
-    this.searchKey = searchKey
-    this.exclusive = exclusive
-    this.index = descents[0].index
-    this.offset = this.index < 0 ? ~this.index : this.index
-    descents.shift()
+var Interrupt = require('interrupt').createInterrupter('b-tree')
+
+function Cursor (sheaf, cartridge, key, index) {
+    this._cartridge = cartridge
+    this.found = index >= 0
+    this.sought = key
+    this.index = index < 0 ? ~index : index
+    this.items = cartridge.value.items
+    this.ghosts = cartridge.value.ghosts
+    this._sheaf = sheaf
 }
 
 Cursor.prototype.next = cadence(function (async) {
@@ -38,16 +38,61 @@ Cursor.prototype.next = cadence(function (async) {
     })
 })
 
+// Restore your cursor when you return from asynchronous operations.
+
+//
+Cursor.prototype.seek = function (key, index) {
+    var items = this._cartridge.value.items
+    if (items.length == 0) {
+        return -1
+    }
+    var compare = this._sheaf.compare(key, items[index].key)
+    if (compare == 0) {
+        return index
+    }
+    if (compare < 0) {
+        for (;;) {
+            index++
+            if (index == items.length) {
+                return -1
+            }
+            compare = this._sheaf.compare(key, items[index].key)
+            if (compare == 0) {
+                return index
+            } else if (compare > 0) {
+                return -1
+            }
+        }
+    }
+    for (;;) {
+        index--
+        if (index == -1) {
+            return -1
+        }
+        compare = this._sheaf.compare(key, items[index].key)
+        if (compare == 0) {
+            return index
+        } else if (compare < 0) {
+            return -1
+        }
+    }
+}
+
+// You must never use `indexOf` to scan backward for insert points, only to scan
+// backward for reading. Actually, let's assume that scanning will operate
+// directly on the `items` array and we're only going to use `indexOf` to search
+// forward for insertion points, and only forward.
+
 Cursor.prototype.indexOf = function (key, index) {
     ok(arguments.length == 2, 'index requires two arguments')
-    var page = this.page
-    var index = this.sheaf.find(page, key, index)
+    var page = this._cartridge.value
+    var index = this._sheaf.find(page, key, index)
     var unambiguous
     unambiguous = -1 < index // <- TODO ?
-               || ~ index < this.page.items.length
-               || page.right.address === null
+               || ~ index < page.items.length
+               || page.right == null
     if (!unambiguous && this.sheaf.comparator(key, page.right.key) >= 0) {
-        return [ ~(this.page.items.length + 1) ]
+        return null
     }
     return index
 }
@@ -74,23 +119,17 @@ Cursor.prototype.unlock = function (callback) {
 }
 
 Cursor.prototype.insert = function (record, key, index) {
-    ok(this.exclusive, 'cursor is not exclusive')
-    ok(index > 0 || this.page.address == 1)
-
-    this.sheaf.unbalanced(this.page)
-
-    if (this._appender == null) {
-        this._appender = this.logger.createAppender(this.page)
-    }
-
-    var heft = this._appender.writeInsert(index, record).length
-    this.page.splice(index, 0, {
+    Interrupt.assert(this.index > 0 || this._cartridge.value.id == 1, 'invalid.insert.index', { index: this.index })
+    // TODO Possibly queue for split.
+    // TODO Okay, how do I write this out?
+    // TODO Restore heft, this is a temporary heft.
+    var heft = JSON.stringify(record).length
+    this._cartridge.value.items.splice(index, 0, {
         key: key,
         record: record,
         heft: heft
     })
-
-    this.length = this.page.items.length
+    this._cartridge.adjustHeft(heft)
 }
 
 Cursor.prototype.remove = function (index) {
@@ -109,6 +148,10 @@ Cursor.prototype.remove = function (index) {
     } else {
         this.page.splice(index, 1)
     }
+}
+
+Cursor.prototype.close = function () {
+    this._cartridge.release()
 }
 
 module.exports = Cursor

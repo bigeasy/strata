@@ -23,7 +23,9 @@
     },
     "dependencies":
     {
+                            "interrupt":                    "6.4.x",
                             "magazine":                     "4.0.x",
+                            "restrictor":                   "2.5.x",
                             "sequester":                    "1.0.x",
                             "cadence":                      "2.0.x"
     },

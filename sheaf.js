@@ -81,4 +81,8 @@ Sheaf.prototype.find = function (page, key, low) {
     return ~low
 }
 
+Sheaf.prototype.hold = function (id) {
+    return this._sheaf.hold(id, null)
+}
+
 module.exports = Sheaf

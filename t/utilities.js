@@ -21,6 +21,7 @@ exports.vivify = cadence(function (async, directory) {
                 entries = entries.map(function (entry) { return JSON.parse(entry) })
                 if (+file % 2 == 1) {
                 } else {
+                    entries = entries.map(function (entry) { return entry.value.id })
                 }
                 vivified[file] = entries
                 return [ vivified ]

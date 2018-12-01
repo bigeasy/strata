@@ -4,5 +4,6 @@
 /benchmark/tmp
 /.proof.out
 /coverage
+/t/tmp
 /t/*/tmp
 /.todo.txt

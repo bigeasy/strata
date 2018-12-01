@@ -49,7 +49,10 @@ function Strata (options) {
     this.logger = new Logger(options)
 
     this.housekeeper = new Turnstile
-    this._journalist = new Journalist(options.directory)
+    this.writer = new Turnstile
+    this._sheaf = new Cache().createMagazine()
+    this._journalist = new Journalist(options.directory, this._sheaf)
+    this._cursors = []
 }
 
 Strata.prototype.create = cadence(function (async, options) {
@@ -73,13 +76,15 @@ Strata.prototype.create = cadence(function (async, options) {
             async([function () {
                 cartridge.release()
             }], function () {
-                cartridge.value.write(JSON.stringify({ method: 'add', address: 1 }) + '\n', async())
+                cartridge.value.write(JSON.stringify({ method: 'add', index: 0, value: { id: 1 } }) + '\n', async())
             })
         }, function () {
             this._journalist.close([ 'pages', '0' ], async())
         }, function () {
             this._journalist.hold([ 'pages', '1' ]).release()
             this._journalist.close([ 'pages', '1' ], async())
+        }, function () {
+            this._sheaf.hold(-1, { items: [{ id: 0 }]  })
         })
         console.log('---- created ---')
     })
@@ -204,6 +209,49 @@ Strata.prototype.toLeaf = cadence(function (async, sought, descents, key, exclus
 })
 
 Strata.prototype.cursor = cadence(function (async, key, exclusive) {
+    // We hold onto all cartridges until we're done, even retries, so we're
+    // going to end up holding cartridges two or more times, but we'll make
+    // progress eventually and release everything.
+    var cartridges = []
+    async([function () {
+        cartridges.forEach(function (cartridge) { cartridge.release() })
+    }], function () {
+        var retry = async.block(function () {
+            var cartridge, index = 0
+            cartridges.push(cartridge = this._sheaf.hold(-1, null))
+            async.loop([], function () {
+                async(function () {
+                    var id = cartridge.value.items[index].id
+                    cartridges.push(cartridge = this._sheaf.hold(id))
+                    if (cartridge.value == null) {
+                        async(function () {
+                            this._journalist.load(id, async())
+                        }, function () {
+                            return [ retry.continue ]
+                        })
+                    } else {
+                        return [ cartridge.value ]
+                    }
+                }, function (page) {
+                    var index = this.sheaf.find(page, key, page.leaf ? page.ghosts : 1)
+                    if (page.leaf) {
+                        return [ async.break, index ]
+                    } else if (index < 0) {
+                        // On a branch, unless we hit the key exactly, we're
+                        // pointing at the insertion point which is right after
+                        // the branching we're supposed to decend, so back it up
+                        // one unless it's a bullseye.
+                        index = ~index - 1
+                    }
+                })
+            })
+        }, function (index) {
+            // Pop the last cartridge to give to the cursor; we don't release it
+            // the cursor does.
+            return new Cursor(this.sheaf, cartridges.pop(), key, index)
+        })
+    })
+    return
     var descents = [ new Descent(this.sheaf, this.sheaf.createLocker()) ]
     async([function () {
         if (descents.length) {
@@ -247,7 +295,6 @@ Strata.prototype.vivify = cadence(function (async) {
                 async(function () {
                     locker.lock(address, false, async())
                 }, [function (page) {
-                    console.log('foo', page)
                     locker.unlock(page)
                 }])
             } else {
