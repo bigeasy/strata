@@ -216,36 +216,31 @@ Strata.prototype.cursor = cadence(function (async, key, exclusive) {
     async([function () {
         cartridges.forEach(function (cartridge) { cartridge.release() })
     }], function () {
-        var retry = async.block(function () {
+        async.block(function () {
             var cartridge, index = 0
             cartridges.push(cartridge = this._sheaf.hold(-1, null))
-            async.loop([], function () {
-                async(function () {
-                    var id = cartridge.value.items[index].id
-                    cartridges.push(cartridge = this._sheaf.hold(id))
-                    if (cartridge.value == null) {
-                        async(function () {
-                            this._journalist.load(id, async())
-                        }, function () {
-                            return [ retry.continue ]
-                        })
-                    } else {
-                        return [ cartridge.value ]
-                    }
-                }, function (page) {
-                    var index = this.sheaf.find(page, key, page.leaf ? page.ghosts : 1)
-                    if (page.leaf) {
-                        return [ async.break, index ]
-                    } else if (index < 0) {
-                        // On a branch, unless we hit the key exactly, we're
-                        // pointing at the insertion point which is right after
-                        // the branching we're supposed to decend, so back it up
-                        // one unless it's a bullseye.
-                        index = ~index - 1
-                    }
-                })
-            })
-        }, function (index) {
+            for (;;) {
+                var id = cartridge.value.items[index].id
+                cartridges.push(cartridge = this._sheaf.hold(id))
+                if (cartridge.value == null) {
+                    return async(function () {
+                        this._journalist.load(id, async())
+                    }, function () {
+                        return [ async.continue ]
+                    })
+                }
+                var page = cartridge.value
+                index = this.sheaf.find(cartridge.value, key, page.leaf ? page.ghosts : 1)
+                if (page.leaf) {
+                    break
+                } else if (index < 0) {
+                    // On a branch, unless we hit the key exactly, we're
+                    // pointing at the insertion point which is right after
+                    // the branching we're supposed to decend, so back it up
+                    // one unless it's a bullseye.
+                    index = ~index - 1
+                }
+            }
             // Pop the last cartridge to give to the cursor; we don't release it
             // the cursor does.
             return new Cursor(this.sheaf, cartridges.pop(), key, index)
