@@ -25,7 +25,7 @@
     {
                             "interrupt":                    "7.0.x",
                             "magazine":                     "5.0.x",
-                            "restrictor":                   "2.5.x",
+                            "restrictor":                   "3.0.x",
                             "sequester":                    "1.0.x",
                             "cadence":                      "3.0.x"
     },
