@@ -1,4 +1,4 @@
-require('./proof')(4, prove)
+require('proof')(4, require('cadence')(prove))
 
 function prove (async, okay) {
     var Strata = require('../..')
