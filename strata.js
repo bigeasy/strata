@@ -18,6 +18,8 @@ var Turnstile = require('turnstile')
 
 var Journalist = require('./journalist')
 
+var mkdirp = require('mkdirp')
+
 // TODO temporary
 var scram = require('./scram')
 
@@ -67,22 +69,18 @@ Strata.prototype.create = cadence(function (async, options) {
             return ! /^\./.test(f)
         }).length == 0, 'create.directory.not.empty', { directory: directory })
     }, function () {
-        fs.mkdir(path.resolve(directory, 'pages'), 0755, async())
+        mkdirp(path.resolve(directory, 'pages'), 0755, async())
     }, function () {
         fs.writeFile(path.resolve(directory, 'instance'), '0\n', async())
     }, function () {
         async(function () {
-            var cartridge = this._journalist.hold([ 'pages', '0' ])
-            async([function () {
-                cartridge.release()
-            }], function () {
-                cartridge.value.write(JSON.stringify({ method: 'add', index: 0, value: { id: 1 } }) + '\n', async())
-            })
+            mkdirp(path.resolve(directory, 'pages'), 0755, async())
         }, function () {
-            this._journalist.close([ 'pages', '0' ], async())
+            fs.writeFile(path.resolve(directory, 'pages', '0'), JSON.stringify({ method: 'add', index: 0, value: { id: 1 } }) + '\n', async())
         }, function () {
-            this._journalist.hold([ 'pages', '1' ]).release()
-            this._journalist.close([ 'pages', '1' ], async())
+            mkdirp(path.resolve(directory, 'pages'), 0755, async())
+        }, function () {
+            fs.writeFile(path.resolve(directory, 'pages', '1'), Buffer.alloc(0), async())
         }, function () {
             this._sheaf.hold(-1, { items: [{ id: 0 }]  })
         })
