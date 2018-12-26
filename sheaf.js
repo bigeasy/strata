@@ -94,13 +94,6 @@ Sheaf.prototype.find = function (page, key, low) {
     return ~low
 }
 
-Sheaf.prototype.hold = function (id) {
-    return this._sheaf.hold(id, null)
-}
-
-Sheaf.prototype._operate = cadence(function (async, entry) {
-})
-
 // TODO Okay, I'm getting tired of having to check canceled and unit test for
 // it, so let's have exploding turnstiles (or just let them OOM?) Maybe on
 // timeout we crash?
