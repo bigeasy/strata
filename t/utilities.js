@@ -13,7 +13,7 @@ exports.vivify = cadence(function (async, directory) {
                 return [ async.continue ]
             }
             async(function () {
-                fs.readFile(path.resolve(directory, 'pages', file), 'utf8', async())
+                fs.readFile(path.resolve(directory, 'pages', file, 'append'), 'utf8', async())
             }, function (entries) {
                 entries = entries.split(/\n/)
                 entries.pop()

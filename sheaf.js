@@ -26,7 +26,7 @@ Sheaf.prototype.load = restrictor.enqueue('canceled', cadence(function (async, i
         if (cartridge.value != null) {
             return [ async.return ]
         }
-        var filename = path.resolve(this._directory, 'pages', String(id))
+        var filename = path.resolve(this._directory, 'pages', String(id), 'append')
         var items = []
         async(function () {
             fs.readFile(filename, 'utf8', async())

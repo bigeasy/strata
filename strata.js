@@ -75,14 +75,15 @@ Strata.prototype.create = cadence(function (async, options) {
         fs.writeFile(path.resolve(directory, 'instance'), '0\n', async())
     }, function () {
         async(function () {
-            mkdirp(path.resolve(directory, 'pages'), 0755, async())
+            mkdirp(path.resolve(directory, 'pages', '0'), 0755, async())
         }, function () {
-            fs.writeFile(path.resolve(directory, 'pages', '0'), JSON.stringify({ method: 'add', index: 0, value: { id: 1 } }) + '\n', async())
+            fs.writeFile(path.resolve(directory, 'pages', '0', 'append'), JSON.stringify({ method: 'add', index: 0, value: { id: 1 } }) + '\n', async())
         }, function () {
-            mkdirp(path.resolve(directory, 'pages'), 0755, async())
+            mkdirp(path.resolve(directory, 'pages', '1'), 0755, async())
         }, function () {
-            fs.writeFile(path.resolve(directory, 'pages', '1'), Buffer.alloc(0), async())
+            fs.writeFile(path.resolve(directory, 'pages', '1', 'append'), Buffer.alloc(0), async())
         }, function () {
+            console.log('--- written ---')
             this._sheaf.magazine.hold(-1, { items: [{ id: 0 }]  })
         })
     })
