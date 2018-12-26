@@ -18,28 +18,6 @@ function Journalist (directory, sheaf) {
     this.turnstile = new Turnstile
 }
 
-Journalist.prototype.hold = function (parts) {
-    var filename = path.resolve.apply(path, [ this._directory ].concat(parts))
-    var cartridge = this._magazine.hold(filename, null)
-    if (cartridge.value == null) {
-        var stream = fs.createWriteStream(filename, { flags: 'a' })
-        cartridge.value = new Staccato.Writable(stream)
-    }
-    return cartridge
-}
-
-Journalist.prototype.close = cadence(function (async, parts) {
-    var filename = path.resolve.apply(path, [ this._directory ].concat(parts))
-    var cartridge = this._magazine.hold(filename, null)
-    async(function () {
-        if (cartridge.value != null) {
-            cartridge.value.end(async())
-        }
-    }, function () {
-        cartridge.release()
-    })
-})
-
 Journalist.prototype.load = restrictor.enqueue('canceled', cadence(function (async, id) {
     console.log('>>>', id)
     var cartridge = this._sheaf.hold(id, null)
