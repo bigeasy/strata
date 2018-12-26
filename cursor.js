@@ -4,6 +4,8 @@ var Queue = require('./queue')
 var Scribe = require('./scribe')
 var scram = require('./scram')
 
+var find = require('./find')
+
 var Interrupt = require('interrupt').createInterrupter('b-tree')
 
 function Cursor (journalist, cartridge, key, index) {
@@ -87,7 +89,7 @@ Cursor.prototype.seek = function (key, index) {
 Cursor.prototype.indexOf = function (key, index) {
     ok(arguments.length == 2, 'index requires two arguments')
     var page = this._cartridge.value
-    var index = this._journalist.find(page, key, index)
+    var index = find(this._journalist.comparator, page, key, index)
     var unambiguous
     unambiguous = -1 < index // <- TODO ?
                || ~ index < page.items.length

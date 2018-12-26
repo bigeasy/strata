@@ -23,6 +23,8 @@ var mkdirp = require('mkdirp')
 // TODO temporary
 var scram = require('./scram')
 
+var find = require('./find')
+
 function extend(to, from) {
     for (var key in from) to[key] = from[key]
     return to
@@ -198,7 +200,7 @@ Strata.prototype.cursor = cadence(function (async, key, exclusive) {
                     })
                 }
                 var page = cartridge.value
-                index = this.journalist.find(cartridge.value, key, page.leaf ? page.ghosts : 1)
+                index = find(this.options.comparator, cartridge.value, key, page.leaf ? page.ghosts : 1)
                 if (page.leaf) {
                     break
                 } else if (index < 0) {

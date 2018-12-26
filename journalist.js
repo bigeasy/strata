@@ -80,20 +80,6 @@ Journalist.prototype.createLocker = function () {
     return new Locker(this, this.magazine)
 }
 
-Journalist.prototype.find = function (page, key, low) {
-    var mid, high = page.items.length - 1
-
-    while (low <= high) {
-        mid = low + ((high - low) >>> 1)
-        var compare = this.comparator(key, page.items[mid].key)
-        if (compare < 0) high = mid - 1
-        else if (compare > 0) low = mid + 1
-        else return mid
-    }
-
-    return ~low
-}
-
 // TODO Okay, I'm getting tired of having to check canceled and unit test for
 // it, so let's have exploding turnstiles (or just let them OOM?) Maybe on
 // timeout we crash?
