@@ -46,11 +46,9 @@ function prove (async, okay) {
             })
         }, function () {
             strata.close(async())
-        }, [function () {
+        }, function () {
             utilities.vivify(directory, async())
-        }, function (error) {
-            console.log(error.stack)
-        }], function (x) {
+        }, function (x) {
             console.log(x)
             return [ async.break ]
             console.log('closed')
