@@ -216,22 +216,6 @@ Strata.prototype.cursor = cadence(function (async, key, exclusive) {
             return new Cursor(this.journalist, cartridges.pop(), key, index)
         })
     })
-    return
-    var descents = [ new Descent(this.sheaf, this.sheaf.createLocker()) ]
-    async([function () {
-        if (descents.length) {
-            descents[0].locker.unlock(descents[0].page)
-            descents[0].locker.dispose()
-        }
-    }], function () {
-        if  (typeof key == 'function') {
-            key.call(this, descents, exclusive, async())
-        } else {
-            this.toLeaf(descents[0].key(key), descents, key, exclusive, async())
-        }
-    }, function (cursor) {
-        return [ cursor ]
-    })
 })
 
 Strata.prototype.iterator = function (key, callback) {
