@@ -86,35 +86,6 @@ Strata.prototype.create = cadence(function (async, options) {
         }, function () {
             this._sheaf.hold(-1, { items: [{ id: 0 }]  })
         })
-        console.log('---- created ---')
-    })
-    return []
-    this.sheaf.createMagazine()
-    var locker = this.sheaf.createLocker(), count = 0, root, leaf, journal
-    async([function () {
-        locker.dispose()
-    }], function () {
-        fs.stat(this.sheaf.directory, async())
-    }, function (stat) {
-        ok(stat.isDirectory(), 'database ' + this.sheaf.directory + ' is not a directory.')
-    }, function () {
-        fs.readdir(this.sheaf.directory, async())
-    }, function (files) {
-        ok(!files.filter(function (f) { return ! /^\./.test(f) }).length,
-              'database ' + this.sheaf.directory + ' is not empty.')
-        this.logger.mkdir(async())
-    }, function () {
-        root = locker.encache(this.sheaf.createPage(0))
-        leaf = locker.encache(this.sheaf.createPage(1))
-    }, [function () {
-        locker.unlock(root)
-        locker.unlock(leaf)
-    }], function () {
-        var script = this.logger.createScript()
-        root.splice(0, 0, { address: leaf.address, heft: 0 })
-        script.writeBranch(root)
-        script.rewriteLeaf(leaf)
-        script.commit(async())
     })
 })
 
