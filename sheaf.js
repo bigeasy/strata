@@ -146,8 +146,6 @@ Sheaf.prototype._locked = cadence(function (async, envelope) {
                             })
                         }, function () {
                             writable.end(async())
-                        }, function () {
-                            stream.close(async())
                         })
                     })
                     break
