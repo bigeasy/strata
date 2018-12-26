@@ -23,7 +23,7 @@ function compare (a, b) { return a < b ? -1 : a > b ? 1 : 0 }
 
 function extract (a) { return a }
 
-function Sheaf (options) {
+function Journalist (options) {
     this.nextAddress = 0
     this.directory = options.directory
     this.cache = options.cache || new Cache()
@@ -39,7 +39,7 @@ function Sheaf (options) {
     this._queues = {}
 }
 
-Sheaf.prototype.create = function () {
+Journalist.prototype.create = function () {
     var root = this.createPage(0)
     var leaf = this.createPage(1)
     this.splice(root, 0, 0, { address: leaf.address, heft: 0 })
@@ -47,7 +47,7 @@ Sheaf.prototype.create = function () {
     return { root: root, leaf: leaf }
 }
 
-Sheaf.prototype.unbalanced = function (page, force) {
+Journalist.prototype.unbalanced = function (page, force) {
     if (force) {
         this.lengths[page.address] = this.options.leafSize
     } else if (this.lengths[page.address] == null) {
@@ -55,11 +55,11 @@ Sheaf.prototype.unbalanced = function (page, force) {
     }
 }
 
-Sheaf.prototype.createPage = function (modulus, address) {
+Journalist.prototype.createPage = function (modulus, address) {
     return new Page(this, address, modulus)
 }
 
-Sheaf.prototype.createMagazine = function () {
+Journalist.prototype.createMagazine = function () {
     var magazine = this.cache.createMagazine()
     var cartridge = magazine.hold(-2, {
         page: {
@@ -76,11 +76,11 @@ Sheaf.prototype.createMagazine = function () {
     this.magazine = magazine
 }
 
-Sheaf.prototype.createLocker = function () {
+Journalist.prototype.createLocker = function () {
     return new Locker(this, this.magazine)
 }
 
-Sheaf.prototype.find = function (page, key, low) {
+Journalist.prototype.find = function (page, key, low) {
     var mid, high = page.items.length - 1
 
     while (low <= high) {
@@ -102,7 +102,7 @@ Sheaf.prototype.find = function (page, key, low) {
 // but we should document this as a valid attitude to work in Turnstile.
 //
 // Writing things out again. Didn't occur to me
-Sheaf.prototype._locked = cadence(function (async, envelope) {
+Journalist.prototype._locked = cadence(function (async, envelope) {
     var queue = this._queues[envelope.body], entry
     console.log('here')
     async(function () {
@@ -150,7 +150,7 @@ Sheaf.prototype._locked = cadence(function (async, envelope) {
     })
 })
 
-Sheaf.prototype.append = function (entry) {
+Journalist.prototype.append = function (entry) {
     var queue = this._queues[entry.id]
     if (queue == null) {
         var queue = this._queues[entry.id] = [{ method: 'write', writes: [], completed: new Signal }]
@@ -160,4 +160,4 @@ Sheaf.prototype.append = function (entry) {
     return queue.signal
 }
 
-module.exports = Sheaf
+module.exports = Journalist

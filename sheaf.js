@@ -11,16 +11,15 @@ var Turnstile = require('turnstile')
 var fs = require('fs')
 var path = require('path')
 
-function Journalist (directory, sheaf) {
-    this._magazine = new Cache().createMagazine()
+function Sheaf (directory) {
+    this.magazine = new Cache().createMagazine()
     this._directory = directory
-    this._sheaf = sheaf
     this.turnstile = new Turnstile
 }
 
-Journalist.prototype.load = restrictor.enqueue('canceled', cadence(function (async, id) {
+Sheaf.prototype.load = restrictor.enqueue('canceled', cadence(function (async, id) {
     console.log('>>>', id)
-    var cartridge = this._sheaf.hold(id, null)
+    var cartridge = this.magazine.hold(id, null)
     async([function () {
         cartridge.release()
     }], function () {
@@ -54,4 +53,4 @@ Journalist.prototype.load = restrictor.enqueue('canceled', cadence(function (asy
     })
 }))
 
-module.exports = Journalist
+module.exports = Sheaf

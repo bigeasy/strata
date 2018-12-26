@@ -6,14 +6,15 @@ var scram = require('./scram')
 
 var Interrupt = require('interrupt').createInterrupter('b-tree')
 
-function Cursor (sheaf, cartridge, key, index) {
+function Cursor (journalist, cartridge, key, index) {
+    ok(journalist)
     this._cartridge = cartridge
     this.found = index >= 0
     this.sought = key
     this.index = index < 0 ? ~index : index
     this.items = cartridge.value.items
     this.ghosts = cartridge.value.ghosts
-    this._sheaf = sheaf
+    this._journalist = journalist
 }
 
 Cursor.prototype.next = cadence(function (async) {
@@ -86,7 +87,7 @@ Cursor.prototype.seek = function (key, index) {
 Cursor.prototype.indexOf = function (key, index) {
     ok(arguments.length == 2, 'index requires two arguments')
     var page = this._cartridge.value
-    var index = this._sheaf.find(page, key, index)
+    var index = this._journalist.find(page, key, index)
     var unambiguous
     unambiguous = -1 < index // <- TODO ?
                || ~ index < page.items.length
@@ -130,7 +131,7 @@ Cursor.prototype.insert = function (record, key, index) {
     var heft = serialized.length
 
     // Okay, now we have a buffer and heft.
-    var signal = this._sheaf.append({
+    var signal = this._journalist.append({
         id: this._cartridge.value.id,
         method: 'insert',
         index: index,

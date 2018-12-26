@@ -4,7 +4,7 @@ var Cache = require('magazine'),
     fs = require('fs'),
     Queue = require('./queue'),
     Script = require('./script'),
-    Sheaf = require('./sheaf'),
+    Journalist = require('./journalist'),
     Balancer = require('./balancer'),
     Descent = require('./descent'),
     Locker = require('./locker'),
@@ -16,7 +16,7 @@ var Cache = require('magazine'),
 var Interrupt = require('interrupt').createInterrupter('b-tree')
 var Turnstile = require('turnstile')
 
-var Journalist = require('./journalist')
+var Sheaf = require('./sheaf')
 
 var mkdirp = require('mkdirp')
 
@@ -47,13 +47,12 @@ function Strata (options) {
         options.framer = new UTF8(options.checksum || 'sha1')
     }
     options.player = new Player(options)
-    this.sheaf = options.sheaf = new Sheaf(options)
+    this.journalist = options.sheaf = new Journalist(options)
     this.logger = new Logger(options)
 
     this.housekeeper = new Turnstile
     this.writer = new Turnstile
-    this._sheaf = new Cache().createMagazine()
-    this._journalist = new Journalist(options.directory, this._sheaf)
+    this._sheaf = new Sheaf(options.directory)
     this._cursors = []
 }
 
@@ -63,7 +62,7 @@ Strata.prototype.create = cadence(function (async, options) {
         fs.stat(directory, async())
     }, function (stat) {
         Interrupt.assert(stat.isDirectory(), 'create.not.directory', { directory: directory })
-        fs.readdir(this.sheaf.directory, async())
+        fs.readdir(this.journalist.directory, async())
     }, function (files) {
         Interrupt.assert(files.filter(function (f) {
             return ! /^\./.test(f)
@@ -82,7 +81,7 @@ Strata.prototype.create = cadence(function (async, options) {
         }, function () {
             fs.writeFile(path.resolve(directory, 'pages', '1'), Buffer.alloc(0), async())
         }, function () {
-            this._sheaf.hold(-1, { items: [{ id: 0 }]  })
+            this._sheaf.magazine.hold(-1, { items: [{ id: 0 }]  })
         })
     })
 })
@@ -187,19 +186,19 @@ Strata.prototype.cursor = cadence(function (async, key, exclusive) {
     }], function () {
         async.block(function () {
             var cartridge, index = 0
-            cartridges.push(cartridge = this._sheaf.hold(-1, null))
+            cartridges.push(cartridge = this._sheaf.magazine.hold(-1, null))
             for (;;) {
                 var id = cartridge.value.items[index].id
-                cartridges.push(cartridge = this._sheaf.hold(id))
+                cartridges.push(cartridge = this._sheaf.magazine.hold(id))
                 if (cartridge.value == null) {
                     return async(function () {
-                        this._journalist.load(id, async())
+                        this._sheaf.load(id, async())
                     }, function () {
                         return [ async.continue ]
                     })
                 }
                 var page = cartridge.value
-                index = this.sheaf.find(cartridge.value, key, page.leaf ? page.ghosts : 1)
+                index = this.journalist.find(cartridge.value, key, page.leaf ? page.ghosts : 1)
                 if (page.leaf) {
                     break
                 } else if (index < 0) {
@@ -212,7 +211,7 @@ Strata.prototype.cursor = cadence(function (async, key, exclusive) {
             }
             // Pop the last cartridge to give to the cursor; we don't release it
             // the cursor does.
-            return new Cursor(this.sheaf, cartridges.pop(), key, index)
+            return new Cursor(this.journalist, cartridges.pop(), key, index)
         })
     })
     return
