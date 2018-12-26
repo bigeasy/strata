@@ -120,16 +120,34 @@ Cursor.prototype.unlock = function (callback) {
 
 Cursor.prototype.insert = function (record, key, index) {
     Interrupt.assert(this.index > 0 || this._cartridge.value.id == 1, 'invalid.insert.index', { index: this.index })
-    // TODO Possibly queue for split.
+    // Forgot where I was with splitting, if I queue for a split check at the
+    // moment I see the count increase, or, well, when else would you do it?
+    // Probably do it now, because now is the time to split, but maybe that
+    // split is canceled when the time comes.
+
     // TODO Okay, how do I write this out?
-    // TODO Restore heft, this is a temporary heft.
-    var heft = JSON.stringify(record).length
+    var serialized = Buffer.from(JSON.stringify(record) + '\n')
+    var heft = serialized.length
+
+    // Okay, now we have a buffer and heft.
+    var signal = this._sheaf.append({
+        id: this._cartridge.value.id,
+        method: 'insert',
+        index: index,
+        serialized: serialized
+    })
+
+    // TODO Restore heft, this is a temporary heft. We're going to want to
+    // calculate heft by calculating our serialization at this point. We may use
+    // a common serializer, one we imagined we'd create in Conduit or Procession.
     this._cartridge.value.items.splice(index, 0, {
         key: key,
         record: record,
         heft: heft
     })
     this._cartridge.adjustHeft(heft)
+
+    return signal
 }
 
 Cursor.prototype.remove = function (index) {

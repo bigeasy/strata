@@ -42,14 +42,18 @@ function prove (async, okay) {
                 okay(cursor.indexOf('x', cursor.ghosts), 0, 'inserted')
                 okay(~cursor.indexOf('z', 0), 1, 'not found')
                 // TODO Assert heft and purge again.
-                okay(strata._sheaf.heft, 3, 'heft')
+                okay(strata._sheaf.heft, 4, 'heft')
             })
         }, function () {
             strata.close(async())
-        }, function () {
+        }, [function () {
             utilities.vivify(directory, async())
-        }, function (x) {
-            return
+        }, function (error) {
+            console.log(error.stack)
+        }], function (x) {
+            console.log(x)
+            return [ async.break ]
+            console.log('closed')
             okay(x, {}, /*require('./fixtures/inserted'), */'inserted')
         })
     })

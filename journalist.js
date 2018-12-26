@@ -2,6 +2,8 @@ var cadence = require('cadence')
 var Staccato = require('staccato')
 var Cache = require('magazine')
 
+var Signal = require('signal')
+
 var restrictor = require('restrictor')
 
 var Turnstile = require('turnstile')
