@@ -19,6 +19,8 @@ var Cache = require('magazine')
 var Locker = require('./locker')
 var Page = require('./page')
 
+var recorder = require('./recorder')(function () { return '0' })
+
 function compare (a, b) { return a < b ? -1 : a > b ? 1 : 0 }
 
 function extract (a) { return a }
@@ -108,21 +110,13 @@ Journalist.prototype._locked = cadence(function (async, envelope) {
                         var writable = new Staccato.Writable(stream)
                         async(function () {
                             async.forEach([ entry.writes ], function (write) {
-                        console.log(path.resolve(directory, 'append'))
-                                var header = Buffer.from(JSON.stringify({
+                                writable.write(recorder({
                                     position: write.position,
                                     previous: write.previous,
                                     method: write.method,
                                     index: write.index,
-                                    length: write.serialized.length
-                                }) + '\n')
-                                var record = Buffer.concat([ header, write.serialized ])
-                                var checksum = JSON.stringify(this._checksum.call(null, record, 0, record.length)) + '\n'
-                                async(function () {
-                                    writable.write(checksum, async())
-                                }, function () {
-                                    writable.write(record, async())
-                                })
+                                    length: 0
+                                }, write.serialized), async())
                             })
                         }, function () {
                             writable.end(async())

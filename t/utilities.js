@@ -1,6 +1,8 @@
 var fs = require('fs')
 var path = require('path')
 
+var shifter = require('../shifter')(null)
+
 var cadence = require('cadence')
 
 exports.vivify = cadence(function (async, directory) {
@@ -21,10 +23,10 @@ exports.vivify = cadence(function (async, directory) {
                 if (+file % 2 == 1) {
                     var records = []
                     while (entries.length != 0) {
-                        var header = entries.shift()
+                        var record = shifter(entries), header = record[0]
                         switch (header.method) {
                         case 'insert':
-                            records.push({ method: header.method, index: header.index, body: entries.shift() })
+                            records.push({ method: header.method, index: header.index, body: record[1] })
                             break
                         case 'remove':
                             records.push({ method: header.method, index: header.index })
