@@ -38,7 +38,7 @@ Sheaf.prototype.load = restrictor.enqueue('canceled', cadence(function (async, i
             entries.forEach(function (entry) {
                 console.log('!', entry)
                 switch (entry.method) {
-                case 'add':
+                case 'insert':
                     items.splice(entry.index, 0, entry.value)
                     break
                 case 'remove':

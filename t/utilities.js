@@ -35,7 +35,16 @@ exports.vivify = cadence(function (async, directory) {
                     }
                     vivified[file] = records
                 } else {
-                    vivified[file] = entries.map(function (entry) { return entry.value.id })
+                    var records = []
+                    while (entries.length != 0) {
+                        var record = shifter(entries), header = record[0]
+                        switch (header.method) {
+                        case 'insert':
+                            records.splice(header.index, 0, header.value.id)
+                            break
+                        }
+                    }
+                    vivified[file] = records
                 }
             })
         })
