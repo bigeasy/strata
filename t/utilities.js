@@ -65,3 +65,20 @@ exports.vivify = cadence(function (async, directory) {
         return [ vivified ]
     })
 })
+
+exports.serialize = cadence(function (async, directory, files) {
+    async.forEach([ Object.keys(files) ], function (id) {
+        var stream = fs.createWriteStream(path.join(directory, 'pages', id, 'append'), { flags: 'a' })
+        var writable = new Staccato.Writable(stream)
+        if (+id % 2 == 0) {
+            async(function () {
+                async.forEach([ files[id] ], function (child, index) {
+                    writable.write(recorder({ method: 'insert', index: index, value: { id: child } }), async())
+                }, function () {
+                })
+            }, function () {
+            })
+        } else {
+        }
+    })
+})

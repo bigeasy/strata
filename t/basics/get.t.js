@@ -1,11 +1,18 @@
-require('./proof')(9, prove)
+require('proof')(9, require('cadence')(prove))
 
 function prove (async, okay) {
-    var strata
+    var Strata = require('../..')
+
+    var options = {
+        directory: utilities.directory,
+        branch: { split: 5, merge: 2 },
+        leaf: { split: 5, merge: 2 }
+    }
+    var strata = new Strata(options)
+
     async(function () {
         serialize(__dirname + '/fixtures/get.json', tmp, async())
     }, function () {
-        strata = createStrata({ directory: tmp, leafSize: 3, branchSize: 3 })
         strata.open(async())
     }, function () {
         okay(strata.sheaf.magazine.heft, 0, 'json size before read')

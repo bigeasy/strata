@@ -3,9 +3,6 @@ require('proof')(5, require('cadence')(prove))
 function prove (async, okay) {
     var Strata = require('../..')
 
-    var path = require('path')
-    var directory = path.resolve(__dirname, '../tmp')
-
     var utilities = require('../utilities')
 
     var options = {
@@ -16,7 +13,7 @@ function prove (async, okay) {
     var strata = new Strata(options)
 
     async(function () {
-        utilities.reset(directory, async())
+        utilities.reset(utilities.directory, async())
     }, function () {
         var strata = new Strata(options)
         async(function () {
