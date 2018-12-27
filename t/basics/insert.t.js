@@ -3,24 +3,20 @@ require('proof')(5, require('cadence')(prove))
 function prove (async, okay) {
     var Strata = require('../..')
 
-    var rimraf = require('rimraf')
-    var mkdirp = require('mkdirp')
     var path = require('path')
     var directory = path.resolve(__dirname, '../tmp')
 
     var utilities = require('../utilities')
 
     var options = {
-        directory: directory,
+        directory: utilities.directory,
         branch: { split: 5, merge: 2 },
         leaf: { split: 5, merge: 2 }
     }
     var strata = new Strata(options)
 
     async(function () {
-        rimraf(directory, async())
-    }, function () {
-        mkdirp(directory, async())
+        utilities.reset(directory, async())
     }, function () {
         var strata = new Strata(options)
         async(function () {
@@ -47,7 +43,7 @@ function prove (async, okay) {
         }, function () {
             strata.close(async())
         }, function () {
-            utilities.vivify(directory, async())
+            utilities.vivify(utilities.directory, async())
         }, function (x) {
             okay(x, {
                 0: [ 1 ],

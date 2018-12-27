@@ -5,6 +5,19 @@ var shifter = require('../shifter')(null)
 
 var cadence = require('cadence')
 
+var rimraf = require('rimraf')
+var mkdirp = require('mkdirp')
+
+exports.directory = path.resolve(__dirname, './tmp')
+
+exports.reset = cadence(function (async, directory) {
+    async(function () {
+        rimraf(directory, async())
+    }, function () {
+        mkdirp(directory, async())
+    })
+})
+
 exports.vivify = cadence(function (async, directory) {
     var vivified = {}
     async(function () {
