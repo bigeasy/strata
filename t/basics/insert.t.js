@@ -1,4 +1,4 @@
-require('proof')(4, require('cadence')(prove))
+require('proof')(5, require('cadence')(prove))
 
 function prove (async, okay) {
     var Strata = require('../..')
@@ -49,10 +49,10 @@ function prove (async, okay) {
         }, function () {
             utilities.vivify(directory, async())
         }, function (x) {
-            console.log(x)
-            return [ async.break ]
-            console.log('closed')
-            okay(x, {}, /*require('./fixtures/inserted'), */'inserted')
+            okay(x, {
+                0: [ 1 ],
+                1: [{ method: 'insert', index: 0, body: 'x' }]
+            }, 'inserted')
         })
     })
 }

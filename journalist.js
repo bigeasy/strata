@@ -100,7 +100,7 @@ Journalist.prototype._locked = cadence(function (async, envelope) {
             async(function () {
                 switch (entry.method) {
                 case 'write':
-                    var directory = path.resolve(this.directory, String(envelope.body))
+                    var directory = path.resolve(this.directory, 'pages', String(envelope.body))
                     async(function () {
                         mkdirp(directory, async())
                     }, function () {
@@ -108,6 +108,7 @@ Journalist.prototype._locked = cadence(function (async, envelope) {
                         var writable = new Staccato.Writable(stream)
                         async(function () {
                             async.forEach([ entry.writes ], function (write) {
+                        console.log(path.resolve(directory, 'append'))
                                 var header = Buffer.from(JSON.stringify({
                                     position: write.position,
                                     previous: write.previous,

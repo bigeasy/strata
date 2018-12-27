@@ -19,11 +19,22 @@ exports.vivify = cadence(function (async, directory) {
                 entries.pop()
                 entries = entries.map(function (entry) { return JSON.parse(entry) })
                 if (+file % 2 == 1) {
-                    console.log('elsed!')
+                    var records = []
+                    while (entries.length != 0) {
+                        var header = entries.shift()
+                        switch (header.method) {
+                        case 'insert':
+                            records.push({ method: header.method, index: header.index, body: entries.shift() })
+                            break
+                        case 'remove':
+                            records.push({ method: header.method, index: header.index })
+                            break
+                        }
+                    }
+                    vivified[file] = records
                 } else {
-                    entries = entries.map(function (entry) { return entry.value.id })
+                    vivified[file] = entries.map(function (entry) { return entry.value.id })
                 }
-                vivified[file] = entries
             })
         })
     }, function () {
