@@ -2,6 +2,8 @@ var cadence = require('cadence')
 var Staccato = require('staccato')
 var Cache = require('magazine')
 
+var shifter = require('./shifter')(function () { return '0' })
+
 var Signal = require('signal')
 
 var restrictor = require('restrictor')
@@ -35,17 +37,22 @@ Sheaf.prototype.load = restrictor.enqueue('canceled', cadence(function (async, i
             entries = entries.split('\n')
             entries.pop()
             entries = entries.map(function (entry) { return JSON.parse(entry) })
-            entries.forEach(function (entry) {
-                console.log('!', entry)
-                switch (entry.method) {
+            while (entries.length) {
+                var record = shifter(entries), header = record[0]
+                console.log('!', record)
+                switch (header.method) {
                 case 'insert':
-                    items.splice(entry.index, 0, entry.value)
+                    if (id % 2 == 0) {
+                        items.splice(header.index, 0, header.value)
+                    } else {
+                        items.splice(header.index, 0, record[1])
+                    }
                     break
                 case 'remove':
-                    items.splice(entry.index, 1)
+                    items.splice(header.index, 1)
                     break
                 }
-            })
+            }
             cartridge.value = { id: id, leaf: id % 2 == 1, items: items, ghosts: 0 }
             console.log('exiting')
             return []
