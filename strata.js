@@ -46,10 +46,10 @@ function Strata (options) {
             record: json.deserialize
         }
     }
-    if (!options.framer) {
+    /* if (!options.framer) {
         var UTF8 = require('./frame/utf8')
         options.framer = new UTF8(options.checksum || 'sha1')
-    }
+    } */
     options.player = new Player(options)
     this.journalist = options.sheaf = new Journalist(options)
     this.logger = new Logger(options)
