@@ -22,9 +22,6 @@ var Sheaf = require('./sheaf')
 
 var mkdirp = require('mkdirp')
 
-// TODO temporary
-var scram = require('./scram')
-
 var find = require('./find')
 
 function extend(to, from) {

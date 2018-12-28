@@ -2,7 +2,6 @@ var cadence = require('cadence')
 var ok = require('assert').ok
 var Queue = require('./queue')
 var Scribe = require('./scribe')
-var scram = require('./scram')
 
 var find = require('./find')
 
