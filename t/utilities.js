@@ -72,33 +72,37 @@ exports.vivify = cadence(function (async, directory) {
 
 exports.serialize = cadence(function (async, directory, files) {
     var NULL = Buffer.alloc(0)
-    async.forEach([ Object.keys(files) ], function (id) {
-        async(function () {
-            mkdirp(path.resolve(directory, 'pages', id), async())
-        }, function () {
-            var stream = fs.createWriteStream(path.resolve(directory, 'pages', id, 'append'), { flags: 'a' })
-            var writable = new Staccato.Writable(stream)
+    async(function () {
+        async.forEach([ Object.keys(files) ], function (id) {
             async(function () {
-                if (+id % 2 == 0) {
-                    async.forEach([ files[id] ], function (child, index) {
-                        writable.write(recorder({
-                            method: 'insert',
-                            index: index,
-                            value: { id: child }
-                        }, NULL), async())
-                    })
-                } else {
-                    async.forEach([ files[id] ], function (record, index) {
-                        var body = record.method == 'remove' ? NULL : record.body
-                        writable.write(recorder({
-                            method: record.method,
-                            index: record.index
-                        }, body), async())
-                    })
-                }
+                mkdirp(path.resolve(directory, 'pages', id), async())
             }, function () {
-                writable.end(async())
+                var stream = fs.createWriteStream(path.resolve(directory, 'pages', id, 'append'), { flags: 'a' })
+                var writable = new Staccato.Writable(stream)
+                async(function () {
+                    if (+id % 2 == 0) {
+                        async.forEach([ files[id] ], function (child, index) {
+                            writable.write(recorder({
+                                method: 'insert',
+                                index: index,
+                                value: { id: child }
+                            }, NULL), async())
+                        })
+                    } else {
+                        async.forEach([ files[id] ], function (record, index) {
+                            var body = record.method == 'remove' ? NULL : record.body
+                            writable.write(recorder({
+                                method: record.method,
+                                index: record.index
+                            }, body), async())
+                        })
+                    }
+                }, function () {
+                    writable.end(async())
+                })
             })
         })
+    }, function () {
+        mkdirp(path.resolve(directory, 'instance', '0'), async())
     })
 })

@@ -75,7 +75,7 @@ Strata.prototype.create = cadence(function (async, options) {
     }, function () {
         mkdirp(path.resolve(directory, 'pages'), 0755, async())
     }, function () {
-        fs.writeFile(path.resolve(directory, 'instance'), '0\n', async())
+        mkdirp(path.resolve(directory, 'instance', '0'), async())
     }, function () {
         async(function () {
             mkdirp(path.resolve(directory, 'pages', '0'), 0755, async())
@@ -96,7 +96,7 @@ Strata.prototype.open = cadence(function (async) {
     this._sheaf.magazine.hold(-1, { items: [{ id: 0 }]  })
     async(function () {
         fs.stat(this.options.directory, async())
-    }, function stat (error, stat) {
+    }, function () {
         fs.readdir(path.join(this.options.directory, 'pages'), async())
     }, function (files) {
         files.forEach(function (file) {
