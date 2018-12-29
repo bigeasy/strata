@@ -24,6 +24,8 @@ var mkdirp = require('mkdirp')
 
 var find = require('./find')
 
+function compare (a, b) { return a < b ? -1 : a > b ? 1 : 0 }
+
 function extend(to, from) {
     for (var key in from) to[key] = from[key]
     return to
@@ -32,6 +34,7 @@ function extend(to, from) {
 // TODO Branch and leaf size, can we just sort that out in a call to balance?
 function Strata (options) {
     this.options = options
+    this.options.comparator = options.comparator || compare
     if (!options.serializers) {
         var json = require('./json')
         options.serializers = {
@@ -90,20 +93,11 @@ Strata.prototype.create = cadence(function (async, options) {
 })
 
 Strata.prototype.open = cadence(function (async) {
-    this.sheaf.createMagazine()
-
-    // TODO instead of rescue, you might try/catch the parts that you know
-    // are likely to cause errors and raise an error of a Strata type.
-
-    // TODO or you might need some way to catch a callback error. Maybe an
-    // outer most catch block?
-
-    // TODO or if you're using Cadence, doesn't the callback get wrapped
-    // anyway?
+    this._sheaf.magazine.hold(-1, { items: [{ id: 0 }]  })
     async(function () {
-        fs.stat(this.sheaf.directory, async())
+        fs.stat(this.options.directory, async())
     }, function stat (error, stat) {
-        fs.readdir(path.join(this.sheaf.directory, 'pages'), async())
+        fs.readdir(path.join(this.options.directory, 'pages'), async())
     }, function (files) {
         files.forEach(function (file) {
             if (/^\d+\.\d+$/.test(file)) {
@@ -201,6 +195,7 @@ Strata.prototype.cursor = cadence(function (async, key, exclusive) {
                     })
                 }
                 var page = cartridge.value
+                console.log('>', this.options.comparator, cartridge.value)
                 index = find(this.options.comparator, cartridge.value, key, page.leaf ? page.ghosts : 1)
                 if (page.leaf) {
                     break

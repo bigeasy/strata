@@ -1,11 +1,6 @@
 {
-    "0": {
-        "children": [ 1 ]
-    },
-    "1": {
-        "log": [
-            { "type": "pos" },
-            { "type": "add", "value": "a" }
-        ]
-    }
+    "0": [ 1 ],
+    "1": [
+        { "method": "insert", "index": 0, "body": "a" }
+    ]
 }
