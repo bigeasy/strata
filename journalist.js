@@ -25,6 +25,8 @@ function compare (a, b) { return a < b ? -1 : a > b ? 1 : 0 }
 
 function extract (a) { return a }
 
+var Interrupt = require('interrupt').createInterrupter('b-tree')
+
 function Journalist (options) {
     this.nextAddress = 0
     this.directory = options.directory
@@ -81,6 +83,78 @@ Journalist.prototype.createMagazine = function () {
 Journalist.prototype.createLocker = function () {
     return new Locker(this, this.magazine)
 }
+
+function Appender (file) {
+    this.writable = new Staccato.Writable(file, { flags: 'a' }))
+}
+
+var EMPTY = Buffer.alloc(0)
+Appender.prototype.append = cadence(function (async, header, body) {
+    this.writable.write(recorder(header, body == null ? EMPTY : body), async())
+})
+
+Appender.prototype.end = cadence(function (async) {
+    this.writable.end(async())
+})
+
+Journalist.prototype.commit = cadence(function (async, script) {
+    var directory = path.resolve(hthis.directory, 'transaction')
+    async(function () {
+        mkdirp(directory, async())
+    }, function () {
+        var appender = new Appender(path.resolve(directory, 'prepare'))
+        async(function () {
+            async.forEach([ entry.writes ], function (write) {
+                appender.append(entry, async())
+            })
+        }, function () {
+            appender.end(async())
+        })
+    }, function () {
+        fs.rename(path.resolve(directory, 'prepare'), path.resolve(directory, 'commit'), async())
+    }, function () {
+        this.transact(async())
+    })
+})
+
+Journalist.prototype.transact = cadence(function (async, script) {
+    var directory = path.resolve(hthis.directory, 'transaction')
+    async(function () {
+        fs.readFile(path.resolve(this.directory, 'transaction', 'prepare'), 'utf8', async())
+    }, function () {
+        entries = entries.split(/\n/)
+        entries.pop()
+        entries = entries.map(function (entry) { return JSON.parse(entry) })
+        async.loop([], function () {
+            if (entries.length == 0) {
+                return [ async.break ]
+            }
+            var record = shifter(entries), header = record[0]
+            switch (header.method) {
+            case 'unlink':
+                async([function () {
+                    fs.unlink(path.resolve(this.directory, header.path), async())
+                }, rescue(/^code:ENOENT$/)])
+                break
+            case 'rename':
+                async([function () {
+                    fs.rename(path.resolve(this.directory, header.from), path.resolve(this.directory, header.to), async())
+                }, rescue(/^code:ENOENT$/)])
+                break
+            }
+        })
+    }, function () {
+        async([function () {
+            fs.unlink(path.resolve(this.directory, 'transaction', 'commit'), async())
+        }, rescue(/^code:ENOENT$/)])
+    }, function () {
+        fs.readdir(path.resolve(this.directory, 'transaction'), async())
+    }, function (files) {
+        Interrupt.assert(files.filter(function (file) {
+            return ! /^\./.test(file)
+        }).length == 0, 'interrupt')
+    })
+})
 
 // TODO Okay, I'm getting tired of having to check canceled and unit test for
 // it, so let's have exploding turnstiles (or just let them OOM?) Maybe on
