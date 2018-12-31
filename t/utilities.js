@@ -35,6 +35,7 @@ exports.vivify = cadence(function (async, directory) {
                 fs.readFile(path.resolve(directory, 'pages', file, 'append'), 'utf8', async())
             }, function (entries) {
                 entries = entries.split(/\n/)
+                console.log(entries)
                 entries.pop()
                 entries = entries.map(function (entry) { return JSON.parse(entry) })
                 if (+file % 2 == 1) {
@@ -71,7 +72,6 @@ exports.vivify = cadence(function (async, directory) {
 })
 
 exports.serialize = cadence(function (async, directory, files) {
-    var NULL = Buffer.alloc(0)
     async(function () {
         async.forEach([ Object.keys(files) ], function (id) {
             async(function () {
@@ -86,15 +86,14 @@ exports.serialize = cadence(function (async, directory, files) {
                                 method: 'insert',
                                 index: index,
                                 value: { id: child }
-                            }, NULL), async())
+                            }), async())
                         })
                     } else {
                         async.forEach([ files[id] ], function (record, index) {
-                            var body = record.method == 'remove' ? NULL : record.body
                             writable.write(recorder({
                                 method: record.method,
                                 index: record.index
-                            }, body), async())
+                            }, record.body), async())
                         })
                     }
                 }, function () {

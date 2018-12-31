@@ -36,7 +36,6 @@ function prove (async, okay) {
 
             cursor.unlock(async())
         }, function () {
-            console.log('here')
             //strata.purge(0)
             //okay(strata.sheaf.magazine.heft, 0, 'page')
 

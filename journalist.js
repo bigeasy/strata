@@ -88,9 +88,8 @@ function Appender (file) {
     this.writable = new Staccato.Writable(file, { flags: 'a' })
 }
 
-var EMPTY = Buffer.alloc(0)
 Appender.prototype.append = cadence(function (async, header, body) {
-    this.writable.write(recorder(header, body == null ? EMPTY : body), async())
+    this.writable.write(recorder(header, body), async())
 })
 
 Appender.prototype.end = cadence(function (async) {

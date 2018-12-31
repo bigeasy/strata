@@ -128,7 +128,7 @@ Cursor.prototype.insert = function (record, key, index) {
     // split is canceled when the time comes.
 
     // TODO Okay, how do I write this out?
-    var serialized = Buffer.from(JSON.stringify(record) + '\n')
+    var serialized = Buffer.from(JSON.stringify(record))
     var heft = serialized.length
 
     // Okay, now we have a buffer and heft.

@@ -20,7 +20,6 @@ function Sheaf (directory) {
 }
 
 Sheaf.prototype.load = restrictor.enqueue('canceled', cadence(function (async, id) {
-    console.log('>>>', id)
     var cartridge = this.magazine.hold(id, null)
     async([function () {
         cartridge.release()
@@ -33,13 +32,11 @@ Sheaf.prototype.load = restrictor.enqueue('canceled', cadence(function (async, i
         async(function () {
             fs.readFile(filename, 'utf8', async())
         }, function (entries) {
-            console.log('here', filename)
             entries = entries.split('\n')
             entries.pop()
             entries = entries.map(function (entry) { return JSON.parse(entry) })
             while (entries.length) {
                 var record = shifter(entries), header = record[0]
-                console.log('!', record)
                 switch (header.method) {
                 case 'insert':
                     if (id % 2 == 0) {
@@ -54,7 +51,6 @@ Sheaf.prototype.load = restrictor.enqueue('canceled', cadence(function (async, i
                 }
             }
             cartridge.value = { id: id, leaf: id % 2 == 1, items: items, ghosts: 0 }
-            console.log('exiting')
             return []
         })
     })
