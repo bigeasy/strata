@@ -2,13 +2,15 @@
 
 set -e
 
-echo ""
-
-(proof run t/*/*.t.js | tee .proof.out | proof progress) \
+(proof run \
+        t/basics/get.t.js \
+        t/basics/recorder.t.js \
+        t/basics/shifter.t.js \
+        t/basics/insert.t.js | tee .proof.out | proof progress) \
     || (proof errors < .proof.out) \
     || exit 1
 
-if [ "$TRAVIS" = "true" ]; then
+if [[ "$TRAVIS" = "ignore" ]]; then
   echo ""
   echo "running with coverage"
   t/cover
