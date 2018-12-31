@@ -85,7 +85,7 @@ Journalist.prototype.createLocker = function () {
 }
 
 function Appender (file) {
-    this.writable = new Staccato.Writable(file, { flags: 'a' }))
+    this.writable = new Staccato.Writable(file, { flags: 'a' })
 }
 
 var EMPTY = Buffer.alloc(0)
