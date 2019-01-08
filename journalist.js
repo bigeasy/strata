@@ -84,18 +84,6 @@ Journalist.prototype.createLocker = function () {
     return new Locker(this, this.magazine)
 }
 
-function Appender (file) {
-    this.writable = new Staccato.Writable(file, { flags: 'a' })
-}
-
-Appender.prototype.append = cadence(function (async, header, body) {
-    this.writable.write(recorder(header, body), async())
-})
-
-Appender.prototype.end = cadence(function (async) {
-    this.writable.end(async())
-})
-
 Journalist.prototype.commit = cadence(function (async, script) {
     var directory = path.resolve(hthis.directory, 'transaction')
     async(function () {
