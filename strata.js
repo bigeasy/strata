@@ -1,4 +1,4 @@
-var recorder = require('./recorder')(function () { return '0' })
+var Appender = require('./appender')
 
 var Cache = require('magazine'),
     cadence = require('cadence'),
@@ -79,11 +79,16 @@ Strata.prototype.create = cadence(function (async, options) {
         async(function () {
             mkdirp(path.resolve(directory, 'pages', '0'), 0755, async())
         }, function () {
-            fs.writeFile(path.resolve(directory, 'pages', '0', 'append'), recorder({ method: 'insert', index: 0, value: { id: 1 } }), async())
+            var appender = new Appender(path.resolve(directory, 'pages', '0', 'append'))
+            async(function () {
+                appender.append({ method: 'insert', index: 0, value: { id: 1 } }, async())
+            }, function () {
+                appender.end(async())
+            })
         }, function () {
             mkdirp(path.resolve(directory, 'pages', '1'), 0755, async())
         }, function () {
-            fs.writeFile(path.resolve(directory, 'pages', '1', 'append'), Buffer.alloc(0), async())
+            new Appender(path.resolve(directory, 'pages', '1', 'append')).end(async())
         }, function () {
             console.log('--- written ---')
             this._sheaf.magazine.hold(-1, { items: [{ id: 0 }]  })
