@@ -19,7 +19,7 @@ var Cache = require('magazine')
 var Locker = require('./locker')
 var Page = require('./page')
 
-var recorder = require('./recorder')(function () { return '0' })
+var Appender = require('./appender')
 
 function compare (a, b) { return a < b ? -1 : a > b ? 1 : 0 }
 
@@ -167,20 +167,19 @@ Journalist.prototype._locked = cadence(function (async, envelope) {
                     async(function () {
                         mkdirp(directory, async())
                     }, function () {
-                        var stream = fs.createWriteStream(path.resolve(directory, 'append'), { flags: 'a' })
-                        var writable = new Staccato.Writable(stream)
+                        var appender = new Appender(path.resolve(directory, 'append'))
                         async(function () {
                             async.forEach([ entry.writes ], function (write) {
-                                writable.write(recorder({
+                                appender.append({
                                     position: write.position,
                                     previous: write.previous,
                                     method: write.method,
                                     index: write.index,
                                     length: 0
-                                }, write.serialized), async())
+                                }, write.serialized, async())
                             })
                         }, function () {
-                            writable.end(async())
+                            appender.end(async())
                         })
                     })
                     break
