@@ -3,7 +3,7 @@ var path = require('path')
 
 var Staccato = require('staccato')
 
-var recorder = require('../recorder')(function () { return "0" })
+var Appender = require('../appender')
 
 var shifter = require('../shifter')(null)
 
@@ -77,27 +77,26 @@ exports.serialize = cadence(function (async, directory, files) {
             async(function () {
                 mkdirp(path.resolve(directory, 'pages', id), async())
             }, function () {
-                var stream = fs.createWriteStream(path.resolve(directory, 'pages', id, 'append'), { flags: 'a' })
-                var writable = new Staccato.Writable(stream)
+                var appender = new Appender(path.resolve(directory, 'pages', id, 'append'))
                 async(function () {
                     if (+id % 2 == 0) {
                         async.forEach([ files[id] ], function (child, index) {
-                            writable.write(recorder({
+                            appender.append({
                                 method: 'insert',
                                 index: index,
                                 value: { id: child }
-                            }), async())
+                            }, async())
                         })
                     } else {
                         async.forEach([ files[id] ], function (record, index) {
-                            writable.write(recorder({
+                            appender.append({
                                 method: record.method,
                                 index: record.index
-                            }, record.body), async())
+                            }, record.body, async())
                         })
                     }
                 }, function () {
-                    writable.end(async())
+                    appender.end(async())
                 })
             })
         })
