@@ -61,6 +61,7 @@ function Strata (options) {
 }
 
 Strata.prototype.create = cadence(function (async, options) {
+    this.instance = 0
     var directory = this.options.directory
     async(function () {
         fs.stat(directory, async())
@@ -100,6 +101,25 @@ Strata.prototype.open = cadence(function (async) {
     this._sheaf.magazine.hold(-1, { items: [{ id: 0 }]  })
     async(function () {
         fs.stat(this.options.directory, async())
+    }, function () {
+        fs.readdir(path.join(this.options.directory, 'instance'), async())
+    }, function (files) {
+        files = files.filter(function (file) {
+            return /^\d+$/.test(file)
+        }).map(function (file) {
+            return +file
+        }).sort(function (left, right) {
+            return right - left
+        })
+        Interrupt.assert(files.length != 0, 'instance.missing')
+        this.instance = files[0] + 1
+        async(function () {
+            mkdirp(path.resolve(this.options.directory, 'instance', String(this.instance)), async())
+        }, function () {
+            async.forEach([ files ], function (file) {
+                fs.rmdir(path.resolve(this.options.directory, 'instance', String(file)), async())
+            })
+        })
     }, function () {
         fs.readdir(path.join(this.options.directory, 'pages'), async())
     }, function (files) {

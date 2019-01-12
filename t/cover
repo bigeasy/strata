@@ -16,7 +16,13 @@ fi
 rm -rf coverage
 
 count=1;
-for file in $(find t ! -path '*/node_modules/*' -name \*.t.js); do
+#for file in $(find t ! -path '*/node_modules/*' -name \*.t.js); do
+for file in  \
+        t/basics/io.t.js \
+        t/basics/get.t.js \
+        t/basics/recorder.t.js \
+        t/basics/shifter.t.js \
+        t/basics/insert.t.js; do
   istanbul cover -x 't/**' -x '*/t/**' $file > /dev/null 2>&1
   mv coverage/coverage.json coverage/coverage$count.json
   count=$(expr $count + 1)

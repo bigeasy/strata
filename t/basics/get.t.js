@@ -1,4 +1,4 @@
-require('proof')(4, require('cadence')(prove))
+require('proof')(5, require('cadence')(prove))
 
 function prove (async, okay) {
     var Strata = require('../..')
@@ -19,6 +19,7 @@ function prove (async, okay) {
     }, function () {
         strata.open(async())
     }, function () {
+        okay(strata.instance, 1, 'increment instance')
         okay(strata._sheaf.magazine.heft, 0, 'json size before read')
         strata.cursor('a', async())
     }, function (cursor) {
