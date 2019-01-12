@@ -9,7 +9,7 @@ function prove (okay) {
     var buffer = recorder({ length: 0 }, 'a')
     okay(buffer.toString().split(/\n/).slice(0, -1).map(function (line) {
         return JSON.parse(line)
-    }), [ '17', { length: 4 }, 'a' ], 'string')
+    }), [ '29', { length: 4, json: true }, 'a' ], 'string')
     var buffer = recorder({ length: 0 })
     okay(buffer.toString().split(/\n/).slice(0, -1).map(function (line) {
         return JSON.parse(line)

@@ -3,6 +3,7 @@
 set -e
 
 (proof run \
+        t/basics/io.t.js \
         t/basics/get.t.js \
         t/basics/recorder.t.js \
         t/basics/shifter.t.js \

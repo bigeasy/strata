@@ -7,6 +7,7 @@ module.exports = function (checksum) {
             header.length = 0
         } else {
             if (!Buffer.isBuffer(body)) {
+                header.json = true
                 body = Buffer.from(JSON.stringify(body))
             }
             buffers = [ body, EOL ]
