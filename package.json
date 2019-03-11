@@ -34,7 +34,7 @@
                             "advance":                      "2.0.x",
                             "arguable":                     "7.0.x",
                             "mkdirp":                       "0.5.1",
-                            "proof":                        "5.0.x",
+                            "proof":                        "7.0.x",
                             "rimraf":                       "2.6.3",
                             "seedrandom":                   "2.4.4",
                             "splice":                       "2.0.x"
