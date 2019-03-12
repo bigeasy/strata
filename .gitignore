@@ -4,6 +4,7 @@
 /benchmark/tmp
 /.proof.out
 /coverage
-/t/tmp
-/t/*/tmp
+/.nyc_output
+/test/tmp
+/test/*/tmp
 /.todo.txt

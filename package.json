@@ -42,6 +42,6 @@
     "main":                 "strata.js",
     "scripts":
     {
-                            "test": "proof platform win32 && proof test */*/*.t.js || t/test"
+                            "test": "proof test test/basics/io.t.js test/basics/get.t.js test/basics/recorder.t.js test/basics/shifter.t.js test/basics/insert.t.js"
     }
 }

@@ -1,0 +1,8 @@
+/.*
+/benchmark
+/coverage
+/docs
+/bin
+/frame
+/node_modules
+/test

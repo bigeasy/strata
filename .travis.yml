@@ -12,6 +12,10 @@ branches:
     - master
     - travis-ci
 
-install:
-  - npm install --no-package-lock --no-save
+before_install:
+  - pip install --user awscli
+  - npm install --no-save --no-package-lock
   - npm install -g istanbul coveralls
+
+after_script:
+  - '[[ "$TRAVIS_PULL_REQUEST" = "false" ]] && aws s3 sync ./coverage s3://bigeasy/addendum/$TRAVIS_JOB_NUMBER/coverage'
