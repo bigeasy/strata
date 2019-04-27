@@ -10,6 +10,9 @@ branches:
     - master
     - travis-ci
 
-before_install:
-  - npm install --no-save --no-package-lock
-  - npm install -g istanbul
+install:
+  - npm install --no-package-lock --no-save
+  - npm install -g nyc
+
+script:
+  - nyc npm test
