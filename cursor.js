@@ -120,7 +120,7 @@ Cursor.prototype.unlock = function (callback) {
 }
 
 Cursor.prototype.insert = function (record, key, index) {
-    Interrupt.assert(this.index > 0 || this._cartridge.value.id == '0.1', 'invalid.insert.index', { index: this.index })
+    Interrupt.assert(index > -1 && (this.index > 0 || this._cartridge.value.id == '0.1'), 'invalid.insert.index', { index: this.index })
     // Forgot where I was with splitting, if I queue for a split check at the
     // moment I see the count increase, or, well, when else would you do it?
     // Probably do it now, because now is the time to split, but maybe that

@@ -32,10 +32,12 @@ function prove (async, okay) {
                     found: cursor.found
                 }, 'cursor not found')
                 cursor.insert('x', 'x', cursor.index)
+                cursor.insert('y', 'y', ~cursor.indexOf('y', cursor.index))
+                cursor.insert('z', 'z', ~cursor.indexOf('z', cursor.index))
                 okay(cursor.indexOf('x', cursor.ghosts), 0, 'inserted')
-                okay(~cursor.indexOf('z', 0), 1, 'not found')
+                okay(~cursor.indexOf('a', 0), 0, 'not found')
                 // TODO Assert heft and purge again.
-                okay(strata._sheaf.magazine.heft, 3, 'heft')
+                okay(strata._sheaf.magazine.heft, 9, 'heft')
             }, function () {
                 cursor.flush(async())
             })
@@ -46,7 +48,13 @@ function prove (async, okay) {
         }, function (x) {
             okay(x, {
                 '0.0': [ '0.1' ],
-                '0.1': [{ method: 'insert', index: 0, body: 'x' }]
+                '0.1': [{
+                    method: 'insert', index: 0, body: 'x'
+                }, {
+                    method: 'insert', index: 1, body: 'y'
+                }, {
+                    method: 'insert', index: 2, body: 'z'
+                }]
             }, 'inserted')
         })
     })

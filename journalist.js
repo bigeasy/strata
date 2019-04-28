@@ -164,7 +164,7 @@ Journalist.prototype._locked = cadence(function (async, envelope) {
             if (queue.length == 0) {
                 return [ async.break ]
             }
-            var entry = queue.pop()
+            var entry = queue.shift()
             async(function () {
                 switch (entry.method) {
                 case 'write':
@@ -199,12 +199,15 @@ Journalist.prototype._locked = cadence(function (async, envelope) {
 Journalist.prototype.append = function (entry, signals) {
     var queue = this._queues[entry.id]
     if (queue == null) {
-        var queue = this._queues[entry.id] = [{
+        queue = this._queues[entry.id] = []
+    }
+    if (queue.length == 0) {
+        queue.push({
             id: this._operationId = increment(this._operationId),
             method: 'write',
             writes: [],
             completed: new Signal
-        }]
+        })
     }
     queue[0].writes.push(entry)
     if (signals[queue[0].id] == null) {
