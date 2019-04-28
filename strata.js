@@ -73,12 +73,12 @@ Strata.prototype.create = cadence(function (async, options) {
             return ! /^\./.test(f)
         }).length == 0, 'create.directory.not.empty', { directory: directory })
     }, function () {
-        mkdirp(path.resolve(directory, 'pages'), 0755, async())
+        mkdirp(path.resolve(directory, 'pages'), 0o755, async())
     }, function () {
         mkdirp(path.resolve(directory, 'instance', '0'), async())
     }, function () {
         async(function () {
-            mkdirp(path.resolve(directory, 'pages', '0'), 0755, async())
+            mkdirp(path.resolve(directory, 'pages', '0'), 0o755, async())
         }, function () {
             var appender = new Appender(path.resolve(directory, 'pages', '0', 'append'))
             async(function () {
@@ -87,7 +87,7 @@ Strata.prototype.create = cadence(function (async, options) {
                 appender.end(async())
             })
         }, function () {
-            mkdirp(path.resolve(directory, 'pages', '1'), 0755, async())
+            mkdirp(path.resolve(directory, 'pages', '1'), 0o755, async())
         }, function () {
             new Appender(path.resolve(directory, 'pages', '1', 'append')).end(async())
         }, function () {
