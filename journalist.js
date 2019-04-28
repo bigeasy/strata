@@ -16,9 +16,6 @@ var sequester = require('sequester')
 
 var Cache = require('magazine')
 
-var Locker = require('./locker')
-var Page = require('./page')
-
 var Appender = require('./appender')
 
 function compare (a, b) { return a < b ? -1 : a > b ? 1 : 0 }
