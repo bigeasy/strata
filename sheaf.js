@@ -50,7 +50,7 @@ Sheaf.prototype.load = restrictor.enqueue('canceled', cadence(function (async, i
                     break
                 }
             }
-            cartridge.value = { id: id, leaf: id % 2 == 1, items: items, ghosts: 0 }
+            cartridge.value = { id: id, leaf: +id.split('.')[1] % 2 == 1, items: items, ghosts: 0 }
             return []
         })
     })

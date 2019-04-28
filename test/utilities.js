@@ -28,7 +28,7 @@ exports.vivify = cadence(function (async, directory) {
         fs.readdir(path.resolve(directory, 'pages'), async())
     }, function (files) {
         async.forEach([ files ], function (file) {
-            if (!/^\d+$/.test(file)) {
+            if (!/^\d+.\d+$/.test(file)) {
                 return [ async.continue ]
             }
             async(function () {
@@ -38,7 +38,7 @@ exports.vivify = cadence(function (async, directory) {
                 console.log(entries)
                 entries.pop()
                 entries = entries.map(function (entry) { return JSON.parse(entry) })
-                if (+file % 2 == 1) {
+                if (+file.split('.')[1] % 2 == 1) {
                     var records = []
                     while (entries.length != 0) {
                         var record = shifter(entries), header = record[0]
@@ -72,6 +72,7 @@ exports.vivify = cadence(function (async, directory) {
 })
 
 exports.serialize = cadence(function (async, directory, files) {
+    var instance = 0
     async(function () {
         async.forEach([ Object.keys(files) ], function (id) {
             async(function () {
@@ -79,6 +80,7 @@ exports.serialize = cadence(function (async, directory, files) {
             }, function () {
                 var appender = new Appender(path.resolve(directory, 'pages', id, 'append'))
                 async(function () {
+                    instance = Math.max(+id.split('.')[0], instance)
                     if (+id % 2 == 0) {
                         async.forEach([ files[id] ], function (child, index) {
                             appender.append({
@@ -101,6 +103,6 @@ exports.serialize = cadence(function (async, directory, files) {
             })
         })
     }, function () {
-        mkdirp(path.resolve(directory, 'instance', '0'), async())
+        mkdirp(path.resolve(directory, 'instance', String(instance)), async())
     })
 })

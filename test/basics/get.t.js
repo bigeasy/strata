@@ -21,8 +21,10 @@ function prove (async, okay) {
     }, function () {
         okay(strata.instance, 1, 'increment instance')
         okay(strata._sheaf.magazine.heft, 0, 'json size before read')
+        console.log('here')
         strata.cursor('a', async())
     }, function (cursor) {
+        console.log('here')
         async(function () {
             okay(! cursor.exclusive, 'shared')
             okay(cursor.index, 0, 'index')

@@ -45,8 +45,8 @@ function prove (async, okay) {
             utilities.vivify(utilities.directory, async())
         }, function (x) {
             okay(x, {
-                0: [ 1 ],
-                1: [{ method: 'insert', index: 0, body: 'x' }]
+                '0.0': [ '0.1' ],
+                '0.1': [{ method: 'insert', index: 0, body: 'x' }]
             }, 'inserted')
         })
     })

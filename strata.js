@@ -67,27 +67,27 @@ Strata.prototype.create = cadence(function (async, options) {
         mkdirp(path.resolve(directory, 'instance', '0'), async())
     }, function () {
         async(function () {
-            mkdirp(path.resolve(directory, 'pages', '0'), 0o755, async())
+            mkdirp(path.resolve(directory, 'pages', '0.0'), 0o755, async())
         }, function () {
-            var appender = new Appender(path.resolve(directory, 'pages', '0', 'append'))
+            var appender = new Appender(path.resolve(directory, 'pages', '0.0', 'append'))
             async(function () {
-                appender.append({ method: 'insert', index: 0, value: { id: 1 } }, async())
+                appender.append({ method: 'insert', index: 0, value: { id: '0.1' } }, async())
             }, function () {
                 appender.end(async())
             })
         }, function () {
-            mkdirp(path.resolve(directory, 'pages', '1'), 0o755, async())
+            mkdirp(path.resolve(directory, 'pages', '0.1'), 0o755, async())
         }, function () {
-            new Appender(path.resolve(directory, 'pages', '1', 'append')).end(async())
+            new Appender(path.resolve(directory, 'pages', '0.1', 'append')).end(async())
         }, function () {
             console.log('--- written ---')
-            this._sheaf.magazine.hold(-1, { items: [{ id: 0 }]  })
+            this._sheaf.magazine.hold(-1, { items: [{ id: '0.0' }]  })
         })
     })
 })
 
 Strata.prototype.open = cadence(function (async) {
-    this._sheaf.magazine.hold(-1, { items: [{ id: 0 }]  })
+    this._sheaf.magazine.hold(-1, { items: [{ id: '0.0' }]  })
     async(function () {
         fs.stat(this.options.directory, async())
     }, function () {
@@ -109,14 +109,6 @@ Strata.prototype.open = cadence(function (async) {
                 fs.rmdir(path.resolve(this.options.directory, 'instance', String(file)), async())
             })
         })
-    }, function () {
-        fs.readdir(path.join(this.options.directory, 'pages'), async())
-    }, function (files) {
-        files.forEach(function (file) {
-            if (/^\d+\.\d+$/.test(file)) {
-                this.sheaf.nextAddress = Math.max(+(file.split('.').shift()) + 1, this.sheaf.nextAddress)
-            }
-        }, this)
     })
 })
 
@@ -154,6 +146,7 @@ Strata.prototype.cursor = cadence(function (async, key, exclusive) {
             cartridges.push(cartridge = this._sheaf.magazine.hold(-1, null))
             for (;;) {
                 var id = cartridge.value.items[index].id
+                console.log('>!', id)
                 cartridges.push(cartridge = this._sheaf.magazine.hold(id))
                 if (cartridge.value == null) {
                     return async(function () {

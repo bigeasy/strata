@@ -162,7 +162,6 @@ Journalist.prototype.transact = cadence(function (async, script) {
 // Writing things out again. Didn't occur to me
 Journalist.prototype._locked = cadence(function (async, envelope) {
     var queue = this._queues[envelope.body], entry
-    console.log('here')
     async(function () {
         async.loop([], function () {
             if (queue.length == 0) {
