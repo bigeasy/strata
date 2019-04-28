@@ -16,6 +16,7 @@ function Cursor (journalist, cartridge, key, index) {
     this.items = cartridge.value.items
     this.ghosts = cartridge.value.ghosts
     this._journalist = journalist
+    this._signals = {}
 }
 
 Cursor.prototype.next = cadence(function (async) {
@@ -132,12 +133,12 @@ Cursor.prototype.insert = function (record, key, index) {
     var heft = serialized.length
 
     // Okay, now we have a buffer and heft.
-    var signal = this._journalist.append({
+    this._journalist.append({
         id: this._cartridge.value.id,
         method: 'insert',
         index: index,
         serialized: serialized
-    })
+    }, this._signals)
 
     // TODO Restore heft, this is a temporary heft. We're going to want to
     // calculate heft by calculating our serialization at this point. We may use
@@ -148,9 +149,17 @@ Cursor.prototype.insert = function (record, key, index) {
         heft: heft
     })
     this._cartridge.adjustHeft(heft)
-
-    return signal
 }
+
+Cursor.prototype.flush = cadence(function (async) {
+    async.forEach([ Object.keys(this._signals) ], function (id) {
+        async(function () {
+            this._signals[id].wait(async())
+        }, function () {
+            delete this._signals[id]
+        })
+    })
+})
 
 Cursor.prototype.remove = function (index) {
     var ghost = this.page.address != 1 && index == 0, entry

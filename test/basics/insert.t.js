@@ -36,6 +36,8 @@ function prove (async, okay) {
                 okay(~cursor.indexOf('z', 0), 1, 'not found')
                 // TODO Assert heft and purge again.
                 okay(strata._sheaf.magazine.heft, 3, 'heft')
+            }, function () {
+                cursor.flush(async())
             })
         }, function () {
             strata.close(async())

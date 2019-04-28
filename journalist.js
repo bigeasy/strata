@@ -41,6 +41,15 @@ function Journalist (options) {
     this.turnstile = new Turnstile
     this._lock = new Turnstile.Set(this, '_locked', this.turnstile)
     this._queues = {}
+    this._operationId = 0xffffffff
+}
+
+function increment (value) {
+    if (value == 0xffffffff) {
+        return 0
+    } else {
+        return value + 1
+    }
 }
 
 Journalist.prototype.create = function () {
@@ -191,14 +200,21 @@ Journalist.prototype._locked = cadence(function (async, envelope) {
     })
 })
 
-Journalist.prototype.append = function (entry) {
+Journalist.prototype.append = function (entry, signals) {
     var queue = this._queues[entry.id]
     if (queue == null) {
-        var queue = this._queues[entry.id] = [{ method: 'write', writes: [], completed: new Signal }]
+        var queue = this._queues[entry.id] = [{
+            id: this._operationId = increment(this._operationId),
+            method: 'write',
+            writes: [],
+            completed: new Signal
+        }]
     }
     queue[0].writes.push(entry)
+    if (signals[queue[0].id] == null) {
+        signals[queue[0].id] = queue[0].completed
+    }
     this._lock.add(entry.id)
-    return queue.signal
 }
 
 module.exports = Journalist
