@@ -85,7 +85,7 @@ Cursor.prototype.seek = function (key, index) {
 // forward for insertion points, and only forward.
 
 Cursor.prototype.indexOf = function (key, index) {
-    ok(arguments.length == 2, 'index requires two arguments')
+    ok(arguments.length == 2, 'indexOf of requires two arguments')
     var page = this._cartridge.value
     var index = find(this._journalist.comparator, page, key, index)
     var unambiguous
