@@ -1,35 +1,26 @@
-var Appender = require('./appender')
+var path = require('path')
+var assert = require('assert')
+var fs = require('fs')
 
-var Cache = require('magazine'),
-    cadence = require('cadence'),
-    Cursor = require('./cursor'),
-    fs = require('fs'),
-    Queue = require('./queue'),
-    Script = require('./script'),
-    Journalist = require('./journalist'),
-    Balancer = require('./balancer'),
-    Descent = require('./descent'),
-    Locker = require('./locker'),
-    Player = require('./player'),
-    Logger = require('./logger'),
-    ok = require('assert').ok,
-    path = require('path')
+var cadence = require('cadence')
+
+var mkdirp = require('mkdirp')
+
+var Cache = require('magazine')
+
+var Appender = require('./appender')
+var Cursor = require('./cursor')
+
+var Journalist = require('./journalist')
 
 var Interrupt = require('interrupt').createInterrupter('b-tree')
 var Turnstile = require('turnstile')
 
 var Sheaf = require('./sheaf')
 
-var mkdirp = require('mkdirp')
-
 var find = require('./find')
 
 function compare (a, b) { return a < b ? -1 : a > b ? 1 : 0 }
-
-function extend(to, from) {
-    for (var key in from) to[key] = from[key]
-    return to
-}
 
 // TODO Branch and leaf size, can we just sort that out in a call to balance?
 function Strata (options) {
@@ -50,9 +41,7 @@ function Strata (options) {
         var UTF8 = require('./frame/utf8')
         options.framer = new UTF8(options.checksum || 'sha1')
     } */
-    options.player = new Player(options)
     this.journalist = options.sheaf = new Journalist(options)
-    this.logger = new Logger(options)
 
     this.housekeeper = new Turnstile
     this.writer = new Turnstile
@@ -149,52 +138,7 @@ Strata.prototype.close = cadence(function (async) {
     }
     purge.release()
 
-    ok(!this.sheaf.magazine.count, 'pages still held by cache')
-})
-
-Strata.prototype.left = function (descents, exclusive, callback) {
-    this.toLeaf(descents[0].left, descents, null, exclusive, callback)
-}
-
-Strata.prototype.right = function (descents, exclusive, callback) {
-    this.toLeaf(descents[0].right, descents, null, exclusive, callback)
-}
-
-Strata.prototype.key = function (key) {
-    return function (descents, exclusive, callback) {
-        this.toLeaf(descents[0].key(key), descents, null, exclusive, callback)
-    }
-}
-
-Strata.prototype.leftOf = function (key) {
-    return cadence(function (async, descents, exclusive) {
-        var conditions = [ descents[0].leaf, descents[0].found([key]) ]
-        async(function () {
-            descents[0].descend(descents[0].key(key), function () {
-                return conditions.some(function (condition) {
-                    return condition.call(descents[0])
-                })
-            }, async())
-        }, function (page, index) {
-            if (descents[0].page.address % 2) {
-                return [ new Cursor(this.sheaf, this.logger, descents, false, key) ]
-            } else {
-                descents[0].setIndex(descents[0].index - 1)
-                this.toLeaf(descents[0].right, descents, null, exclusive, async())
-            }
-        })
-    })
-}
-
-Strata.prototype.toLeaf = cadence(function (async, sought, descents, key, exclusive) {
-    async(function () {
-        descents[0].descend(sought, descents[0].penultimate, async())
-    }, function () {
-        if (exclusive) descents[0].exclude()
-        descents[0].descend(sought, descents[0].leaf, async())
-    }, function () {
-        return [ new Cursor(this.sheaf, this.logger, descents, exclusive, key) ]
-    })
+    assert(!this.sheaf.magazine.count, 'pages still held by cache')
 })
 
 Strata.prototype.cursor = cadence(function (async, key, exclusive) {
@@ -238,77 +182,6 @@ Strata.prototype.cursor = cadence(function (async, key, exclusive) {
     })
 })
 
-Strata.prototype.iterator = function (key, callback) {
-    this.cursor(key, false, callback)
-}
-
-Strata.prototype.mutator = function (key, callback) {
-    this.cursor(key, true, callback)
-}
-
-Strata.prototype.balance = function (callback) {
-    new Balancer(this.sheaf, this.logger).balance(callback)
-}
-
-Strata.prototype.vivify = cadence(function (async) {
-    var locker = this.sheaf.createLocker(), root
-
-    function record (item) {
-        return { address: item.address }
-    }
-
-    var expand = cadence(function (async, parent, pages, index) {
-        async(function () {
-            if (index < pages.length) {
-                var address = pages[index].address
-                async(function () {
-                    locker.lock(address, false, async())
-                }, [function (page) {
-                    locker.unlock(page)
-                }])
-            } else {
-                return [ async.return, pages ]
-            }
-        }, function (page) {
-            if (page.address % 2 == 0) {
-                async(function () {
-                    pages[index].children = page.items.map(record)
-                    if (index) {
-                        pages[index].key = parent.items[index].key
-                    }
-                    expand.call(this, page, pages[index].children, 0, async())
-                }, function () {
-                    expand.call(this, parent, pages, index + 1, async())
-                })
-            } else {
-                async(function () {
-                    pages[index].children = []
-                    pages[index].ghosts = page.ghosts
-
-                    for (var i = 0, I = page.items.length; i < I; i++) {
-                        pages[index].children.push(page.items[i].record)
-                    }
-                }, function () {
-                    expand.call(this, parent, pages, index + 1, async())
-                })
-            }
-        }, function () {
-            return [ pages ]
-        })
-    })
-
-    async(function () {
-        locker.lock(0, false, async())
-    }, function (page) {
-        async([function () {
-            locker.unlock(page)
-            locker.dispose()
-        }], function () {
-            expand.call(this, page, root = page.items.map(record), 0, async())
-        })
-    })
-})
-
 Strata.prototype.purge = function (downTo) {
     var purge = this.sheaf.magazine.purge()
     while (purge.cartridge && this.sheaf.magazine.heft > downTo) {
@@ -319,7 +192,7 @@ Strata.prototype.purge = function (downTo) {
 }
 
 Strata.prototype.__defineGetter__('balanced', function () {
-    ok(false)
+    assert(false)
     return ! Object.keys(this.sheaf.lengths).length
 })
 
