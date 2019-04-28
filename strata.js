@@ -16,8 +16,6 @@ var Journalist = require('./journalist')
 var Interrupt = require('interrupt').createInterrupter('b-tree')
 var Turnstile = require('turnstile')
 
-var Sheaf = require('./sheaf')
-
 var find = require('./find')
 
 function compare (a, b) { return a < b ? -1 : a > b ? 1 : 0 }
@@ -41,11 +39,10 @@ function Strata (options) {
         var UTF8 = require('./frame/utf8')
         options.framer = new UTF8(options.checksum || 'sha1')
     } */
-    this.journalist = options.sheaf = new Journalist(options)
+    this.journalist = new Journalist(options)
 
     this.housekeeper = new Turnstile
     this.writer = new Turnstile
-    this._sheaf = new Sheaf(options.directory)
     this._cursors = []
 }
 
@@ -81,13 +78,13 @@ Strata.prototype.create = cadence(function (async, options) {
             new Appender(path.resolve(directory, 'pages', '0.1', 'append')).end(async())
         }, function () {
             console.log('--- written ---')
-            this._sheaf.magazine.hold(-1, { items: [{ id: '0.0' }]  })
+            this.journalist.magazine.hold(-1, { items: [{ id: '0.0' }]  })
         })
     })
 })
 
 Strata.prototype.open = cadence(function (async) {
-    this._sheaf.magazine.hold(-1, { items: [{ id: '0.0' }]  })
+    this.journalist.magazine.hold(-1, { items: [{ id: '0.0' }]  })
     async(function () {
         fs.stat(this.options.directory, async())
     }, function () {
@@ -143,14 +140,16 @@ Strata.prototype.cursor = cadence(function (async, key, exclusive) {
     }], function () {
         async.block(function () {
             var cartridge, index = 0
-            cartridges.push(cartridge = this._sheaf.magazine.hold(-1, null))
+            cartridges.push(cartridge = this.journalist.magazine.hold(-1, null))
+            console.log(cartridge.value)
             for (;;) {
                 var id = cartridge.value.items[index].id
                 console.log('>!', id)
-                cartridges.push(cartridge = this._sheaf.magazine.hold(id))
+                cartridges.push(cartridge = this.journalist.magazine.hold(id))
                 if (cartridge.value == null) {
                     return async(function () {
-                        this._sheaf.load(id, async())
+                        console.log(id)
+                        this.journalist.load(id, async())
                     }, function () {
                         return [ async.continue ]
                     })
@@ -176,17 +175,12 @@ Strata.prototype.cursor = cadence(function (async, key, exclusive) {
 })
 
 Strata.prototype.purge = function (downTo) {
-    var purge = this.sheaf.magazine.purge()
-    while (purge.cartridge && this.sheaf.magazine.heft > downTo) {
+    var purge = this.journalist.magazine.purge()
+    while (purge.cartridge && this.journalist.magazine.heft > downTo) {
         purge.cartridge.remove()
         purge.next()
     }
     purge.release()
 }
-
-Strata.prototype.__defineGetter__('balanced', function () {
-    assert(false)
-    return ! Object.keys(this.sheaf.lengths).length
-})
 
 module.exports = Strata

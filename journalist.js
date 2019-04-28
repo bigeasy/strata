@@ -2,6 +2,8 @@ var ok = require('assert').ok
 var path = require('path')
 var fs = require('fs')
 
+var shifter = require('./shifter')(function () { return '0' })
+
 var mkdirp = require('mkdirp')
 
 var Staccato = require('staccato')
@@ -24,7 +26,10 @@ function extract (a) { return a }
 
 var Interrupt = require('interrupt').createInterrupter('b-tree')
 
+var restrictor = require('restrictor')
+
 function Journalist (options) {
+    this.magazine = new Cache().createMagazine()
     this.nextAddress = 0
     this.directory = options.directory
     this.cache = options.cache || new Cache()
@@ -35,8 +40,11 @@ function Journalist (options) {
     this.comparator = options.comparator || compare
     this.player = options.player
     this.lengths = {}
+    this.turnstiles = {
+        lock: new Turnstile
+    }
     this.turnstile = new Turnstile
-    this._lock = new Turnstile.Set(this, '_locked', this.turnstile)
+    this._lock = new Turnstile.Set(this, '_locked', this.turnstiles.lock)
     this._queues = {}
     this._operationId = 0xffffffff
 }
@@ -148,6 +156,46 @@ Journalist.prototype.transact = cadence(function (async, script) {
         }).length == 0, 'interrupt')
     })
 })
+
+Journalist.prototype.load = restrictor.enqueue('canceled', cadence(function (async, id) {
+    var cartridge = this.magazine.hold(id, null)
+    console.log(id)
+    async([function () {
+        cartridge.release()
+    }], function () {
+        if (cartridge.value != null) {
+            return [ async.return ]
+        }
+    console.log(id)
+        console.log('>>>', id, cartridge.value)
+        var filename = path.resolve(this.directory, 'pages', String(id), 'append')
+        var items = []
+        async(function () {
+            fs.readFile(filename, 'utf8', async())
+        }, function (entries) {
+            entries = entries.split('\n')
+            entries.pop()
+            entries = entries.map(function (entry) { return JSON.parse(entry) })
+            while (entries.length) {
+                var record = shifter(entries), header = record[0]
+                switch (header.method) {
+                case 'insert':
+                    if (id % 2 == 0) {
+                        items.splice(header.index, 0, header.value)
+                    } else {
+                        items.splice(header.index, 0, record[1])
+                    }
+                    break
+                case 'remove':
+                    items.splice(header.index, 1)
+                    break
+                }
+            }
+            cartridge.value = { id: id, leaf: +id.split('.')[1] % 2 == 1, items: items, ghosts: 0 }
+            return []
+        })
+    })
+}))
 
 // TODO Okay, I'm getting tired of having to check canceled and unit test for
 // it, so let's have exploding turnstiles (or just let them OOM?) Maybe on

@@ -37,7 +37,7 @@ function prove (async, okay) {
                 okay(cursor.indexOf('x', cursor.ghosts), 0, 'inserted')
                 okay(~cursor.indexOf('a', 0), 0, 'not found')
                 // TODO Assert heft and purge again.
-                okay(strata._sheaf.magazine.heft, 9, 'heft')
+                okay(strata.journalist.magazine.heft, 9, 'heft')
             }, function () {
                 cursor.flush(async())
             })
