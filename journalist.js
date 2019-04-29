@@ -2,8 +2,6 @@ var ok = require('assert').ok
 var path = require('path')
 var fs = require('fs')
 
-var shifter = require('./shifter')(function () { return '0' })
-
 var mkdirp = require('mkdirp')
 
 var Staccato = require('staccato')
@@ -21,10 +19,6 @@ var Cache = require('magazine')
 var Appender = require('./appender')
 var Splitter = require('./splitter')
 
-function compare (a, b) { return a < b ? -1 : a > b ? 1 : 0 }
-
-function extract (a) { return a }
-
 var Interrupt = require('interrupt').createInterrupter('b-tree')
 
 var restrictor = require('restrictor')
@@ -35,11 +29,8 @@ function Journalist (options) {
     this.directory = options.directory
     this.cache = options.cache || new Cache()
     this.options = options
+    this.comparator = options.comparator
     this._checksum = function () { return "0" }
-    this.tracer = options.tracer || function () { arguments[2]() }
-    this.extractor = options.extractor || extract
-    this.comparator = options.comparator || compare
-    this.player = options.player
     this.lengths = {}
     this.turnstiles = {
         lock: new Turnstile
@@ -57,106 +48,6 @@ function increment (value) {
         return value + 1
     }
 }
-
-Journalist.prototype.create = function () {
-    var root = this.createPage(0)
-    var leaf = this.createPage(1)
-    this.splice(root, 0, 0, { address: leaf.address, heft: 0 })
-    ok(root.address == 0, 'root not zero')
-    return { root: root, leaf: leaf }
-}
-
-Journalist.prototype.unbalanced = function (page, force) {
-    if (force) {
-        this.lengths[page.address] = this.options.leafSize
-    } else if (this.lengths[page.address] == null) {
-        this.lengths[page.address] = page.items.length - page.ghosts
-    }
-}
-
-Journalist.prototype.createPage = function (modulus, address) {
-    return new Page(this, address, modulus)
-}
-
-Journalist.prototype.createMagazine = function () {
-    var magazine = this.cache.createMagazine()
-    var cartridge = magazine.hold(-2, {
-        page: {
-            address: -2,
-            items: [{ key: null, address: 0, heft: 0 }],
-            queue: sequester.createQueue()
-        }
-    })
-    var metaRoot = cartridge.value.page
-    metaRoot.cartridge = cartridge
-    metaRoot.lock = metaRoot.queue.createLock()
-    metaRoot.lock.share(function () {})
-    this.metaRoot = metaRoot
-    this.magazine = magazine
-}
-
-Journalist.prototype.createLocker = function () {
-    return new Locker(this, this.magazine)
-}
-
-Journalist.prototype.commit = cadence(function (async, script) {
-    var directory = path.resolve(hthis.directory, 'transaction')
-    async(function () {
-        mkdirp(directory, async())
-    }, function () {
-        var appender = new Appender(path.resolve(directory, 'prepare'))
-        async(function () {
-            async.forEach([ entry.writes ], function (write) {
-                appender.append(entry, async())
-            })
-        }, function () {
-            appender.end(async())
-        })
-    }, function () {
-        fs.rename(path.resolve(directory, 'prepare'), path.resolve(directory, 'commit'), async())
-    }, function () {
-        this.transact(async())
-    })
-})
-
-Journalist.prototype.transact = cadence(function (async, script) {
-    var directory = path.resolve(hthis.directory, 'transaction')
-    async(function () {
-        fs.readFile(path.resolve(this.directory, 'transaction', 'prepare'), 'utf8', async())
-    }, function () {
-        entries = entries.split(/\n/)
-        entries.pop()
-        entries = entries.map(function (entry) { return JSON.parse(entry) })
-        async.loop([], function () {
-            if (entries.length == 0) {
-                return [ async.break ]
-            }
-            var record = shifter(entries), header = record[0]
-            switch (header.method) {
-            case 'unlink':
-                async([function () {
-                    fs.unlink(path.resolve(this.directory, header.path), async())
-                }, rescue(/^code:ENOENT$/)])
-                break
-            case 'rename':
-                async([function () {
-                    fs.rename(path.resolve(this.directory, header.from), path.resolve(this.directory, header.to), async())
-                }, rescue(/^code:ENOENT$/)])
-                break
-            }
-        })
-    }, function () {
-        async([function () {
-            fs.unlink(path.resolve(this.directory, 'transaction', 'commit'), async())
-        }, rescue(/^code:ENOENT$/)])
-    }, function () {
-        fs.readdir(path.resolve(this.directory, 'transaction'), async())
-    }, function (files) {
-        Interrupt.assert(files.filter(function (file) {
-            return ! /^\./.test(file)
-        }).length == 0, 'interrupt')
-    })
-})
 
 Journalist.prototype.load = restrictor.enqueue('canceled', cadence(function (async, id) {
     var cartridge = this.magazine.hold(id, null)

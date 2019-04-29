@@ -17,28 +17,6 @@ function Cursor (journalist, cartridge, key, index) {
     this._signals = {}
 }
 
-Cursor.prototype.next = cadence(function (async) {
-    var next
-
-    if (this.page.right.address === null) {
-        // return [ async, false ] <- return immediately!
-        return [ false ]
-    }
-
-    async(function () {
-        this._locker.lock(this.page.right.address, this.exclusive, async())
-    }, function (next) {
-        this._locker.unlock(this.page)
-
-        this.page = next
-
-        this.offset = this.page.ghosts
-        this.length = this.page.items.length
-
-        return [ true ]
-    })
-})
-
 // Restore your cursor when you return from asynchronous operations.
 
 //
@@ -98,25 +76,8 @@ Cursor.prototype.indexOf = function (key, index) {
     return index
 }
 
-Cursor.prototype._unlock = cadence(function (async) {
-    async([function () {
-        this._locker.unlock(this.page)
-        this._locker.dispose()
-    }], function () {
-        this._appender.close(async())
-    })
-})
-
-// TODO pass an integer as the first argument to force the arity of the
-// return.
-Cursor.prototype.unlock = function (callback) {
-    if (this._appender) {
-        this._unlock(callback)
-    } else {
-        this._locker.unlock(this.page)
-        this._locker.dispose()
-        callback()
-    }
+Cursor.prototype.release = function () {
+    this._cartridge.release()
 }
 
 Cursor.prototype.insert = function (value, key, index) {
