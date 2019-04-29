@@ -24,21 +24,6 @@ function compare (a, b) { return a < b ? -1 : a > b ? 1 : 0 }
 function Strata (options) {
     this.options = options
     this.options.comparator = options.comparator || compare
-    if (!options.serializers) {
-        var json = require('./json')
-        options.serializers = {
-            key: json.serializer,
-            record: json.serializer
-        }
-        options.deserializers = {
-            key: json.deserialize,
-            record: json.deserialize
-        }
-    }
-    /* if (!options.framer) {
-        var UTF8 = require('./frame/utf8')
-        options.framer = new UTF8(options.checksum || 'sha1')
-    } */
     this.journalist = new Journalist(options)
 
     this.housekeeper = new Turnstile
