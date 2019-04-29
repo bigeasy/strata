@@ -77,7 +77,6 @@ Strata.prototype.create = cadence(function (async, options) {
         }, function () {
             new Appender(path.resolve(directory, 'pages', '0.1', 'append')).end(async())
         }, function () {
-            console.log('--- written ---')
             this.journalist.magazine.hold(-1, { items: [{ id: '0.0' }]  })
         })
     })
@@ -141,21 +140,17 @@ Strata.prototype.cursor = cadence(function (async, key, exclusive) {
         async.block(function () {
             var cartridge, index = 0
             cartridges.push(cartridge = this.journalist.magazine.hold(-1, null))
-            console.log(cartridge.value)
             for (;;) {
                 var id = cartridge.value.items[index].id
-                console.log('>!', id)
                 cartridges.push(cartridge = this.journalist.magazine.hold(id))
                 if (cartridge.value == null) {
                     return async(function () {
-                        console.log(id)
                         this.journalist.load(id, async())
                     }, function () {
                         return [ async.continue ]
                     })
                 }
                 var page = cartridge.value
-                console.log('>', this.options.comparator, cartridge.value)
                 index = find(this.options.comparator, cartridge.value, key, page.leaf ? page.ghosts : 1)
                 if (page.leaf) {
                     break

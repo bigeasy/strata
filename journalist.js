@@ -19,6 +19,7 @@ var sequester = require('sequester')
 var Cache = require('magazine')
 
 var Appender = require('./appender')
+var Splitter = require('./splitter')
 
 function compare (a, b) { return a < b ? -1 : a > b ? 1 : 0 }
 
@@ -159,40 +160,50 @@ Journalist.prototype.transact = cadence(function (async, script) {
 
 Journalist.prototype.load = restrictor.enqueue('canceled', cadence(function (async, id) {
     var cartridge = this.magazine.hold(id, null)
-    console.log(id)
     async([function () {
         cartridge.release()
     }], function () {
         if (cartridge.value != null) {
             return [ async.return ]
         }
-    console.log(id)
-        console.log('>>>', id, cartridge.value)
         var filename = path.resolve(this.directory, 'pages', String(id), 'append')
-        var items = []
+        var items = [], heft = 0, leaf = +id.split('.')[1] % 2 == 1
+        var readable = new Staccato.Readable(fs.createReadStream(filename))
+        var splitter = new Splitter(function () { return '0' })
         async(function () {
-            fs.readFile(filename, 'utf8', async())
-        }, function (entries) {
-            entries = entries.split('\n')
-            entries.pop()
-            entries = entries.map(function (entry) { return JSON.parse(entry) })
-            while (entries.length) {
-                var record = shifter(entries), header = record[0]
-                switch (header.method) {
-                case 'insert':
-                    if (id % 2 == 0) {
-                        items.splice(header.index, 0, header.value)
-                    } else {
-                        items.splice(header.index, 0, record[1])
+            async.loop([], function () {
+                async(function () {
+                    readable.read(async())
+                }, function (chunk) {
+                    if (chunk == null) {
+                        readable.raise()
+                        return [ async.break ]
                     }
-                    break
-                case 'remove':
-                    items.splice(header.index, 1)
-                    break
-                }
-            }
-            cartridge.value = { id: id, leaf: +id.split('.')[1] % 2 == 1, items: items, ghosts: 0 }
-            return []
+                    splitter.split(chunk).forEach(function (entry) {
+                        switch (entry.header.method) {
+                        case 'insert':
+                            if (leaf) {
+                                items.splice(entry.header.index, 0, {
+                                    key: entry.body.key,
+                                    value: entry.body.value,
+                                    heft: entry.sizes[1]
+                                })
+                                heft += entry.sizes[1]
+                            } else {
+                                items.splice(entry.header.index, 0, {
+                                    id: entry.header.value.id,
+                                    heft: entry.sizes[0]
+                                })
+                                heft += entry.sizes[0]
+                            }
+                        }
+                    })
+                })
+            })
+        }, function () {
+            // TODO Did we ghost? Not really checking.
+            cartridge.value = { id: id, leaf: leaf, items: items, ghosts: 0 }
+            cartridge.adjustHeft(heft)
         })
     })
 }))
@@ -223,13 +234,7 @@ Journalist.prototype._locked = cadence(function (async, envelope) {
                         var appender = new Appender(path.resolve(directory, 'append'))
                         async(function () {
                             async.forEach([ entry.writes ], function (write) {
-                                appender.append({
-                                    position: write.position,
-                                    previous: write.previous,
-                                    method: write.method,
-                                    index: write.index,
-                                    length: 0
-                                }, write.serialized, async())
+                                appender.append(write.header, write.body, async())
                             })
                         }, function () {
                             appender.end(async())

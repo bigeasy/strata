@@ -37,7 +37,7 @@ function prove (async, okay) {
                 okay(cursor.indexOf('x', cursor.ghosts), 0, 'inserted')
                 okay(~cursor.indexOf('a', 0), 0, 'not found')
                 // TODO Assert heft and purge again.
-                okay(strata.journalist.magazine.heft, 9, 'heft')
+                okay(strata.journalist.magazine.heft, 130, 'heft')
             }, function () {
                 cursor.flush(async())
             })
@@ -49,11 +49,11 @@ function prove (async, okay) {
             okay(x, {
                 '0.0': [ '0.1' ],
                 '0.1': [{
-                    method: 'insert', index: 0, body: 'x'
+                    method: 'insert', index: 0, body: { key: 'x', value: 'x' }
                 }, {
-                    method: 'insert', index: 1, body: 'y'
+                    method: 'insert', index: 1, body: { key: 'y', value: 'y' }
                 }, {
-                    method: 'insert', index: 2, body: 'z'
+                    method: 'insert', index: 2, body: { key: 'z', value: 'z' }
                 }]
             }, 'inserted')
         })

@@ -5,13 +5,13 @@ function prove (okay) {
     var buffer = recorder({ length: 0 }, Buffer.from('"a"'))
     okay(buffer.toString().split(/\n/).slice(0, -1).map(function (line) {
         return JSON.parse(line)
-    }), [ '17', { length: 4 }, 'a' ], 'buffer')
+    }), [ [ '12', '3' ], { length: 4 }, 'a' ], 'buffer')
     var buffer = recorder({ length: 0 }, 'a')
     okay(buffer.toString().split(/\n/).slice(0, -1).map(function (line) {
         return JSON.parse(line)
-    }), [ '29', { length: 4, json: true }, 'a' ], 'string')
+    }), [ [ '24', '3' ], { length: 4, json: true }, 'a' ], 'string')
     var buffer = recorder({ length: 0 })
     okay(buffer.toString().split(/\n/).slice(0, -1).map(function (line) {
         return JSON.parse(line)
-    }), [ '13', { length: 0 } ], 'no body')
+    }), [ [ '12' ], { length: 0 } ], 'no body')
 }

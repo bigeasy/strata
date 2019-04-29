@@ -21,16 +21,14 @@ function prove (async, okay) {
     }, function () {
         okay(strata.instance, 1, 'increment instance')
         okay(strata.journalist.magazine.heft, 0, 'json size before read')
-        console.log('here')
         strata.cursor('a', async())
     }, function (cursor) {
-        console.log('here')
         async(function () {
             okay(! cursor.exclusive, 'shared')
             okay(cursor.index, 0, 'index')
 //            okay(cursor.offset, 0, 'offset')
             var item = cursor.items[cursor.index]
-            okay(item, 'a', 'get record')
+            okay(item.value, 'a', 'get record')
             cursor.close()
             return
             okay(item.key, 'a', 'get key')

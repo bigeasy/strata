@@ -26,11 +26,15 @@ function prove (async, okay) {
         async(function () {
             reader.read(async())
         }, function (record) {
-            okay(record, { checksum: '0', header: { value: 1, length: 0 }, body: null }, 'no body')
+            okay(record, {
+                checksum: [ '0' ],
+                header: { value: 1, length: 0 },
+                body: null
+            }, 'no body')
             reader.read(async())
         }, function (record) {
             okay(record, {
-                checksum: '0',
+                checksum: [ '0', '0' ],
                 header: { value: 2, json: true, length: 12 },
                 body: { value: 3 }
             }, 'json body')
@@ -38,7 +42,7 @@ function prove (async, okay) {
         }, function (record) {
             record.body = record.body.toString()
             okay(record, {
-                checksum: '0',
+                checksum: [ '0', '0' ],
                 header: { value: 4, length: 5 },
                 body: 'a\nb\n'
             }, 'buffer body')

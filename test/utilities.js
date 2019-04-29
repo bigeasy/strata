@@ -94,7 +94,10 @@ exports.serialize = cadence(function (async, directory, files) {
                             appender.append({
                                 method: record.method,
                                 index: record.index
-                            }, record.body, async())
+                            }, {
+                                key: record.body,
+                                value: record.body
+                            }, async())
                         })
                     }
                 }, function () {
