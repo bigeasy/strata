@@ -5,7 +5,7 @@ var Staccato = require('staccato')
 
 var Appender = require('../appender')
 
-var shifter = require('../shifter')(null)
+var shifter = require('./shifter')(null)
 
 var cadence = require('cadence')
 
