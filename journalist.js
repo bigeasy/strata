@@ -49,6 +49,47 @@ function increment (value) {
     }
 }
 
+Journalist.prototype.read = cadence(function (async, id) {
+    var filename = path.resolve(this.directory, 'pages', String(id), 'append')
+    var items = [], heft = 0, leaf = +id.split('.')[1] % 2 == 1
+    var readable = new Staccato.Readable(fs.createReadStream(filename))
+    var splitter = new Splitter(function () { return '0' })
+    async(function () {
+        async.loop([], function () {
+            async(function () {
+                readable.read(async())
+            }, function (chunk) {
+                if (chunk == null) {
+                    readable.raise()
+                    return [ async.break ]
+                }
+                splitter.split(chunk).forEach(function (entry) {
+                    switch (entry.header.method) {
+                    case 'insert':
+                        if (leaf) {
+                            items.splice(entry.header.index, 0, {
+                                key: entry.body.key,
+                                value: entry.body.value,
+                                heft: entry.sizes[1]
+                            })
+                            heft += entry.sizes[1]
+                        } else {
+                            items.splice(entry.header.index, 0, {
+                                id: entry.header.value.id,
+                                heft: entry.sizes[0]
+                            })
+                            heft += entry.sizes[0]
+                        }
+                    }
+                })
+            })
+        })
+    }, function () {
+        // TODO Did we ghost? Not really checking.
+        return { id: id, leaf: leaf, items: items, ghosts: 0, heft: heft }
+    })
+})
+
 Journalist.prototype.load = restrictor.enqueue('canceled', cadence(function (async, id) {
     var cartridge = this.magazine.hold(id, null)
     async([function () {
@@ -57,44 +98,12 @@ Journalist.prototype.load = restrictor.enqueue('canceled', cadence(function (asy
         if (cartridge.value != null) {
             return [ async.return ]
         }
-        var filename = path.resolve(this.directory, 'pages', String(id), 'append')
-        var items = [], heft = 0, leaf = +id.split('.')[1] % 2 == 1
-        var readable = new Staccato.Readable(fs.createReadStream(filename))
-        var splitter = new Splitter(function () { return '0' })
         async(function () {
-            async.loop([], function () {
-                async(function () {
-                    readable.read(async())
-                }, function (chunk) {
-                    if (chunk == null) {
-                        readable.raise()
-                        return [ async.break ]
-                    }
-                    splitter.split(chunk).forEach(function (entry) {
-                        switch (entry.header.method) {
-                        case 'insert':
-                            if (leaf) {
-                                items.splice(entry.header.index, 0, {
-                                    key: entry.body.key,
-                                    value: entry.body.value,
-                                    heft: entry.sizes[1]
-                                })
-                                heft += entry.sizes[1]
-                            } else {
-                                items.splice(entry.header.index, 0, {
-                                    id: entry.header.value.id,
-                                    heft: entry.sizes[0]
-                                })
-                                heft += entry.sizes[0]
-                            }
-                        }
-                    })
-                })
-            })
-        }, function () {
-            // TODO Did we ghost? Not really checking.
-            cartridge.value = { id: id, leaf: leaf, items: items, ghosts: 0 }
-            cartridge.adjustHeft(heft)
+            this.read(id, async())
+        }, function (page) {
+            cartridge.value = page
+            cartridge.adjustHeft(page.heft)
+            return []
         })
     })
 }))
