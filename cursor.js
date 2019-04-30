@@ -5,7 +5,7 @@ var find = require('./find')
 
 var Interrupt = require('interrupt').createInterrupter('b-tree')
 
-function Cursor (journalist, cartridge, key, index) {
+function Cursor (journalist, key, cartridge, index) {
     ok(journalist)
     this._cartridge = cartridge
     this.found = index >= 0

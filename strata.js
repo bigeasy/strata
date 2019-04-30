@@ -16,8 +16,6 @@ var Journalist = require('./journalist')
 var Interrupt = require('interrupt').createInterrupter('b-tree')
 var Turnstile = require('turnstile')
 
-var find = require('./find')
-
 function compare (a, b) { return a < b ? -1 : a > b ? 1 : 0 }
 
 // TODO Branch and leaf size, can we just sort that out in a call to balance?
@@ -114,43 +112,14 @@ Strata.prototype.close = cadence(function (async) {
     assert(!this.sheaf.magazine.count, 'pages still held by cache')
 })
 
-Strata.prototype.cursor = cadence(function (async, key, exclusive) {
+Strata.prototype.cursor = cadence(function (async, key) {
     // We hold onto all cartridges until we're done, even retries, so we're
     // going to end up holding cartridges two or more times, but we'll make
     // progress eventually and release everything.
-    var cartridges = []
-    async([function () {
-        cartridges.forEach(function (cartridge) { cartridge.release() })
-    }], function () {
-        async.block(function () {
-            var cartridge, index = 0
-            cartridges.push(cartridge = this.journalist.magazine.hold(-1, null))
-            for (;;) {
-                var id = cartridge.value.items[index].id
-                cartridges.push(cartridge = this.journalist.magazine.hold(id))
-                if (cartridge.value == null) {
-                    return async(function () {
-                        this.journalist.load(id, async())
-                    }, function () {
-                        return [ async.continue ]
-                    })
-                }
-                var page = cartridge.value
-                index = find(this.options.comparator, cartridge.value, key, page.leaf ? page.ghosts : 1)
-                if (page.leaf) {
-                    break
-                } else if (index < 0) {
-                    // On a branch, unless we hit the key exactly, we're
-                    // pointing at the insertion point which is right after
-                    // the branching we're supposed to decend, so back it up
-                    // one unless it's a bullseye.
-                    index = ~index - 1
-                }
-            }
-            // Pop the last cartridge to give to the cursor; we don't release it
-            // the cursor does.
-            return new Cursor(this.journalist, cartridges.pop(), key, index)
-        })
+    async(function () {
+        this.journalist.descend(key, -1, false, async())
+    }, function (descent) {
+        return new Cursor(this.journalist, key, descent.cartridge, descent.index)
     })
 })
 

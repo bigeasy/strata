@@ -1,4 +1,4 @@
-var ok = require('assert').ok
+var assert = require('assert')
 var path = require('path')
 var fs = require('fs')
 
@@ -22,6 +22,8 @@ var Splitter = require('./splitter')
 var Interrupt = require('interrupt').createInterrupter('b-tree')
 
 var restrictor = require('restrictor')
+
+var find = require('./find')
 
 function Journalist (options) {
     this.magazine = new Cache().createMagazine()
@@ -107,6 +109,64 @@ Journalist.prototype.load = restrictor.enqueue('canceled', cadence(function (asy
         })
     })
 }))
+
+Journalist.prototype.descend = cadence(function (async, key, level, fork) {
+    var cartridges = [], retries = [ cartridges, [] ]
+    async([function () {
+        while (retries.length != 0) {
+            retries.pop().forEach(function (cartridge) { cartridge.release() })
+        }
+    }], function () {
+        async.block(function () {
+            var result = { cartridge: null, index: 0, level: 0 }
+            cartridges.push(result.cartridge = this.magazine.hold(-1, null))
+            for (;;) {
+                var id = result.cartridge.value.items[result.index].id
+                cartridges.push(result.cartridge = this.magazine.hold(id))
+                if (result.cartridge.value == null) {
+                    return async(function () {
+                        this.load(id, async())
+                    }, function () {
+                        cartridges = []
+                        retries.unshift(cartridges)
+                        retries.pop().forEach(function (cartridge) { cartridge.release() })
+                        return [ async.continue ]
+                    })
+                }
+                var page = result.cartridge.value
+                // TODO Maybe page offset instead of ghosts, nah leave it so you remember it.
+                result.index = find(this.options.comparator, page, key, page.leaf ? page.ghosts : 1)
+                if (page.leaf) {
+                    assert.equal(level, -1, 'could not find branch')
+                    break
+                } else if (level == result.level) {
+                    break
+                } else if (result.index < 0) {
+                    // On a branch, unless we hit the key exactly, we're
+                    // pointing at the insertion point which is right after the
+                    // branching we're supposed to decend, so back it up one
+                    // unless it's a bullseye.
+                    result.index = ~result.index - 1
+                } else if (fork != 0) {
+                    if (fork < 0) {
+                        if (result.index-- == 0) {
+                            return null
+                        }
+                    } else {
+                        if (++result.index == page.items.length) {
+                            return null
+                        }
+                    }
+                }
+                result.level++
+            }
+            cartridges.pop()
+            // Pop the last cartridge to give to the cursor; we don't release it
+            // the cursor does.
+            return result
+        })
+    })
+})
 
 // TODO Okay, I'm getting tired of having to check canceled and unit test for
 // it, so let's have exploding turnstiles (or just let them OOM?) Maybe on
