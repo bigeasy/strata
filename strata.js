@@ -119,7 +119,9 @@ Strata.prototype.cursor = cadence(function (async, key) {
     async(function () {
         this.journalist.descend(key, -1, false, async())
     }, function (descent) {
-        return new Cursor(this.journalist, key, descent.cartridge, descent.index)
+        var cartridge = descent.cartridges.pop()
+        descent.cartridges.forEach(function (cartridge) { cartridge.release() })
+        return new Cursor(this.journalist, key, cartridge, descent.index)
     })
 })
 

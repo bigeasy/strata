@@ -118,12 +118,13 @@ Journalist.prototype.descend = cadence(function (async, key, level, fork) {
         }
     }], function () {
         async.block(function () {
-            var result = { cartridge: null, index: 0, level: 0 }
+            var result = { cartridge: null, index: 0, level: 0, cartridges: [] }
             cartridges.push(result.cartridge = this.magazine.hold(-1, null))
             for (;;) {
                 var id = result.cartridge.value.items[result.index].id
                 cartridges.push(result.cartridge = this.magazine.hold(id))
                 if (result.cartridge.value == null) {
+                    result.cartridge.remove()
                     return async(function () {
                         this.load(id, async())
                     }, function () {
@@ -160,7 +161,7 @@ Journalist.prototype.descend = cadence(function (async, key, level, fork) {
                 }
                 result.level++
             }
-            cartridges.pop()
+            result.cartridges.push.apply(result.cartridges, cartridges.splice(0))
             // Pop the last cartridge to give to the cursor; we don't release it
             // the cursor does.
             return result
