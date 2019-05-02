@@ -111,9 +111,13 @@ Journalist.prototype.load = restrictor.enqueue('canceled', cadence(function (asy
 }))
 
 Journalist.prototype._descend = function (key, level, fork) {
-    var descent = { miss: null, cartridges: [], index: 0, level: 0 }, cartridge
+    var descent = { miss: null, cartridges: [], index: 0, level: 0, keyed: null }, cartridge
     descent.cartridges.push(cartridge = this.magazine.hold(-1, null))
     for (;;) {
+        if (descent.index != 0) {
+            console.log('>', descent.keyed)
+            descent.keyed = page.items[descent.index].key
+        }
         var id = cartridge.value.items[descent.index].id
         descent.cartridges.push(cartridge = this.magazine.hold(id, null))
         if (cartridge.value == null) {
