@@ -70,7 +70,7 @@ Cursor.prototype.indexOf = function (key, index) {
     unambiguous = -1 < index // <- TODO ?
                || ~ index < page.items.length
                || page.right == null
-    if (!unambiguous && this.sheaf.comparator(key, page.right.key) >= 0) {
+    if (!unambiguous && this.sheaf.comparator(key, page.right) >= 0) {
         return null
     }
     return index

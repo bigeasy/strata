@@ -60,7 +60,7 @@ Strata.prototype.create = cadence(function (async, options) {
         }, function () {
             new Appender(path.resolve(directory, 'pages', '0.1', 'append')).end(async())
         }, function () {
-            this.journalist.magazine.hold(-1, { items: [{ id: '0.0' }]  })
+            this.journalist.magazine.hold(-1, { items: [{ id: '0.0' }], right: null  })
         })
     })
 })
