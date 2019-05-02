@@ -110,62 +110,57 @@ Journalist.prototype.load = restrictor.enqueue('canceled', cadence(function (asy
     })
 }))
 
-Journalist.prototype.descend = cadence(function (async, key, level, fork) {
-    var cartridges = [], retries = [ cartridges, [] ]
-    async([function () {
-        while (retries.length != 0) {
-            retries.pop().forEach(function (cartridge) { cartridge.release() })
+Journalist.prototype._descend = function (key, level, fork) {
+    var descent = { miss: null, cartridges: [], index: 0, level: 0 }, cartridge
+    descent.cartridges.push(cartridge = this.magazine.hold(-1, null))
+    for (;;) {
+        var id = cartridge.value.items[descent.index].id
+        descent.cartridges.push(cartridge = this.magazine.hold(id, null))
+        if (cartridge.value == null) {
+            descent.cartridges.pop().remove()
+            descent.miss = id
+            return descent
         }
-    }], function () {
-        async.block(function () {
-            var result = { cartridge: null, index: 0, level: 0, cartridges: [] }
-            cartridges.push(result.cartridge = this.magazine.hold(-1, null))
-            for (;;) {
-                var id = result.cartridge.value.items[result.index].id
-                cartridges.push(result.cartridge = this.magazine.hold(id))
-                if (result.cartridge.value == null) {
-                    result.cartridge.remove()
-                    return async(function () {
-                        this.load(id, async())
-                    }, function () {
-                        cartridges = []
-                        retries.unshift(cartridges)
-                        retries.pop().forEach(function (cartridge) { cartridge.release() })
-                        return [ async.continue ]
-                    })
+        var page = cartridge.value
+        // TODO Maybe page offset instead of ghosts, nah leave it so you remember it.
+        descent.index = find(this.options.comparator, page, key, page.leaf ? page.ghosts : 1)
+        if (page.leaf) {
+            assert.equal(level, -1, 'could not find branch')
+            break
+        } else if (level == descent.level) {
+            break
+        } else if (descent.index < 0) {
+            // On a branch, unless we hit the key exactly, we're
+            // pointing at the insertion point which is right after the
+            // branching we're supposed to decend, so back it up one
+            // unless it's a bullseye.
+            descent.index = ~descent.index - 1
+        } else if (fork != 0) {
+            if (fork < 0) {
+                if (descent.index-- == 0) {
+                    return null
                 }
-                var page = result.cartridge.value
-                // TODO Maybe page offset instead of ghosts, nah leave it so you remember it.
-                result.index = find(this.options.comparator, page, key, page.leaf ? page.ghosts : 1)
-                if (page.leaf) {
-                    assert.equal(level, -1, 'could not find branch')
-                    break
-                } else if (level == result.level) {
-                    break
-                } else if (result.index < 0) {
-                    // On a branch, unless we hit the key exactly, we're
-                    // pointing at the insertion point which is right after the
-                    // branching we're supposed to decend, so back it up one
-                    // unless it's a bullseye.
-                    result.index = ~result.index - 1
-                } else if (fork != 0) {
-                    if (fork < 0) {
-                        if (result.index-- == 0) {
-                            return null
-                        }
-                    } else {
-                        if (++result.index == page.items.length) {
-                            return null
-                        }
-                    }
+            } else {
+                if (++descent.index == page.items.length) {
+                    return null
                 }
-                result.level++
             }
-            result.cartridges.push.apply(result.cartridges, cartridges.splice(0))
-            // Pop the last cartridge to give to the cursor; we don't release it
-            // the cursor does.
-            return result
-        })
+        }
+        descent.level++
+    }
+    return descent
+}
+
+Journalist.prototype.descend = cadence(function (async, key, level, fork) {
+    var cartridges = []
+    async.loop([], function () {
+        var descent = this._descend(key, level, fork)
+        cartridges.forEach(function (cartridge) { cartridge.release() })
+        if (descent.miss == null) {
+            return [ async.break, descent ]
+        }
+        cartridges = descent.cartridges
+        this.load(descent.miss, async())
     })
 })
 
