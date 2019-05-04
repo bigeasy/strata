@@ -10,6 +10,7 @@ var Signal = require('signal')
 
 var Turnstile = require('turnstile')
 Turnstile.Set = require('turnstile/set')
+Turnstile.Queue = require('turnstile/queue')
 
 var cadence = require('cadence')
 var sequester = require('sequester')
@@ -35,12 +36,15 @@ function Journalist (options) {
     this._checksum = function () { return "0" }
     this.lengths = {}
     this.turnstiles = {
-        lock: new Turnstile
+        lock: new Turnstile,
+        housekeeping: new Turnstile
     }
     this.turnstile = new Turnstile
-    this._lock = new Turnstile.Set(this, '_locked', this.turnstiles.lock)
+    this._locks = [  new Turnstile.Set(this, '_locked', this.turnstiles.lock) ]
+    this._housekeeping = new Turnstile.Queue(this, '_tidy', this.turnstiles.housekeeping)
     this._queues = {}
     this._operationId = 0xffffffff
+    this._blocks = []
 }
 
 function increment (value) {
@@ -111,13 +115,14 @@ Journalist.prototype.load = restrictor.enqueue('canceled', cadence(function (asy
 }))
 
 Journalist.prototype._descend = function (key, level, fork) {
-    var descent = { miss: null, cartridges: [], index: 0, level: 0, keyed: null }, cartridge
+    var descent = { miss: null, cartridges: [], index: 0, level: -1, keyed: null }, cartridge
     descent.cartridges.push(cartridge = this.magazine.hold(-1, null))
     for (;;) {
         if (descent.index != 0) {
             console.log('>', descent.keyed)
-            descent.keyed = page.items[descent.index].key
+            descent.keyed = { key: page.items[descent.index].key, level: descent.level - 1 })
         }
+        descent.level++
         var id = cartridge.value.items[descent.index].id
         descent.cartridges.push(cartridge = this.magazine.hold(id, null))
         if (cartridge.value == null) {
@@ -150,7 +155,6 @@ Journalist.prototype._descend = function (key, level, fork) {
                 }
             }
         }
-        descent.level++
     }
     return descent
 }
@@ -168,6 +172,23 @@ Journalist.prototype.descend = cadence(function (async, key, level, fork) {
     })
 })
 
+Journalist.prototype._writeLeaf = cadence(function (async, id, writes) {
+    var page = queue.cartridge.value
+    var directory = path.resolve(this.directory, 'pages', String(id))
+    async(function () {
+        mkdirp(directory, async())
+    }, function () {
+        var appender = new Appender(path.resolve(directory, 'append'))
+        async(function () {
+            async.forEach([ writes ], function (write) {
+                appender.append(write.header, write.body, async())
+            })
+        }, function () {
+            appender.end(async())
+        })
+    })
+})
+
 // TODO Okay, I'm getting tired of having to check canceled and unit test for
 // it, so let's have exploding turnstiles (or just let them OOM?) Maybe on
 // timeout we crash?
@@ -177,54 +198,248 @@ Journalist.prototype.descend = cadence(function (async, key, level, fork) {
 //
 // Writing things out again. Didn't occur to me
 Journalist.prototype._locked = cadence(function (async, envelope) {
-    var queue = this._queues[envelope.body], entry
+    var entry = envelope.body
     async(function () {
-        async.loop([], function () {
-            if (queue.length == 0) {
+        process.nextTick(async())
+    }, function () {
+        switch (envelope.method) {
+        case 'pause':
+            var block = this._blocks[envelope.index]
+            delete this._blocks[envelope.index]
+            block.enter.unlatch()
+            block.pause.wait(async())
+            break
+        case 'write':
+            async(function () {
+                var queue = this._queues[entry.id]
+                delete this._queues[entry.id]
+                var cartridge = queue.cartridge, page = cartridge.value
+                if (
+                    page.items.length >= this.options.leaf.split ||
+                    (
+                        (page.id != '0.0' || page.right != null) &&
+                        page.items.length <= this.options.leaf.merge
+                    )
+                ) {
+                    this._housekeeping.add(entry.id)
+                }
+                this._writeLeaf(entry.body, entry.writes, async())
+            }, function () {
+                queue.exit.unlatch()
+            })
+            break
+        }
+    })
+})
+
+Journalist.prototype._queue = function (id) {
+    var queue = this._queues[id]
+    if (queue == null) {
+        queue = this._queues[id] = {
+            id: this._operationId = increment(this._operationId),
+            method: 'write',
+            writes: [],
+            cartridge: this.magazine.hold(id, null),
+            exit: new Signal
+        }
+        this._lock.add(id)
+    }
+    return queue
+}
+
+Journalist.prototype.lock = cadence(function (async, id) {
+    var hash = id.split('.').reduce(function (sum, value) { return sum + +value }, 0)
+    var index = hash % this._lcoks.length
+    var block = this._blocks[index]
+    if (block == null) {
+        this._blocks[index] = { enter: new Signal, pause: new Signal }
+    }
+    return block
+})
+
+Journalist.prototype._tidy = cadence(function (async, id) {
+    if (page.items.length >= this.options.leaf.split) {
+        this._splitLeaf(id, async())
+    } else if (page.items.length <= this.options.leaf.merge) {
+        this._mergeLeaf(id, async())
+    } // otherwise vaccum
+})
+
+function release (cartridge) { cartridge.release() }
+
+Journalist.prototype._getPageAndParent = cadence(function (async, id, cartridges) {
+    var page = { child: null, parent: null, keyed: null }
+    async(function () {
+        this.descend(key, -1, 0, async())
+    }, function (descent) {
+        cartridges.push(descent.cartridge)
+        page.child = descent.cartridge.value
+        page.keyed = descent.keyed
+        this.descent(key, descent.level - 1, 0, async())
+    }, function (descent) {
+        cartridges.push(descent.cartridge)
+        page.parent = descent.cartridge.value
+        return page
+    })
+})
+
+Journalist.prototype._mergeLeaf = cadence(function (async, id) {
+    // Go to the leaf.
+    var pages = [ null, null, null ], cartridges = [], branches = []
+    async([function () {
+        cartridges.forEach(release)
+    }], function () {
+        async(function () {
+            this._getPageAndParent(id, cartridges, async())
+        }, function (page) {
+            pages[1] = page
+            var siblings = []
+            siblings.push(1)
+            if (id != '0.0') {
+                siblings.push(-1)
+            }
+            if (page.child.right != null) {
+                siblings.push(1)
+            }
+            async.forEach([ siblings ], function (fork) {
+                async(function () {
+                    this._getPageAndParent(id, cartridges, async())
+                }, function (page) {
+                    page[1 + fork] = page
+                })
+            })
+        })
+        var pauses = pages.filter(function () { return page != null }).map(function (page) {
+            this._pause(page.cartridge.value.id)
+        })
+        async([function () {
+            pauses.forEach(function (pause) {
+                pause.block.unlock()
+            })
+        }], function () {
+            async.forEach([ pauses ], function (pause) { pause.enter.wait(async()) })
+        }, function () {
+            if (pages[1].child.items.length > this._options.leaf.split) {
                 return [ async.break ]
             }
-            var entry = queue.shift()
+            // Choose the left or right for a merge.
+            if (pages[2] == null) {
+                from = pages[1]
+                to = pages[0]
+            } else if (
+                pages[0] == null ||
+                pages[0].child.items.length < pages[2].child.items.length
+            ) {
+                from = pages[2]
+                to = pages[1]
+            } else {
+                from = pages[1]
+                to = pages[0]
+            }
+            // Merge.
+            to.right = from.right
+            to.items.push.apply(to.items, from.items.slice(from.ghosts))
+            // Remove the merged leaf from the parent.
+            var descent = from.parent, shifted
+            // Delete any empty branches along the way to the leaf page.
+            while (descent.page.items.length == 1) {
+                commit.push({ method: 'unlink', path: descent.page.id })
+                descent = this._descend(descent.keyed.key, descent.keyed.level - 1, 0)
+                cartridges.push.apply(cartridges, descent.cartridges)
+            }
+            // If branch item is the first entry, then the key of the second
+            // entry should be promoted to the branch page above where the
+            // locate key was found, otherwise we can just delete the entry.
+            if (descent.index == 0) {
+                var shifted = descent.page.items.shift()
+                descent.page.items[descent.index].key = null
+                commit.push({
+                    method: 'splice',
+                    id: descent.page.id,
+                    vargs: [ 0, 1, descent.page.items[0] ]
+                })
+                descent = this._descend(descent.keyed.key, descent.keyed.level, 0)
+                cartridges.push.apply(cartridges, descent.cartridges)
+                descent.page.items[descent.index].key = shifted.key
+                commit.push({
+                    method: 'splice',
+                    id: descent.page.id,
+                    vargs: [ 0, 1, descent.page.items[descent.index] ]
+                })
+            } else {
+                descent.page.items.splice(descent.index, 1)
+                commit.push({
+                    method: 'splice',
+                    id: descent.page.id,
+                    vargs: [ descent.index, 1 ]
+                })
+            }
+            var commit = {}
             async(function () {
-                switch (entry.method) {
-                case 'write':
-                    var directory = path.resolve(this.directory, 'pages', String(envelope.body))
-                    async(function () {
-                        mkdirp(directory, async())
-                    }, function () {
-                        var appender = new Appender(path.resolve(directory, 'append'))
-                        async(function () {
-                            async.forEach([ entry.writes ], function (write) {
-                                appender.append(write.header, write.body, async())
-                            })
-                        }, function () {
-                            appender.end(async())
-                        })
-                    })
-                    break
-                }
+                // Append any writes to the two leaves we've merged, write them
+                // to their existing files.
             }, function () {
-                entry.completed.unlatch()
+                commit.write(this._instance, script, async())
             })
+        })
+    }, function () {
+        async(function () {
+            commit.prepare(async())
+        }, function () {
+            commit.commit(async())
+        }, function () {
+            if (descent.depth != 0 && descent.page.items.length < this._options.branch.merge) {
+                this._mergeLeaf(descent.depth)
+            }
         })
     })
 })
 
+Journalist.prototype.splitLeaf = cadence(function (async, envelope) {
+    var page = cartridges[0].value, pages = 1, size
+    while ((size = Math.floor(page.items.length / pages)) > this.options.leaf.split - 1) {
+        pages++
+    }
+    if (pages != 1) {
+        var begin = 0, splits = [], remainder = page.items.length % size, extra
+        console.log(pages, size, remainder)
+        for (var i = 0; i < pages; i++) {
+            extra = remainder-- > 0 ? 1 : 0
+            splits.push(page.items.slice(begin, size + extra))
+            begin += size + extra
+        }
+        // TODO Not as expected, splits are inconsistent.
+        console.log(splits)
+        // TODO Adjust heft.
+        // page.heft = // reduce heft
+        page.items = splits[0]
+        // Create new page cartridges.
+
+        // Mark as no longer splitting.
+        page.splitting = false
+
+        // Load the parent leaf page.
+        // Insert the new leaf key and write it out, here, just here.
+        // Determine if you need to split the leaf.
+    }
+    break
+})
+
+Journalist.prototype.split = function (id) {
+    var pause = this._pause(id)
+    this._housekeeping.push({
+        method: 'split',
+        cartridge: this.magazine.hold(id, null),
+        pause: this._pause(id)
+    })
+}
+
 Journalist.prototype.append = function (entry, signals) {
-    var queue = this._queues[entry.id]
-    if (queue == null) {
-        queue = this._queues[entry.id] = []
-    }
-    if (queue.length == 0) {
-        queue.push({
-            id: this._operationId = increment(this._operationId),
-            method: 'write',
-            writes: [],
-            completed: new Signal
-        })
-    }
-    queue[0].writes.push(entry)
-    if (signals[queue[0].id] == null) {
-        signals[queue[0].id] = queue[0].completed
+    var queue = this._queue(entry.id)
+    queue.writes.push(entry)
+    if (signals[queue.id] == null) {
+        signals[queue.id] = queue.exit
+        queue.exit.notify(function () { delete signals[queue.id] })
     }
     this._lock.add(entry.id)
 }

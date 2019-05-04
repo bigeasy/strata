@@ -96,6 +96,7 @@ Cursor.prototype.insert = function (value, key, index) {
     // Okay, now we have a buffer and heft.
     this._journalist.append({
         id: this._cartridge.value.id,
+        lonely: this._cartridge.value.lonely,
         header: { method: 'insert', index: index, json: true },
         body: body
     }, this._signals)
@@ -105,15 +106,22 @@ Cursor.prototype.insert = function (value, key, index) {
     // a common serializer, one we imagined we'd create in Conduit or Procession.
     this._cartridge.value.items.splice(index, 0, { key: key, value: value, heft: heft })
     this._cartridge.adjustHeft(heft)
+
+    if (
+        !this._cartridge.value.splitting &&
+        this._cartridge.value.items.length == this._journalist.options.leaf.split
+    ) {
+        this._journalist.split(this._cartridge.value.id)
+    }
 }
 
 Cursor.prototype.flush = cadence(function (async) {
-    async.forEach([ Object.keys(this._signals) ], function (id) {
-        async(function () {
-            this._signals[id].wait(async())
-        }, function () {
-            delete this._signals[id]
-        })
+    var signals = []
+    for (var id in this._signals) {
+        signals.push(this._signals[id])
+    }
+    async.forEach([ signals ], function (signal) {
+        signal.wait(async())
     })
 })
 
