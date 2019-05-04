@@ -25,6 +25,7 @@
     {
                             "interrupt":                    "7.0.x",
                             "magazine":                     "5.0.x",
+                            "hash.fnv":                     "1.0.x",
                             "restrictor":                   "3.0.x",
                             "sequester":                    "1.0.x",
                             "cadence":                      "3.0.x"
@@ -42,6 +43,6 @@
     "main":                 "strata.js",
     "scripts":
     {
-                            "test": "proof test test/basics/splitter.t.js test/basics/get.t.js test/basics/recorder.t.js test/basics/insert.t.js"
+                            "test": "proof test test/basics/splitter.t.js test/basics/get.t.js test/basics/recorder.t.js test/basics/insert.t.js test/basics/commit.t.js"
     }
 }
