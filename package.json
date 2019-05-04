@@ -43,6 +43,6 @@
     "main":                 "strata.js",
     "scripts":
     {
-                            "test": "proof test test/basics/splitter.t.js test/basics/get.t.js test/basics/recorder.t.js test/basics/insert.t.js test/basics/commit.t.js"
+                            "test": "proof test test/basics/splitter.t.js test/basics/get.t.js test/basics/recorder.t.js test/basics/insert.t.js test/commit/unlink.t.js"
     }
 }
