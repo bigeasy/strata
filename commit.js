@@ -66,6 +66,10 @@ Commit.prototype._emplace = cadence(function (async, pages) {
             this._journalist.write(page, 'commit', async())
         }, function (write) {
             async(function () {
+                this._journalist.load(page.id, async())
+            }, function (cartridge) {
+                cartridge.heft = write.size
+                cartridge.release()
                 fs.readFile(this._journalist.path('commit', write.append), async())
             }, function (buffer) {
                 var hash = fnv(buffer, 0, buffer.length, 0)
@@ -111,7 +115,7 @@ Commit.prototype.prepare = cadence(function (async, stop) {
                 break
             case 'split':
                 async(function () {
-                    this._journalist.load(operation[1], async())
+                    this._journalist.read(operation[1], async())
                 }, function (page) {
                     var right = {
                         id: this._journalist.createId(),
@@ -122,7 +126,7 @@ Commit.prototype.prepare = cadence(function (async, stop) {
                 break
             case 'splice':
                 async(function () {
-                    this._journalist.load(operation[1], async())
+                    this._journalist.read(operation[1], async())
                 }, function (page) {
                     page.items.splice.apply(page.items, operation.vargs)
                     this._emplace([ page ], async())
@@ -130,7 +134,7 @@ Commit.prototype.prepare = cadence(function (async, stop) {
                 break
             case 'drain':
                 async(function () {
-                    this._journalist.load('0.0', async())
+                    this._journalist.read('0.0', async())
                 }, function (root) {
                     var right = {
                         id: this._journalist.createId(),
@@ -153,10 +157,10 @@ Commit.prototype.prepare = cadence(function (async, stop) {
                 break
             case 'fill':
                 async(function () {
-                    this._journalist.load('0.0', async())
+                    this._journalist.read('0.0', async())
                 }, function (root) {
                     async(function () {
-                        this._journalist.load(items[0].id, async())
+                        this._journalist.read(items[0].id, async())
                     }, function (page) {
                         root.items = page.items
                         async(function () {
