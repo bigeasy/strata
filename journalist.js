@@ -54,6 +54,25 @@ function increment (value) {
     }
 }
 
+Journalist.prototype.write = cadence(function (async, page) {
+    var append = String(this.instance) + '.' + String(Date.now())
+    var filename = path.resolve('pages', String(id), append)
+    var appender = new Appender(path.resolve(this.directory, filename))
+    async(function () {
+        async.forEach([ page.items ], function (item, index) {
+            appender.append({
+                method: 'insert',
+                index: index,
+                value: { key: item.key, id: item.id }
+            }, null, async())
+        })
+    }, function () {
+        appender.end(async())
+    }, function () {
+        return { page: page, append: append }
+    })
+})
+
 Journalist.prototype.read = cadence(function (async, id) {
     var directory = path.resolve(this.directory, 'pages', String(id))
     var items = [], heft = 0, leaf = +id.split('.')[1] % 2 == 1
@@ -61,40 +80,43 @@ Journalist.prototype.read = cadence(function (async, id) {
     async(function () {
         this._appendable(id, async())
     }, function (append) {
-        var filename = path.join(directory, append)
-        var readable = new Staccato.Readable(fs.createReadStream(filename))
-        async.loop([], function () {
-            async(function () {
-                readable.read(async())
-            }, function (chunk) {
-                if (chunk == null) {
-                    readable.raise()
-                    return [ async.break ]
-                }
-                splitter.split(chunk).forEach(function (entry) {
-                    switch (entry.header.method) {
-                    case 'insert':
-                        if (leaf) {
-                            items.splice(entry.header.index, 0, {
-                                key: entry.body.key,
-                                value: entry.body.value,
-                                heft: entry.sizes[1]
-                            })
-                            heft += entry.sizes[1]
-                        } else {
-                            items.splice(entry.header.index, 0, {
-                                id: entry.header.value.id,
-                                heft: entry.sizes[0]
-                            })
-                            heft += entry.sizes[0]
-                        }
+        async(function () {
+            var filename = path.join(directory, append)
+            var readable = new Staccato.Readable(fs.createReadStream(filename))
+            async.loop([], function () {
+                async(function () {
+                    readable.read(async())
+                }, function (chunk) {
+                    if (chunk == null) {
+                        readable.raise()
+                        return [ async.break ]
                     }
+                    splitter.split(chunk).forEach(function (entry) {
+                        switch (entry.header.method) {
+                        case 'insert':
+                            if (leaf) {
+                                items.splice(entry.header.index, 0, {
+                                    key: entry.body.key,
+                                    value: entry.body.value,
+                                    heft: entry.sizes[1]
+                                })
+                                heft += entry.sizes[1]
+                            } else {
+                                items.splice(entry.header.index, 0, {
+                                    id: entry.header.value.id,
+                                    key: entry.header.value.key,
+                                    heft: entry.sizes[0]
+                                })
+                                heft += entry.sizes[0]
+                            }
+                        }
+                    })
                 })
             })
+        }, function () {
+            // TODO Did we ghost? Not really checking.
+            return { id: id, leaf: leaf, items: items, ghosts: 0, heft: heft, append: append }
         })
-    }, function () {
-        // TODO Did we ghost? Not really checking.
-        return { id: id, leaf: leaf, items: items, ghosts: 0, heft: heft }
     })
 })
 

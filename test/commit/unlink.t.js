@@ -8,13 +8,11 @@ function prove (async, okay) {
     async(function () {
         utilities.reset(utilities.directory, async())
     }, function () {
-        fs.writeFile(path.join(utilities.directory, '1.1'), '{}', async())
+        fs.writeFile(path.join(utilities.directory, '1.1'), '', async())
     }, function () {
-        var commit = new Commit(utilities.directory)
+        var commit = new Commit({ directory: utilities.directory })
         async(function () {
-            commit.write(1, [[
-                'unlink', path.join(utilities.directory, '1.1')
-            ]], async())
+            commit.write(1, [[ 'unlink', path.join(utilities.directory, '1.1') ]], async())
         }, function () {
             commit.prepare(async())
         }, function () {
