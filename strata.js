@@ -117,7 +117,7 @@ Strata.prototype.cursor = cadence(function (async, key) {
     // going to end up holding cartridges two or more times, but we'll make
     // progress eventually and release everything.
     async(function () {
-        this.journalist.descend(key, -1, false, async())
+        this.journalist.descend(key, -1, 0, async())
     }, function (descent) {
         var cartridge = descent.cartridges.pop()
         descent.cartridges.forEach(function (cartridge) { cartridge.release() })
