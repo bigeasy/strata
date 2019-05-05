@@ -8,6 +8,7 @@ var Appender = require('../appender')
 var shifter = require('./shifter')(null)
 
 var cadence = require('cadence')
+var ascension = require('ascension')
 
 var rimraf = require('rimraf')
 var mkdirp = require('mkdirp')
@@ -22,6 +23,10 @@ exports.reset = cadence(function (async, directory) {
     })
 })
 
+var appendable = ascension([ Number, Number ], function (file) {
+    return file.split('.')
+})
+
 exports.vivify = cadence(function (async, directory) {
     var vivified = {}
     async(function () {
@@ -32,7 +37,12 @@ exports.vivify = cadence(function (async, directory) {
                 return [ async.continue ]
             }
             async(function () {
-                fs.readFile(path.resolve(directory, 'pages', file, 'append'), 'utf8', async())
+                fs.readdir(path.resolve(directory, 'pages', file), async())
+            }, function (dir) {
+                var append = dir.filter(function (file) {
+                    return /^\d+\.\d+$/.test(file)
+                }).sort(appendable).pop()
+                fs.readFile(path.resolve(directory, 'pages', file, append), 'utf8', async())
             }, function (entries) {
                 entries = entries.split(/\n/)
                 console.log(entries)
@@ -78,7 +88,7 @@ exports.serialize = cadence(function (async, directory, files) {
             async(function () {
                 mkdirp(path.resolve(directory, 'pages', id), async())
             }, function () {
-                var appender = new Appender(path.resolve(directory, 'pages', id, 'append'))
+                var appender = new Appender(path.resolve(directory, 'pages', id, '0.0'))
                 async(function () {
                     instance = Math.max(+id.split('.')[0], instance)
                     if (+id % 2 == 0) {

@@ -2,6 +2,8 @@ var assert = require('assert')
 var path = require('path')
 var fs = require('fs')
 
+var ascension = require('ascension')
+
 var mkdirp = require('mkdirp')
 
 var Staccato = require('staccato')
@@ -25,7 +27,8 @@ var restrictor = require('restrictor')
 
 var find = require('./find')
 
-function Journalist (options) {
+function Journalist (strata, options) {
+    this.strata = strata
     this.magazine = new Cache().createMagazine()
     this.nextAddress = 0
     this.directory = options.directory
@@ -52,11 +55,14 @@ function increment (value) {
 }
 
 Journalist.prototype.read = cadence(function (async, id) {
-    var filename = path.resolve(this.directory, 'pages', String(id), 'append')
+    var directory = path.resolve(this.directory, 'pages', String(id))
     var items = [], heft = 0, leaf = +id.split('.')[1] % 2 == 1
-    var readable = new Staccato.Readable(fs.createReadStream(filename))
     var splitter = new Splitter(function () { return '0' })
     async(function () {
+        this._appendable(id, async())
+    }, function (append) {
+        var filename = path.join(directory, append)
+        var readable = new Staccato.Readable(fs.createReadStream(filename))
         async.loop([], function () {
             async(function () {
                 readable.read(async())
@@ -168,6 +174,20 @@ Journalist.prototype.descend = cadence(function (async, key, level, fork) {
     })
 })
 
+var appendable = ascension([ Number, Number ], function (file) {
+    return file.split('.')
+})
+
+Journalist.prototype._appendable = cadence(function (async, id) {
+    async(function () {
+        fs.readdir(path.join(this.directory, 'pages', id), async())
+    }, function (dir) {
+        return dir.filter(function (file) {
+            return /^\d+\.\d+$/.test(file)
+        }).sort(appendable).pop()
+    })
+})
+
 // TODO Okay, I'm getting tired of having to check canceled and unit test for
 // it, so let's have exploding turnstiles (or just let them OOM?) Maybe on
 // timeout we crash?
@@ -189,9 +209,9 @@ Journalist.prototype._locked = cadence(function (async, envelope) {
                 case 'write':
                     var directory = path.resolve(this.directory, 'pages', String(envelope.body))
                     async(function () {
-                        mkdirp(directory, async())
-                    }, function () {
-                        var appender = new Appender(path.resolve(directory, 'append'))
+                        this._appendable(envelope.body, async())
+                    }, function (append) {
+                        var appender = new Appender(path.resolve(directory, append))
                         async(function () {
                             async.forEach([ entry.writes ], function (write) {
                                 appender.append(write.header, write.body, async())

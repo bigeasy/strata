@@ -22,7 +22,7 @@ function compare (a, b) { return a < b ? -1 : a > b ? 1 : 0 }
 function Strata (options) {
     this.options = options
     this.options.comparator = options.comparator || compare
-    this.journalist = new Journalist(options)
+    this.journalist = new Journalist(this, options)
 
     this.housekeeper = new Turnstile
     this.writer = new Turnstile
@@ -49,7 +49,7 @@ Strata.prototype.create = cadence(function (async, options) {
         async(function () {
             mkdirp(path.resolve(directory, 'pages', '0.0'), 0o755, async())
         }, function () {
-            var appender = new Appender(path.resolve(directory, 'pages', '0.0', 'append'))
+            var appender = new Appender(path.resolve(directory, 'pages', '0.0', '0.0'))
             async(function () {
                 appender.append({ method: 'insert', index: 0, value: { id: '0.1' } }, async())
             }, function () {
@@ -58,7 +58,7 @@ Strata.prototype.create = cadence(function (async, options) {
         }, function () {
             mkdirp(path.resolve(directory, 'pages', '0.1'), 0o755, async())
         }, function () {
-            new Appender(path.resolve(directory, 'pages', '0.1', 'append')).end(async())
+            new Appender(path.resolve(directory, 'pages', '0.1', '0.0')).end(async())
         }, function () {
             this.journalist.magazine.hold(-1, { items: [{ id: '0.0' }], right: null  })
         })
