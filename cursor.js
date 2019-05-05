@@ -108,12 +108,12 @@ Cursor.prototype.insert = function (value, key, index) {
 }
 
 Cursor.prototype.flush = cadence(function (async) {
-    async.forEach([ Object.keys(this._signals) ], function (id) {
-        async(function () {
-            this._signals[id].wait(async())
-        }, function () {
-            delete this._signals[id]
-        })
+    var signals = []
+    for (var id in this._signals) {
+        signals.push(this._signals[id])
+    }
+    async.forEach([ signals ], function (signal) {
+        signal.wait(async())
     })
 })
 
