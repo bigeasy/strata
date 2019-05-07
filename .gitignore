@@ -4,6 +4,9 @@
 /benchmark/tmp
 /.proof.out
 /coverage
+/es6/coverage
+/es6/node_modules
+/es5/.nyc_output
 /.nyc_output
 /test/tmp
 /test/*/tmp
