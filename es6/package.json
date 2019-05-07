@@ -1,35 +1,36 @@
 {
-    "name":                 "b-tree.async",
-    "version":              "9.9.9",
-    "description":          "Async/Await I/O B-tree in pure JavaScript for Node.js.",
-    "keywords":
-    [
-                            "btree", "database", "json", "b-tree", "leveldb", "levelup"
-    ],
-    "author":               "Alan Gutierrez <alan@prettyrobots.com>",
-    "contributors":
-    [{
-                            "name":   "Demarius Chrite",
-                            "email":  "chrite.demarius@gmail.com",
-                            "web":    "https://github.com/demarius"
-    }],
-    "homepage":             "https://github.com/bigeasy/strata",
-    "bugs":                 "https://github.com/bigeasy/strata/issues",
-    "license":              "MIT",
-    "repository":
-    {
-                            "type": "git",
-                            "url": "bigeasy/strata"
-    },
-    "dependencies":
-    {
-    },
-    "devDependencies":
-    {
-    },
-    "main":                 "strata.js",
-    "scripts":
-    {
-                            "test": "mocha"
-    }
+          "name": "b-tree.async",
+          "version": "9.9.9",
+          "description": "Async/Await I/O B-tree in pure JavaScript for Node.js.",
+          "keywords": [
+                    "btree",
+                    "database",
+                    "json",
+                    "b-tree",
+                    "leveldb",
+                    "levelup"
+          ],
+          "author": "Alan Gutierrez <alan@prettyrobots.com>",
+          "contributors": [
+                    {
+                              "name": "Demarius Chrite",
+                              "email": "chrite.demarius@gmail.com",
+                              "web": "https://github.com/demarius"
+                    }
+          ],
+          "homepage": "https://github.com/bigeasy/strata",
+          "bugs": "https://github.com/bigeasy/strata/issues",
+          "license": "MIT",
+          "repository": {
+                    "type": "git",
+                    "url": "bigeasy/strata"
+          },
+          "dependencies": {
+                    "rimraf": "^2.6.3"
+          },
+          "devDependencies": {},
+          "main": "strata.js",
+          "scripts": {
+                    "test": "mocha"
+          }
 }
