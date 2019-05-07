@@ -1,3 +1,5 @@
+const once = require('./once')
+
 class Appender {
     constructor (stream) {
         this._output = stream
@@ -12,10 +14,7 @@ class Appender {
     }
 
     async _waitFor (event) {
-        await new Promise(resolve => {
-            this._output.on('error', resolve.bind())
-            this._output.on(event, resolve.bind())
-        })
+        await once(this._output, event, null)
         if (this._errors.length != 0) {
             throw this._errors.shift()
         }
