@@ -38,6 +38,7 @@ class Cache {
         this._map = {}
         this._head = { _cache: null, next: null, previous: null }
         this._head.next = this._head.previous = this._head
+        this.entries = 0
         this.heft = 0
     }
 
@@ -45,6 +46,7 @@ class Cache {
         const stringified = JSON.stringify(key)
         const entry = this._map[stringified]
         if (entry == null) {
+            this.entries++
             return this._map[stringified] = new Entry(this, stringified, initializer)
         }
         entry.next.previous = entry.previous
@@ -65,6 +67,7 @@ class Cache {
         entry.next.previous = entry.previous
         entry.previous.next = entry.next
         delete this._map[entry._stringified]
+        this.entries--
     }
 
     purge (heft) {

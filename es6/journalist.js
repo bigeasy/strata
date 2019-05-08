@@ -169,7 +169,7 @@ class Journalist {
 
     async close () {
         if (this._root != null) {
-            this._root.release()
+            this._root.remove()
             this._root = null
         }
     }

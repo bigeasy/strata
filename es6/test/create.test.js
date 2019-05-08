@@ -20,5 +20,7 @@ describe('strata create', () => {
             '0.0': [ [ '0.1', null ] ],
             '0.1': []
         }, 'created')
+        cache.purge(0)
+        assert.equal(cache.entries, 0, 'cache empty')
     })
 })
