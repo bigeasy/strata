@@ -6,6 +6,7 @@
 /coverage
 /es6/coverage
 /es6/node_modules
+/es6/tmp
 /es6/.nyc_output
 /.nyc_output
 /test/tmp
