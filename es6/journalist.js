@@ -5,9 +5,7 @@ const path = require('path')
 const recorder = require('./recorder')
 const Interrupt = require('interrupt').createInterrupter('strata')
 
-const appendable = ascension([ Number, Number ], function (file) {
-    return file.split('.')
-})
+const appendable = require('./appendable')
 
 class Journalist {
     constructor (options) {
