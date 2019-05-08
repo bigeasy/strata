@@ -9,7 +9,7 @@ const appendable = require('./appendable')
 
 class Journalist {
     constructor (options) {
-        this.cache = options.cache || new Cache
+        this.cache = options.cache
         this.instance = 0
         this.options = options
         this._recorder = recorder(() => '0')
