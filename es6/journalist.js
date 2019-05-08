@@ -42,12 +42,12 @@ class Journalist {
     async open () {
         const directory = this.options.directory
         this._root = this.cache.hold([ directory, -1 ], { items: [{ id: '0.0' }] })
-        const instances = fs.readdir(path.join(directory, 'instance'))
+        const instances = (await fs.readdir(path.join(directory, 'instances')))
             .filter(file => /^\d+$/.test(file))
             .map(file => +file)
             .sort((left, right) => right - left)
         this.instance = instances[0] + 1
-        await fs.mkdirp(directory, 'instances', String(this.instance))
+        await fs.mkdir(path.join(directory, 'instances', String(this.instance)))
         for (let instance of instances) {
             await fs.rmdir(path.resolve(directory, 'instances', String(instance)))
         }

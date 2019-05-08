@@ -25,7 +25,7 @@ class Strata {
     }
 
     open () {
-        return this.journalist.create()
+        return this.journalist.open()
     }
 
     async search (key) {

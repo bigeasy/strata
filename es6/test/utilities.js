@@ -2,8 +2,10 @@ const path = require('path')
 const callback = require('../callback')
 const rimraf = require('rimraf')
 const ascension = require('ascension')
+const fileSystem = require('fs')
 const fs = require('fs').promises
 const shifter = require('./shifter')(() => '0')
+const recorder = require('../recorder')(() => '0')
 
 const appendable = ascension([ Number, Number ], function (file) {
     return file.split('.')
@@ -72,7 +74,7 @@ exports.serialize = async function (directory, files) {
                         header: {
                             method: 'insert',
                             index: index,
-                            value: { id: record.id, key: record.key }
+                            value: { id: record[0], key: record[1] }
                         },
                         body: null
                     }
@@ -91,12 +93,9 @@ exports.serialize = async function (directory, files) {
                     }
                 })
             )
-        ).map((entry) => recorder(entry.header, entry.body))
+        ).map(entry => recorder(entry.header, entry.body))
         const file = path.resolve(directory, 'pages', id, '0.0')
-        const stream = fs.createFileStream(file, { flags: 'a' })
-        const appender = new Appender(stream)
-        await appender.append(writes)
-        await appender.end()
+        await fs.appendFile(file, Buffer.concat(writes))
     }
-    await fs.mkdir(path.resolve(directory, 'instance', String(instance)), { recursive: true })
+    await fs.mkdir(path.resolve(directory, 'instances', String(instance)), { recursive: true })
 }
