@@ -8,11 +8,13 @@ node_js:
 branches:
   only:
     - master
+    - sketch
     - travis-ci
 
 install:
   - npm install --no-package-lock --no-save
-  - npm install -g nyc
+  - npm install -g nyc mocha
 
 script:
   - nyc npm test
+  - (cd es6 && nyc npm test)
