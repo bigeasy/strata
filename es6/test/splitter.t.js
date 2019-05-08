@@ -1,7 +1,7 @@
 describe('splitter', () => {
     function checksum (buffer, start, end) { return String(end - start) }
     const assert = require('assert')
-    const recorder = require('../../recorder')(checksum)
+    const recorder = require('../recorder')(checksum)
     const Splitter = require('../splitter')
     it('can be constructed', () => {
         const splitter = new Splitter(checksum)

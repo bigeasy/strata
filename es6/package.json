@@ -26,6 +26,8 @@
                     "url": "bigeasy/strata"
           },
           "dependencies": {
+                    "ascension": "^1.0.1",
+                    "interrupt": "^7.0.5",
                     "rimraf": "^2.6.3"
           },
           "devDependencies": {},

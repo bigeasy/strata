@@ -1,0 +1,12 @@
+["0","0"]
+{"method":"insert","index":0,"json":true,"length":24}
+{"key":"a","value":"a"}
+["0","0"]
+{"method":"insert","index":1,"json":true,"length":24}
+{"key":"c","value":"c"}
+["0","0"]
+{"method":"insert","index":2,"json":true,"length":24}
+{"key":"d","value":"d"}
+["0","0"]
+{"method":"insert","index":3,"json":true,"length":24}
+{"key":"e","value":"e"}

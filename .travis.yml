@@ -12,9 +12,11 @@ branches:
     - travis-ci
 
 install:
-  - npm install --no-package-lock --no-save
+  - (cd efcb && npm install --no-package-lock --no-save)
+  - (cd es6 && npm install --no-package-lock --no-save)
   - npm install -g nyc mocha
 
 script:
   - nyc npm test
+  - (cd efcb && nyc npm test)
   - (cd es6 && nyc npm test)
