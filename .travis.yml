@@ -6,7 +6,8 @@ branches:
     - travis-ci
 matrix:
   include:
-  - language: node_js
+  - name: 'Javascript async/await'
+    language: node_js
     node_js:
       - '12'
     before_install:
@@ -16,7 +17,8 @@ matrix:
     - npm install -g nyc mocha
     script:
     - nyc npm test
-  - language: node_js
+  - name: 'Javascript error-first callbacks'
+    language: node_js
     node_js:
       - '12'
       - '10'
