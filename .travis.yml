@@ -1,22 +1,29 @@
 sudo: false
 
-language: node_js
-
-node_js:
-  - '12'
-
 branches:
   only:
     - master
-    - sketch
     - travis-ci
-
-install:
-  - (cd efcb && npm install --no-package-lock --no-save)
-  - (cd es6 && npm install --no-package-lock --no-save)
-  - npm install -g nyc mocha
-
-script:
-  - nyc npm test
-  - (cd efcb && nyc npm test)
-  - (cd es6 && nyc npm test)
+matrix:
+  include:
+  - language: node_js
+    node_js:
+      - '12'
+    before_install:
+    - cd es6
+    install:
+    - npm install --no-package-lock --no-save
+    - npm install -g nyc mocha
+    script:
+    - nyc npm test
+  - language: node_js
+    node_js:
+      - '12'
+      - '10'
+    before_install:
+    - cd efcb
+    install:
+    - npm install --no-package-lock --no-save
+    - npm install -g nyc
+    script:
+    - nyc npm test
