@@ -4,28 +4,24 @@ branches:
   only:
     - master
     - travis-ci
+
+node_js:
+   - '12'
+   - '10'
+
+env:
+- SUBDIR=es6 MOCHA=mocha
+- SUBDIR=efcb
+
 matrix:
-  include:
-  - name: 'Javascript async/await'
-    language: node_js
-    node_js:
-      - '12'
-    before_install:
-    - cd es6
-    install:
-    - npm install --no-package-lock --no-save
-    - npm install -g nyc mocha
-    script:
-    - nyc npm test
-  - name: 'Javascript error-first callbacks'
-    language: node_js
-    node_js:
-      - '12'
-      - '10'
-    before_install:
-    - cd efcb
-    install:
-    - npm install --no-package-lock --no-save
-    - npm install -g nyc
-    script:
-    - nyc npm test
+  exclude:
+  - node_js: '10'
+    env: SUBDIR=es6
+
+before_install:
+- cd $SUBDIR
+install:
+- npm install --no-package-lock --no-save
+- npm install -g nyc $MOCHA
+script:
+- nyc npm test
