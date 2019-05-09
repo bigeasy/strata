@@ -18,10 +18,11 @@ env:
 matrix:
   exclude:
   - node_js: '10'
-    env: SUBDIR=es6
+    env: SUBDIR=es6 MOCHA=mocha
 
 before_install:
 - cd $SUBDIR
+- pwd
 install:
 - npm install --no-package-lock --no-save
 - npm install -g nyc $MOCHA
