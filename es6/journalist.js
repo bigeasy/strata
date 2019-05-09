@@ -8,8 +8,18 @@ const Splitter = require('./splitter')
 const find = require('./find')
 const assert = require('assert')
 const Cursor = require('./cursor')
+const Queue = require('p-queue')
+const callback = require('./callback')
 
 const appendable = require('./appendable')
+
+function increment (value) {
+    if (value == 0xffffffff) {
+        return 0
+    } else {
+        return value + 1
+    }
+}
 
 class Journalist {
     constructor (options) {
@@ -19,6 +29,9 @@ class Journalist {
         this.comparator = options.comparator || ascension([ String ], (value) => value)
         this._recorder = recorder(() => '0')
         this._root = null
+        this._operationId = 0xffffffff
+        this._appenders = [ new Queue ]
+        this._queues = {}
     }
 
     async create () {
@@ -179,6 +192,55 @@ class Journalist {
         if (this._root != null) {
             this._root.remove()
             this._root = null
+        }
+    }
+
+    async _writeLeaf (id, writes) {
+        const append = await this._appendable(id)
+        const recorder = this._recorder
+        const entry = this._hold(id)
+        const buffers = writes.map(write => {
+            const buffer = recorder(write.header, write.body)
+            if (write.header.method == 'insert') {
+                entry.heft += (write.record.heft = buffer.length)
+            }
+            return buffer
+        })
+        entry.release()
+        const file = path.resolve(this.options.directory, 'pages', id, append)
+        await fs.appendFile(file, Buffer.concat(buffers))
+    }
+
+    async _append (method, body) {
+        await callback((callback) => process.nextTick(callback))
+        switch (method) {
+        case 'write':
+            const id = body
+            const queue = this._queues[id]
+            delete this._queues[id]
+            const entry = queue.entry, page = entry.page
+            await this._writeLeaf(id, queue.writes)
+        }
+    }
+
+    _index (id) {
+        return id.split('.').reduce((sum, value) => sum + +value, 0) % this._appenders.length
+    }
+
+    append (entry, promises) {
+        let queue = this._queues[entry.id]
+        if (queue == null) {
+            const appender = this._appenders[this._index(entry.id)]
+            queue = this._queues[entry.id] = {
+                id: this._operationId = increment(this._operationId),
+                writes: [],
+                entry: this._hold(entry.id),
+                promise: appender.add(() => this._append('write', entry.id))
+            }
+        }
+        queue.writes.push(entry)
+        if (promises[queue.id] == null) {
+            promises[queue.id] = queue.promise
         }
     }
 }

@@ -4,7 +4,7 @@ describe('strata get', () => {
     const Cache = require('../cache')
     const utilities = require('./utilities')
     const path = require('path')
-    const directory = path.join(utilities.directory, 'open')
+    const directory = path.join(utilities.directory, 'get')
     const fs = require('fs').promises
     before(async () => {
         await utilities.reset(directory)

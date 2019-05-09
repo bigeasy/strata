@@ -18,20 +18,20 @@ class Unlocker {
 
 class Strata {
     constructor (options) {
-        this.journalist = new Journalist(options)
+        this._journalist = new Journalist(options)
     }
 
     create () {
-        return this.journalist.create()
+        return this._journalist.create()
     }
 
     open () {
-        return this.journalist.open()
+        return this._journalist.open()
     }
 
     async search (key) {
         DESCEND: for (;;) {
-            const descent = await this.journalist.descend(key, -1, 0)
+            const descent = await this._journalist.descend(key, -1, 0)
             const cursor = new Cursor(this._journalist, descent, key)
             UNLOCK: while (cursor._page.lock != null) {
                 descent.entries.forEach(entry => entry.release())
@@ -47,7 +47,7 @@ class Strata {
     }
 
     close () {
-        return this.journalist.close()
+        return this._journalist.close()
     }
 }
 

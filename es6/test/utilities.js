@@ -38,10 +38,10 @@ exports.vivify = async function (directory) {
                 var record = shifter(entries), header = record[0]
                 switch (header.method) {
                 case 'insert':
-                    records.push({ method: header.method, index: header.index, body: record[1] })
+                    records.push([ header.method, header.index, record[1] ])
                     break
                 case 'remove':
-                    records.push({ method: header.method, index: header.index })
+                    records.push([ header.method, header.index ])
                     break
                 }
             }
