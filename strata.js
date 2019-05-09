@@ -134,4 +134,8 @@ Strata.prototype.purge = function (downTo) {
     purge.release()
 }
 
+// TODO Wait on housekeeping to complete.
+Strata.prototype.flush = cadence(function (async) {
+})
+
 module.exports = Strata

@@ -1,13 +1,9 @@
 {
-    "0": {
-        "children": [ 1 ]
-    },
-    "1": {
-        "log": [
-            { "type": "pos" },
-            { "type": "add", "value": "d" },
-            { "type": "add", "value": "c" },
-            { "type": "add", "value": "a" }
-        ]
-    }
+    "0.0": [ "0.1" ],
+    "0.1": [
+        { "method": "insert", "index": 0, "body": "a" },
+        { "method": "insert", "index": 1, "body": "c" },
+        { "method": "insert", "index": 2, "body": "d" },
+        { "method": "insert", "index": 3, "body": "e" }
+    ]
 }
