@@ -4,6 +4,10 @@ const fs = require('fs').promises
 const path = require('path')
 const recorder = require('./recorder')
 const Interrupt = require('interrupt').createInterrupter('strata')
+const Splitter = require('./splitter')
+const find = require('./find')
+const assert = require('assert')
+const Cursor = require('./cursor')
 
 const appendable = require('./appendable')
 
@@ -12,6 +16,7 @@ class Journalist {
         this.cache = options.cache
         this.instance = 0
         this.options = options
+        this.comparator = options.comparator || ascension([ String ], (value) => value)
         this._recorder = recorder(() => '0')
         this._root = null
     }
@@ -59,11 +64,11 @@ class Journalist {
     }
 
     async read (id) {
-        const directory = path.resolve(this.directory, 'pages', String(id))
+        const directory = path.resolve(this.options.directory, 'pages', String(id))
         const items = [], leaf = +id.split('.')[1] % 2 == 1
         let heft = 0
         const splitter = new Splitter(function () { return '0' })
-        const append = this._appendable(id)
+        const append = await this._appendable(id)
         const filename = path.join(directory, append)
         const readable = fileSystem.createReadStream(filename)
         for await (let chunk of readable) {
@@ -93,7 +98,7 @@ class Journalist {
     }
 
     async load (id) {
-        const entry = this._cache.hold(id, null)
+        const entry = this._hold(id)
         try {
             if (entry.value == null) {
                 entry.value = await this.read(id)
@@ -104,10 +109,15 @@ class Journalist {
         }
     }
 
+    _hold (id) {
+        return this.cache.hold([ this.options.directory, id ], null)
+    }
+
     _descend (key, level, fork) {
+        debugger
         const descent = { miss: null, entries: [], index: 0, level: 0, keyed: null }
         let entry = null
-        descent.entries.push(entry = this._cache.hold(-1, null))
+        descent.entries.push(entry = this._hold(-1))
         for (;;) {
             if (descent.index != 0) {
                 descent.keyed = {
@@ -116,7 +126,7 @@ class Journalist {
                 }
             }
             var id = entry.value.items[descent.index].id
-            descent.entries.push(entry = this._cache.hold(id, null))
+            descent.entries.push(entry = this._hold(id))
             if (entry.value == null) {
                 descent.entries.pop().remove()
                 descent.miss = id
@@ -124,7 +134,7 @@ class Journalist {
             }
             var page = entry.value
             // TODO Maybe page offset instead of ghosts, nah leave it so you remember it.
-            descent.index = find(this.options.comparator, page, key, page.leaf ? page.ghosts : 1)
+            descent.index = find(this.comparator, page, key, page.leaf ? page.ghosts : 1)
             if (page.leaf) {
                 assert.equal(level, -1, 'could not find branch')
                 break
