@@ -5,6 +5,8 @@ branches:
     - master
     - travis-ci
 
+language: node_js
+
 node_js:
    - '12'
    - '10'
