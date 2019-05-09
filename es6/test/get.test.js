@@ -11,8 +11,8 @@ describe('strata get', () => {
     })
     it('can get a cursor', async () => {
         await utilities.serialize(directory, {
-            '0.0': [ [ '0.1', null ] ],
-            '0.1': [{ "method": "insert", "index": 0, "body": "a" }]
+            '0.0': [[ '0.1', null ]],
+            '0.1': [[ 'insert', 0, 'a' ]]
         })
         const cache = new Cache
         const strata = new Strata({ directory, cache })
@@ -21,7 +21,7 @@ describe('strata get', () => {
         const cursor = search.get()
         assert(search.get() === cursor, 'get again')
         assert.deepStrictEqual(cursor.items[cursor.index], {
-            key: 'a', value: 'a', heft: 23
+            key: 'a', value: 'a', heft: 65
         }, 'got')
         cursor.release()
         await strata.close()

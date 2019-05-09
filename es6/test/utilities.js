@@ -40,7 +40,7 @@ exports.vivify = async function (directory) {
                 case 'insert':
                     records.push([ header.method, header.index, record[1] ])
                     break
-                case 'remove':
+                case 'delete':
                     records.push([ header.method, header.index ])
                     break
                 }
@@ -81,15 +81,19 @@ exports.serialize = async function (directory, files) {
                 })
             ) : (
                 files[id].map((record, index) => {
-                    return {
-                        header: {
-                            method: record.method,
-                            index: record.index
-                        },
-                        body: {
-                            key: record.body,
-                            value: record.body
+                    switch (record[0]) {
+                    case 'insert':
+                        return {
+                            header: { method: 'insert', index: record[1], key: record[2] },
+                            body: record[2]
                         }
+                        break
+                    case 'delete':
+                        return {
+                            header: { method: 'delete', index: record[1] },
+                            body: null
+                        }
+                        break
                     }
                 })
             )

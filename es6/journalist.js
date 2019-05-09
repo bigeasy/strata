@@ -90,11 +90,11 @@ class Journalist {
                 case 'insert':
                     if (leaf) {
                         items.splice(entry.header.index, 0, {
-                            key: entry.body.key,
-                            value: entry.body.value,
-                            heft: entry.sizes[1]
+                            key: entry.header.key,
+                            value: entry.body,
+                            heft: entry.sizes[0] + entry.sizes[1]
                         })
-                        heft += entry.sizes[1]
+                        heft += entry.sizes[0] + entry.sizes[1]
                     } else {
                         items.splice(entry.header.index, 0, {
                             id: entry.header.value.id,

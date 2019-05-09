@@ -52,7 +52,7 @@ class Cursor {
     }
 
     remove (index) {
-        const ghost = this.page.address != 1 && index == 0
+        const ghost = this._page.id != '0.1' && index == 0
 
         this._journalist.append({
             id: this._page.id,
