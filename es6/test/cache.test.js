@@ -18,7 +18,7 @@ describe('cache', () => {
         assert.equal(entry.value, 1, 'cached')
         assert.equal(entry.heft, 0, 'initial entry heft')
         entry.heft = 1
-        assert.equal(cache.heft, 1, 'updated entry heft')
+        assert.equal(entry.heft, 1, 'updated entry heft')
         assert.equal(cache.heft, 1, 'updated cache heft')
         entry.release()
     })
