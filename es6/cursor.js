@@ -39,12 +39,13 @@ class Cursor {
         Interrupt.assert( index > -1 && (this.index > 0 || this._page.id == '0.1'), 'invalid.insert.index', { index: this.index })
 
         // Heft will be set when the record is serialized.
+        assert(key && value)
         const record = { key: key, value: value, heft: 0 }
 
         this._journalist.append({
             id: this._page.id,
             record: record,
-            header: { method: 'insert', index: index },
+            header: { method: 'insert', index: index, key: key },
             body: value
         }, this._promises)
 

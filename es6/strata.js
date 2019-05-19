@@ -11,6 +11,7 @@ class Unlocker {
         if (this._lock != null) {
             this._lock.call()
             this._lock = null
+            this._cursor._page.lock = null
         }
         return this._cursor
     }
