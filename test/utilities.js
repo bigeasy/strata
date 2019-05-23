@@ -1,5 +1,5 @@
 const path = require('path')
-const callback = require('../callback')
+const callback = require('prospective/callback')
 const rimraf = require('rimraf')
 const ascension = require('ascension')
 const fileSystem = require('fs')

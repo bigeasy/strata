@@ -5,7 +5,7 @@ const path = require('path')
 const fnv = require('hash.fnv')
 const rimraf = require('rimraf')
 
-const callback = require('./callback')
+const callback = require('prospective/callback')
 
 class Commit {
     constructor (journalist) {

@@ -9,9 +9,9 @@ const find = require('./find')
 const assert = require('assert')
 const Cursor = require('./cursor')
 const Queue = require('p-queue')
-const callback = require('./callback')
+const callback = require('prospective/callback')
 const coalesece = require('extant')
-const Latch = require('./latch')
+const Future = require('prospective/future')
 const Commit = require('./commit')
 
 const appendable = require('./appendable')
@@ -258,7 +258,7 @@ class Journalist {
         const index = this._index(id)
         let block = this._blocks[index][blockId]
         if (block == null) {
-            this._blocks[index][blockId] = block = { enter: new Latch, exit: new Latch }
+            this._blocks[index][blockId] = block = { enter: new Future, exit: new Future }
             this._appenders[index].add(() => this._append('block', [ index, blockId ]))
         }
         return block
@@ -287,7 +287,7 @@ class Journalist {
             const [ index, blockId ] = body
             const block = this._blocks[index][blockId]
             delete this._blocks[index][blockId]
-            block.enter.unlatch()
+            block.enter.resolve()
             await block.exit.promise
             break
         }
@@ -396,7 +396,7 @@ class Journalist {
         delete this._dirty[key]
         await commit.prepare()
         await commit.commit()
-        block.exit.unlatch()
+        block.exit.resolve()
         await commit.prepare()
         await commit.commit()
         entries.forEach(entry => entry.release())
