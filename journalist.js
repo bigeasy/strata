@@ -93,31 +93,39 @@ class Journalist {
         return leaf ? append : /^(\d+.\d+)\.([0-9a-f]+)$/.exec(append).slice(1, 3)
     }
 
-    async read (id) {
+    async _read(id, append) {
+        let heft = 0
+        let items = []
+        const splitter = new Splitter(function () { return '0' })
         const directory = path.resolve(this.directory, 'pages', String(id))
+        const filename = path.join(directory, append)
+        const readable = fileSystem.createReadStream(filename)
+        for await (let chunk of readable) {
+            for (let entry of splitter.split(chunk)) {
+                switch (entry.header.method) {
+                case 'slice':
+                    const page = await this._read(entry.header.id, entry.header.append)
+                    items = page.items.slice(entry.header.index, entry.header._length)
+                    heft = items.reduce((sum, record) => sum + record.heft, 0)
+                    break
+                case 'insert':
+                    items.splice(entry.header.index, 0, {
+                        key: entry.header.key,
+                        value: entry.body,
+                        heft: entry.sizes[0] + entry.sizes[1]
+                    })
+                    heft += entry.sizes[0] + entry.sizes[1]
+                }
+            }
+        }
+        // TODO Did we ghost? Check when we implement remove.
+        return { id, leaf: true, items, ghosts: 0, heft, append }
+    }
+
+    async read (id) {
         const leaf = +id.split('.')[1] % 2 == 1
         if (leaf) {
-            let heft = 0
-            const items = []
-            const splitter = new Splitter(function () { return '0' })
-            const append = await this.appendable(id, true)
-            const filename = path.join(directory, append)
-            const readable = fileSystem.createReadStream(filename)
-            for await (let chunk of readable) {
-                splitter.split(chunk).forEach(function (entry) {
-                    switch (entry.header.method) {
-                    case 'insert':
-                        items.splice(entry.header.index, 0, {
-                            key: entry.header.key,
-                            value: entry.body,
-                            heft: entry.sizes[0] + entry.sizes[1]
-                        })
-                        heft += entry.sizes[0] + entry.sizes[1]
-                    }
-                })
-            }
-            // TODO Did we ghost? Check when we implement remove.
-            return { id, leaf, items, ghosts: 0, heft, append }
+            return this._read(id, await this.appendable(id, true))
         }
         const [ append, hash ] = await this.appendable(id, false)
         const buffer = await fs.readFile(this._path('pages', id, `${append}.${hash}`))
@@ -220,6 +228,10 @@ class Journalist {
     }
 
     async close () {
+        this.closed = true
+        for (let appender of this._appenders) {
+            await appender.add(() => {})
+        }
         if (this._root != null) {
             this._root.remove()
             this._root = null
@@ -299,6 +311,7 @@ class Journalist {
         const child = await this.descend(key, level, fork)
         entries.push.apply(entries, child.entries)
         const parent = this._descend(key, child.level - 1, 0)
+        entries.push.apply(entries, parent.entries)
         return { child, parent }
     }
 
@@ -323,7 +336,7 @@ class Journalist {
         let id
         do {
             id = this._id++
-        } while (id % 2 == leaf ? 1 : 0)
+        } while (leaf ? id % 2 == 0 : id % 2 == 1)
         return String(this.instance) + '.' +  String(id)
     }
 
@@ -371,24 +384,21 @@ class Journalist {
         }, this)
         const writes = this._queue(lineage.child.page.id).writes.splice(0)
         await this._writeLeaf(lineage.child.page.id, writes)
+        // TODO Make header a nested object.
         prepare.push([ 'stub', pages[1].id, pages[1].append, {
-            method: 'splice',
-            header: {
+            method: 'slice',
                 index: partition,
-                length: length,
+                _length: length,
                 id: pages[0].id,
                 append: pages[0].append
-            }
         }])
         const append = this._filename()
         prepare.push([ 'stub', pages[0].id, append, {
-            method: 'splice',
-            header: {
+            method: 'slice',
                 index: 0,
-                length: partition,
+                _length: partition,
                 id: pages[0].id,
                 append: pages[0].append
-            }
         }])
         pages[0].append = append
         prepare.push([ 'commit' ])

@@ -189,7 +189,6 @@ class Commit {
         }).sort((left, right) => left.index - right.index)
         for (let step of steps) {
             const operation = (await this._load(step.file)).shift()
-            console.log(operation)
             switch (operation.shift()) {
             case 'begin':
                 const commit = dir.filter(function (file) {
