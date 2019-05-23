@@ -1,8 +1,7 @@
-var assert = require('assert')
+const assert = require('assert')
 
-var find = require('./find')
-
-var Interrupt = require('interrupt').createInterrupter('b-tree')
+const Strata = { Error: require('./error') }
+const find = require('./find')
 
 class Cursor {
     constructor (journalist, descent, key) {
@@ -36,7 +35,12 @@ class Cursor {
     }
 
     insert (value, key, index) {
-        Interrupt.assert( index > -1 && (this.index > 0 || this._page.id == '0.1'), 'invalid.insert.index', { index: this.index })
+        Strata.Error.assert(
+            index > -1 &&
+            (
+                this.index > 0 ||
+                this._page.id == '0.1'
+            ), 'invalid.insert.index', { index: this.index })
 
         // Heft will be set when the record is serialized.
         assert(key && value)

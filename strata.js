@@ -2,6 +2,8 @@ const Journalist = require('./journalist')
 const Cursor = require('./cursor')
 
 class Unlocker {
+    static Error = require('./error')
+
     constructor (cursor) {
         this._cursor = cursor
         cursor._page.lock = new Promise(resolve => this._lock = resolve)

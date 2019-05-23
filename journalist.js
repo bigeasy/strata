@@ -3,7 +3,6 @@ const fileSystem = require('fs')
 const fs = require('fs').promises
 const path = require('path')
 const recorder = require('./recorder')
-const Interrupt = require('interrupt').createInterrupter('strata')
 const Splitter = require('./splitter')
 const find = require('./find')
 const assert = require('assert')
@@ -15,6 +14,8 @@ const Future = require('prospective/future')
 const Commit = require('./commit')
 
 const appendable = require('./appendable')
+
+const Strata = { Error: require('./error') }
 
 function increment (value) {
     if (value == 0xffffffff) {
@@ -56,8 +57,8 @@ class Journalist {
         const directory = this.directory
         this._root = this.cache.hold([ directory, -1 ], { items: [{ id: '0.0' }] })
         const stat = await fs.stat(directory)
-        Interrupt.assert(stat.isDirectory(), 'create.not.directory', { directory: directory })
-        Interrupt.assert((await fs.readdir(directory)).filter(file => {
+        Strata.Error.assert(stat.isDirectory(), 'create.not.directory', { directory: directory })
+        Strata.Error.assert((await fs.readdir(directory)).filter(file => {
             return ! /^\./.test(file)
         }).length == 0, 'create.directory.not.empty', { directory: directory })
         await fs.mkdir(path.resolve(directory, 'instance', '0'), { recursive: true })
