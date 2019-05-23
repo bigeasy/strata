@@ -2,10 +2,12 @@ const assert = require('assert')
 const fs = require('fs').promises
 const path = require('path')
 
-const fnv = require('hash.fnv')
+const fnv = require('./fnv')
 const rimraf = require('rimraf')
 
 const callback = require('prospective/callback')
+
+const Strata = { Error: require('./error') }
 
 class Commit {
     constructor (journalist) {
@@ -28,16 +30,16 @@ class Commit {
         const directory = path.join(this._journalist.directory, 'commit')
         const buffer = Buffer.from(entries.map(JSON.stringify).join('\n') + '\n')
         await fs.writeFile(path.join(directory, 'prepare'), buffer)
-        const hash = Number(fnv(0, buffer, 0, buffer.length)).toString(16)
+        const hash = fnv(buffer)
         const from = path.join(directory, 'prepare')
-        const to = path.join(directory, file + '-' + hash)
+        const to = path.join(directory, `${file}.${hash}`)
         await fs.rename(from, to)
     }
 
     async _load (file) {
         const buffer = await fs.readFile(path.join(this._commit, file))
-        const hash = Number(fnv(0, buffer, 0, buffer.length)).toString(16)
-        assert.equal(hash, file.split('-')[1], 'commit hash failure')
+        const hash = fnv(buffer)
+        assert.equal(hash, file.split('.')[1], 'commit hash failure')
         return buffer.toString().split('\n').filter(line => line != '').map(JSON.parse)
     }
 
@@ -56,29 +58,28 @@ class Commit {
     }
 
     async _emplace (page) {
-        const recorder = this._journalist._recorder
-        const filename = `${page.id}-${page.append}`
-        const writes = page.items.map((item, index) => {
-            return recorder({ method: 'inssert', index, value: { key: item.key, id: item.id } })
-        })
-        const buffer = Buffer.concat(writes)
-        await fs.writeFile(this._path(filename), buffer)
+        const unlink = path.join('pages', page.id, `${page.append}.${page.hash}`)
+        const buffer = Buffer.from(JSON.stringify(page.items))
+        const hash = fnv(buffer)
+        const filename = `${page.append}.${hash}`
+        await fs.writeFile(this._path(`${page.id}-${filename}`), buffer)
         const entry = this._journalist._hold(page.id)
         if (entry.value == null) {
             entry.remove()
         } else {
             entry.heft = buffer.length
+            entry.append = page.append
             entry.release()
         }
-        const hash = fnv(0, buffer, 0, buffer.length)
-        const from = path.join('commit', filename)
-        const to = path.join('pages', page.id, page.append)
+        const from = path.join('commit', `${page.id}-${filename}`)
+        const to = path.join('pages', page.id, filename)
         await this._prepare([ 'rename', from, to, hash ])
+        await this._prepare([ 'unlink', unlink ])
     }
 
     async prepare (stop) {
         const dir = await this._readdir()
-        const commit = dir.filter(file => /^commit-/.test(file)).shift()
+        const commit = dir.filter(file => /^commit\.[0-9a-f]+$/.test(file)).shift()
         if (commit == null) {
             return false
         }
@@ -88,7 +89,7 @@ class Commit {
         const operations = await this._load(commit)
         // Start by deleting the commit script, once this runs we have to move
         // forward through the entire commit.
-        await this._prepare([ 'unlink', this._path('commit') ])
+        await this._prepare([ 'begin' ])
         while (operations.length != 0) {
             const operation = operations.shift()
             switch (operation[0]) {
@@ -97,11 +98,11 @@ class Commit {
             case 'commit': {
                     const entries = operations.splice(0)
                     const buffer = Buffer.from(entries.map(JSON.stringify).join('\n') + '\n')
-                    const hash = fnv(0, buffer, 0, buffer.length)
+                    const hash = fnv(buffer)
                     const filename = this._path('_commit')
                     await fs.writeFile(this._path('_commit'), buffer)
                     const from = path.join('commit', '_commit')
-                    const to = path.join('commit', `commit-${Number(hash).toString(16)}`)
+                    const to = path.join('commit', `commit.${hash}`)
                     await this._prepare([ 'rename', from, to, hash ])
                 }
                 break
@@ -111,7 +112,7 @@ class Commit {
                     const recorder = this._journalist._recorder
                     const page = { id: operation[1], append: operation[2] }
                     const buffer = recorder(operation[3])
-                    const hash = fnv(0, buffer, 0, buffer.length)
+                    const hash = fnv(buffer)
                     const filename = `${page.id}-${page.append}`
                     const from = path.join('commit', filename)
                     const to = path.join('pages', page.id, page.append)
@@ -181,19 +182,20 @@ class Commit {
     async commit () {
         const dir = await this._readdir()
         const steps = dir.filter(file => {
-            return /^\d+-[0-9a-f]{8}$/.test(file)
+            return /^\d+\.[0-9a-f]+$/.test(file)
         }).map(file => {
-            const split = file.split('-')
+            const split = file.split('.')
             return { index: +split[0], file: file, hash: split[1] }
         }).sort((left, right) => left.index - right.index)
         for (let step of steps) {
             const operation = (await this._load(step.file)).shift()
+            console.log(operation)
             switch (operation.shift()) {
             case 'begin':
-                var commit = dir.filter(function (file) {
-                    return /^commit-/.test(file)
+                const commit = dir.filter(function (file) {
+                    return /^commit\./.test(file)
                 }).shift()
-                fs.unlink(path.join(directory, commit), async())
+                await fs.unlink(this._path(commit))
                 break
             case 'rename':
                 const from = path.join(this._journalist.directory, operation.shift())
@@ -201,11 +203,11 @@ class Commit {
                 await fs.mkdir(path.dirname(to), { recursive: true })
                 await fs.rename(from, to)
                 const buffer = await fs.readFile(to)
-                const hash = fnv(0, buffer, 0, buffer.length)
-                assert.equal(hash, operation.shift(), 'rename failed')
+                const hash = fnv(buffer)
+                Strata.Error.assert(hash == operation.shift(), 'rename failed')
                 break
             case 'unlink':
-                await this._unlink(operation.shift())
+                await this._unlink(path.join(this._journalist.directory, operation.shift()))
                 break
             case 'end':
                 break

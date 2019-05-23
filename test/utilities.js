@@ -6,6 +6,7 @@ const fileSystem = require('fs')
 const fs = require('fs').promises
 const shifter = require('./shifter')(() => '0')
 const recorder = require('../recorder')(() => '0')
+const fnv = require('../fnv')
 
 const appendable = ascension([ Number, Number ], function (file) {
     return file.split('.')
@@ -27,12 +28,12 @@ exports.vivify = async function (directory) {
         }
         const dir = await fs.readdir(path.resolve(directory, 'pages', file))
         const append = dir.filter(function (file) {
-            return /^\d+\.\d+$/.test(file)
+            return /^\d+\.\d+(?:\.[0-9a-f]+)?$/.test(file)
         }).sort(appendable).pop()
         const lines = (await fs.readFile(path.resolve(pages, file, append), 'utf8')).split(/\n/)
-        lines.pop()
-        const entries = lines.map(line => JSON.parse(line))
         if (+file.split('.')[1] % 2 == 1) {
+            lines.pop()
+            const entries = lines.map(line => JSON.parse(line))
             var records = []
             while (entries.length != 0) {
                 var record = shifter(entries), header = record[0]
@@ -47,16 +48,7 @@ exports.vivify = async function (directory) {
             }
             vivified[file] = records
         } else {
-            var records = []
-            while (entries.length != 0) {
-                var record = shifter(entries), header = record[0]
-                switch (header.method) {
-                case 'insert':
-                    records.splice(header.index, 0, [ header.value.id, header.value.key ])
-                    break
-                }
-            }
-            vivified[file] = records
+            vivified[file] = JSON.parse(lines[0]).map(entry => [ entry.id, entry.key ])
         }
     }
     return vivified
@@ -67,39 +59,33 @@ exports.serialize = async function (directory, files) {
     for (let id in files) {
         instance = Math.max(+id.split('.')[0], instance)
         await fs.mkdir(path.resolve(directory, 'pages', id), { recursive: true })
-        const writes = (
-            +id % 2 == 0 ? (
-                files[id].map((record, index) => {
+        if (+id % 2 == 0) {
+            const buffer = Buffer.from(JSON.stringify(files[id].map(record => {
+                return { id: record[0], key: record[1] }
+            })))
+            const hash = fnv(buffer)
+            const file = path.resolve(directory, 'pages', id, `0.0.${hash}`)
+            await fs.writeFile(file, buffer)
+        } else {
+            const writes = files[id].map((record, index) => {
+                switch (record[0]) {
+                case 'insert':
                     return {
-                        header: {
-                            method: 'insert',
-                            index: index,
-                            value: { id: record[0], key: record[1] }
-                        },
+                        header: { method: 'insert', index: record[1], key: record[2] },
+                        body: record[2]
+                    }
+                    break
+                case 'delete':
+                    return {
+                        header: { method: 'delete', index: record[1] },
                         body: null
                     }
-                })
-            ) : (
-                files[id].map((record, index) => {
-                    switch (record[0]) {
-                    case 'insert':
-                        return {
-                            header: { method: 'insert', index: record[1], key: record[2] },
-                            body: record[2]
-                        }
-                        break
-                    case 'delete':
-                        return {
-                            header: { method: 'delete', index: record[1] },
-                            body: null
-                        }
-                        break
-                    }
-                })
-            )
-        ).map(entry => recorder(entry.header, entry.body))
-        const file = path.resolve(directory, 'pages', id, '0.0')
-        await fs.appendFile(file, Buffer.concat(writes))
+                    break
+                }
+            }).map(entry => recorder(entry.header, entry.body))
+            const file = path.resolve(directory, 'pages', id, '0.0')
+            await fs.writeFile(file, Buffer.concat(writes))
+        }
     }
     await fs.mkdir(path.resolve(directory, 'instances', String(instance)), { recursive: true })
 }

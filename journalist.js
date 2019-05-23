@@ -12,6 +12,7 @@ const callback = require('prospective/callback')
 const coalesece = require('extant')
 const Future = require('prospective/future')
 const Commit = require('./commit')
+const fnv = require('./fnv')
 
 const appendable = require('./appendable')
 
@@ -64,11 +65,9 @@ class Journalist {
         await fs.mkdir(path.resolve(directory, 'instance', '0'), { recursive: true })
         const pages = path.resolve(directory, 'pages')
         await fs.mkdir(path.resolve(pages, '0.0'), { recursive: true })
-        await fs.writeFile(path.resolve(pages, '0.0', '0.0'), this._recorder.call(null, {
-            method: 'insert',
-            index: 0,
-            value: { id: '0.1', key: null }
-        }))
+        const buffer = Buffer.from(JSON.stringify([{ id: '0.1', key: null }]))
+        const hash = fnv(buffer)
+        await fs.writeFile(path.resolve(pages, '0.0', `0.0.${hash}`), buffer)
         await fs.mkdir(path.resolve(pages, '0.1'), { recursive: true })
         await fs.writeFile(path.resolve(pages, '0.1', '0.0'), Buffer.alloc(0))
     }
@@ -90,43 +89,45 @@ class Journalist {
     async appendable (id, leaf) {
         const regex = leaf ? /^\d+\.\d+$/ : /^\d+\.\d+\.[a-z0-9]+$/
         const dir = await fs.readdir(path.join(this.directory, 'pages', id))
-        return dir.filter(function (file) {
-            return regex.test(file)
-        }).sort(appendable).pop()
+        const append = dir.filter(file => regex.test(file)).sort(appendable).pop()
+        return leaf ? append : /^(\d+.\d+)\.([0-9a-f]+)$/.exec(append).slice(1, 3)
     }
 
     async read (id) {
         const directory = path.resolve(this.directory, 'pages', String(id))
-        const items = [], leaf = +id.split('.')[1] % 2 == 1
-        let heft = 0
-        const splitter = new Splitter(function () { return '0' })
-        const append = await this.appendable(id, true)
-        const filename = path.join(directory, append)
-        const readable = fileSystem.createReadStream(filename)
-        for await (let chunk of readable) {
-            splitter.split(chunk).forEach(function (entry) {
-                switch (entry.header.method) {
-                case 'insert':
-                    if (leaf) {
+        const leaf = +id.split('.')[1] % 2 == 1
+        if (leaf) {
+            let heft = 0
+            const items = []
+            const splitter = new Splitter(function () { return '0' })
+            const append = await this.appendable(id, true)
+            const filename = path.join(directory, append)
+            const readable = fileSystem.createReadStream(filename)
+            for await (let chunk of readable) {
+                splitter.split(chunk).forEach(function (entry) {
+                    switch (entry.header.method) {
+                    case 'insert':
                         items.splice(entry.header.index, 0, {
                             key: entry.header.key,
                             value: entry.body,
                             heft: entry.sizes[0] + entry.sizes[1]
                         })
                         heft += entry.sizes[0] + entry.sizes[1]
-                    } else {
-                        items.splice(entry.header.index, 0, {
-                            id: entry.header.value.id,
-                            key: entry.header.value.key,
-                            heft: entry.sizes[0]
-                        })
-                        heft += entry.sizes[0]
                     }
-                }
-            })
+                })
+            }
+            // TODO Did we ghost? Check when we implement remove.
+            return { id, leaf, items, ghosts: 0, heft, append }
         }
-        // TODO Did we ghost? Check when we implement remove.
-        return { id, leaf, items, ghosts: 0, heft, append }
+        const [ append, hash ] = await this.appendable(id, false)
+        const buffer = await fs.readFile(this._path('pages', id, `${append}.${hash}`))
+        const actual = fnv(buffer)
+        Strata.Error.assert(actual == hash, 'bad branch hash', {
+            id, append, actual, expected: hash
+        })
+        const items = JSON.parse(buffer.toString())
+        const heft = buffer.length
+        return { id, leaf, items, offset: 1, heft, append, hash }
     }
 
     async load (id) {
@@ -315,7 +316,7 @@ class Journalist {
 
     _path (...vargs) {
         vargs.unshift(this.directory)
-        return path.resolve.apply(path, vargs)
+        return path.resolve.apply(path, vargs.map(varg => String(varg)))
     }
 
     _nextId (leaf) {
