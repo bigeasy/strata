@@ -86,10 +86,11 @@ class Journalist {
         }
     }
 
-    async _appendable (id) {
+    async appendable (id, leaf) {
+        const regex = leaf ? /^\d+\.\d+$/ : /^\d+\.\d+\.[a-z0-9]+$/
         const dir = await fs.readdir(path.join(this.directory, 'pages', id))
         return dir.filter(function (file) {
-            return /^\d+\.\d+$/.test(file)
+            return regex.test(file)
         }).sort(appendable).pop()
     }
 
@@ -98,7 +99,7 @@ class Journalist {
         const items = [], leaf = +id.split('.')[1] % 2 == 1
         let heft = 0
         const splitter = new Splitter(function () { return '0' })
-        const append = await this._appendable(id)
+        const append = await this.appendable(id, true)
         const filename = path.join(directory, append)
         const readable = fileSystem.createReadStream(filename)
         for await (let chunk of readable) {
@@ -224,7 +225,7 @@ class Journalist {
     }
 
     async _writeLeaf (id, writes) {
-        const append = await this._appendable(id)
+        const append = await this.appendable(id, true)
         const recorder = this._recorder
         const entry = this._hold(id, null)
         const buffers = writes.map(write => {
