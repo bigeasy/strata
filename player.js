@@ -1,7 +1,7 @@
 const assert = require('assert')
 const EOL = Buffer.from('\n')
 
-class Splitter {
+class Player {
     constructor (checksum) {
         this._remainder = Buffer.alloc(0)
         this._checksum = checksum
@@ -62,4 +62,4 @@ class Splitter {
     }
 }
 
-module.exports = Splitter
+module.exports = Player

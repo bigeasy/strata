@@ -1,23 +1,23 @@
-describe('splitter', () => {
+describe('player', () => {
     function checksum (buffer, start, end) { return String(end - start) }
     const assert = require('assert')
     const recorder = require('../recorder')(checksum)
-    const Splitter = require('../splitter')
+    const Player = require('../player')
     it('can be constructed', () => {
-        const splitter = new Splitter(checksum)
-        assert(splitter != null, 'constructed')
+        const player = new Player(checksum)
+        assert(player != null, 'constructed')
     })
     it('can split lines', () => {
-        var splitter = new Splitter(checksum)
+        var player = new Player(checksum)
         const buffers = [
             recorder({ value: 1 }),
             recorder({}, { value: 1 }),
             recorder({}, Buffer.from('abcdefghijklm\nnopqrstuvwxyz'))
         ]
         const buffer = Buffer.concat(buffers)
-        assert.deepStrictEqual(splitter.split(buffer.slice(0, 5)), [], 'partial')
-        assert(!splitter.empty(), 'splitter has remainder')
-        assert.deepStrictEqual(splitter.split(buffer.slice(5, 120)), [{
+        assert.deepStrictEqual(player.split(buffer.slice(0, 5)), [], 'partial')
+        assert(!player.empty(), 'player has remainder')
+        assert.deepStrictEqual(player.split(buffer.slice(5, 120)), [{
             checksums: [ '22' ],
             header: { value: 1, length: 0 },
             body: null,
@@ -28,7 +28,7 @@ describe('splitter', () => {
             body: { value: 1 },
             sizes: [ 25, 11 ]
         }], 'body partial')
-        assert.deepStrictEqual(splitter.split(buffer.slice(120)).map(function (entry) {
+        assert.deepStrictEqual(player.split(buffer.slice(120)).map(function (entry) {
             entry.body = entry.body.toString().split('\n')
             return entry
         }), [{

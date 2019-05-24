@@ -3,7 +3,7 @@ const fileSystem = require('fs')
 const fs = require('fs').promises
 const path = require('path')
 const recorder = require('./recorder')
-const Splitter = require('./splitter')
+const Player = require('./player')
 const find = require('./find')
 const assert = require('assert')
 const Cursor = require('./cursor')
@@ -96,12 +96,12 @@ class Journalist {
     async _read(id, append) {
         let heft = 0
         let items = []
-        const splitter = new Splitter(function () { return '0' })
+        const player = new Player(function () { return '0' })
         const directory = path.resolve(this.directory, 'pages', String(id))
         const filename = path.join(directory, append)
         const readable = fileSystem.createReadStream(filename)
         for await (let chunk of readable) {
-            for (let entry of splitter.split(chunk)) {
+            for (let entry of player.split(chunk)) {
                 switch (entry.header.method) {
                 case 'slice':
                     const page = await this._read(entry.header.id, entry.header.append)
