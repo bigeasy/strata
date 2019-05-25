@@ -105,7 +105,7 @@ class Journalist {
                 switch (entry.header.method) {
                 case 'slice':
                     const page = await this._read(entry.header.id, entry.header.append)
-                    items = page.items.slice(entry.header.index, entry.header._length)
+                    items = page.items.slice(entry.header.index, entry.header.length)
                     heft = items.reduce((sum, record) => sum + record.heft, 0)
                     break
                 case 'insert':
@@ -388,7 +388,7 @@ class Journalist {
         prepare.push([ 'stub', pages[1].id, pages[1].append, {
             method: 'slice',
                 index: partition,
-                _length: length,
+                length: length,
                 id: pages[0].id,
                 append: pages[0].append
         }])
@@ -396,7 +396,7 @@ class Journalist {
         prepare.push([ 'stub', pages[0].id, append, {
             method: 'slice',
                 index: 0,
-                _length: partition,
+                length: partition,
                 id: pages[0].id,
                 append: pages[0].append
         }])

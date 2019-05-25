@@ -5,7 +5,11 @@ class Player {
     constructor (checksum) {
         this._remainder = Buffer.alloc(0)
         this._checksum = checksum
-        this._entry = { checksums: null, header: null, body: null, sizes: [] }
+        this._entry = {
+            checksums: null,
+            header: null,
+            push: { header: null, body: null, sizes: [] }
+        }
     }
 
     split (chunk) {
@@ -26,31 +30,40 @@ class Player {
             } else if (this._entry.header == null) {
                 assert(checksum(buffer, 0, buffer.length) == this._entry.checksums[0])
                 this._entry.header = JSON.parse(buffer.toString())
-                this._entry.sizes.push(buffer.length)
+                this._entry.push.header = this._entry.header.header
+                this._entry.push.sizes.push(buffer.length)
                 if (this._entry.header.length == 0) {
-                    entries.push(this._entry)
-                    this._entry = { checksums: null, header: null, body: null, sizes: [] }
+                    entries.push(this._entry.push)
+                    this._entry = {
+                        checksums: null,
+                        header: null,
+                        push: { header: null, body: null, sizes: [] }
+                    }
                 } else {
-                    this._entry.body = []
+                    this._entry.push.body = []
                 }
             } else {
-                this._entry.body.push(buffer)
-                const length = this._entry.body.reduce(function (length, buffer) {
+                this._entry.push.body.push(buffer)
+                const length = this._entry.push.body.reduce(function (length, buffer) {
                     return length + buffer.length
                 }, 0) + 1
                 if (length < this._entry.header.length) {
-                    this._entry.body.push(EOL)
+                    this._entry.push.body.push(EOL)
                 } else {
-                    const body = Buffer.concat(this._entry.body)
+                    const body = Buffer.concat(this._entry.push.body)
                     assert(checksum(body, 0, body.length) == this._entry.checksums[1])
                     if (this._entry.header.json) {
-                        this._entry.body = JSON.parse(body.toString())
+                        this._entry.push.body = JSON.parse(body.toString())
                     } else {
-                        this._entry.body = body
+                        this._entry.push.body = body
                     }
-                    this._entry.sizes.push(body.length)
-                    entries.push(this._entry)
-                    this._entry = { checksums: null, header: null, body: null, sizes: [] }
+                    this._entry.push.sizes.push(body.length)
+                    entries.push(this._entry.push)
+                    this._entry = {
+                        checksums: null,
+                        header: null,
+                        push: { header: null, body: null, sizes: [] }
+                    }
                 }
             }
         })

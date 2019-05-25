@@ -36,7 +36,7 @@ exports.vivify = async function (directory) {
             const entries = lines.map(line => JSON.parse(line))
             var records = []
             while (entries.length != 0) {
-                var record = shifter(entries), header = record[0]
+                var record = shifter(entries), header = record[0].header
                 switch (header.method) {
                 case 'insert':
                     records.push([ header.method, header.index, record[1] ])

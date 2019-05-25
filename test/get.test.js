@@ -21,7 +21,7 @@ describe('strata get', () => {
         const cursor = search.get()
         assert(search.get() === cursor, 'get again')
         assert.deepStrictEqual(cursor.items[cursor.index], {
-            key: 'a', value: 'a', heft: 65
+            key: 'a', value: 'a', heft: 76
         }, 'got')
         cursor.release()
         await strata.close()

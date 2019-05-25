@@ -18,24 +18,21 @@ describe('player', () => {
         assert.deepStrictEqual(player.split(buffer.slice(0, 5)), [], 'partial')
         assert(!player.empty(), 'player has remainder')
         assert.deepStrictEqual(player.split(buffer.slice(5, 120)), [{
-            checksums: [ '22' ],
-            header: { value: 1, length: 0 },
+            header: { value: 1 },
             body: null,
-            sizes: [ 22 ]
+            sizes: [ 46 ]
         }, {
-            checksums: [ '25', '11' ],
-            header: { json: true, length: 12 },
+            header: {},
             body: { value: 1 },
-            sizes: [ 25, 11 ]
+            sizes: [ 37, 11 ]
         }], 'body partial')
         assert.deepStrictEqual(player.split(buffer.slice(120)).map(function (entry) {
             entry.body = entry.body.toString().split('\n')
             return entry
         }), [{
-            checksums: [ '13', '27' ],
-            header: { length: 28 },
+            header: {},
             body: [ 'abcdefghijklm', 'nopqrstuvwxyz' ],
-            sizes: [ 13, 27 ]
+            sizes: [ 38, 27 ]
         }], 'body remainder')
     })
 })
