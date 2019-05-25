@@ -123,7 +123,7 @@ class Commit {
             case 'split': {
                     const page = await this._journalist.read(operation[1][0])
                     page.append = operation[1][1]
-                    var right = {
+                    const right = {
                         id: operation[2][0],
                         items: page.items.splice(operation[3]),
                         append: operation[2][1]
@@ -140,11 +140,11 @@ class Commit {
                 break
             case 'drain': {
                     const root = this._journalist.read('0.0')
-                    var right = {
+                    const right = {
                         id: operation[2],
                         items: root.splice(operation[1])
                     }
-                    var left = {
+                    const left = {
                         id: operation[3],
                         items: root.splice(0)
                     }

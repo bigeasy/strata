@@ -165,7 +165,7 @@ class Journalist {
             level: 0,
             index: 0
         }
-        let entry = null
+        let entry = null, page = null
         descent.entries.push(entry = this._hold(-1, null))
         for (;;) {
             if (descent.index != 0) {
@@ -174,14 +174,14 @@ class Journalist {
                     level: descent.level
                 }
             }
-            var id = entry.value.items[descent.index].id
+            const id = entry.value.items[descent.index].id
             descent.entries.push(entry = this._hold(id, null))
             if (entry.value == null) {
                 descent.entries.pop().remove()
                 descent.miss = id
                 return descent
             }
-            var page = entry.value
+            page = entry.value
             // TODO Maybe page offset instead of ghosts, nah leave it so you remember it.
             descent.index = find(this.comparator, page, key, page.leaf ? page.ghosts : 1)
             if (page.leaf) {
@@ -217,7 +217,7 @@ class Journalist {
     async descend (key, level, fork) {
         let entries = []
         for (;;) {
-            var descent = this._descend(key, level, fork)
+            const descent = this._descend(key, level, fork)
             entries.forEach((entry) => entry.release())
             if (descent.miss == null) {
                 return descent
