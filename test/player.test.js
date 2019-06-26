@@ -8,7 +8,7 @@ describe('player', () => {
         assert(player != null, 'constructed')
     })
     it('can split lines', () => {
-        var player = new Player(checksum)
+        const player = new Player(checksum)
         const buffers = [
             recorder({ value: 1 }),
             recorder({}, { value: 1 }),

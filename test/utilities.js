@@ -34,9 +34,9 @@ exports.vivify = async function (directory) {
         if (+file.split('.')[1] % 2 == 1) {
             lines.pop()
             const entries = lines.map(line => JSON.parse(line))
-            var records = []
+            const records = []
             while (entries.length != 0) {
-                var record = shifter(entries), header = record[0].header
+                const record = shifter(entries), header = record[0].header
                 switch (header.method) {
                 case 'insert':
                     records.push([ header.method, header.index, record[1] ])
