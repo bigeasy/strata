@@ -1,43 +1,47 @@
 {
-          "name": "b-tree.async",
-          "private": true,
-          "version": "9.9.9",
-          "description": "Async/Await I/O B-tree in pure JavaScript for Node.js.",
-          "keywords": [
-                    "btree",
-                    "database",
-                    "json",
-                    "b-tree",
-                    "leveldb",
-                    "levelup"
-          ],
-          "author": "Alan Gutierrez <alan@prettyrobots.com>",
-          "contributors": [
-                    {
-                              "name": "Demarius Chrite",
-                              "email": "chrite.demarius@gmail.com",
-                              "web": "https://github.com/demarius"
-                    }
-          ],
-          "homepage": "https://github.com/bigeasy/strata",
-          "bugs": "https://github.com/bigeasy/strata/issues",
-          "license": "MIT",
-          "repository": {
-                    "type": "git",
-                    "url": "bigeasy/strata"
-          },
-          "dependencies": {
-                    "ascension": "^1.0.1",
-                    "extant": "^1.0.11",
-                    "hash.fnv": "^1.0.5",
-                    "prospective": "0.0.x",
-                    "interrupt": "8.0.x",
-                    "p-queue": "^5.0.0",
-                    "rimraf": "^2.6.3"
-          },
-          "devDependencies": {},
-          "main": "strata.js",
-          "scripts": {
-                    "test": "mocha"
-          }
+    "private":              true,
+    "name":                 "b-tree.async",
+    "version":              "9.9.9",
+    "description":
+
+      "Async/Await I/O B-tree in pure JavaScript for Node.js.",
+
+    "keywords":
+    [
+                            "btree", "database", "json", "b-tree", "leveldb",
+                            "levelup"
+    ],
+    "author":               "Alan Gutierrez <alan@prettyrobots.com>",
+    "contributors":
+    [{
+                            "name":  "Demarius Chrite",
+                            "email": "chrite.demarius@gmail.com",
+                            "web":   "https://github.com/demarius"
+    }],
+    "homepage":             "https://github.com/bigeasy/strata",
+    "bugs":                 "https://github.com/bigeasy/strata/issues",
+    "license":              "MIT",
+    "repository":
+    {
+                            "type": "git",
+                            "url": "bigeasy/strata"
+    },
+    "dependencies":
+    {
+                            "ascension":                    "^1.0.1",
+                            "extant":                       "^1.0.11",
+                            "hash.fnv":                     "^1.0.5",
+                            "interrupt":                    "8.0.x",
+                            "p-queue":                      "^5.0.0",
+                            "prospective":                  "0.0.x",
+                            "rimraf":                       "^2.6.3"
+    },
+    "devDependencies":
+    {
+    },
+    "main":                 "strata.js",
+    "scripts":
+    {
+                            "test": "mocha"
+    }
 }
