@@ -1,4 +1,24 @@
-<a href="http://www.flickr.com/photos/rickz/2207171252/" title="&quot;The Wave&quot; by rickz, on Flickr"><img src="http://farm3.staticflickr.com/2363/2207171252_4bb23fba1e_o.jpg" width="722"
+[![Actions Status](https://github.com/bigeasy/ascension/workflows/Node%20CI/badge.svg)](https://github.com/bigeasy/ascension/actions)
+[![codecov](https://codecov.io/gh/bigeasy/ascension/branch/master/graph/badge.svg)](https://codecov.io/gh/bigeasy/ascension)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+A comparator function builder.
+
+| What          | Where                                         |
+| --- | --- |
+| Discussion    | https://github.com/bigeasy/strata/issues/1    |
+| Documentation | https://bigeasy.github.io/strata              |
+| Source        | https://github.com/bigeasy/strata             |
+| Issues        | https://github.com/bigeasy/strata/issues      |
+| CI            | https://travis-ci.org/bigeasy/strata          |
+| Coverage:     | https://codecov.io/gh/bigeasy/strata          |
+| License:      | MIT                                           |
+
+
+```
+npm install b-tree
+```
+
 height="481" alt="&quot;The Wave&quot;"></a><br>
 The Wave by [Rick Z.](http://www.flickr.com/people/rickz/).
 
