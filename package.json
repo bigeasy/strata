@@ -31,7 +31,7 @@
                             "ascension":                    "^1.0.1",
                             "extant":                       "^1.0.11",
                             "hash.fnv":                     "^1.0.5",
-                            "interrupt":                    "8.0.x",
+                            "interrupt":                    "^9.0.0-alpha.4",
                             "p-queue":                      "6.2.0",
                             "prospective":                  "^0.1.0-alpha.4",
                             "rimraf":                       "^3.0.0"
