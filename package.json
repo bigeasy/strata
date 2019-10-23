@@ -34,7 +34,7 @@
                             "interrupt":                    "8.0.x",
                             "p-queue":                      "6.2.0",
                             "prospective":                  "0.0.x",
-                            "rimraf":                       "^2.6.3"
+                            "rimraf":                       "^3.0.0"
     },
     "devDependencies":
     {
