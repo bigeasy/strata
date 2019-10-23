@@ -32,7 +32,7 @@
                             "extant":                       "^1.0.11",
                             "hash.fnv":                     "^1.0.5",
                             "interrupt":                    "8.0.x",
-                            "p-queue":                      "^5.0.0",
+                            "p-queue":                      "6.2.0",
                             "prospective":                  "0.0.x",
                             "rimraf":                       "^2.6.3"
     },
