@@ -38,10 +38,11 @@
     },
     "devDependencies":
     {
+                            "proof":                        "^8.0.0-alpha.8"
     },
     "main":                 "strata.js",
     "scripts":
     {
-                            "test": "mocha"
+                            "test": "proof test/*.test.js"
     }
 }

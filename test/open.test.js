@@ -1,30 +1,25 @@
-describe('strata open', () => {
-    const assert = require('assert')
+require('proof')(3, async (okay) => {
     const Strata = require('../strata')
     const Cache = require('../cache')
     const utilities = require('./utilities')
     const path = require('path')
     const directory = path.join(utilities.directory, 'open')
     const fs = require('fs').promises
-    before(async () => {
-        await utilities.reset(directory)
+    await utilities.reset(directory)
+    await utilities.serialize(directory, {
+        '0.0': [ [ '0.1', null ] ],
+        '0.1': []
     })
-    it('can create a new database', async () => {
-        await utilities.serialize(directory, {
-            '0.0': [ [ '0.1', null ] ],
-            '0.1': []
-        })
-        await fs.mkdir(path.join(directory, 'instances', '1'))
-        await fs.writeFile(path.join(directory, '.ignore'), Buffer.alloc(0))
-        const cache = new Cache
-        const strata = new Strata({ directory, cache })
-        await strata.open()
-        const instances = await fs.readdir(path.join(directory, 'instances'))
-        assert.deepStrictEqual(instances, [ '2' ], 'instance')
-        assert.equal(cache.entries, 1, 'cache empty')
-        await strata.close()
-        await strata.close()
-        cache.purge(0)
-        assert.equal(cache.entries, 0, 'cache empty')
-    })
+    await fs.mkdir(path.join(directory, 'instances', '1'))
+    await fs.writeFile(path.join(directory, '.ignore'), Buffer.alloc(0))
+    const cache = new Cache
+    const strata = new Strata({ directory, cache })
+    await strata.open()
+    const instances = await fs.readdir(path.join(directory, 'instances'))
+    okay(instances, [ '2' ], 'instance')
+    okay(cache.entries, 1, 'cache empty')
+    await strata.close()
+    await strata.close()
+    cache.purge(0)
+    okay(cache.entries, 0, 'cache empty')
 })

@@ -12,7 +12,7 @@ branches:
 
 install:
   - npm install --no-package-lock --no-save
-  - npm install -g nyc mocha
+  - npm install -g nyc prove
 
 script:
   - nyc npm test
