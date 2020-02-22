@@ -19,11 +19,7 @@ const appendable = require('./appendable')
 const Strata = { Error: require('./error') }
 
 function increment (value) {
-    if (value == 0xffffffff) {
-        return 0
-    } else {
-        return value + 1
-    }
+    return value + 1 & 0xffffffff
 }
 
 class Journalist {
