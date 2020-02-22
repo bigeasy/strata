@@ -83,7 +83,7 @@ class Commit {
         if (commit == null) {
             return false
         }
-        for (let file of dir.filter(file => file != commit)) {
+        for (const file of dir.filter(file => file != commit)) {
             await this._unlink(this._path(file))
         }
         const operations = await this._load(commit)
@@ -187,7 +187,7 @@ class Commit {
             const split = file.split('.')
             return { index: +split[0], file: file, hash: split[1] }
         }).sort((left, right) => left.index - right.index)
-        for (let step of steps) {
+        for (const step of steps) {
             const operation = (await this._load(step.file)).shift()
             switch (operation.shift()) {
             case 'begin':
