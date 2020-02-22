@@ -4,7 +4,6 @@ require('proof')(1, async (okay) => {
     const utilities = require('./utilities')
     const path = require('path')
     const directory = path.join(utilities.directory, 'split')
-    const fs = require('fs').promises
     await utilities.reset(directory)
     await utilities.serialize(directory, {
         '0.0': [[ '0.1', null ]],
