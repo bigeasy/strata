@@ -89,3 +89,20 @@ exports.serialize = async function (directory, files) {
     }
     await fs.mkdir(path.resolve(directory, 'instances', String(instance)), { recursive: true })
 }
+
+exports.alphabet = function (length, letters = 26) {
+    const alphabet = 'abcdefghijklmnopqrstuvwxyz'.split('').slice(0, letters)
+    function append (length) {
+        if (length == 1) {
+            return alphabet.map(letter => [ letter ])
+        }
+        const entries = []
+        for (const letter of alphabet) {
+            for (const appendage of append(length - 1)) {
+                entries.push(([ letter ]).concat(appendage))
+            }
+        }
+        return entries
+    }
+    return append(length).map(word => word.join(''))
+}

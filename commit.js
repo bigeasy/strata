@@ -57,6 +57,38 @@ class Commit {
         await callback(callback => rimraf(file, callback))
     }
 
+    // How is this not a race condition? I see that we're setting the heft if
+    // the page is cached in memory, but we're not holding it. If the page is
+    // loading before our commit is over, it will have the wrong heft, will it
+    // not?
+    //
+    // But, it doesn't matter all that much, does it? The heft is advisory.
+    // Until we commit, some of these pages will not be visited. If we where to
+    // hold onto the cache entries and release them on destruction, the heft
+    // wouldn't matter until then, because...
+    //
+    // Oh, wait, I recall that we don't care about adjusting heft if the record
+    // does exist because we will hold it in the Journalist during the commit.
+    // The remove is for when we're replaying as part of a recovery.
+    //
+    // Note that I still don't recall what my reasoning was on truncated writes.
+    // Assume that I assumed that Strata is a primative and could act as a
+    // write-ahead log. Not sure how I go about recovering from a truncation,
+    // though. Cross that bridge. It's a primitive.
+    //
+    // Now I'm not seeing why I'm doing the heft adjustment here. I'm already
+    // holding on in the Journalist and adjusting heft there. Repeating the
+    // operations here, so why not just have drain run in this commit object?
+
+    // Split, drain and fill are all pretty direct as far as commit operations
+    // go. You can give an address, or not in the case of fill and drain, and
+    // the operation is straight forward. From the Jouranlist on branch merge,
+    // though, we ought to make the decision in there and leave the two pages.
+    //
+    // Oh, I remember. Branch heft is the buffer length, and we won't know the
+    // buffer length until we serialize the record.
+
+    //
     async _emplace (page) {
         const unlink = path.join('pages', page.id, `${page.append}.${page.hash}`)
         const buffer = Buffer.from(JSON.stringify(page.items))
@@ -121,6 +153,18 @@ class Commit {
                 }
                 break
             case 'split': {
+                    // Appears that I'm writing out the page items in their
+                    // entirety when I know the keys are extracted from the
+                    // records, or at least they where once upon a time. Nope.
+                    // Looks like that changed. Keys are now explicit.
+                    //
+                    // Well that simplifies all these operations, doesn't it.
+                    //
+                    // No, I'm not really doing leaf splits yet. They are based
+                    // on a previous page. If I recall, the plan for vacuum is
+                    // based on stubs as a linked list. Suppose you can put down
+                    // a stub, the rewrite what it was based on, so all pages
+                    // after the first split become linked lists.
                     const page = await this._journalist.read(operation[1][0])
                     page.append = operation[1][1]
                     const right = {
@@ -139,6 +183,12 @@ class Commit {
                 }
                 break
             case 'drain': {
+                    // Ugh. Why is `operation` an array? Why can't it be an
+                    // object so that the properties serve as a reminder?
+                    //
+                    // Interesting. I'm straight up reading and writing the
+                    // files, which makes sense I suppose. Is this not a problem
+                    // for the leaves, though?
                     const root = this._journalist.read('0.0')
                     const right = {
                         id: operation[2],

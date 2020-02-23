@@ -89,7 +89,7 @@ class Journalist {
         return leaf ? append : /^(\d+.\d+)\.([0-9a-f]+)$/.exec(append).slice(1, 3)
     }
 
-    async _read(id, append) {
+    async _read (id, append) {
         let heft = 0
         let items = []
         const player = new Player(function () { return '0' })
@@ -131,9 +131,13 @@ class Journalist {
         })
         const items = JSON.parse(buffer.toString())
         const heft = buffer.length
-        return { id, leaf, items, offset: 1, heft, append, hash }
+        return { id, leaf, items, offset: 1, heft, append }
     }
 
+    // What is going on here? Why is there an `entry.heft` and an
+    // `entry.value.heft`?
+
+    //
     async load (id) {
         const entry = this._hold(id, null)
         try {
@@ -264,6 +268,10 @@ class Journalist {
         return queue
     }
 
+    // We prevent deadlock on the hash during merge by returning the same block
+    // object if it has already been obtained for an existing page.
+
+    //
     _block (blockId, id) {
         const index = this._index(id)
         let block = this._blocks[index][blockId]
@@ -274,6 +282,21 @@ class Journalist {
         return block
     }
 
+    // Writes appear to be able to run with impunity. What was the logic there?
+    // Something about the leaf being written to synchronously, but if it was
+    // asynchronous, then it is on the user to assert that the page has not
+    // changed.
+    //
+    // The block will wait on a promise release preventing any of the writes
+    // from writing.
+    //
+    // Keep in mind that there is only one housekeeper, so that might factor
+    // into the logic here.
+    //
+    // Can't see what's preventing writes from becoming stale. Do I ensure that
+    // they are written before the split? Must be.
+
+    //
     async _append (method, body) {
         await callback((callback) => process.nextTick(callback))
         switch (method) {
@@ -340,16 +363,90 @@ class Journalist {
         return `${this.instance}.${this._id++}`
     }
 
+    // Assume there is nothing to block or worry about with the branch pages.
+    // Can't recall at the moment, though. Descents are all synchronous.
+    //
+    // You've come back to this and it really bothers you that these slices are
+    // performed twice, once in the journalist and once in the commit. You
+    // probably want to let this go for now until you can see clearly how you
+    // might go about eliminating this duplication. Perhaps the commit uses the
+    // journalist to descend, lock, etc. just as the Cursor does. Or maybe the
+    // Journalist is just a Sheaf of pages, which does perform the leaf write,
+    // but defers to the Commit, now called a Journalist, to do the splits.
+    //
+    // It is not the case that the cached information is in some format that is
+    // not ready for serialization. What do we get exactly? What we'll see at
+    // first is that these two are calling each other a lot, so we're going to
+    // probably want to move more logic back over to Commit, including leaf
+    // splits. It will make us doubt that we could ever turn this easily into an
+    // R*Tree but the better the architecture, the easier it will be to extract
+    // components for reuse as modules, as opposed to making this into some sort
+    // of pluggable framework.
+    //
+    // Maybe it just came to me. Why am I logging `drain`, `fill`, etc? The
+    // commit should just expose `emplace` and the journalist can do the split
+    // and generate the pages and then the Commit is just journaled file system
+    // operations. It won't even update the heft, it will just return the new
+    // heft and maybe it doesn't do the page reads either.
+    //
+    // We'd only be duplicating the splices, really.
+
+    //
+    async _drainRoot (key) {
+        const commit = new Commit(this)
+        const root = await this.descend(key, 0, 0)
+        const partition = Math.floor(root.items.length / 2)
+        const right = {
+            id: this._nextId(false),
+            offset: 1,
+            heft: 0,
+            items: root.items.slice(partition),
+            append: null
+        }
+        const left = {
+            id: this._nextId(false),
+            offset: 1,
+            heft: 0,
+            items: root.items.slice(partition),
+            append: null
+        }
+        const leftId = this._nextId(leaf)
+        const rightId = this._nextId(leaf)
+        // Yeah, I want these to be objects.
+        prepare.push([ 'drain', partition, leftId, rightId ])
+        // Okay. I need a new page of some kind.
+        root.items = [{
+            id: leftId,
+            key: null
+        }, {
+            id: rightId,
+            key: right.items[0].key
+        }]
+    }
+
     // TODO We need to block writes to the new page as well. Once we go async
     // again, someone could descend the tree and start writing to the new page
     // before we get a chance to write the new page stub.
+    //
+    // ^^^ Coming back to the project and this was not done. You'd simply
+    // calculate the new id before requesting your blocks, request two blocks.
+
+    //
     async _splitLeaf (key, lineage, entries) {
         const blockId = this._blockId = increment(this._blockId)
         const block = this._block(blockId, lineage.child.page.id)
         await block.enter.promise
+        // Race is the wrong word, it's our synchronous time. We have to split
+        // the page and then write them out. Anyone writing to this leaf has to
+        // to be able to see the split so that they surrender their cursor if
+        // their insert or delete belongs in the new page, not the old one.
+        //
+        // Notice that all the page manipulation takes place before the first
+        // write. Recall that the page manipulation is done to the page in
+        // memory which is offical, the page writes are lagging.
         const pages = [ lineage.child.page ]
-        const partition = Math.floor(pages[0].items.length / 2)
         const length = pages[0].items.length
+        const partition = Math.floor(length / 2)
         const items = lineage.child.page.items.splice(partition)
         const heft = items.reduce((sum, item) => sum + item.heft, 0)
         pages.push({
@@ -361,6 +458,7 @@ class Journalist {
             append: this._filename()
         })
         pages[0].right = pages[1].items[0].key
+        // This doesn't seem right. Why is the key of a *record* set to null?
         pages[1].items[0].key = null
         lineage.child.entry.heft = (pages[0].heft -= heft)
         const entry = this._hold(pages[1].id, pages[1])
@@ -383,18 +481,18 @@ class Journalist {
         // TODO Make header a nested object.
         prepare.push([ 'stub', pages[1].id, pages[1].append, {
             method: 'slice',
-                index: partition,
-                length: length,
-                id: pages[0].id,
-                append: pages[0].append
+            index: partition,
+            length: length,
+            id: pages[0].id,
+            append: pages[0].append
         }])
         const append = this._filename()
         prepare.push([ 'stub', pages[0].id, append, {
             method: 'slice',
-                index: 0,
-                length: partition,
-                id: pages[0].id,
-                append: pages[0].append
+            index: 0,
+            length: partition,
+            id: pages[0].id,
+            append: pages[0].append
         }])
         pages[0].append = append
         prepare.push([ 'commit' ])
@@ -402,6 +500,8 @@ class Journalist {
         const commit = new Commit(this)
         await commit.write(prepare)
         delete this._dirty[key]
+        // Pretty sure that the separate prepare and commit are merely because
+        // we want to release the lock on the leaf as soon as possible.
         await commit.prepare()
         await commit.commit()
         block.exit.resolve()
@@ -410,7 +510,7 @@ class Journalist {
         entries.forEach(entry => entry.release())
         if (lineage.parent.page.items.length >= this.branch.split) {
             if (lineage.parent.page.id == '0.0') {
-                await this._drainRoot()
+                await this._drainRoot(key)
             } else {
                 await this._splitBranch(lineage.parent)
             }
