@@ -479,24 +479,32 @@ class Journalist {
         const writes = this._queue(lineage.child.page.id).writes.splice(0)
         await this._writeLeaf(lineage.child.page.id, writes)
         // TODO Make header a nested object.
-        prepare.push([ 'stub', pages[1].id, pages[1].append, {
-            method: 'slice',
-            index: partition,
-            length: length,
-            id: pages[0].id,
-            append: pages[0].append
-        }])
+        prepare.push({
+            method: 'stub',
+            page: { id: pages[1].id, append: pages[1].append },
+            record: {
+                method: 'slice',
+                index: partition,
+                length: length,
+                id: pages[0].id,
+                append: pages[0].append
+            }
+        })
         const append = this._filename()
-        prepare.push([ 'stub', pages[0].id, append, {
-            method: 'slice',
-            index: 0,
-            length: partition,
-            id: pages[0].id,
-            append: pages[0].append
-        }])
+        prepare.push({
+            method: 'stub',
+            page: { id: pages[0].id, append },
+            record: {
+                method: 'slice',
+                index: 0,
+                length: partition,
+                id: pages[0].id,
+                append: pages[0].append
+            }
+        })
         pages[0].append = append
-        prepare.push([ 'commit' ])
-        prepare.push([ 'splice', lineage.parent.page.id, splice ])
+        prepare.push({ method: 'commit' })
+        prepare.push({ method: 'splice', id: lineage.parent.page.id, splice })
         const commit = new Commit(this)
         await commit.write(prepare)
         delete this._dirty[key]

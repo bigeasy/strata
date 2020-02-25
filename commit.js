@@ -109,7 +109,14 @@ class Commit {
         await this._prepare([ 'unlink', unlink ])
     }
 
-    async prepare (stop) {
+    // Okay. Now I see. I wanted the commit to be light and easy and minimal, so
+    // that it could be written quickly and loaded quickly, but that is only
+    // necessary for the leaf. We really want a `Prepare` that will write files
+    // for branches instead of this thing that duplicates, but now I'm starting
+    // to feel better about the duplication.
+
+    //
+    async prepare () {
         const dir = await this._readdir()
         const commit = dir.filter(file => /^commit\.[0-9a-f]+$/.test(file)).shift()
         if (commit == null) {
@@ -124,7 +131,8 @@ class Commit {
         await this._prepare([ 'begin' ])
         while (operations.length != 0) {
             const operation = operations.shift()
-            switch (operation[0]) {
+            assert(!Array.isArray(operation))
+            switch (operation.method) {
             // This is the next commit in a series of commits, we write out the
             // remaining operations into a new commit.
             case 'commit': {
@@ -142,12 +150,11 @@ class Commit {
             // loads) a previous page.
             case 'stub': {
                     const recorder = this._journalist._recorder
-                    const page = { id: operation[1], append: operation[2] }
-                    const buffer = recorder(operation[3])
+                    const buffer = recorder(operation.record)
                     const hash = fnv(buffer)
-                    const filename = `${page.id}-${page.append}`
+                    const filename = `${operation.page.id}-${operation.page.append}`
                     const from = path.join('commit', filename)
-                    const to = path.join('pages', page.id, page.append)
+                    const to = path.join('pages', operation.page.id, operation.page.append)
                     await fs.writeFile(this._path(filename), buffer)
                     await this._prepare([ 'rename', from, to, hash ])
                 }
@@ -177,8 +184,8 @@ class Commit {
                 }
                 break
             case 'splice': {
-                    const page = await this._journalist.read(operation[1])
-                    page.items.splice.apply(page.items, operation[2])
+                    const page = await this._journalist.read(operation.id)
+                    page.items.splice.apply(page.items, operation.splice)
                     await this._emplace(page)
                 }
                 break
