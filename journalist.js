@@ -131,7 +131,7 @@ class Journalist {
         })
         const items = JSON.parse(buffer.toString())
         const heft = buffer.length
-        return { id, leaf, items, offset: 1, heft, append }
+        return { id, leaf, items, offset: 1, heft, append, hash }
     }
 
     // What is going on here? Why is there an `entry.heft` and an
@@ -359,6 +359,7 @@ class Journalist {
         return String(this.instance) + '.' +  String(id)
     }
 
+    // TODO Why are you using the `_id` for both file names and page ids?
     _filename (id) {
         return `${this.instance}.${this._id++}`
     }
@@ -503,9 +504,9 @@ class Journalist {
             }
         })
         pages[0].append = append
-        prepare.push({ method: 'commit' })
-        prepare.push({ method: 'splice', id: lineage.parent.page.id, splice })
         const commit = new Commit(this)
+        prepare.push({ method: 'commit' })
+        prepare.push(await commit.emplace(lineage.parent))
         await commit.write(prepare)
         delete this._dirty[key]
         // Pretty sure that the separate prepare and commit are merely because
@@ -515,6 +516,7 @@ class Journalist {
         block.exit.resolve()
         await commit.prepare()
         await commit.commit()
+        await commit.dispose()
         entries.forEach(entry => entry.release())
         if (lineage.parent.page.items.length >= this.branch.split) {
             if (lineage.parent.page.id == '0.0') {

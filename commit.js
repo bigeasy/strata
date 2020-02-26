@@ -18,22 +18,28 @@ class Commit {
 
     async write (commit) {
         const dir = await this._readdir()
-        assert.deepStrictEqual(dir, [], 'commit directory not empty')
+        const unemplaced = dir.filter(file => ! /\d+\.\d+-\d+\.\d+\.[0-9a-f]/)
+        assert.deepStrictEqual(unemplaced, [], 'commit directory not empty')
         await this._write('commit', commit)
     }
 
+    // Believe we can just write out into the commit directory, we don't need to
+    // move a file into the directory. No, we do want to get a good write and
+    // only rename is atomic. What if we had a bad write?
+
+    //
     async _prepare (operation) {
         await this._write(String(this._index++), [ operation ])
     }
 
+    // Recall that `fs.writeFile` overwrites without complaint.
+
+    //
     async _write (file, entries) {
-        const directory = path.join(this._journalist.directory, 'commit')
         const buffer = Buffer.from(entries.map(JSON.stringify).join('\n') + '\n')
-        await fs.writeFile(path.join(directory, 'prepare'), buffer)
-        const hash = fnv(buffer)
-        const from = path.join(directory, 'prepare')
-        const to = path.join(directory, `${file}.${hash}`)
-        await fs.rename(from, to)
+        const write = path.join(this._commit, 'write')
+        await fs.writeFile(write, buffer)
+        await fs.rename(write, path.join(this._commit, `${file}.${fnv(buffer)}`))
     }
 
     async _load (file) {
@@ -89,24 +95,50 @@ class Commit {
     // buffer length until we serialize the record.
 
     //
-    async _emplace (page) {
-        const unlink = path.join('pages', page.id, `${page.append}.${page.hash}`)
+    async _emplace (page, hash) {
+    }
+
+    // append is the Strata instance plus an ever increasing integer for for
+    // that instance joined by a dot.
+
+    // Similarly, page ids are ths Strata instance plus an ever increasing
+    // integer for that instance where the integer is the next even integer for
+    // branch pages and the next odd integer for leaf pages.
+    //
+    // In storage, the page is a directory, the append is the file name. In the
+    // commit the filename is the page id and apppend id hyphen joined.
+    //
+    // The commit is prefixed with the word `commit-` and each step is a file
+    // that is decimal integer and hexidecimal integer, that is, step number and
+    // hash of contents.
+    //
+    // We check for a commit, if one exists, we write out the steps as step
+    // files. The step files are numbered so we work through them in order. The
+    // first step deletes the commit so we won't write the steps again. Each
+    // step file is read, it's acton performed, the step file is deleted. After
+    // we've run all the steps we delete the commit directory recusively, not
+    // from a step file but in any case, because we might have emplacement files
+    // that where never prepared and committed.
+    //
+    // We delete the commit directory recursively to get rid of everything, so
+    // we have to maybe make it in all the functions as a first step, but that's
+    // okay, I'm not going to fuss about it.
+
+    //
+    async emplace ({ page, entry = {} }) {
+        await fs.mkdir(this._commit, { recursive: true })
         const buffer = Buffer.from(JSON.stringify(page.items))
         const hash = fnv(buffer)
+        entry.heft = buffer.length
         const filename = `${page.append}.${hash}`
-        await fs.writeFile(this._path(`${page.id}-${filename}`), buffer)
-        const entry = this._journalist._hold(page.id)
-        if (entry.value == null) {
-            entry.remove()
-        } else {
-            entry.heft = buffer.length
-            entry.append = page.append
-            entry.release()
-        }
+        await fs.writeFile(path.join(this._commit, `${page.id}-${filename}`), buffer)
         const from = path.join('commit', `${page.id}-${filename}`)
         const to = path.join('pages', page.id, filename)
-        await this._prepare([ 'rename', from, to, hash ])
-        await this._prepare([ 'unlink', unlink ])
+        return {
+            method: 'emplace',
+            page: { id: page.id, append: page.append },
+            hash
+        }
     }
 
     // Okay. Now I see. I wanted the commit to be light and easy and minimal, so
@@ -114,6 +146,10 @@ class Commit {
     // necessary for the leaf. We really want a `Prepare` that will write files
     // for branches instead of this thing that duplicates, but now I'm starting
     // to feel better about the duplication.
+    //
+    // Seems like there should be some sort of prepare builder class, especially
+    // given that there is going to be emplacements followed by this prepare
+    // call, but I'm content to have that still be an array.
 
     //
     async prepare () {
@@ -121,9 +157,6 @@ class Commit {
         const commit = dir.filter(file => /^commit\.[0-9a-f]+$/.test(file)).shift()
         if (commit == null) {
             return false
-        }
-        for (const file of dir.filter(file => file != commit)) {
-            await this._unlink(this._path(file))
         }
         const operations = await this._load(commit)
         // Start by deleting the commit script, once this runs we have to move
@@ -139,8 +172,7 @@ class Commit {
                     const entries = operations.splice(0)
                     const buffer = Buffer.from(entries.map(JSON.stringify).join('\n') + '\n')
                     const hash = fnv(buffer)
-                    const filename = this._path('_commit')
-                    await fs.writeFile(this._path('_commit'), buffer)
+                    await fs.writeFile(path.join(this._commit, '_commit'), buffer)
                     const from = path.join('commit', '_commit')
                     const to = path.join('commit', `commit.${hash}`)
                     await this._prepare([ 'rename', from, to, hash ])
@@ -157,6 +189,16 @@ class Commit {
                     const to = path.join('pages', operation.page.id, operation.page.append)
                     await fs.writeFile(this._path(filename), buffer)
                     await this._prepare([ 'rename', from, to, hash ])
+                }
+                break
+            case 'emplace': {
+                    const { page, hash } = operation
+                    const unlink = path.join('pages', page.id, `${page.append}.${page.hash}`)
+                    const filename = `${page.append}.${hash}`
+                    const from = path.join('commit', `${page.id}-${filename}`)
+                    const to = path.join('pages', page.id, filename)
+                    await this._prepare([ 'rename', from, to, hash ])
+                    await this._prepare([ 'unlink', unlink ])
                 }
                 break
             case 'split': {
@@ -236,6 +278,11 @@ class Commit {
         return true
     }
 
+
+    // Appears that prepared files are always going to be a decimal integer
+    // followed by a hexidecimal integer. Files for emplacement appear to have a
+    // hyphen in them.
+    //
     async commit () {
         const dir = await this._readdir()
         const steps = dir.filter(file => {
@@ -270,6 +317,10 @@ class Commit {
             }
             await fs.unlink(this._path(step.file))
         }
+    }
+
+    async dispose () {
+        await this._unlink(this._commit)
     }
 }
 
