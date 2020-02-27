@@ -38,6 +38,9 @@ exports.vivify = async function (directory) {
             while (entries.length != 0) {
                 const record = shifter(entries), header = record[0].header
                 switch (header.method) {
+                case 'right':
+                    record.push([ header.method, header.right ])
+                    break
                 case 'insert':
                     records.push([ header.method, header.index, record[1] ])
                     break
@@ -69,18 +72,21 @@ exports.serialize = async function (directory, files) {
         } else {
             const writes = files[id].map((record, index) => {
                 switch (record[0]) {
+                case 'right':
+                    return {
+                        header: { method: 'right', right: record[1] },
+                        body: null
+                    }
                 case 'insert':
                     return {
                         header: { method: 'insert', index: record[1], key: record[2] },
                         body: record[2]
                     }
-                    break
                 case 'delete':
                     return {
                         header: { method: 'delete', index: record[1] },
                         body: null
                     }
-                    break
                 }
             }).map(entry => recorder(entry.header, entry.body))
             const file = path.resolve(directory, 'pages', id, '0.0')

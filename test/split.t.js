@@ -8,6 +8,8 @@ require('proof')(1, async (okay) => {
     await utilities.serialize(directory, {
         '0.0': [[ '0.1', null ]],
         '0.1': [[
+            'right', null
+        ], [
             'insert', 0, 'a'
         ], [
             'insert', 1, 'b'
