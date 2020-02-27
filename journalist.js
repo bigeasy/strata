@@ -90,32 +90,44 @@ class Journalist {
     }
 
     async _read (id, append) {
-        let heft = 0
-        let items = []
         const player = new Player(function () { return '0' })
         const directory = path.resolve(this.directory, 'pages', String(id))
         const filename = path.join(directory, append)
+        const page = { id, leaf: true, items: [], right: null, ghosts: 0, heft: 0, append }
         const readable = fileSystem.createReadStream(filename)
         for await (let chunk of readable) {
             for (let entry of player.split(chunk)) {
                 switch (entry.header.method) {
-                case 'slice':
-                    const page = await this._read(entry.header.id, entry.header.append)
-                    items = page.items.slice(entry.header.index, entry.header.length)
-                    heft = items.reduce((sum, record) => sum + record.heft, 0)
+                case 'right': {
+                        page.right = entry.header.right
+                    }
                     break
-                case 'insert':
-                    items.splice(entry.header.index, 0, {
-                        key: entry.header.key,
-                        value: entry.body,
-                        heft: entry.sizes[0] + entry.sizes[1]
-                    })
-                    heft += entry.sizes[0] + entry.sizes[1]
+                // TODO Split into `load` and `slice`.
+                case 'slice': {
+                        const previous = await this._read(entry.header.id, entry.header.append)
+                        page.items = previous.items.slice(entry.header.index, entry.header.length)
+                        page.heft = page.items.reduce((sum, record) => sum + record.heft, 0)
+                        if (entry.header.length < previous.items.length) {
+                            page.right = previous.items[entry.header.length].key
+                        } else {
+                            page.right = previous.right
+                        }
+                    }
+                    break
+                case 'insert': {
+                        page.items.splice(entry.header.index, 0, {
+                            key: entry.header.key,
+                            value: entry.body,
+                            heft: entry.sizes[0] + entry.sizes[1]
+                        })
+                        page.heft += entry.sizes[0] + entry.sizes[1]
+                    }
+                    break
                 }
             }
         }
         // TODO Did we ghost? Check when we implement remove.
-        return { id, leaf: true, items, ghosts: 0, heft, append }
+        return page
     }
 
     async read (id) {
