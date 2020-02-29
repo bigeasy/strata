@@ -182,7 +182,7 @@ class Commit {
             // loads) a previous page.
             case 'stub': {
                     const recorder = this._journalist._recorder
-                    const buffer = recorder(operation.record)
+                    const buffer = Buffer.concat(operation.records.map(record => recorder(record)))
                     const hash = fnv(buffer)
                     const filename = `${operation.page.id}-${operation.page.append}`
                     const from = path.join('commit', filename)

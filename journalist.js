@@ -102,16 +102,20 @@ class Journalist {
                         page.right = entry.header.right
                     }
                     break
+                case 'load': {
+                        const loaded = await this._read(entry.header.id, entry.header.append)
+                        page.items = loaded.items
+                        page.heft = loaded.heft
+                        page.right = loaded.right
+                    }
+                    break
                 // TODO Split into `load` and `slice`.
                 case 'slice': {
-                        const previous = await this._read(entry.header.id, entry.header.append)
-                        page.items = previous.items.slice(entry.header.index, entry.header.length)
-                        page.heft = page.items.reduce((sum, record) => sum + record.heft, 0)
-                        if (entry.header.length < previous.items.length) {
-                            page.right = previous.items[entry.header.length].key
-                        } else {
-                            page.right = previous.right
+                        if (entry.header.length < page.items.length) {
+                            page.right = page.items[entry.header.length].key
                         }
+                        page.items = page.items.slice(entry.header.index, entry.header.length)
+                        page.heft = page.items.reduce((sum, record) => sum + record.heft, 0)
                     }
                     break
                 case 'insert': {
@@ -495,25 +499,29 @@ class Journalist {
         prepare.push({
             method: 'stub',
             page: { id: pages[1].id, append: pages[1].append },
-            record: {
+            records: [{
+                method: 'load',
+                id: pages[0].id,
+                append: pages[0].append
+            }, {
                 method: 'slice',
                 index: partition,
                 length: length,
-                id: pages[0].id,
-                append: pages[0].append
-            }
+            }]
         })
         const append = this._filename()
         prepare.push({
             method: 'stub',
             page: { id: pages[0].id, append },
-            record: {
-                method: 'slice',
-                index: 0,
-                length: partition,
+            records: [{
+                method: 'load',
                 id: pages[0].id,
                 append: pages[0].append
-            }
+            }, {
+                method: 'slice',
+                index: 0,
+                length: partition
+            }]
         })
         pages[0].append = append
         const commit = new Commit(this)
