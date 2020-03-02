@@ -90,10 +90,10 @@ class Journalist {
     }
 
     async _read (id, append) {
+        const page = { id, leaf: true, items: [], right: null, ghosts: 0, heft: 0, append }
         const player = new Player(function () { return '0' })
         const directory = path.resolve(this.directory, 'pages', String(id))
         const filename = path.join(directory, append)
-        const page = { id, leaf: true, items: [], right: null, ghosts: 0, heft: 0, append }
         const readable = fileSystem.createReadStream(filename)
         for await (let chunk of readable) {
             for (let entry of player.split(chunk)) {
@@ -109,7 +109,6 @@ class Journalist {
                         page.right = loaded.right
                     }
                     break
-                // TODO Split into `load` and `slice`.
                 case 'slice': {
                         if (entry.header.length < page.items.length) {
                             page.right = page.items[entry.header.length].key
@@ -130,7 +129,6 @@ class Journalist {
                 }
             }
         }
-        // TODO Did we ghost? Check when we implement remove.
         return page
     }
 
