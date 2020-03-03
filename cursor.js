@@ -6,13 +6,13 @@ const find = require('./find')
 class Cursor {
     constructor (journalist, descent, key) {
         this._entry = descent.entries.pop()
-        this._page = this._entry.value
+        this.page = this._entry.value
         descent.entries.forEach(entry => entry.release())
         this.found = descent.index >= 0
         this.sought = key
         this.index = descent.index < 0 ? ~descent.index : descent.index
-        this.items = this._page.items
-        this.ghosts = this._page.ghosts
+        this.items = this.page.items
+        this.ghosts = this.page.ghosts
         this._journalist = journalist
         this._promises = {}
     }
@@ -24,10 +24,10 @@ class Cursor {
 
     indexOf (key, index) {
         const comparator = this._journalist.comparator
-        index = find(comparator, this._page, key, index)
+        index = find(comparator, this.page, key, index)
         const unambiguous = -1 < index // <- TODO ?
-            || ~ index < this._page.items.length
-            || this._page.right == null
+            || ~ index < this.page.items.length
+            || this.page.right == null
         if (!unambiguous && comparator(key, page.right) >= 0) {
             return null
         }
@@ -39,7 +39,7 @@ class Cursor {
             index > -1 &&
             (
                 this.index > 0 ||
-                this._page.id == '0.1'
+                this.page.id == '0.1'
             ), 'invalid.insert.index', { index: this.index })
 
         // Heft will be set when the record is serialized.
@@ -47,29 +47,29 @@ class Cursor {
         const record = { key: key, value: value, heft: 0 }
 
         this._journalist.append({
-            id: this._page.id,
+            id: this.page.id,
             record: record,
             header: { method: 'insert', index: index, key: key },
             body: value
         }, this._promises)
 
-        this._page.items.splice(index, 0, record)
+        this.page.items.splice(index, 0, record)
     }
 
     remove (index) {
-        const ghost = this._page.id != '0.1' && index == 0
+        const ghost = this.page.id != '0.1' && index == 0
 
         this._journalist.append({
-            id: this._page.id,
+            id: this.page.id,
             header: { method: 'delete', index: index },
             body: null
         }, this._promises)
 
         if (ghost) {
-            this._page.ghosts++
+            this.page.ghosts++
             this.ghosts++
         } else {
-            const [ spliced ] = this._page.items.splice(index, 1)
+            const [ spliced ] = this.page.items.splice(index, 1)
             this._entry.heft -= spliced.heft
         }
     }

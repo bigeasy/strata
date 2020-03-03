@@ -6,14 +6,14 @@ class Unlocker {
 
     constructor (cursor) {
         this._cursor = cursor
-        cursor._page.lock = new Promise(resolve => this._lock = resolve)
+        cursor.page.lock = new Promise(resolve => this._lock = resolve)
     }
 
     get () {
         if (this._lock != null) {
             this._lock.call()
             this._lock = null
-            this._cursor._page.lock = null
+            this._cursor.page.lock = null
         }
         return this._cursor
     }
@@ -36,7 +36,7 @@ class Strata {
         DESCEND: for (;;) {
             const descent = await this._journalist.descend(key, -1, 0)
             const cursor = new Cursor(this._journalist, descent, key)
-            UNLOCK: while (cursor._page.lock != null) {
+            UNLOCK: while (cursor.page.lock != null) {
                 descent.entries.forEach(entry => entry.release())
                 await page.lock
                 if ((cursor.index = cursor.indexOf(key, 0)) == null) {
