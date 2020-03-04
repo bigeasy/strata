@@ -473,8 +473,6 @@ class Journalist {
             append: this._filename()
         })
         pages[0].right = pages[1].items[0].key
-        // This doesn't seem right. Why is the key of a *record* set to null?
-        pages[1].items[0].key = null
         lineage.child.entry.heft = (pages[0].heft -= heft)
         const entry = this._hold(pages[1].id, pages[1])
         entries.push(entry)
