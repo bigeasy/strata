@@ -487,9 +487,9 @@ class Journalist {
     // calculate the new id before requesting your blocks, request two blocks.
 
     //
-    async _splitLeaf (key, lineage, entries) {
+    async _splitLeaf (key, child, parent, entries) {
         const blockId = this._blockId = increment(this._blockId)
-        const block = this._block(blockId, lineage.child.page.id)
+        const block = this._block(blockId, child.page.id)
         await block.enter.promise
         // Race is the wrong word, it's our synchronous time. We have to split
         // the page and then write them out. Anyone writing to this leaf has to
@@ -499,38 +499,38 @@ class Journalist {
         // Notice that all the page manipulation takes place before the first
         // write. Recall that the page manipulation is done to the page in
         // memory which is offical, the page writes are lagging.
-        const pages = [ lineage.child.page ]
+        const pages = [ child.page ]
         const length = pages[0].items.length
         const partition = Math.floor(length / 2)
-        const items = lineage.child.page.items.splice(partition)
+        const items = child.page.items.splice(partition)
         const heft = items.reduce((sum, item) => sum + item.heft, 0)
         pages.push({
             id: this._nextId(true),
             leaf: true,
             items: items,
-            right: lineage.child.page.right,
+            right: child.page.right,
             heft: heft,
             append: this._filename()
         })
         pages[0].right = pages[1].items[0].key
-        lineage.child.entry.heft = (pages[0].heft -= heft)
+        child.entry.heft = (pages[0].heft -= heft)
         const entry = this._hold(pages[1].id, pages[1])
         entries.push(entry)
         entry.heft = pages[1].heft
         const prepare = []
-        const splice = [ lineage.parent.index + 1, 0, {
+        const splice = [ parent.index + 1, 0, {
             key: pages[0].right,
             id: pages[1].id,
             heft: 0
         }]
-        lineage.parent.page.items.splice.apply(lineage.parent.page.items, splice)
+        parent.page.items.splice.apply(parent.page.items, splice)
         pages.forEach(function (page) {
             if (page.items.length >= this.leaf.split) {
-                this._housekeeping.add(page.items[0].key)
+                this._housekeeping.add(() => this._housekeeper(page.items[0].key))
             }
         }, this)
-        const writes = this._queue(lineage.child.page.id).writes.splice(0)
-        await this._writeLeaf(lineage.child.page.id, writes)
+        const writes = this._queue(child.page.id).writes.splice(0)
+        await this._writeLeaf(child.page.id, writes)
         // TODO Make header a nested object.
         prepare.push({
             method: 'stub',
@@ -562,7 +562,7 @@ class Journalist {
         pages[0].append = append
         const commit = new Commit(this)
         prepare.push({ method: 'commit' })
-        prepare.push(await commit.emplace(lineage.parent))
+        prepare.push(await commit.emplace(parent))
         await commit.write(prepare)
         delete this._dirty[key]
         // Pretty sure that the separate prepare and commit are merely because
@@ -574,11 +574,12 @@ class Journalist {
         await commit.commit()
         await commit.dispose()
         entries.forEach(entry => entry.release())
-        if (lineage.parent.page.items.length >= this.branch.split) {
-            if (lineage.parent.page.id == '0.0') {
+        if (parent.page.items.length >= this.branch.split) {
+            throw new Error
+            if (parent.page.id == '0.0') {
                 await this._drainRoot(key)
             } else {
-                await this._splitBranch(lineage.parent)
+                await this._splitBranch(parent)
             }
         }
     }
@@ -587,12 +588,12 @@ class Journalist {
         const entries = []
         const child = await this.search(key)
         entries.push.apply(entries, child.entries)
-        const parent = this._descend(key, child.level - 1, 0)
-        entries.push.apply(entries, parent.entries)
-        // TODO Remove this object, pass in both...
-        const lineage = { child, parent }
-        if (lineage.child.page.items.length >= this.leaf.split) {
-            await this._splitLeaf(key, lineage, entries)
+        if (child.page.items.length >= this.leaf.split) {
+            const parent = this._descend(key, child.level - 1, 0)
+            entries.push.apply(entries, parent.entries)
+            await this._splitLeaf(key, child, parent, entries)
+        } else {
+            entires.forEach(entry => entry.release())
         }
     }
 
