@@ -34,7 +34,7 @@ class Strata {
 
     async search (key) {
         DESCEND: for (;;) {
-            const descent = await this._journalist.descend(key, -1, 0)
+            const descent = await this._journalist.search(key)
             const cursor = new Cursor(this._journalist, descent, key)
             UNLOCK: while (cursor.page.lock != null) {
                 descent.entries.forEach(entry => entry.release())

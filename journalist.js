@@ -168,6 +168,46 @@ class Journalist {
         return this.cache.hold([ this.directory, id ], initial)
     }
 
+    _search (key) {
+        const descent = {
+            entries: [],
+            miss: null,
+            entry: null,
+            page: null,
+            keyed: null,
+            level: 0,
+            index: 0
+        }
+        let entry = null, page = null
+        descent.entries.push(entry = this._hold(-1, null))
+        for (;;) {
+            if (descent.index != 0) {
+                descent.keyed = {
+                    key: page.items[descent.index].key,
+                    level: descent.level
+                }
+            }
+            const id = entry.value.items[descent.index].id
+            descent.entries.push(entry = this._hold(id, null))
+            if (entry.value == null) {
+                descent.entries.pop().release()
+                return { miss: id, entries: descent.entries }
+            }
+            page = entry.value
+            descent.index = find(this.comparator, page, key, page.leaf ? page.ghosts : 1)
+            console.log(entry.value, descent.index)
+            if (page.leaf) {
+                break
+            } else if (descent.index < 0) {
+                descent.index = ~descent.index - 1
+            }
+            descent.level++
+        }
+        descent.entry = descent.entries[descent.entries.length - 1]
+        descent.page = descent.entry.value
+        return descent
+    }
+
     // TODO If `key` is `null` then just go left.
     _descend (key, level, fork) {
         const descent = {
@@ -228,10 +268,10 @@ class Journalist {
         return descent
     }
 
-    async descend (key, level, fork) {
+    async _decline (f) {
         let entries = []
         for (;;) {
-            const descent = this._descend(key, level, fork)
+            const descent = f()
             entries.forEach((entry) => entry.release())
             if (descent.miss == null) {
                 return descent
@@ -239,6 +279,14 @@ class Journalist {
             entries = descent.entries
             await this.load(descent.miss)
         }
+    }
+
+    async seek (key, level, fork) {
+        return this._decline(() => this._seek(key, level, fork))
+    }
+
+    async search (key) {
+        return this._decline(() => this._search(key))
     }
 
     async close () {
@@ -338,14 +386,6 @@ class Journalist {
             await block.exit.promise
             break
         }
-    }
-
-    async _getPageAndParent (key, level, fork, entries) {
-        const child = await this.descend(key, level, fork)
-        entries.push.apply(entries, child.entries)
-        const parent = this._descend(key, child.level - 1, 0)
-        entries.push.apply(entries, parent.entries)
-        return { child, parent }
     }
 
     _index (id) {
@@ -545,7 +585,12 @@ class Journalist {
 
     async _housekeeper (key) {
         const entries = []
-        const lineage = await this._getPageAndParent(key, -1, 0, entries)
+        const child = await this.search(key)
+        entries.push.apply(entries, child.entries)
+        const parent = this._descend(key, child.level - 1, 0)
+        entries.push.apply(entries, parent.entries)
+        // TODO Remove this object, pass in both...
+        const lineage = { child, parent }
         if (lineage.child.page.items.length >= this.leaf.split) {
             await this._splitLeaf(key, lineage, entries)
         }
