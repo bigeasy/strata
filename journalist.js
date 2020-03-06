@@ -218,6 +218,7 @@ class Journalist {
         }
         let entry = null, page = null
         entries.push(entry = this._hold(-1, null))
+        page = entry.value
         for (;;) {
             // You'll struggle to remember this, but it is true...
             if (descent.index != 0) {
@@ -240,18 +241,19 @@ class Journalist {
                 // level, but I don't reference the level, so it's probably fine
                 // here.
                 if (descent.keyed.key == key) {
-                    if (fork < 0) {
-                        if (descent.index-- == 0) {
+                    if (fork) {
+                        if (descent.index == 0) {
                             return null
                         }
-                        fork = 0
-                    } else if (fork > 0) {
-                        if (++descent.index == page.items.length) {
-                            return null
-                        }
-                        fork = 0
+                        // Go right down to the desired level.
+                        throw new Error
                     }
                 }
+            }
+
+            // You don't fork right. You can track the rightward key though.
+            if (descent.index + 1 < entry.value.items.length) {
+                descent.right = page.items[descent.index + 1].key
             }
 
             // We exit at the leaf, so this will always be a branch page.
