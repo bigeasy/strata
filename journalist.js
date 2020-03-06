@@ -168,45 +168,6 @@ class Journalist {
         return this.cache.hold([ this.directory, id ], initial)
     }
 
-    _search (key) {
-        const descent = {
-            entries: [],
-            miss: null,
-            entry: null,
-            page: null,
-            keyed: null,
-            level: 0,
-            index: 0
-        }
-        let entry = null, page = null
-        descent.entries.push(entry = this._hold(-1, null))
-        for (;;) {
-            if (descent.index != 0) {
-                descent.keyed = {
-                    key: page.items[descent.index].key,
-                    level: descent.level
-                }
-            }
-            const id = entry.value.items[descent.index].id
-            descent.entries.push(entry = this._hold(id, null))
-            if (entry.value == null) {
-                descent.entries.pop().release()
-                return { miss: id, entries: descent.entries }
-            }
-            page = entry.value
-            descent.index = find(this.comparator, page, key, page.leaf ? page.ghosts : 1)
-            if (page.leaf) {
-                break
-            } else if (descent.index < 0) {
-                descent.index = ~descent.index - 1
-            }
-            descent.level++
-        }
-        descent.entry = descent.entries[descent.entries.length - 1]
-        descent.page = descent.entry.value
-        return descent
-    }
-
     // TODO If `key` is `null` then just go left.
     _descend ({ key, level = -1, fork = 0 }) {
         const entries = [], descent = {
