@@ -195,7 +195,6 @@ class Journalist {
             }
             page = entry.value
             descent.index = find(this.comparator, page, key, page.leaf ? page.ghosts : 1)
-            console.log(entry.value, descent.index)
             if (page.leaf) {
                 break
             } else if (descent.index < 0) {
@@ -209,10 +208,8 @@ class Journalist {
     }
 
     // TODO If `key` is `null` then just go left.
-    _descend (key, level, fork) {
-        const descent = {
-            entries: [],
-            miss: null,
+    _descend ({ key, level = -1, fork = 0 }) {
+        const entries = [], descent = {
             entry: null,
             page: null,
             keyed: null,
@@ -220,52 +217,86 @@ class Journalist {
             index: 0
         }
         let entry = null, page = null
-        descent.entries.push(entry = this._hold(-1, null))
+        entries.push(entry = this._hold(-1, null))
         for (;;) {
+            // You'll struggle to remember this, but it is true...
             if (descent.index != 0) {
+                // The last key we visit is the key for the leaf page, if we're
+                // headed to a leaf. We don't have to have the exact leaf key,
+                // so if housekeeping is queued up in such a way that a leaf
+                // page in the queue is absorbed by a merge prior to its
+                // housekeeping inspection, the descent on that key is not going
+                // to cause a ruckus. Keys are not going to disappear on us when
+                // we're doing branch housekeeping.
                 descent.keyed = {
                     key: page.items[descent.index].key,
                     level: descent.level
                 }
+                // If we're trying to find siblings we're using an exact key
+                // that is definately above the level sought, we'll see it and
+                // then go left or right if there is a branch in that direction.
+                //
+                // TODO Earlier I had this at KILLROY below. And I adjust the
+                // level, but I don't reference the level, so it's probably fine
+                // here.
+                if (descent.keyed.key == key) {
+                    if (fork < 0) {
+                        if (descent.index-- == 0) {
+                            return null
+                        }
+                        fork = 0
+                    } else if (fork > 0) {
+                        if (++descent.index == page.items.length) {
+                            return null
+                        }
+                        fork = 0
+                    }
+                }
             }
+
+            // We exit at the leaf, so this will always be a branch page.
             const id = entry.value.items[descent.index].id
-            descent.entries.push(entry = this._hold(id, null))
+
+            // Attempt to hold the page from the cache, return the id of the
+            // page if we have a cache miss.
+            entries.push(entry = this._hold(id, null))
             if (entry.value == null) {
-                descent.entries.pop().remove()
-                descent.miss = id
-                return descent
+                entries.pop().remove()
+                return { miss: id, entries }
             }
+
+            // Binary search the page for the key.
             page = entry.value
-            // TODO Maybe page offset instead of ghosts, nah leave it so you remember it.
-            descent.index = find(this.comparator, page, key, page.leaf ? page.ghosts : 1)
+            const index = find(this.comparator, page, key, page.leaf ? page.ghosts : 1)
+
+            // If the page is a leaf, assert that we're looking for a leaf and
+            // return the leaf page.
             if (page.leaf) {
+                descent.index = index
                 assert.equal(level, -1, 'could not find branch')
                 break
-            } else if (descent.index < 0) {
-                // On a branch, unless we hit the key exactly, we're
-                // pointing at the insertion point which is right after the
-                // branching we're supposed to decend, so back it up one
-                // unless it's a bullseye.
-                descent.index = ~descent.index - 1
-                if (level == descent.level) {
-                    break
-                }
-            } else if (fork != 0) {
-                if (fork < 0) {
-                    if (descent.index-- == 0) {
-                        return null
-                    }
-                } else {
-                    if (++descent.index == page.items.length) {
-                        return null
-                    }
-                }
             }
+
+            // If the index is less than zero we didn't find the exact key, so
+            // we're looking at the bitwise not of the insertion point which is
+            // right after the branch we're supposed to descend, so back it up
+            // one.
+            descent.index = index < 0 ? ~index - 1 : index
+
+            // If we're trying to reach branch and we've hit the level, let's
+            // assert that we hit the key exactly, or else that we're on the
+            // left most path where all the keys are null.
+            if (level == descent.level) {
+                assert(descent.index == 0 || index > 0, 'inexact branch key')
+                break
+            }
+
+            // KILLROY was here.
+
             descent.level++
         }
-        descent.entry = descent.entries[descent.entries.length - 1]
-        descent.page = descent.entry.value
-        return descent
+        entry = entries[entries.length - 1]
+        return { ...descent, entries, entry, page: entry.value }
     }
 
     async _decline (f) {
@@ -285,8 +316,8 @@ class Journalist {
         return this._decline(() => this._seek(key, level, fork))
     }
 
-    async search (key) {
-        return this._decline(() => this._search(key))
+    search (key) {
+        return this._decline(() => this._descend({ key }))
     }
 
     async close () {
@@ -589,7 +620,7 @@ class Journalist {
         const child = await this.search(key)
         entries.push.apply(entries, child.entries)
         if (child.page.items.length >= this.leaf.split) {
-            const parent = this._descend(key, child.level - 1, 0)
+            const parent = this._descend({ key, level: child.level - 1 })
             entries.push.apply(entries, parent.entries)
             await this._splitLeaf(key, child, parent, entries)
         } else {
