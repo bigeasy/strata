@@ -275,10 +275,6 @@ class Journalist {
         }
     }
 
-    async seek (key, level, fork) {
-        return this._decline(() => this._seek(key, level, fork))
-    }
-
     search (key) {
         return this._decline(() => this._descend({ key }))
     }
