@@ -478,6 +478,7 @@ class Journalist {
 
     //
     async _splitLeaf (key, child, parent, entries) {
+        // TODO Add right page to block.
         const blockId = this._blockId = increment(this._blockId)
         const block = this._block(blockId, child.page.id)
         await block.enter.promise
@@ -489,72 +490,109 @@ class Journalist {
         // Notice that all the page manipulation takes place before the first
         // write. Recall that the page manipulation is done to the page in
         // memory which is offical, the page writes are lagging.
-        const pages = [ child.page ]
-        const length = pages[0].items.length
+
+        // Split page creating a right page.
+        const left = child.page
+        const length = left.items.length
         const partition = Math.floor(length / 2)
         const items = child.page.items.splice(partition)
         const heft = items.reduce((sum, item) => sum + item.heft, 0)
-        pages.push({
+        const right = {
             id: this._nextId(true),
             leaf: true,
             items: items,
             right: child.page.right,
             heft: heft,
             append: this._filename()
-        })
-        pages[0].right = pages[1].items[0].key
-        child.entry.heft = (pages[0].heft -= heft)
-        const entry = this._hold(pages[1].id, pages[1])
+        }
+
+        // Set the right key of the left page.
+        left.right = right.items[0].key
+
+        // Set the heft of the left page and entry.
+        child.entry.heft = (left.heft -= heft)
+
+        // Create an entry for the right page.
+        const entry = this._hold(right.id, right)
         entries.push(entry)
-        entry.heft = pages[1].heft
-        const prepare = []
-        const splice = [ parent.index + 1, 0, {
-            key: pages[0].right,
-            id: pages[1].id,
+        entry.heft = right.heft
+
+        // Insert a reference to the right page in the parent branch page.
+        parent.page.items.splice(parent.index + 1, 0, {
+            key: right.items[0].key,
+            id: right.id,
             heft: 0
-        }]
-        parent.page.items.splice.apply(parent.page.items, splice)
-        pages.forEach(function (page) {
+        })
+
+        // If any of the pages is still larger than the split threshhold, check
+        // the split again.
+        for (const page of [ right, left ]) {
             if (page.items.length >= this.leaf.split) {
                 this._housekeeping.add(() => this._housekeeper(page.items[0].key))
             }
-        }, this)
+        }
+
+        // Write any queued writes, they would have been in memory, in the page
+        // that was split above. Once we await, items can be inserte or removed
+        // from the page in memory. Our synchronous operations are over.
         const writes = this._queue(child.page.id).writes.splice(0)
         await this._writeLeaf(child.page.id, writes)
+
         // TODO Make header a nested object.
+
+        // Create our journaled tree alterations.
+        const commit = new Commit(this)
+
+        const prepare = []
+
+        // Record the split of the right page in a new stub.
         prepare.push({
             method: 'stub',
-            page: { id: pages[1].id, append: pages[1].append },
+            page: { id: right.id, append: right.append },
             records: [{
                 method: 'load',
-                id: pages[0].id,
-                append: pages[0].append
+                id: left.id,
+                append: left.append
             }, {
                 method: 'slice',
                 index: partition,
                 length: length,
             }]
         })
+
+        // Record the split of the left page in a new stub, for which we create
+        // a new append file.
         const append = this._filename()
         prepare.push({
             method: 'stub',
-            page: { id: pages[0].id, append },
+            page: { id: left.id, append },
             records: [{
                 method: 'load',
-                id: pages[0].id,
-                append: pages[0].append
+                id: left.id,
+                append: left.append
             }, {
                 method: 'slice',
                 index: 0,
                 length: partition
             }]
         })
-        pages[0].append = append
-        const commit = new Commit(this)
+        left.append = append
+
+        // Commit the stubs before we commit the updated branch.
         prepare.push({ method: 'commit' })
+
+        // Write the new branch to a temporary file.
         prepare.push(await commit.emplace(parent))
+
+        // Record the commit.
         await commit.write(prepare)
+
+        // TODO If we where to use `_dirty` we'd find that we where unable to
+        // record as dirty up above. Can we track `_dirty` by the append
+        // idenifier? Can't we just delete this sooner, why am I deleting it
+        // here?
         delete this._dirty[key]
+
         // Pretty sure that the separate prepare and commit are merely because
         // we want to release the lock on the leaf as soon as possible.
         await commit.prepare()
