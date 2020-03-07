@@ -275,7 +275,7 @@ class Journalist {
         }
     }
 
-    search (key) {
+    descend (key) {
         return this._decline(() => this._descend({ key }))
     }
 
@@ -576,7 +576,7 @@ class Journalist {
 
     async _housekeeper (key) {
         const entries = []
-        const child = await this.search(key)
+        const child = await this._descend({ key })
         entries.push.apply(entries, child.entries)
         if (child.page.items.length >= this.leaf.split) {
             const parent = this._descend({ key, level: child.level - 1 })
