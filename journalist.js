@@ -41,11 +41,11 @@ class Journalist {
         this._recorder = recorder(() => '0')
         this._root = null
         this._operationId = 0xffffffff
-        this._appenders = [ new Queue ]
+        this._appenders = [ new Queue({ concurrency: 1 }) ]
         this._queues = {}
         this._blockId = 0xffffffff
         this._blocks = [{}]
-        this._housekeeping = new Queue
+        this._housekeeping = new Queue({ concurrency: 1 })
         this._dirty = {}
         this._id = 0
     }
