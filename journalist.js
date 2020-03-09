@@ -262,10 +262,10 @@ class Journalist {
         return { ...descent, entries, entry, page: entry.value }
     }
 
-    async _decline (f) {
+    async descend (key) {
         let entries = []
         for (;;) {
-            const descent = f()
+            const descent = this._descend({ key })
             entries.forEach((entry) => entry.release())
             if (descent.miss == null) {
                 return descent
@@ -273,10 +273,6 @@ class Journalist {
             entries = descent.entries
             await this.load(descent.miss)
         }
-    }
-
-    descend (key) {
-        return this._decline(() => this._descend({ key }))
     }
 
     async close () {
