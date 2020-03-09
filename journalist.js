@@ -262,10 +262,10 @@ class Journalist {
         return { ...descent, entries, entry, page: entry.value }
     }
 
-    async descend (key) {
+    async descend (query) {
         let entries = []
         for (;;) {
-            const descent = this._descend({ key })
+            const descent = this._descend(query)
             entries.forEach((entry) => entry.release())
             if (descent.miss == null) {
                 return descent
@@ -610,10 +610,10 @@ class Journalist {
 
     async _housekeeper (key) {
         const entries = []
-        const child = await this._descend({ key })
+        const child = await this.descend({ key })
         entries.push.apply(entries, child.entries)
         if (child.page.items.length >= this.leaf.split) {
-            const parent = this._descend({ key, level: child.level - 1 })
+            const parent = await this.descend({ key, level: child.level - 1 })
             entries.push.apply(entries, parent.entries)
             await this._splitLeaf(key, child, parent, entries)
         } else {
