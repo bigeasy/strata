@@ -94,10 +94,6 @@ class Commit {
     // Oh, I remember. Branch heft is the buffer length, and we won't know the
     // buffer length until we serialize the record.
 
-    //
-    async _emplace (page, hash) {
-    }
-
     // append is the Strata instance plus an ever increasing integer for for
     // that instance joined by a dot.
 
