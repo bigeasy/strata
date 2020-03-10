@@ -208,7 +208,7 @@ class Commit {
                     // based on stubs as a linked list. Suppose you can put down
                     // a stub, the rewrite what it was based on, so all pages
                     // after the first split become linked lists.
-                    const page = await this._journalist.read(operation[1][0])
+                    const { page } = await this._journalist.read(operation[1][0])
                     page.append = operation[1][1]
                     const right = {
                         id: operation[2][0],
@@ -220,7 +220,7 @@ class Commit {
                 }
                 break
             case 'splice': {
-                    const page = await this._journalist.read(operation.id)
+                    const { page } = await this._journalist.read(operation.id)
                     page.items.splice.apply(page.items, operation.splice)
                     await this._emplace(page)
                 }
@@ -232,7 +232,7 @@ class Commit {
                     // Interesting. I'm straight up reading and writing the
                     // files, which makes sense I suppose. Is this not a problem
                     // for the leaves, though?
-                    const root = this._journalist.read('0.0')
+                    const { root } = this._journalist.read('0.0')
                     const right = {
                         id: operation[2],
                         items: root.splice(operation[1])
@@ -255,8 +255,8 @@ class Commit {
                 }
                 break
             case 'fill': {
-                    const root = await this._journalist.read('0.0')
-                    const page = await this._journalist.read(items[0].id)
+                    const { root } = await this._journalist.read('0.0')
+                    const { page } = await this._journalist.read(items[0].id)
                     root.items = page.items
                     await this._emplace(root)
                     await this._prepare([ 'unlink', path.join('pages', page.id) ])

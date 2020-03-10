@@ -96,7 +96,7 @@ class Journalist {
     }
 
     async _read (id, append) {
-        const page = { id, leaf: true, items: [], right: null, ghosts: 0, heft: 0, append }
+        const page = { id, leaf: true, items: [], right: null, ghosts: 0, append }
         const player = new Player(function () { return '0' })
         const directory = path.resolve(this.directory, 'pages', String(id))
         const filename = path.join(directory, append)
@@ -111,7 +111,6 @@ class Journalist {
                 case 'load': {
                         const loaded = await this._read(entry.header.id, entry.header.append)
                         page.items = loaded.items
-                        page.heft = loaded.heft
                         page.right = loaded.right
                     }
                     break
@@ -120,7 +119,6 @@ class Journalist {
                             page.right = page.items[entry.header.length].key
                         }
                         page.items = page.items.slice(entry.header.index, entry.header.length)
-                        page.heft = page.items.reduce((sum, record) => sum + record.heft, 0)
                     }
                     break
                 case 'insert': {
@@ -129,13 +127,13 @@ class Journalist {
                             value: entry.body,
                             heft: entry.sizes[0] + entry.sizes[1]
                         })
-                        page.heft += entry.sizes[0] + entry.sizes[1]
                     }
                     break
                 }
             }
         }
-        return page
+        const heft = page.items.reduce((sum, record) => sum + record.heft, 0)
+        return { page, heft }
     }
 
     async read (id) {
@@ -150,8 +148,7 @@ class Journalist {
             id, actual, expected: hash
         })
         const items = JSON.parse(buffer.toString())
-        const heft = buffer.length
-        return { id, leaf, items, offset: 1, heft, hash }
+        return { page: { id, leaf, items, offset: 1, hash }, heft: buffer.length }
     }
 
     // What is going on here? Why is there an `entry.heft` and an
@@ -162,8 +159,9 @@ class Journalist {
         const entry = this._hold(id, null)
         try {
             if (entry.value == null) {
-                entry.value = await this.read(id)
-                entry.heft = entry.value.heft
+                const { page, heft } = await this.read(id)
+                entry.value = page
+                entry.heft = heft
             }
         } finally {
             entry.release()
