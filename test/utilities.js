@@ -27,11 +27,11 @@ exports.vivify = async function (directory) {
             continue
         }
         const dir = await fs.readdir(path.resolve(directory, 'pages', file))
-        const append = dir.filter(function (file) {
-            return /^\d+\.\d+(?:\.[0-9a-f]+)?$/.test(file)
-        }).sort(appendable).pop()
-        const lines = (await fs.readFile(path.resolve(pages, file, append), 'utf8')).split(/\n/)
         if (+file.split('.')[1] % 2 == 1) {
+            const append = dir.filter(function (file) {
+                return /^\d+\.\d+(?:\.[0-9a-f]+)?$/.test(file)
+            }).sort(appendable).pop()
+            const lines = (await fs.readFile(path.resolve(pages, file, append), 'utf8')).split(/\n/)
             lines.pop()
             const entries = lines.map(line => JSON.parse(line))
             const records = []
@@ -51,6 +51,10 @@ exports.vivify = async function (directory) {
             }
             vivified[file] = records
         } else {
+            const hash = dir.filter(function (file) {
+                return /^[0-9a-f]+$/.test(file)
+            }).pop()
+            const lines = (await fs.readFile(path.resolve(pages, file, hash), 'utf8')).split(/\n/)
             vivified[file] = JSON.parse(lines[0]).map(entry => [ entry.id, entry.key ])
         }
     }
@@ -67,7 +71,7 @@ exports.serialize = async function (directory, files) {
                 return { id: record[0], key: record[1] }
             })))
             const hash = fnv(buffer)
-            const file = path.resolve(directory, 'pages', id, `0.0.${hash}`)
+            const file = path.resolve(directory, 'pages', id, hash)
             await fs.writeFile(file, buffer)
         } else {
             const writes = files[id].map((record, index) => {

@@ -130,13 +130,12 @@ class Commit {
         const buffer = Buffer.from(JSON.stringify(page.items))
         const hash = fnv(buffer)
         entry.heft = buffer.length
-        const filename = `${page.append}.${hash}`
-        await fs.writeFile(path.join(this._commit, `${page.id}-${filename}`), buffer)
-        const from = path.join('commit', `${page.id}-${filename}`)
-        const to = path.join('pages', page.id, filename)
+        await fs.writeFile(path.join(this._commit, `${page.id}-${hash}`), buffer)
+        const from = path.join('commit', `${page.id}-${hash}`)
+        const to = path.join('pages', page.id, hash)
         return {
             method: 'emplace',
-            page: { id: page.id, append: page.append },
+            page: { id: page.id, hash: page.hash },
             hash
         }
     }
@@ -193,10 +192,9 @@ class Commit {
                 break
             case 'emplace': {
                     const { page, hash } = operation
-                    const unlink = path.join('pages', page.id, `${page.append}.${page.hash}`)
-                    const filename = `${page.append}.${hash}`
-                    const from = path.join('commit', `${page.id}-${filename}`)
-                    const to = path.join('pages', page.id, filename)
+                    const unlink = path.join('pages', page.id, page.hash)
+                    const from = path.join('commit', `${page.id}-${hash}`)
+                    const to = path.join('pages', page.id, hash)
                     await this._prepare([ 'rename', from, to, hash ])
                     await this._prepare([ 'unlink', unlink ])
                 }

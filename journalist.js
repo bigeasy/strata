@@ -63,7 +63,7 @@ class Journalist {
         await fs.mkdir(path.resolve(pages, '0.0'), { recursive: true })
         const buffer = Buffer.from(JSON.stringify([{ id: '0.1', key: null }]))
         const hash = fnv(buffer)
-        await fs.writeFile(path.resolve(pages, '0.0', `0.0.${hash}`), buffer)
+        await fs.writeFile(path.resolve(pages, '0.0', hash), buffer)
         await fs.mkdir(path.resolve(pages, '0.1'), { recursive: true })
         await fs.writeFile(path.resolve(pages, '0.1', '0.0'), Buffer.alloc(0))
     }
@@ -82,11 +82,17 @@ class Journalist {
         }
     }
 
-    async appendable (id, leaf) {
-        const regex = leaf ? /^\d+\.\d+$/ : /^\d+\.\d+\.[a-z0-9]+$/
+    async _hashable (id) {
+        const regex = /^[a-z0-9]+$/
         const dir = await fs.readdir(path.join(this.directory, 'pages', id))
-        const append = dir.filter(file => regex.test(file)).sort(appendable).pop()
-        return leaf ? append : /^(\d+.\d+)\.([0-9a-f]+)$/.exec(append).slice(1, 3)
+        const files = dir.filter(file => regex.test(file))
+        assert.equal(files.length, 1, 'multiple branch page files')
+        return files.pop()
+    }
+
+    async _appendable (id) {
+        const dir = await fs.readdir(path.join(this.directory, 'pages', id))
+        return dir.filter(file => /^\d+\.\d+$/.test(file)).sort(appendable).pop()
     }
 
     async _read (id, append) {
@@ -135,17 +141,17 @@ class Journalist {
     async read (id) {
         const leaf = +id.split('.')[1] % 2 == 1
         if (leaf) {
-            return this._read(id, await this.appendable(id, true))
+            return this._read(id, await this._appendable(id))
         }
-        const [ append, hash ] = await this.appendable(id, false)
-        const buffer = await fs.readFile(this._path('pages', id, `${append}.${hash}`))
+        const hash = await this._hashable(id)
+        const buffer = await fs.readFile(this._path('pages', id, hash))
         const actual = fnv(buffer)
         Strata.Error.assert(actual == hash, 'bad branch hash', {
-            id, append, actual, expected: hash
+            id, actual, expected: hash
         })
         const items = JSON.parse(buffer.toString())
         const heft = buffer.length
-        return { id, leaf, items, offset: 1, heft, append, hash }
+        return { id, leaf, items, offset: 1, heft, hash }
     }
 
     // What is going on here? Why is there an `entry.heft` and an
@@ -287,7 +293,7 @@ class Journalist {
     }
 
     async _writeLeaf (id, writes) {
-        const append = await this.appendable(id, true)
+        const append = await this._appendable(id)
         const recorder = this._recorder
         const entry = this._hold(id, null)
         const buffers = writes.map(write => {
