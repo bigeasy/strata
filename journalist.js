@@ -109,7 +109,7 @@ class Journalist {
                     }
                     break
                 case 'load': {
-                        const loaded = await this._read(entry.header.id, entry.header.append)
+                        const { page: loaded } = await this._read(entry.header.id, entry.header.append)
                         page.items = loaded.items
                         page.right = loaded.right
                     }
