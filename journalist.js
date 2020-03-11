@@ -173,17 +173,10 @@ class Journalist {
     }
 
     // TODO If `key` is `null` then just go left.
-    _descend ({ key, level = -1, fork = 0 }) {
-        const entries = [], descent = {
-            entry: null,
-            page: null,
-            keyed: null,
-            level: 0,
-            index: 0
-        }
-        let entry = null, page = null
+    _descend (entries, { key, level = -1, fork = 0 }) {
+        const descent = { miss: null, keyed: null, level: 0, index: 0 }
+        let entry = null
         entries.push(entry = this._hold(-1, null))
-        page = entry.value
         for (;;) {
             // You'll struggle to remember this, but it is true...
             if (descent.index != 0) {
@@ -195,7 +188,7 @@ class Journalist {
                 // to cause a ruckus. Keys are not going to disappear on us when
                 // we're doing branch housekeeping.
                 descent.keyed = {
-                    key: page.items[descent.index].key,
+                    key: entry.value.items[descent.index].key,
                     level: descent.level
                 }
                 // If we're trying to find siblings we're using an exact key
@@ -218,7 +211,7 @@ class Journalist {
 
             // You don't fork right. You can track the rightward key though.
             if (descent.index + 1 < entry.value.items.length) {
-                descent.right = page.items[descent.index + 1].key
+                descent.right = entry.value.items[descent.index + 1].key
             }
 
             // We exit at the leaf, so this will always be a branch page.
@@ -229,16 +222,16 @@ class Journalist {
             entries.push(entry = this._hold(id, null))
             if (entry.value == null) {
                 entries.pop().remove()
-                return { miss: id, entries }
+                return { miss: id }
             }
 
             // Binary search the page for the key.
-            page = entry.value
-            const index = find(this.comparator, page, key, page.leaf ? page.ghosts : 1)
+            const offset = entry.value.leaf ? entry.value.ghosts : 1
+            const index = find(this.comparator, entry.value, key, offset)
 
             // If the page is a leaf, assert that we're looking for a leaf and
             // return the leaf page.
-            if (page.leaf) {
+            if (entry.value.leaf) {
                 descent.index = index
                 assert.equal(level, -1, 'could not find branch')
                 break
@@ -262,19 +255,27 @@ class Journalist {
 
             descent.level++
         }
-        entry = entries[entries.length - 1]
-        return { ...descent, entries, entry, page: entry.value }
+        return descent
     }
 
+    // We hold onto the entries array for the descent to prevent the unlikely
+    // race condition where we cannot descend because we have to load a page,
+    // but while we're loading a page another page in the descent unloads.
+    //
+    // Conceivably, this could continue indefinitely.
+
+    //
     async descend (query) {
-        let entries = []
+        const entries = [[]]
         for (;;) {
-            const descent = this._descend(query)
-            entries.forEach((entry) => entry.release())
+            entries.push([])
+            const descent = this._descend(entries[1], query)
+            entries.shift().forEach((entry) => entry.release())
             if (descent.miss == null) {
-                return descent
+                const entry = entries[0].pop()
+                entries.shift().forEach((entry) => entry.release())
+                return { ...descent, entry }
             }
-            entries = descent.entries
             await this.load(descent.miss)
         }
     }
@@ -480,7 +481,7 @@ class Journalist {
     async _splitLeaf (key, child, parent, entries) {
         // TODO Add right page to block.
         const blockId = this._blockId = increment(this._blockId)
-        const block = this._block(blockId, child.page.id)
+        const block = this._block(blockId, child.entry.value.id)
         await block.enter.promise
         // Race is the wrong word, it's our synchronous time. We have to split
         // the page and then write them out. Anyone writing to this leaf has to
@@ -492,16 +493,16 @@ class Journalist {
         // memory which is offical, the page writes are lagging.
 
         // Split page creating a right page.
-        const left = child.page
+        const left = child.entry.value
         const length = left.items.length
         const partition = Math.floor(length / 2)
-        const items = child.page.items.splice(partition)
+        const items = left.items.splice(partition)
         const heft = items.reduce((sum, item) => sum + item.heft, 0)
         const right = {
             id: this._nextId(true),
             leaf: true,
             items: items,
-            right: child.page.right,
+            right: left.right,
             heft: heft,
             append: this._filename()
         }
@@ -518,7 +519,7 @@ class Journalist {
         entry.heft = right.heft
 
         // Insert a reference to the right page in the parent branch page.
-        parent.page.items.splice(parent.index + 1, 0, {
+        parent.entry.value.items.splice(parent.index + 1, 0, {
             key: right.items[0].key,
             id: right.id,
             heft: 0
@@ -535,8 +536,8 @@ class Journalist {
         // Write any queued writes, they would have been in memory, in the page
         // that was split above. Once we await, items can be inserte or removed
         // from the page in memory. Our synchronous operations are over.
-        const writes = this._queue(child.page.id).writes.splice(0)
-        await this._writeLeaf(child.page.id, writes)
+        const writes = this._queue(left.id).writes.splice(0)
+        await this._writeLeaf(left.id, writes)
 
         // TODO Make header a nested object.
 
@@ -582,7 +583,7 @@ class Journalist {
         prepare.push({ method: 'commit' })
 
         // Write the new branch to a temporary file.
-        prepare.push(await commit.emplace(parent))
+        prepare.push(await commit.emplace(parent.entry))
 
         // Record the commit.
         await commit.write(prepare)
@@ -602,7 +603,7 @@ class Journalist {
         await commit.commit()
         await commit.dispose()
         entries.forEach(entry => entry.release())
-        if (parent.page.items.length >= this.branch.split) {
+        if (parent.entry.value.items.length >= this.branch.split) {
             throw new Error
             if (parent.page.id == '0.0') {
                 await this._drainRoot(key)
@@ -616,7 +617,7 @@ class Journalist {
         const entries = []
         const child = await this.descend({ key })
         entries.push.apply(entries, child.entries)
-        if (child.page.items.length >= this.leaf.split) {
+        if (child.entry.value.items.length >= this.leaf.split) {
             const parent = await this.descend({ key, level: child.level - 1 })
             entries.push.apply(entries, parent.entries)
             await this._splitLeaf(key, child, parent, entries)

@@ -5,9 +5,8 @@ const find = require('./find')
 
 class Cursor {
     constructor (journalist, descent, key) {
-        this._entry = descent.entries.pop()
+        this._entry = descent.entry
         this.page = this._entry.value
-        descent.entries.forEach(entry => entry.release())
         this.found = descent.index >= 0
         this.sought = key
         this.index = descent.index < 0 ? ~descent.index : descent.index

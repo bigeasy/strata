@@ -121,17 +121,17 @@ class Commit {
     // okay, I'm not going to fuss about it.
 
     //
-    async emplace ({ page, entry = {} }) {
+    async emplace (entry) {
         await fs.mkdir(this._commit, { recursive: true })
-        const buffer = Buffer.from(JSON.stringify(page.items))
+        const buffer = Buffer.from(JSON.stringify(entry.value.items))
         const hash = fnv(buffer)
         entry.heft = buffer.length
-        await fs.writeFile(path.join(this._commit, `${page.id}-${hash}`), buffer)
-        const from = path.join('commit', `${page.id}-${hash}`)
-        const to = path.join('pages', page.id, hash)
+        await fs.writeFile(path.join(this._commit, `${entry.value.id}-${hash}`), buffer)
+        const from = path.join('commit', `${entry.value.id}-${hash}`)
+        const to = path.join('pages', entry.value.id, hash)
         return {
             method: 'emplace',
-            page: { id: page.id, hash: page.hash },
+            page: { id: entry.value.id, hash: entry.value.hash },
             hash
         }
     }
