@@ -174,7 +174,7 @@ class Journalist {
 
     // TODO If `key` is `null` then just go left.
     _descend (entries, { key, level = -1, fork = 0 }) {
-        const descent = { miss: null, keyed: null, level: 0, index: 0 }
+        const descent = { miss: null, keyed: null, level: 0, index: 0, entry: null }
         let entry = null
         entries.push(entry = this._hold(-1, null))
         for (;;) {
@@ -272,9 +272,9 @@ class Journalist {
             const descent = this._descend(entries[1], query)
             entries.shift().forEach((entry) => entry.release())
             if (descent.miss == null) {
-                const entry = entries[0].pop()
+                descent.entry = entries[0].pop()
                 entries.shift().forEach((entry) => entry.release())
-                return { ...descent, entry }
+                return descent
             }
             await this.load(descent.miss)
         }
