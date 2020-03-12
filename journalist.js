@@ -148,7 +148,7 @@ class Journalist {
             id, actual, expected: hash
         })
         const items = JSON.parse(buffer.toString())
-        return { page: { id, leaf, items, offset: 1, hash }, heft: buffer.length }
+        return { page: { id, leaf, items, hash }, heft: buffer.length }
     }
 
     // What is going on here? Why is there an `entry.heft` and an
