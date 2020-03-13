@@ -37,7 +37,7 @@ class Journalist {
         this.cache = options.cache
         this.instance = 0
         this.directory = options.directory
-        this.comparator = options.comparator || ascension([ String ], (value) => value)
+        this.comparator = options.comparator || ascension([ String ], (value) => [ value ])
         this._recorder = recorder(() => '0')
         this._root = null
         this._operationId = 0xffffffff
