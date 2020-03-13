@@ -157,15 +157,12 @@ class Journalist {
     //
     async load (id) {
         const entry = this._hold(id, null)
-        try {
-            if (entry.value == null) {
-                const { page, heft } = await this.read(id)
-                entry.value = page
-                entry.heft = heft
-            }
-        } finally {
-            entry.release()
+        if (entry.value == null) {
+            const { page, heft } = await this.read(id)
+            entry.value = page
+            entry.heft = heft
         }
+        return entry
     }
 
     _hold (id, initial) {
@@ -276,7 +273,7 @@ class Journalist {
                 entries.shift().forEach((entry) => entry.release())
                 return descent
             }
-            await this.load(descent.miss)
+            (await this.load(descent.miss)).release()
         }
     }
 
