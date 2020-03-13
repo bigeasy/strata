@@ -14,6 +14,13 @@ const Future = require('prospective/future')
 const Commit = require('./commit')
 const fnv = require('./fnv')
 
+function traceIf (condition) {
+    if (condition) return function (...vargs) {
+        console.log.apply(console, vargs)
+    }
+    return function () {}
+}
+
 const appendable = require('./appendable')
 
 const Strata = { Error: require('./error') }
@@ -86,7 +93,7 @@ class Journalist {
         const regex = /^[a-z0-9]+$/
         const dir = await fs.readdir(path.join(this.directory, 'pages', id))
         const files = dir.filter(file => regex.test(file))
-        assert.equal(files.length, 1, 'multiple branch page files')
+        assert.equal(files.length, 1, `multiple branch page files: ${id}, ${files}`)
         return files.pop()
     }
 
@@ -436,35 +443,51 @@ class Journalist {
 
     //
     async _drainRoot (key) {
-        const commit = new Commit(this)
-        const root = await this.descend(key, 0, 0)
-        const partition = Math.floor(root.items.length / 2)
-        const right = {
-            id: this._nextId(false),
-            offset: 1,
-            heft: 0,
-            items: root.items.slice(partition),
-            append: null
-        }
-        const left = {
-            id: this._nextId(false),
-            offset: 1,
-            heft: 0,
-            items: root.items.slice(partition),
-            append: null
-        }
-        const leftId = this._nextId(leaf)
-        const rightId = this._nextId(leaf)
-        // Yeah, I want these to be objects.
-        prepare.push([ 'drain', partition, leftId, rightId ])
-        // Okay. I need a new page of some kind.
-        root.items = [{
+        const entries = []
+        const root = await this.descend({ key, level: 0 })
+        entries.push(root)
+        const partition = Math.floor(root.entry.value.items.length / 2)
+        // TODO Print `root.page.items` and see that heft is wrong in the items.
+        // Why is it in the items and why is it wrong? Does it matter?
+        const leftId = this._nextId(false)
+        const left = this._hold(leftId, {
             id: leftId,
+            offset: 1,
+            items: root.entry.value.items.slice(0, partition),
+            hash: null
+        })
+        entries.push(left)
+        const rightId = this._nextId(false)
+        const right = this._hold(rightId, {
+            id: rightId,
+            offset: 1,
+            items: root.entry.value.items.slice(partition),
+            hash: null
+        })
+        entries.push(right)
+        root.entry.value.items = [{
+            id: left.value.id,
             key: null
         }, {
-            id: rightId,
-            key: right.items[0].key
+            id: right.value.id,
+            key: right.value.items[0].key
         }]
+        right.value.items[0].key = null
+        const commit = new Commit(this)
+        const prepare = []
+        // Write the new branch to a temporary file.
+        prepare.push(await commit.emplace(right))
+        prepare.push(await commit.emplace(left))
+        prepare.push(await commit.emplace(root.entry))
+        // Record the commit.
+        await commit.write(prepare)
+        await commit.prepare()
+        await commit.commit()
+    }
+
+    _descentify (page, appendable = false) {
+        const entry = this._hold(page.id, page)
+        return { entry, entries: [ entry ], append: null }
     }
 
     // TODO We need to block writes to the new page as well. Once we go async
@@ -601,8 +624,7 @@ class Journalist {
         await commit.dispose()
         entries.forEach(entry => entry.release())
         if (parent.entry.value.items.length >= this.branch.split) {
-            throw new Error
-            if (parent.page.id == '0.0') {
+            if (parent.entry.value.id == '0.0') {
                 await this._drainRoot(key)
             } else {
                 await this._splitBranch(parent)
@@ -610,6 +632,7 @@ class Journalist {
         }
     }
 
+    // TODO Must wait for housekeeping to finish before closing.
     async _housekeeper (key) {
         const entries = []
         const child = await this.descend({ key })
@@ -619,7 +642,7 @@ class Journalist {
             entries.push.apply(entries, parent.entries)
             await this._splitLeaf(key, child, parent, entries)
         } else {
-            entires.forEach(entry => entry.release())
+            entries.forEach(entry => entry.release())
         }
     }
 
