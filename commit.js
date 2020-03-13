@@ -188,11 +188,15 @@ class Commit {
                 break
             case 'emplace': {
                     const { page, hash } = operation
-                    const unlink = path.join('pages', page.id, page.hash)
                     const from = path.join('commit', `${page.id}-${hash}`)
                     const to = path.join('pages', page.id, hash)
                     await this._prepare([ 'rename', from, to, hash ])
-                    await this._prepare([ 'unlink', unlink ])
+                    if (page.hash !== null) {
+                        await this._prepare([ 'unlink', path.join('pages', page.id, page.hash) ])
+                    }
+                    const entry = await this._journalist.load(page.id)
+                    entry.value.hash = hash
+                    entry.release()
                 }
                 break
             case 'split': {
