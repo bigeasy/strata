@@ -1,4 +1,6 @@
 require('proof')(1, async (okay) => {
+    const Destructible = require('destructible')
+    const destructible = new Destructible('insert.t')
     const Strata = require('../strata')
     const Cache = require('../cache')
     const utilities = require('./utilities')
@@ -7,7 +9,7 @@ require('proof')(1, async (okay) => {
     const fs = require('fs').promises
     await utilities.reset(directory)
     const cache = new Cache
-    const strata = new Strata({ directory, cache })
+    const strata = new Strata(destructible.durable('strata'), { directory, cache })
     await strata.create()
     const cursor = (await strata.search('a')).get()
     cursor.insert('a', 'a', cursor.index)
@@ -23,4 +25,5 @@ require('proof')(1, async (okay) => {
             [ 'insert', 1, 'b' ]
         ]
     }, 'inserted')
+    await destructible.destructed
 })

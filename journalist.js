@@ -14,6 +14,9 @@ const Future = require('prospective/future')
 const Commit = require('./commit')
 const fnv = require('./fnv')
 
+const Turnstile = require('turnstile')
+Turnstile.Queue = require('turnstile/queue')
+
 function traceIf (condition) {
     if (condition) return function (...vargs) {
         console.log.apply(console, vargs)
@@ -30,7 +33,7 @@ function increment (value) {
 }
 
 class Journalist {
-    constructor (options) {
+    constructor (destructible, options) {
         const leaf = coalesece(options.leaf, {})
         this.leaf = {
             split: coalesece(leaf.split, 5),
@@ -52,7 +55,7 @@ class Journalist {
         this._queues = {}
         this._blockId = 0xffffffff
         this._blocks = [{}]
-        this._housekeeping = new Queue({ concurrency: 1 })
+        this._housekeeping = new Turnstile.Queue(new Turnstile(destructible.durable('housekeeper')), this._housekeeper, this)
         this._dirty = {}
         this._id = 0
     }
@@ -286,6 +289,7 @@ class Journalist {
 
     async close () {
         this.closed = true
+        await this._housekeeping.turnstile.terminate()
         for (let appender of this._appenders) {
             await appender.add(() => {})
         }
@@ -549,7 +553,7 @@ class Journalist {
         // the split again.
         for (const page of [ right, left ]) {
             if (page.items.length >= this.leaf.split) {
-                this._housekeeping.add(() => this._housekeeper(page.items[0].key))
+                this._housekeeping.push(page.items[0].key)
             }
         }
 
@@ -633,7 +637,7 @@ class Journalist {
     }
 
     // TODO Must wait for housekeeping to finish before closing.
-    async _housekeeper (key) {
+    async _housekeeper ({ body: key }) {
         const entries = []
         const child = await this.descend({ key })
         entries.push.apply(entries, child.entries)
@@ -649,7 +653,7 @@ class Journalist {
     _tidy (key) {
         if (this._dirty[key] == null) {
             this._dirty[key] = true
-            this._housekeeping.add(() => this._housekeeper(key))
+            this._housekeeping.push(key)
         }
     }
 }

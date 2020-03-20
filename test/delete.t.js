@@ -1,4 +1,6 @@
 require('proof')(1, async (okay) => {
+    const Destructible = require('destructible')
+    const destructible = new Destructible('delete.t')
     const Strata = require('../strata')
     const Cache = require('../cache')
     const utilities = require('./utilities')
@@ -16,7 +18,7 @@ require('proof')(1, async (okay) => {
         ]]
     })
     const cache = new Cache
-    const strata = new Strata({ directory, cache })
+    const strata = new Strata(destructible.durable('strata'), { directory, cache })
     await strata.open()
     const cursor = (await strata.search('a')).get()
     cursor.remove(cursor.index)
@@ -34,6 +36,7 @@ require('proof')(1, async (okay) => {
         ]
     }, 'inserted')
     cache.purge(0)
+    await destructible.destructed
     // **TODO** Cache purge broken.
     // okay(cache.heft, 0, 'cache purged')
 })

@@ -20,8 +20,8 @@ class Unlocker {
 }
 
 class Strata {
-    constructor (options) {
-        this._journalist = new Journalist(options)
+    constructor (destructible, options) {
+        this._journalist = new Journalist(destructible, options)
     }
 
     create () {
