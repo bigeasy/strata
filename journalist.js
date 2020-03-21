@@ -289,6 +289,16 @@ class Journalist {
 
     async close () {
         this.closed = true
+        // Trying to figure out how to wait for the Turnstile to drain. We can't
+        // terminate the housekeeping turnstile then the acceptor turnstile
+        // because they depend on each other, so we're going to loop. We wait
+        // for one to drain, then the other, then check to see if anything is in
+        // the queues to determine if we can leave the loop. Actually, we only
+        // need to check the size of the first queue in the loop, the second
+        // will be empty when `drain` returns.
+        do {
+            await this._housekeeping.turnstile.drain()
+        } while (this._housekeeping.turnstile.size != 0)
         await this._housekeeping.turnstile.terminate()
         for (let appender of this._appenders) {
             await appender.add(() => {})
