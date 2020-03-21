@@ -36,7 +36,7 @@
                             "p-queue":                      "6.2.0",
                             "prospective":                  "^0.1.0-alpha.4",
                             "rimraf":                       "^3.0.0",
-                            "turnstile":                    "6.0.0-alpha.0"
+                            "turnstile":                    "6.0.0-alpha.2"
     },
     "devDependencies":
     {
