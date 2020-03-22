@@ -505,6 +505,16 @@ class Journalist {
         entries.forEach(entry => entry.release())
     }
 
+    async _possibleSplit (page, key) {
+        if (page.items.length >= this.branch.split) {
+            if (page.id == '0.0') {
+                await this._drainRoot(key)
+            } else {
+                await this._splitBranch(parent)
+            }
+        }
+    }
+
     _descentify (page, appendable = false) {
         const entry = this._hold(page.id, page)
         return { entry, entries: [ entry ], append: null }
@@ -642,14 +652,10 @@ class Journalist {
         await commit.prepare()
         await commit.commit()
         await commit.dispose()
+        // We can release and then perform the split because we're the only one
+        // that will be changing the tree structure.
         entries.forEach(entry => entry.release())
-        if (parent.entry.value.items.length >= this.branch.split) {
-            if (parent.entry.value.id == '0.0') {
-                await this._drainRoot(key)
-            } else {
-                await this._splitBranch(parent)
-            }
-        }
+        await this._possibleSplit(parent.entry.value, key)
     }
 
     // TODO Must wait for housekeeping to finish before closing.
