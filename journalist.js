@@ -463,7 +463,7 @@ class Journalist {
     async _drainRoot (key) {
         const entries = []
         const root = await this.descend({ key, level: 0 })
-        entries.push(root)
+        entries.push(root.entry)
         const partition = Math.floor(root.entry.value.items.length / 2)
         // TODO Print `root.page.items` and see that heft is wrong in the items.
         // Why is it in the items and why is it wrong? Does it matter?
@@ -501,6 +501,8 @@ class Journalist {
         await commit.write(prepare)
         await commit.prepare()
         await commit.commit()
+        await commit.dispose()
+        entries.forEach(entry => entry.release())
     }
 
     _descentify (page, appendable = false) {
