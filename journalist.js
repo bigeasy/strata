@@ -7,7 +7,6 @@ const Player = require('./player')
 const find = require('./find')
 const assert = require('assert')
 const Cursor = require('./cursor')
-const { default: Queue } = require('p-queue')
 const callback = require('prospective/callback')
 const coalesece = require('extant')
 const Future = require('prospective/future')
@@ -16,6 +15,8 @@ const fnv = require('./fnv')
 
 const Turnstile = require('turnstile')
 Turnstile.Queue = require('turnstile/queue')
+
+const Fracture = require('fracture')
 
 function traceIf (condition) {
     if (condition) return function (...vargs) {
@@ -51,11 +52,13 @@ class Journalist {
         this._recorder = recorder(() => '0')
         this._root = null
         this._operationId = 0xffffffff
-        this._appenders = [ new Queue({ concurrency: 1 }) ]
+        const appending = new Fracture(destructible.durable('appender'))
+        this._appending = new Turnstile.Queue(appending, this._append, this)
         this._queues = {}
         this._blockId = 0xffffffff
         this._blocks = [{}]
-        this._housekeeping = new Turnstile.Queue(new Turnstile(destructible.durable('housekeeper')), this._housekeeper, this)
+        const housekeeping = new Turnstile(destructible.durable('housekeeper'))
+        this._housekeeping = new Turnstile.Queue(housekeeping, this._housekeeper, this)
         this._dirty = {}
         this._id = 0
     }
@@ -288,24 +291,25 @@ class Journalist {
     }
 
     async close () {
-        this.closed = true
-        // Trying to figure out how to wait for the Turnstile to drain. We can't
-        // terminate the housekeeping turnstile then the acceptor turnstile
-        // because they depend on each other, so we're going to loop. We wait
-        // for one to drain, then the other, then check to see if anything is in
-        // the queues to determine if we can leave the loop. Actually, we only
-        // need to check the size of the first queue in the loop, the second
-        // will be empty when `drain` returns.
-        do {
-            await this._housekeeping.turnstile.drain()
-        } while (this._housekeeping.turnstile.size != 0)
-        await this._housekeeping.turnstile.terminate()
-        for (let appender of this._appenders) {
-            await appender.add(() => {})
-        }
-        if (this._root != null) {
-            this._root.remove()
-            this._root = null
+        if (!this.closed) {
+            this.closed = true
+            // Trying to figure out how to wait for the Turnstile to drain. We
+            // can't terminate the housekeeping turnstile then the acceptor
+            // turnstile because they depend on each other, so we're going to
+            // loop. We wait for one to drain, then the other, then check to see
+            // if anything is in the queues to determine if we can leave the
+            // loop. Actually, we only need to check the size of the first queue
+            // in the loop, the second will be empty when `drain` returns.
+            do {
+                await this._housekeeping.turnstile.drain()
+                await this._appending.turnstile.drain()
+            } while (this._housekeeping.turnstile.size != 0)
+            await this._housekeeping.turnstile.terminate()
+            await this._appending.turnstile.terminate()
+            if (this._root != null) {
+                this._root.remove()
+                this._root = null
+            }
         }
     }
 
@@ -328,12 +332,11 @@ class Journalist {
     _queue (id) {
         let queue = this._queues[id]
         if (queue == null) {
-            const appender = this._appenders[this._index(id)]
             queue = this._queues[id] = {
                 id: this._operationId = increment(this._operationId),
                 writes: [],
                 entry: this._hold(id, null),
-                promise: appender.add(() => this._append('write', id))
+                promise: this._appending.enqueue({ method: 'write', id }, this._index(id))
             }
         }
         return queue
@@ -348,7 +351,7 @@ class Journalist {
         let block = this._blocks[index][blockId]
         if (block == null) {
             this._blocks[index][blockId] = block = { enter: new Future, exit: new Future }
-            this._appenders[index].add(() => this._append('block', [ index, blockId ]))
+            this._appending.push({ method: 'block', index, blockId }, index)
         }
         return block
     }
@@ -368,11 +371,12 @@ class Journalist {
     // they are written before the split? Must be.
 
     //
-    async _append (method, body) {
+    async _append ({ body }) {
         await callback((callback) => process.nextTick(callback))
+        const { method } = body
         switch (method) {
         case 'write':
-            const id = body
+            const { id } = body
             const queue = this._queues[id]
             delete this._queues[id]
             const entry = queue.entry, page = entry.value
@@ -388,7 +392,7 @@ class Journalist {
             await this._writeLeaf(id, queue.writes)
             break
         case 'block':
-            const [ index, blockId ] = body
+            const { index, blockId } = body
             const block = this._blocks[index][blockId]
             delete this._blocks[index][blockId]
             block.enter.resolve()
@@ -398,7 +402,7 @@ class Journalist {
     }
 
     _index (id) {
-        return id.split('.').reduce((sum, value) => sum + +value, 0) % this._appenders.length
+        return id.split('.').reduce((sum, value) => sum + +value, 0) % this._appending.turnstile.health.turnstiles
     }
 
     append (entry, promises) {
