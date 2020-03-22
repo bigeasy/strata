@@ -25,8 +25,6 @@ require('proof')(2, async (okay) => {
             cursor.insert(leaf[0], leaf[0], cursor.index)
             cursor.release()
             await cursor.flush()
-            // TODO Must wait for housekeeping to finish before closing.
-            await new Promise(resolve => setTimeout(resolve, 500))
             await strata.close()
             cache.purge(0)
             // **TODO** broken test...
