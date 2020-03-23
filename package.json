@@ -29,7 +29,7 @@
     "dependencies":
     {
                             "ascension":                    "^1.0.1",
-                            "destructible":                 "5.2.0-alpha.5",
+                            "destructible":                 "5.2.0-alpha.6",
                             "extant":                       "^1.0.11",
                             "fracture":                     "0.3.0-alpha.7",
                             "hash.fnv":                     "^1.0.5",
