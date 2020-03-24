@@ -390,6 +390,7 @@ class Journalist {
                 this._tidy(page.items[0].key)
             }
             await this._writeLeaf(id, queue.writes)
+            entry.release()
             break
         case 'block':
             const { index, blockId } = body

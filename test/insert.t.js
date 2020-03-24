@@ -1,4 +1,4 @@
-require('proof')(1, async (okay) => {
+require('proof')(2, async (okay) => {
     const Destructible = require('destructible')
     const destructible = new Destructible('insert.t')
     const Strata = require('../strata')
@@ -17,6 +17,8 @@ require('proof')(1, async (okay) => {
     cursor.release()
     await cursor.flush()
     await strata.close()
+    cache.purge(0)
+    okay(cache.heft, 0, 'cache empty')
     const vivified = await utilities.vivify(directory)
     okay(vivified, {
         '0.0': [ [ '0.1', null ] ],
