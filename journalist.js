@@ -61,6 +61,9 @@ class Journalist {
         this._housekeeping = new Turnstile.Queue(housekeeping, this._housekeeper, this)
         this._dirty = {}
         this._id = 0
+        this.closed = false
+        this.destroyed = false
+        destructible.destruct(() => this.destroyed = true)
     }
 
     async create () {
@@ -253,11 +256,8 @@ class Journalist {
             // one.
             descent.index = index < 0 ? ~index - 1 : index
 
-            // If we're trying to reach branch and we've hit the level, let's
-            // assert that we hit the key exactly, or else that we're on the
-            // left most path where all the keys are null.
+            // We're trying to reach branch and we've hit the level.
             if (level == descent.level) {
-                assert(descent.index == 0 || index > 0, 'inexact branch key')
                 break
             }
 
@@ -505,14 +505,52 @@ class Journalist {
         entries.forEach(entry => entry.release())
     }
 
-    async _possibleSplit (page, key) {
+    async _possibleSplit (page, key, level) {
         if (page.items.length >= this.branch.split) {
             if (page.id == '0.0') {
                 await this._drainRoot(key)
             } else {
-                await this._splitBranch(parent)
+                await this._splitBranch(key, level)
             }
         }
+    }
+
+    async _splitBranch (key, level) {
+        const entries = []
+        const branch = await this.descend({ key, level })
+        entries.push(branch.entry)
+        const parent = await this.descend({ key, level: level - 1 })
+        entries.push(parent.entry)
+        const partition = Math.floor(branch.entry.value.items.length / 2)
+        const rightId = this._nextId(false)
+        const right = this._hold(rightId, {
+            id: rightId,
+            leaf: false,
+            items: branch.entry.value.items.splice(partition),
+            heft: 0,
+            hash: null
+        })
+        entries.push(right)
+        const promotion = right.value.items[0].key
+        right.value.items[0].key = null
+        branch.entry.value.items = branch.entry.value.items.splice(0, partition)
+        parent.entry.value.items.splice(parent.index + 1, 0, { key: promotion, id: rightId })
+        const commit = new Commit(this)
+        const prepare = []
+        // Write the new branch to a temporary file.
+        prepare.push(await commit.emplace(right))
+        prepare.push(await commit.emplace(branch.entry))
+        prepare.push(await commit.emplace(parent.entry))
+        // Record the commit.
+        await commit.write(prepare)
+        await commit.prepare()
+        await commit.commit()
+        await commit.dispose()
+        entries.forEach(entry => entry.release())
+        await this._possibleSplit(parent.entry.value, key, parent.level)
+        // TODO Is this necessary now that we're splitting a page at a time?
+        // await this._possibleSplit(branch.entry.value, key, level)
+        // await this._possibleSplit(right.value, partition, level)
     }
 
     _descentify (page, appendable = false) {
@@ -655,7 +693,7 @@ class Journalist {
         // We can release and then perform the split because we're the only one
         // that will be changing the tree structure.
         entries.forEach(entry => entry.release())
-        await this._possibleSplit(parent.entry.value, key)
+        await this._possibleSplit(parent.entry.value, key, parent.level)
     }
 
     // TODO Must wait for housekeeping to finish before closing.
