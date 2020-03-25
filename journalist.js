@@ -562,11 +562,15 @@ class Journalist {
     // calculate the new id before requesting your blocks, request two blocks.
 
     //
-    async _splitLeaf (key, child, parent, entries) {
+    async _splitLeaf (key, child, entries) {
         // TODO Add right page to block.
         const blockId = this._blockId = increment(this._blockId)
         const block = this._block(blockId, child.entry.value.id)
         await block.enter.promise
+
+        const parent = await this.descend({ key, level: child.level - 1 })
+        entries.push.apply(entries, parent.entries)
+
         // Race is the wrong word, it's our synchronous time. We have to split
         // the page and then write them out. Anyone writing to this leaf has to
         // to be able to see the split so that they surrender their cursor if
@@ -578,40 +582,37 @@ class Journalist {
 
         // Split page creating a right page.
         const left = child.entry.value
-        const length = left.items.length
+        const length = child.entry.value.items.length
         const partition = Math.floor(length / 2)
-        const items = left.items.splice(partition)
+        const items = child.entry.value.items.splice(partition)
         const heft = items.reduce((sum, item) => sum + item.heft, 0)
-        const right = {
-            id: this._nextId(true),
+        const rightId = this._nextId(true)
+        const right = this._hold(rightId, {
+            id: rightId,
             leaf: true,
             items: items,
-            right: left.right,
-            heft: heft,
+            right: child.entry.value.right,
             append: this._filename()
-        }
+        })
+        entries.push(right)
+        right.heft = heft
 
         // Set the right key of the left page.
-        left.right = right.items[0].key
+        child.entry.value.right = right.value.items[0].key
 
         // Set the heft of the left page and entry.
-        child.entry.heft = (left.heft -= heft)
-
-        // Create an entry for the right page.
-        const entry = this._hold(right.id, right)
-        entries.push(entry)
-        entry.heft = right.heft
+        child.entry.heft -= heft
 
         // Insert a reference to the right page in the parent branch page.
         parent.entry.value.items.splice(parent.index + 1, 0, {
-            key: right.items[0].key,
-            id: right.id,
+            key: right.value.items[0].key,
+            id: right.value.id,
             heft: 0
         })
 
         // If any of the pages is still larger than the split threshhold, check
         // the split again.
-        for (const page of [ right, left ]) {
+        for (const page of [ right.value, child.entry.value ]) {
             if (page.items.length >= this.leaf.split) {
                 this._housekeeping.push(page.items[0].key)
             }
@@ -620,8 +621,8 @@ class Journalist {
         // Write any queued writes, they would have been in memory, in the page
         // that was split above. Once we await, items can be inserte or removed
         // from the page in memory. Our synchronous operations are over.
-        const writes = this._queue(left.id).writes.splice(0)
-        await this._writeLeaf(left.id, writes)
+        const writes = this._queue(child.entry.value.id).writes.splice(0)
+        await this._writeLeaf(child.entry.value.id, writes)
 
         // TODO Make header a nested object.
 
@@ -633,11 +634,11 @@ class Journalist {
         // Record the split of the right page in a new stub.
         prepare.push({
             method: 'stub',
-            page: { id: right.id, append: right.append },
+            page: { id: right.value.id, append: right.value.append },
             records: [{
                 method: 'load',
-                id: left.id,
-                append: left.append
+                id: child.entry.value.id,
+                append: child.entry.value.append
             }, {
                 method: 'slice',
                 index: partition,
@@ -650,18 +651,18 @@ class Journalist {
         const append = this._filename()
         prepare.push({
             method: 'stub',
-            page: { id: left.id, append },
+            page: { id: child.entry.value.id, append },
             records: [{
                 method: 'load',
-                id: left.id,
-                append: left.append
+                id: child.entry.value.id,
+                append: child.entry.value.append
             }, {
                 method: 'slice',
                 index: 0,
                 length: partition
             }]
         })
-        left.append = append
+        child.entry.value.append = append
 
         // Commit the stubs before we commit the updated branch.
         prepare.push({ method: 'commit' })
@@ -698,9 +699,7 @@ class Journalist {
         const child = await this.descend({ key })
         entries.push.apply(entries, child.entries)
         if (child.entry.value.items.length >= this.leaf.split) {
-            const parent = await this.descend({ key, level: child.level - 1 })
-            entries.push.apply(entries, parent.entries)
-            await this._splitLeaf(key, child, parent, entries)
+            await this._splitLeaf(key, child, entries)
         } else {
             entries.forEach(entry => entry.release())
         }
