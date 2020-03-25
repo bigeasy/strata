@@ -35,7 +35,6 @@ require('proof')(2, async (okay) => {
             cursor.insert('f', 'f', cursor.index)
             cursor.release()
             await cursor.flush()
-            await new Promise(resolve => setTimeout(resolve, 50))
             await strata.close()
             cache.purge(0)
             // **TODO** broken test...
