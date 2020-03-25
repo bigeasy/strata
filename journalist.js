@@ -554,11 +554,6 @@ class Journalist {
         // await this._possibleSplit(right.value, partition, level)
     }
 
-    _descentify (page, appendable = false) {
-        const entry = this._hold(page.id, page)
-        return { entry, entries: [ entry ], append: null }
-    }
-
     // TODO We need to block writes to the new page as well. Once we go async
     // again, someone could descend the tree and start writing to the new page
     // before we get a chance to write the new page stub.
