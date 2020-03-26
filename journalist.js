@@ -145,6 +145,10 @@ class Journalist {
                         })
                     }
                     break
+                case 'delete': {
+                        page.items.splice(entry.header.index, 1)
+                    }
+                    break
                 }
             }
         }
