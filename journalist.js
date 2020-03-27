@@ -39,12 +39,12 @@ class Journalist {
         const leaf = coalesece(options.leaf, {})
         this.leaf = {
             split: coalesece(leaf.split, 5),
-            merge: coalesece(leaf.merge, 2)
+            merge: coalesece(leaf.merge, 1)
         }
         const branch = coalesece(options.branch, {})
         this.branch = {
             split: coalesece(branch.split, 5),
-            merge: coalesece(branch.merge, 2)
+            merge: coalesece(branch.merge, 1)
         }
         this.cache = options.cache
         this.instance = 0
