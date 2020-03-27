@@ -1,4 +1,4 @@
-require('proof')(2, async (okay) => {
+require('proof')(3, async (okay) => {
     const Destructible = require('destructible')
     const destructible = new Destructible('drain.t')
 
@@ -27,8 +27,7 @@ require('proof')(2, async (okay) => {
             await cursor.flush()
             await strata.close()
             cache.purge(0)
-            // **TODO** broken test...
-            // okay(cache.heft, 0, 'cache purged')
+            okay(cache.heft, 0, 'cache purged')
         }
         await split()
         async function reopen () {

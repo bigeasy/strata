@@ -589,7 +589,7 @@ class Journalist {
         await block.enter.promise
 
         const parent = await this.descend({ key, level: child.level - 1 })
-        entries.push.apply(entries, parent.entries)
+        entries.push(parent.entry)
 
         // Race is the wrong word, it's our synchronous time. We have to split
         // the page and then write them out. Anyone writing to this leaf has to
