@@ -22,6 +22,9 @@ class Cursor {
     // forward for insertion points, and only forward.
 
     indexOf (key, index) {
+        if (this.page.deleted) {
+            return null
+        }
         const comparator = this._journalist.comparator
         index = find(comparator, this.page, key, index)
         const unambiguous = -1 < index // <- TODO ?

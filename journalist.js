@@ -57,6 +57,7 @@ class Journalist {
         this._queues = {}
         this._blockId = 0xffffffff
         this._blocks = [{}]
+        // TODO Convert to Turnstile.Set.
         const housekeeping = new Turnstile(destructible.durable('housekeeper'))
         this._housekeeping = new Turnstile.Queue(housekeeping, this._housekeeper, this)
         this._dirty = {}
@@ -112,7 +113,9 @@ class Journalist {
     }
 
     async _read (id, append) {
-        const page = { id, leaf: true, items: [], right: null, ghosts: 0, append }
+        const page = {
+            id, leaf: true, items: [], deleted: false, lock: null, right: null, ghosts: 0, append
+        }
         const player = new Player(function () { return '0' })
         const directory = path.resolve(this.directory, 'pages', String(id))
         const filename = path.join(directory, append)
@@ -135,6 +138,11 @@ class Journalist {
                             page.right = page.items[entry.header.length].key
                         }
                         page.items = page.items.slice(entry.header.index, entry.header.length)
+                    }
+                    break
+                case 'merge': {
+                        const { page: right } = await this._read(entry.header.id, entry.header.append)
+                        page.items.push.apply(page.items, right.items.slice(right.ghosts))
                     }
                     break
                 case 'insert': {
@@ -190,9 +198,9 @@ class Journalist {
     }
 
     // TODO If `key` is `null` then just go left.
-    _descend (entries, { key, level = -1, fork = 0 }) {
+    _descend (entries, { key, level = -1, fork = false }) {
         const descent = { miss: null, keyed: null, level: 0, index: 0, entry: null }
-        let entry = null
+        let entry = null, forking = false
         entries.push(entry = this._hold(-1, null))
         for (;;) {
             // You'll struggle to remember this, but it is true...
@@ -204,9 +212,9 @@ class Journalist {
                 // housekeeping inspection, the descent on that key is not going
                 // to cause a ruckus. Keys are not going to disappear on us when
                 // we're doing branch housekeeping.
-                descent.keyed = {
+                descent.pivot = {
                     key: entry.value.items[descent.index].key,
-                    level: descent.level
+                    level: descent.level - 1
                 }
                 // If we're trying to find siblings we're using an exact key
                 // that is definately above the level sought, we'll see it and
@@ -215,13 +223,13 @@ class Journalist {
                 // TODO Earlier I had this at KILLROY below. And I adjust the
                 // level, but I don't reference the level, so it's probably fine
                 // here.
-                if (descent.keyed.key == key) {
+                if (descent.pivot.key == key) {
                     if (fork) {
                         if (descent.index == 0) {
                             return null
                         }
-                        // Go right down to the desired level.
-                        throw new Error
+                        descent.index--
+                        forking = true
                     }
                 }
             }
@@ -244,7 +252,8 @@ class Journalist {
 
             // Binary search the page for the key.
             const offset = entry.value.leaf ? entry.value.ghosts : 1
-            const index = find(this.comparator, entry.value, key, offset)
+            const index = forking ? entry.value.items.length - 1
+                                  : find(this.comparator, entry.value, key, offset)
 
             // If the page is a leaf, assert that we're looking for a leaf and
             // return the leaf page.
@@ -296,6 +305,7 @@ class Journalist {
 
     async close () {
         if (!this.closed) {
+            assert(!this.destroyed, 'already destroyed')
             this.closed = true
             // Trying to figure out how to wait for the Turnstile to drain. We
             // can't terminate the housekeeping turnstile then the acceptor
@@ -383,18 +393,24 @@ class Journalist {
             const { id } = body
             const queue = this._queues[id]
             delete this._queues[id]
-            const entry = queue.entry, page = entry.value
-            if (
-                page.items.length >= this.leaf.split ||
-                (
-                    (page.id != '0.1' || page.right != null) &&
-                    page.items.length <= this.leaf.merge
-                )
-            ) {
-                this._tidy(page.items[0].key)
+            // We flush a page's writes before we merge it into its left
+            // sibling so there will always a queue entry for a page that has
+            // been merged. It will never have any writes so we can skip writing
+            // and thereby avoid putting it back into the housekeeping queue.
+            if (queue.writes.length != 0) {
+                const page = queue.entry.value
+                if (
+                    page.items.length >= this.leaf.split ||
+                    (
+                        ! (page.id == '0.1' && page.right == null) &&
+                        page.items.length <= this.leaf.merge
+                    )
+                ) {
+                    this._tidy(page.items[0].key)
+                }
+                await this._writeLeaf(id, queue.writes)
             }
-            await this._writeLeaf(id, queue.writes)
-            entry.release()
+            queue.entry.release()
             break
         case 'block':
             const { index, blockId } = body
@@ -623,10 +639,13 @@ class Journalist {
         }
 
         // Write any queued writes, they would have been in memory, in the page
-        // that was split above. Once we await, items can be inserte or removed
+        // that was split above. Once we await, items can be inserted or removed
         // from the page in memory. Our synchronous operations are over.
         const writes = this._queue(child.entry.value.id).writes.splice(0)
         await this._writeLeaf(child.entry.value.id, writes)
+
+        // Curious race condition here, though, where we've flushed the page to
+        // split
 
         // TODO Make header a nested object.
 
@@ -697,13 +716,210 @@ class Journalist {
         await this._possibleSplit(parent.entry.value, key, parent.level)
     }
 
+    async _selectMerger (key, child, entries) {
+        const level = child.entry.value.leaf ? -1 : child.level
+        const left = await this.descend({ key, level, fork: true })
+        const right = child.right == null
+                    ? null
+                    : await this.descend({ key: child.right, level })
+        const mergers = []
+        if (left != null) {
+            entries.push(left.entry)
+            mergers.push({
+                count: left.entry.value.items.length,
+                key: child.entry.value.items[0].key,
+                level: level
+            })
+        }
+        if (right != null) {
+            entries.push(right.entry)
+            mergers.push({
+                count: right.entry.value.items.length,
+                key: child.entry.value.items[0].key,
+                level: level
+            })
+        }
+        return mergers.sort((left, right) => left.count - right.count).shift()
+    }
+
+    _isDirty (page, sizes) {
+        return page.items.length >= sizes.split ||
+        (
+            ! (page.id == '0.1' && page.right == null) &&
+            page.items.length <= sizes.merge
+        )
+    }
+
+    async _mergeLeaf ({ key, level }) {
+        const entries = []
+
+        const left = await this.descend({ key, level, fork: true })
+        entries.push(left.entry)
+        const right = await this.descend({ key, level })
+        entries.push(right.entry)
+
+        const pivot = await this.descend(right.pivot)
+        entries.push(pivot.entry)
+
+        const surgery = {
+            deletions: [],
+            replacement: null,
+            splice: pivot
+        }
+
+        // If the pivot is somewhere above we need to promote a key, unless all
+        // the branches happen to be single entry branches.
+        if (right.level -1 != right.pivot.level) {
+            let level = right.level - 1
+            do {
+                const ancestor = this.descend({ key, level })
+                entries.push(ancestor.entry)
+                if (ancestor.entry.value.items.length == 1) {
+                    surgery.deletions.push(ancestor)
+                } else {
+                    assert.equal(ancestor.index, 0, 'unexpected ancestor')
+                    surgery.replacement = ancestor.entry.value.items[1].key
+                    surgery.splice = ancestor
+                }
+                level--
+            } while (surgery.replacement == null && level != right.pivot.level)
+        }
+
+        const blockId = this._blockId = increment(this._blockId)
+        const blocks = [
+            this._block(blockId, left.entry.value.id),
+            this._block(blockId, right.entry.value.id)
+        ]
+
+        // Block writes to both pages.
+        for (const block of blocks) {
+            await block.enter.promise
+        }
+
+        // Add the items in the right page to the end of the left page.
+        const items = left.entry.value.items
+        items.push.apply(items, right.entry.value.items.splice(right.entry.value.ghosts))
+
+        // Set right reference of left page.
+        left.entry.value.right = right.entry.value.right
+
+        // Adjust heft of left entry.
+        left.entry.heft += right.entry.heft
+
+        // Mark the right page deleted, it will cause `indexOf` in the `Cursor`
+        // to return `null` indicating that the user must release the `Cursor`
+        // and descend again.
+        right.entry.value.deleted = true
+
+        // See if the merged page needs to split or merge further.
+        if (this._isDirty(left.entry.value, this.leaf)) {
+            this._housekeeping.push(left.entry.value.items[0].key)
+        }
+
+        // Replace the key of the pivot if necessary.
+        if (surgery.replacement != null) {
+            pivot.entry.value.items[pivot.index].key = surgery.replacement
+        }
+
+        // Remove the branch page that references the leaf page.
+        surgery.splice.entry.value.items.splice(surgery.splice.index, 1)
+
+        // Now we've rewritten the branch tree and merged the leaves. When we go
+        // asynchronous `Cursor`s will be invalid and they'll have to descend
+        // again. User writes will continue in memory, but leaf page writes are
+        // currently blocked. We start by flushing any cached writes.
+        const writes = {
+            left: this._queue(left.entry.value.id).writes.splice(0),
+            right: this._queue(right.entry.value.id).writes.splice(0)
+        }
+
+        await this._writeLeaf(left.entry.value.id, writes.left)
+        await this._writeLeaf(right.entry.value.id, writes.right)
+
+        // Create our journaled tree alterations.
+        const commit = new Commit(this)
+
+        const prepare = []
+
+        // Record the split of the right page in a new stub.
+        const append = this._filename()
+        prepare.push({
+            method: 'stub',
+            page: { id: left.entry.value.id, append: append },
+            records: [{
+                method: 'load',
+                id: left.entry.value.id,
+                append: left.entry.value.append
+            }, {
+                method: 'merge',
+                id: right.entry.value.id,
+                append: right.entry.value.append
+            }, {
+                method: 'right',
+                right: left.entry.value.right
+            }]
+        })
+        left.entry.value.append = append
+
+        // Commit the stub before we commit the updated branch.
+        prepare.push({ method: 'commit' })
+
+        // If we replaced the key in the pivot, write the pivot.
+        if (surgery.replacement != null) {
+            prepare.push(await commit.emplace(pivot.entry))
+        }
+
+        // Write the page we spliced.
+        prepare.push(await commit.emplace(surgery.splice.entry))
+
+        // Delete any removed branches.
+        for (const deletion in surgery.deletions) {
+            prepare.push({
+                method: 'unlink',
+                path: path.join('pages', deletion.entry.value.id)
+            })
+        }
+
+        // Record the commit.
+        await commit.write(prepare)
+
+        // TODO If we where to use `_dirty` we'd find that we where unable to
+        // record as dirty up above. Can we track `_dirty` by the append
+        // idenifier? Can't we just delete this sooner, why am I deleting it
+        // here?
+        delete this._dirty[key]
+
+        // Pretty sure that the separate prepare and commit are merely because
+        // we want to release the lock on the leaf as soon as possible.
+        await commit.prepare()
+        await commit.commit()
+        for (const block of blocks) {
+            block.exit.resolve()
+        }
+        await commit.prepare()
+        await commit.commit()
+        await commit.dispose()
+        // We can release and then perform the split because we're the only one
+        // that will be changing the tree structure.
+        entries.forEach(entry => entry.release())
+    }
+
     // TODO Must wait for housekeeping to finish before closing.
     async _housekeeper ({ body: key }) {
         const entries = []
         const child = await this.descend({ key })
-        entries.push.apply(entries, child.entries)
+        entries.push(child.entry)
         if (child.entry.value.items.length >= this.leaf.split) {
             await this._splitLeaf(key, child, entries)
+        } else if (
+            ! (
+                child.entry.value.id == '0.1' && child.entry.value.right == null
+            ) &&
+            child.entry.value.items.length <= this.leaf.merge
+        ) {
+            const merger = await this._selectMerger(key, child, entries)
+            entries.forEach(entry => entry.release())
+            await this._mergeLeaf(merger)
         } else {
             entries.forEach(entry => entry.release())
         }

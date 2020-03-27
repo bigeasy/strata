@@ -267,7 +267,7 @@ class Commit {
                 }
                 break
             case 'unlink': {
-                    await this._prepare(operation)
+                    await this._prepare([ 'unlink', operation.path ])
                 }
                 break
             }
