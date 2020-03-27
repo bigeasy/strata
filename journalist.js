@@ -15,6 +15,7 @@ const fnv = require('./fnv')
 
 const Turnstile = require('turnstile')
 Turnstile.Queue = require('turnstile/queue')
+Turnstile.Set = require('turnstile/set')
 
 const Fracture = require('fracture')
 
@@ -59,8 +60,7 @@ class Journalist {
         this._blocks = [{}]
         // TODO Convert to Turnstile.Set.
         const housekeeping = new Turnstile(destructible.durable('housekeeper'))
-        this._housekeeping = new Turnstile.Queue(housekeeping, this._housekeeper, this)
-        this._dirty = {}
+        this._housekeeping = new Turnstile.Set(housekeeping, this._housekeeper, this)
         this._id = 0
         this.closed = false
         this.destroyed = false
@@ -406,7 +406,7 @@ class Journalist {
                         page.items.length <= this.leaf.merge
                     )
                 ) {
-                    this._tidy(page.items[0].key)
+                    this._housekeeping.add(page.items[0].key)
                 }
                 await this._writeLeaf(id, queue.writes)
             }
@@ -634,7 +634,7 @@ class Journalist {
         // the split again.
         for (const page of [ right.value, child.entry.value ]) {
             if (page.items.length >= this.leaf.split) {
-                this._housekeeping.push(page.items[0].key)
+                this._housekeeping.add(page.items[0].key)
             }
         }
 
@@ -695,12 +695,6 @@ class Journalist {
 
         // Record the commit.
         await commit.write(prepare)
-
-        // TODO If we where to use `_dirty` we'd find that we where unable to
-        // record as dirty up above. Can we track `_dirty` by the append
-        // idenifier? Can't we just delete this sooner, why am I deleting it
-        // here?
-        delete this._dirty[key]
 
         // Pretty sure that the separate prepare and commit are merely because
         // we want to release the lock on the leaf as soon as possible.
@@ -883,12 +877,6 @@ class Journalist {
         // Record the commit.
         await commit.write(prepare)
 
-        // TODO If we where to use `_dirty` we'd find that we where unable to
-        // record as dirty up above. Can we track `_dirty` by the append
-        // idenifier? Can't we just delete this sooner, why am I deleting it
-        // here?
-        delete this._dirty[key]
-
         // Pretty sure that the separate prepare and commit are merely because
         // we want to release the lock on the leaf as soon as possible.
         await commit.prepare()
@@ -922,13 +910,6 @@ class Journalist {
             await this._mergeLeaf(merger)
         } else {
             entries.forEach(entry => entry.release())
-        }
-    }
-
-    _tidy (key) {
-        if (this._dirty[key] == null) {
-            this._dirty[key] = true
-            this._housekeeping.push(key)
         }
     }
 }
