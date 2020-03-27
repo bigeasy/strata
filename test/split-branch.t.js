@@ -8,7 +8,7 @@ require('proof')(2, async (okay) => {
     const path = require('path')
     const directory = path.join(utilities.directory, 'split-branch')
     await utilities.reset(directory)
-    const leaf = utilities.alphabet(3, 3).slice(0, 20)
+    const leaf = utilities.alphabet(4, 4).slice(0, 33)
     await utilities.serialize(directory, {
         '0.0': [[ '0.1', null ]],
         '0.1': [[ 'right', null ]].concat(leaf.slice(1).map((word, index) => {
