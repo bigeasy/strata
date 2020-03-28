@@ -68,13 +68,14 @@ class Journalist {
     }
 
     async create () {
-        const directory = this.directory
-        this._root = this.cache.hold([ directory, -1 ], { items: [{ id: '0.0' }] })
-        const stat = await fs.stat(directory)
+        const directory = this.directory, stat = await fs.stat(directory)
         Strata.Error.assert(stat.isDirectory(), 'create.not.directory', { directory })
         Strata.Error.assert((await fs.readdir(directory)).filter(file => {
             return ! /^\./.test(file)
         }).length == 0, 'create.directory.not.empty', { directory })
+
+        this._root = this._create({ id: -1, items: [{ id: '0.0' }] })
+
         await fs.mkdir(this._path('instance', '0'), { recursive: true })
         await fs.mkdir(this._path('pages', '0.0'), { recursive: true })
         const buffer = Buffer.from(JSON.stringify([{ id: '0.1', key: null }]))
@@ -85,16 +86,15 @@ class Journalist {
     }
 
     async open () {
-        const directory = this.directory
-        this._root = this.cache.hold([ directory, -1 ], { items: [{ id: '0.0' }] })
-        const instances = (await fs.readdir(path.join(directory, 'instances')))
+        this._root = this._create({ id: -1, items: [{ id: '0.0' }] })
+        const instances = (await fs.readdir(this._path('instances')))
             .filter(file => /^\d+$/.test(file))
             .map(file => +file)
             .sort((left, right) => right - left)
         this.instance = instances[0] + 1
-        await fs.mkdir(path.join(directory, 'instances', String(this.instance)))
+        await fs.mkdir(this._path('instances', this.instance))
         for (let instance of instances) {
-            await fs.rmdir(path.resolve(directory, 'instances', String(instance)))
+            await fs.rmdir(this._path('instances', instance))
         }
     }
 
@@ -116,9 +116,7 @@ class Journalist {
             id, leaf: true, items: [], deleted: false, lock: null, right: null, ghosts: 0, append
         }
         const player = new Player(function () { return '0' })
-        const directory = path.resolve(this._path('pages', String(id)))
-        const filename = path.join(directory, append)
-        const readable = fileSystem.createReadStream(filename)
+        const readable = fileSystem.createReadStream(this._path('pages', id, append))
         for await (let chunk of readable) {
             for (let entry of player.split(chunk)) {
                 switch (entry.header.method) {
