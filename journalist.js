@@ -71,18 +71,17 @@ class Journalist {
         const directory = this.directory
         this._root = this.cache.hold([ directory, -1 ], { items: [{ id: '0.0' }] })
         const stat = await fs.stat(directory)
-        Strata.Error.assert(stat.isDirectory(), 'create.not.directory', { directory: directory })
+        Strata.Error.assert(stat.isDirectory(), 'create.not.directory', { directory })
         Strata.Error.assert((await fs.readdir(directory)).filter(file => {
             return ! /^\./.test(file)
-        }).length == 0, 'create.directory.not.empty', { directory: directory })
-        await fs.mkdir(path.resolve(directory, 'instance', '0'), { recursive: true })
-        const pages = path.resolve(directory, 'pages')
-        await fs.mkdir(path.resolve(pages, '0.0'), { recursive: true })
+        }).length == 0, 'create.directory.not.empty', { directory })
+        await fs.mkdir(this._path('instance', '0'), { recursive: true })
+        await fs.mkdir(this._path('pages', '0.0'), { recursive: true })
         const buffer = Buffer.from(JSON.stringify([{ id: '0.1', key: null }]))
         const hash = fnv(buffer)
-        await fs.writeFile(path.resolve(pages, '0.0', hash), buffer)
-        await fs.mkdir(path.resolve(pages, '0.1'), { recursive: true })
-        await fs.writeFile(path.resolve(pages, '0.1', '0.0'), Buffer.alloc(0))
+        await fs.writeFile(this._path('pages', '0.0', hash), buffer)
+        await fs.mkdir(this._path('pages', '0.1'), { recursive: true })
+        await fs.writeFile(this._path('pages', '0.1', '0.0'), Buffer.alloc(0))
     }
 
     async open () {
@@ -101,14 +100,14 @@ class Journalist {
 
     async _hashable (id) {
         const regex = /^[a-z0-9]+$/
-        const dir = await fs.readdir(path.join(this.directory, 'pages', id))
+        const dir = await fs.readdir(this._path('pages', id))
         const files = dir.filter(file => regex.test(file))
         assert.equal(files.length, 1, `multiple branch page files: ${id}, ${files}`)
         return files.pop()
     }
 
     async _appendable (id) {
-        const dir = await fs.readdir(path.join(this.directory, 'pages', id))
+        const dir = await fs.readdir(this._path('pages', id))
         return dir.filter(file => /^\d+\.\d+$/.test(file)).sort(appendable).pop()
     }
 
@@ -117,7 +116,7 @@ class Journalist {
             id, leaf: true, items: [], deleted: false, lock: null, right: null, ghosts: 0, append
         }
         const player = new Player(function () { return '0' })
-        const directory = path.resolve(this.directory, 'pages', String(id))
+        const directory = path.resolve(this._path('pages', String(id)))
         const filename = path.join(directory, append)
         const readable = fileSystem.createReadStream(filename)
         for await (let chunk of readable) {
@@ -339,8 +338,7 @@ class Journalist {
             return buffer
         })
         entry.release()
-        const file = path.resolve(this.directory, 'pages', id, append)
-        await fs.appendFile(file, Buffer.concat(buffers))
+        await fs.appendFile(this._path('pages', id, append), Buffer.concat(buffers))
     }
 
     _queue (id) {
