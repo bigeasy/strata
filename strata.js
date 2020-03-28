@@ -37,7 +37,7 @@ class Strata {
             const descent = await this._journalist.descend({ key })
             const cursor = new Cursor(this._journalist, descent, key)
             UNLOCK: while (cursor.page.lock != null) {
-                descent.entries.forEach(entry => entry.release())
+                descent.entry.release()
                 await page.lock
                 if ((cursor.index = cursor.indexOf(key, 0)) == null) {
                     cursor.release()

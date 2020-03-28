@@ -289,18 +289,18 @@ class Journalist {
     // Conceivably, this could continue indefinitely.
 
     //
-    async descend (query) {
-        const entries = [[]]
+    async descend (query, entries = []) {
+        const _entries = [[]]
         for (;;) {
-            entries.push([])
-            const descent = this._descend(entries[1], query)
-            entries.shift().forEach((entry) => entry.release())
+            _entries.push([])
+            const descent = this._descend(_entries[1], query)
+            _entries.shift().forEach(entry => entry.release())
             if (descent.miss == null) {
-                descent.entry = entries[0].pop()
-                entries.shift().forEach((entry) => entry.release())
+                entries.push(descent.entry = _entries[0].pop())
+                _entries.shift().forEach(entry => entry.release())
                 return descent
             }
-            (await this.load(descent.miss)).release()
+            _entries[0].push(await this.load(descent.miss))
         }
     }
 
@@ -483,8 +483,7 @@ class Journalist {
     //
     async _drainRoot (key) {
         const entries = []
-        const root = await this.descend({ key, level: 0 })
-        entries.push(root.entry)
+        const root = await this.descend({ key, level: 0 }, entries)
         const partition = Math.floor(root.entry.value.items.length / 2)
         // TODO Print `root.page.items` and see that heft is wrong in the items.
         // Why is it in the items and why is it wrong? Does it matter?
@@ -536,10 +535,8 @@ class Journalist {
 
     async _splitBranch (key, level) {
         const entries = []
-        const branch = await this.descend({ key, level })
-        entries.push(branch.entry)
-        const parent = await this.descend({ key, level: level - 1 })
-        entries.push(parent.entry)
+        const branch = await this.descend({ key, level }, entries)
+        const parent = await this.descend({ key, level: level - 1 }, entries)
         const partition = Math.floor(branch.entry.value.items.length / 2)
         const right = this._create({
             id: this._nextId(false),
@@ -585,8 +582,7 @@ class Journalist {
         const block = this._block(blockId, child.entry.value.id)
         await block.enter.promise
 
-        const parent = await this.descend({ key, level: child.level - 1 })
-        entries.push(parent.entry)
+        const parent = await this.descend({ key, level: child.level - 1 }, entries)
 
         // Race is the wrong word, it's our synchronous time. We have to split
         // the page and then write them out. Anyone writing to this leaf has to
@@ -708,13 +704,12 @@ class Journalist {
 
     async _selectMerger (key, child, entries) {
         const level = child.entry.value.leaf ? -1 : child.level
-        const left = await this.descend({ key, level, fork: true })
+        const left = await this.descend({ key, level, fork: true }, entries)
         const right = child.right == null
                     ? null
-                    : await this.descend({ key: child.right, level })
+                    : await this.descend({ key: child.right, level }, entries)
         const mergers = []
         if (left != null) {
-            entries.push(left.entry)
             mergers.push({
                 count: left.entry.value.items.length,
                 key: child.entry.value.items[0].key,
@@ -722,7 +717,6 @@ class Journalist {
             })
         }
         if (right != null) {
-            entries.push(right.entry)
             mergers.push({
                 count: right.entry.value.items.length,
                 key: child.entry.value.items[0].key,
@@ -743,13 +737,10 @@ class Journalist {
     async _mergeLeaf ({ key, level }) {
         const entries = []
 
-        const left = await this.descend({ key, level, fork: true })
-        entries.push(left.entry)
-        const right = await this.descend({ key, level })
-        entries.push(right.entry)
+        const left = await this.descend({ key, level, fork: true }, entries)
+        const right = await this.descend({ key, level }, entries)
 
-        const pivot = await this.descend(right.pivot)
-        entries.push(pivot.entry)
+        const pivot = await this.descend(right.pivot, entries)
 
         const surgery = {
             deletions: [],
@@ -762,8 +753,7 @@ class Journalist {
         if (right.level -1 != right.pivot.level) {
             let level = right.level - 1
             do {
-                const ancestor = this.descend({ key, level })
-                entries.push(ancestor.entry)
+                const ancestor = this.descend({ key, level }, entries)
                 if (ancestor.entry.value.items.length == 1) {
                     surgery.deletions.push(ancestor)
                 } else {
@@ -891,8 +881,7 @@ class Journalist {
     // TODO Must wait for housekeeping to finish before closing.
     async _housekeeper ({ body: key }) {
         const entries = []
-        const child = await this.descend({ key })
-        entries.push(child.entry)
+        const child = await this.descend({ key }, entries)
         if (child.entry.value.items.length >= this.leaf.split) {
             await this._splitLeaf(key, child, entries)
         } else if (
