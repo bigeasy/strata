@@ -183,7 +183,7 @@ class Journalist {
 
     //
     async load (id) {
-        const entry = this._hold(id, null)
+        const entry = this._hold(id)
         if (entry.value == null) {
             const { page, heft } = await this.read(id)
             entry.value = page
@@ -192,15 +192,19 @@ class Journalist {
         return entry
     }
 
-    _hold (id, initial) {
-        return this.cache.hold([ this.directory, id ], initial)
+    _create (page) {
+        return this.cache.hold([ this.directory, page.id ], page)
+    }
+
+    _hold (id) {
+        return this.cache.hold([ this.directory, id ], null)
     }
 
     // TODO If `key` is `null` then just go left.
     _descend (entries, { key, level = -1, fork = false }) {
         const descent = { miss: null, keyed: null, level: 0, index: 0, entry: null }
         let entry = null, forking = false
-        entries.push(entry = this._hold(-1, null))
+        entries.push(entry = this._hold(-1))
         for (;;) {
             // You'll struggle to remember this, but it is true...
             if (descent.index != 0) {
@@ -243,7 +247,7 @@ class Journalist {
 
             // Attempt to hold the page from the cache, return the id of the
             // page if we have a cache miss.
-            entries.push(entry = this._hold(id, null))
+            entries.push(entry = this._hold(id))
             if (entry.value == null) {
                 entries.pop().remove()
                 return { miss: id }
@@ -329,7 +333,7 @@ class Journalist {
     async _writeLeaf (id, writes) {
         const append = await this._appendable(id)
         const recorder = this._recorder
-        const entry = this._hold(id, null)
+        const entry = this._hold(id)
         const buffers = writes.map(write => {
             const buffer = recorder(write.header, write.body)
             if (write.header.method == 'insert') {
@@ -347,7 +351,7 @@ class Journalist {
             queue = this._queues[id] = {
                 id: this._operationId = increment(this._operationId),
                 writes: [],
-                entry: this._hold(id, null),
+                entry: this._hold(id),
                 promise: this._appending.enqueue({ method: 'write', id }, this._index(id))
             }
         }
@@ -486,17 +490,15 @@ class Journalist {
         const partition = Math.floor(root.entry.value.items.length / 2)
         // TODO Print `root.page.items` and see that heft is wrong in the items.
         // Why is it in the items and why is it wrong? Does it matter?
-        const leftId = this._nextId(false)
-        const left = this._hold(leftId, {
-            id: leftId,
+        const left = this._create({
+            id: this._nextId(false),
             offset: 1,
             items: root.entry.value.items.slice(0, partition),
             hash: null
         })
         entries.push(left)
-        const rightId = this._nextId(false)
-        const right = this._hold(rightId, {
-            id: rightId,
+        const right = this._create({
+            id: this._nextId(false),
             offset: 1,
             items: root.entry.value.items.slice(partition),
             hash: null
@@ -541,9 +543,8 @@ class Journalist {
         const parent = await this.descend({ key, level: level - 1 })
         entries.push(parent.entry)
         const partition = Math.floor(branch.entry.value.items.length / 2)
-        const rightId = this._nextId(false)
-        const right = this._hold(rightId, {
-            id: rightId,
+        const right = this._create({
+            id: this._nextId(false),
             leaf: false,
             items: branch.entry.value.items.splice(partition),
             heft: 0,
@@ -604,9 +605,8 @@ class Journalist {
         const partition = Math.floor(length / 2)
         const items = child.entry.value.items.splice(partition)
         const heft = items.reduce((sum, item) => sum + item.heft, 0)
-        const rightId = this._nextId(true)
-        const right = this._hold(rightId, {
-            id: rightId,
+        const right = this._create({
+            id: this._nextId(true),
             leaf: true,
             items: items,
             right: child.entry.value.right,
