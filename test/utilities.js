@@ -63,10 +63,10 @@ exports.vivify = async function (directory) {
 
 exports.serialize = async function (directory, files) {
     let instance = 0
-    for (let id in files) {
+    for (const id in files) {
         instance = Math.max(+id.split('.')[0], instance)
         await fs.mkdir(path.resolve(directory, 'pages', id), { recursive: true })
-        if (+id % 2 == 0) {
+        if (+id.split('.')[1] % 2 == 0) {
             const buffer = Buffer.from(JSON.stringify(files[id].map(record => {
                 return { id: record[0], key: record[1] }
             })))
@@ -91,6 +91,9 @@ exports.serialize = async function (directory, files) {
                         header: { method: 'delete', index: record[1] },
                         body: null
                     }
+                default:
+                    console.log(record)
+                    break
                 }
             }).map(entry => recorder(entry.header, entry.body))
             const file = path.resolve(directory, 'pages', id, '0.0')

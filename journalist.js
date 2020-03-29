@@ -224,14 +224,9 @@ class Journalist {
                 // TODO Earlier I had this at KILLROY below. And I adjust the
                 // level, but I don't reference the level, so it's probably fine
                 // here.
-                if (descent.pivot.key == key) {
-                    if (fork) {
-                        if (descent.index == 0) {
-                            return null
-                        }
-                        descent.index--
-                        forking = true
-                    }
+                if (descent.pivot.key == key && fork) {
+                    descent.index--
+                    forking = true
                 }
             }
 
@@ -279,6 +274,9 @@ class Journalist {
 
             descent.level++
         }
+        if (fork && !forking) {
+            return null
+        }
         return descent
     }
 
@@ -295,6 +293,10 @@ class Journalist {
             _entries.push([])
             const descent = this._descend(_entries[1], query)
             _entries.shift().forEach(entry => entry.release())
+            if (descent == null) {
+                _entries.shift().forEach((entry) => entry.release())
+                return null
+            }
             if (descent.miss == null) {
                 entries.push(descent.entry = _entries[0].pop())
                 _entries.shift().forEach(entry => entry.release())
@@ -719,7 +721,7 @@ class Journalist {
         if (right != null) {
             mergers.push({
                 count: right.entry.value.items.length,
-                key: child.entry.value.items[0].key,
+                key: child.right,
                 level: level
             })
         }
@@ -734,14 +736,7 @@ class Journalist {
         )
     }
 
-    async _mergeLeaf ({ key, level }) {
-        const entries = []
-
-        const left = await this.descend({ key, level, fork: true }, entries)
-        const right = await this.descend({ key, level }, entries)
-
-        const pivot = await this.descend(right.pivot, entries)
-
+    async _surgery (right, pivot) {
         const surgery = {
             deletions: [],
             replacement: null,
@@ -750,13 +745,14 @@ class Journalist {
 
         // If the pivot is somewhere above we need to promote a key, unless all
         // the branches happen to be single entry branches.
-        if (right.level -1 != right.pivot.level) {
+        if (right.level - 1 != pivot.level) {
             let level = right.level - 1
             do {
                 const ancestor = this.descend({ key, level }, entries)
                 if (ancestor.entry.value.items.length == 1) {
                     surgery.deletions.push(ancestor)
                 } else {
+                    // TODO Also null out after splice.
                     assert.equal(ancestor.index, 0, 'unexpected ancestor')
                     surgery.replacement = ancestor.entry.value.items[1].key
                     surgery.splice = ancestor
@@ -764,6 +760,157 @@ class Journalist {
                 level--
             } while (surgery.replacement == null && level != right.pivot.level)
         }
+
+        return surgery
+    }
+
+    async _fill (key) {
+        const entries = []
+
+        const root = await this.descend({ key, level: 0 }, entries)
+        const child = await this.descend({ key, level: 1 }, entries)
+
+        root.entry.value.items = child.entry.value.items
+        root.heft = child.heft
+
+        // Create our journaled tree alterations.
+        const commit = new Commit(this)
+        const prepare = []
+
+        // Write the merged page.
+        prepare.push(await commit.emplace(root.entry))
+
+        // Delete the page merged into the merged page.
+        prepare.push({
+            method: 'unlink',
+            path: path.join('pages', child.entry.value.id)
+        })
+
+        // Record the commit.
+        await commit.write(prepare)
+
+        // Pretty sure that the separate prepare and commit are merely because
+        // we want to release the lock on the leaf as soon as possible.
+        await commit.prepare()
+        await commit.commit()
+        await commit.dispose()
+
+        entries.forEach(entry => entry.release())
+    }
+
+    async _possibleMerge (surgery, key, branch) {
+        if (surgery.splice.entry.value.items.length <= this.branch.merge) {
+            if (surgery.splice.entry.value.id != '0.0') {
+                // TODO Have `_selectMerger` manage its own entries.
+                const entries = []
+                const merger = await this._selectMerger(key, surgery.splice, entries)
+                entries.forEach(entry => entry.release())
+                await this._mergeBranch(merger)
+            } else if (branch && this.branch.merge == 1) {
+                await this._fill(key)
+            }
+        }
+    }
+
+    async _mergeBranch ({ key, level }) {
+        const entries = []
+
+        const left = await this.descend({ key, level, fork: true }, entries)
+        const right = await this.descend({ key, level }, entries)
+
+        const pivot = await this.descend(right.pivot, entries)
+
+        const surgery = await this._surgery(right, pivot)
+
+        right.entry.value.items[0].key = key
+        left.entry.value.items.push.apply(left.entry.value.items, right.entry.value.items)
+
+        // Replace the key of the pivot if necessary.
+        if (surgery.replacement != null) {
+            pivot.entry.value.items[pivot.index].key = surgery.replacement
+        }
+
+        // Remove the branch page that references the leaf page.
+        surgery.splice.entry.value.items.splice(surgery.splice.index, 1)
+
+        // If the splice index was zero, null the key of the new left most branch.
+        if (surgery.splice.index == 0) {
+            surgery.splice.entry.value.items[0].key = null
+        }
+
+        // Heft will be adjusted by serialization, but let's do this for now.
+        left.entry.heft += right.entry.heft
+
+        // Create our journaled tree alterations.
+        const commit = new Commit(this)
+
+        const prepare = []
+
+        // Write the merged page.
+        prepare.push(await commit.emplace(left.entry))
+
+        // Delete the page merged into the merged page.
+        prepare.push({
+            method: 'unlink',
+            path: path.join('pages', right.entry.value.id)
+        })
+
+        // If we replaced the key in the pivot, write the pivot.
+        if (surgery.replacement != null) {
+            prepare.push(await commit.emplace(pivot.entry))
+        }
+
+        // Write the page we spliced.
+        prepare.push(await commit.emplace(surgery.splice.entry))
+
+        // Delete any removed branches.
+        for (const deletion in surgery.deletions) {
+            prepare.push({
+                method: 'unlink',
+                path: path.join('pages', deletion.entry.value.id)
+            })
+        }
+
+        // Record the commit.
+        await commit.write(prepare)
+
+        // Pretty sure that the separate prepare and commit are merely because
+        // we want to release the lock on the leaf as soon as possible.
+        await commit.prepare()
+        await commit.commit()
+        await commit.dispose()
+
+        let leaf = left.entry
+        // We don't have to restart our descent on a cache miss because we're
+        // the only ones altering the shape of the tree.
+        //
+        // TODO I'm sure there is a way we can find this on a descent somewhere,
+        // that way we don't have to test this hard-to-test cache miss.
+        while (!leaf.value.leaf) {
+            const id = leaf.value.items[0].id
+            leaf = this._hold(id)
+            if (leaf.value == null) {
+                leaf.remove()
+                entries.push(leaf = await this.load(id))
+            } else {
+                entries.push(leaf)
+            }
+        }
+
+        entries.forEach(entry => entry.release())
+
+        await this._possibleMerge(surgery, leaf.value.items[0].key, true)
+    }
+
+    async _mergeLeaf ({ key, level }) {
+        const entries = []
+
+        const left = await this.descend({ key, level, fork: true }, entries)
+        const right = await this.descend({ key, level }, entries)
+
+        const pivot = await this.descend(right.pivot, entries)
+
+        const surgery = await this._surgery(right, pivot)
 
         const blockId = this._blockId = increment(this._blockId)
         const blocks = [
@@ -803,6 +950,10 @@ class Journalist {
 
         // Remove the branch page that references the leaf page.
         surgery.splice.entry.value.items.splice(surgery.splice.index, 1)
+
+        if (surgery.splice.index == 0) {
+            surgery.splice.entry.value.items[0].key = null
+        }
 
         // Now we've rewritten the branch tree and merged the leaves. When we go
         // asynchronous `Cursor`s will be invalid and they'll have to descend
@@ -873,9 +1024,12 @@ class Journalist {
         await commit.prepare()
         await commit.commit()
         await commit.dispose()
+
         // We can release and then perform the split because we're the only one
         // that will be changing the tree structure.
         entries.forEach(entry => entry.release())
+
+        await this._possibleMerge(surgery, left.entry.value.items[0].key, false)
     }
 
     // TODO Must wait for housekeeping to finish before closing.
