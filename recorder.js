@@ -1,6 +1,6 @@
 module.exports = function (checksum) {
     const EOL = Buffer.from('\n')
-    return function (header, body) {
+    return function (header, body = null) {
         const buffers = [], checksums = []
         let length = 0, json = false
         if (body != null) {

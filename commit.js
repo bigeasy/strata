@@ -16,6 +16,7 @@ class Commit {
         this._commit = path.join(journalist.directory, 'commit')
     }
 
+    // TODO Should be a hash of specific files to filter, not a regex.
     async write (commit) {
         const dir = await this._readdir()
         const unemplaced = dir.filter(file => ! /\d+\.\d+-\d+\.\d+\.[0-9a-f]/)
@@ -126,6 +127,7 @@ class Commit {
         const buffer = Buffer.from(JSON.stringify(entry.value.items))
         const hash = fnv(buffer)
         entry.heft = buffer.length
+        // TODO `this._path()`
         await fs.writeFile(path.join(this._commit, `${entry.value.id}-${hash}`), buffer)
         const from = path.join('commit', `${entry.value.id}-${hash}`)
         const to = path.join('pages', entry.value.id, hash)
@@ -133,6 +135,51 @@ class Commit {
             method: 'emplace',
             page: { id: entry.value.id, hash: entry.value.hash },
             hash
+        }
+    }
+
+    async _vacuum (id, first, second, items) {
+        await fs.mkdir(this._commit, { recursive: true })
+        const filename = this._path(`${id}-${first}`)
+        const recorder = this._journalist._recorder
+        // Write out a new page slowly, a record at a time.
+        for (let index = 0, I = items.length; index < I; index++) {
+            const { key, body } = items[index]
+            await fs.appendFile(filename, recorder({ method: 'insert', index, key }, body))
+        }
+        await fs.appendFile(filename, recorder({
+            method: 'dependent', id: id, append: second
+        }))
+        return {
+            method: 'rename',
+            from: path.join('commit', `${id}-${first}`),
+            to: path.join('pages', id, first),
+            hash: hash
+        }
+    }
+
+    async vacuum (id, first, second, items, right) {
+        await fs.mkdir(this._commit, { recursive: true })
+        const filename = this._path(`${id}-${first}`)
+        const recorder = this._journalist._recorder
+        const buffers = []
+        buffers.push(recorder({ method: 'right', right }))
+        // Write out a new page slowly, a record at a time.
+        for (let index = 0, I = items.length; index < I; index++) {
+            const { key, value } = items[index]
+            buffers.push(recorder({ method: 'insert', index, key }, value))
+        }
+        buffers.push(recorder({
+            method: 'dependent', id: id, append: second
+        }))
+        const buffer = Buffer.concat(buffers)
+        const hash = fnv(buffer)
+        await fs.writeFile(filename, buffer)
+        return {
+            method: 'rename',
+            from: path.join('commit', `${id}-${first}`),
+            to: path.join('pages', id, first),
+            hash: hash
         }
     }
 
@@ -183,6 +230,11 @@ class Commit {
                     const from = path.join('commit', filename)
                     const to = path.join('pages', operation.page.id, operation.page.append)
                     await fs.writeFile(this._path(filename), buffer)
+                    await this._prepare([ 'rename', from, to, hash ])
+                }
+                break
+            case 'rename': {
+                    const { from, to, hash } = operation
                     await this._prepare([ 'rename', from, to, hash ])
                 }
                 break
