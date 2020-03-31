@@ -13,8 +13,6 @@ const Future = require('prospective/future')
 const Commit = require('./commit')
 const fnv = require('./fnv')
 
-const Keyify = require('keyify')
-
 const Turnstile = require('turnstile')
 Turnstile.Queue = require('turnstile/queue')
 Turnstile.Set = require('turnstile/set')
@@ -34,14 +32,6 @@ const Strata = { Error: require('./error') }
 
 function increment (value) {
     return value + 1 & 0xffffffff
-}
-
-function keyify ({ id, append }, override = null) {
-    return Keyify.stringify({ id, append: override || append })
-}
-
-function reference ({ id, append }, override = null) {
-    return { id, append: override || append }
 }
 
 class Page {
@@ -827,11 +817,6 @@ class Journalist {
         // that was split above. Once we await, items can be inserted or removed
         // from the page in memory. Our synchronous operations are over.
         const append = this._filename()
-        const references = {
-            source: reference(child.entry.value),
-            left: reference(child.entry.value, append),
-            right: reference(right.value)
-        }
         const writes = this._queue(child.entry.value.id).writes.splice(0)
         writes.push({
             header: { method: 'dependent', id: child.entry.value.id, append },
