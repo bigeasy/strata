@@ -173,8 +173,7 @@ class Journalist {
                     }
                     break
                 case 'dependent': {
-                        const { id, append } = entry.header
-                        page.entries.push({ method: 'dependent', header: entry.header })
+                        page.entries.push(entry.header)
                     }
                     break
                 }
@@ -547,7 +546,7 @@ class Journalist {
             leaf.entry.value.entries = [{
                 header: { method: 'load', id: leaf.entry.value.id, append: first },
                 entries: [{
-                    method: 'dependent', id: leaf.entry.value.id, append: second
+                    header: { hmethod: 'dependent', id: leaf.entry.value.id, append: second }
                 }]
             }]
 
