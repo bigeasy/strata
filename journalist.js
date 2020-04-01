@@ -34,34 +34,6 @@ function increment (value) {
     return value + 1 & 0xffffffff
 }
 
-class Page {
-    constructor (dependents) {
-        this._dependents = dependents
-    }
-
-    add ({ id, append }, override = null) {
-        this._dependents[`${id}/${override || append}`] = true
-    }
-}
-
-class Dependencies {
-    constructor (dependencies) {
-        this._dependencies = dependencies
-    }
-
-    page ({ id, append }, override = null) {
-        const key = `${id}/${override || append}`
-        if (!(key in this._dependencies)) {
-            this._dependencies[key] = {}
-        }
-        return new Page(this._dependencies[key])
-    }
-
-    merge (dependencies) {
-        this._dependencies = { ...this._dependencies, ...dependencies }
-    }
-}
-
 class Journalist {
     constructor (destructible, options) {
         const leaf = coalesece(options.leaf, {})
@@ -144,7 +116,7 @@ class Journalist {
             id,
             leaf: true,
             items: [],
-            dependencies: {},
+            entries: [],
             deletes: 0,
             // TODO Rename merged.
             deleted: false,
@@ -153,8 +125,6 @@ class Journalist {
             ghosts: 0,
             append
         }
-        const dependencies = new Dependencies(page.dependencies)
-        dependencies.page({ id, append })
         const player = new Player(function () { return '0' })
         const readable = fileSystem.createReadStream(this._path('pages', id, append))
         for await (let chunk of readable) {
@@ -169,8 +139,9 @@ class Journalist {
                         const { page: loaded } = await this._read(id, append)
                         page.items = loaded.items
                         page.right = loaded.right
-                        dependencies.merge(loaded.dependencies)
-                        // TODO Put an error here and there is no abend.
+                        page.entries.push({
+                            method: 'load', header: entry.header, entries: loaded.entries
+                        })
                     }
                     break
                 case 'slice': {
@@ -183,7 +154,9 @@ class Journalist {
                 case 'merge': {
                         const { page: right } = await this._read(entry.header.id, entry.header.append)
                         page.items.push.apply(page.items, right.items.slice(right.ghosts))
-                        dependencies.merge(right.dependencies)
+                        page.entries.push({
+                            method: 'merge', header: entry.header, entries: right.entries
+                        })
                     }
                     break
                 case 'insert': {
@@ -201,7 +174,7 @@ class Journalist {
                     break
                 case 'dependent': {
                         const { id, append } = entry.header
-                        dependencies.page({ id, append }).add(entry.header)
+                        page.entries.push({ method: 'dependent', header: entry.header })
                     }
                     break
                 }
@@ -518,6 +491,27 @@ class Journalist {
         const first = this._filename()
         const second = this._filename()
 
+        const dependencies = function map ({ id, append }, entries, dependencies = {}) {
+            assert(dependencies[`${id}/${append}`] == null)
+            const page = dependencies[`${id}/${append}`] = {}
+            for (const entry of entries) {
+                switch (entry.header.method) {
+                case 'load':
+                case 'merge': {
+                        map(entry.header, entry.entries, dependencies)
+                    }
+                    break
+                case 'dependent': {
+                        const { id, append } = entry.header
+                        assert(!page[`${id}/${append}`])
+                        page[`${id}/${append}`] = true
+                    }
+                    break
+                }
+            }
+            return dependencies
+        } (leaf.entry.value, leaf.entry.value.entries)
+
         await (async () => {
             // Flush any existing writes. We're still write blocked.
             const writes = this._queue(leaf.entry.value.id).writes.splice(0)
@@ -550,6 +544,12 @@ class Journalist {
                 }]
             })
             leaf.entry.value.append = second
+            leaf.entry.value.entries = [{
+                header: { method: 'load', id: leaf.entry.value.id, append: first },
+                entries: [{
+                    method: 'dependent', id: leaf.entry.value.id, append: second
+                }]
+            }]
 
             const commit = new Commit(this)
             await commit.write(prepare)
@@ -572,7 +572,7 @@ class Journalist {
             prepare.push(await commit.vacuum(leaf.entry.value.id, first, second, items, leaf.entry.value.right))
             // Merged pages themselves can just be deleted, but when we do, we
             // need to... Seems like both split and merge can use the same
-            // mechanism, this dependant reference. So, every page we load has a
+            // mechanism, this dependent reference. So, every page we load has a
             // list of dependents. We can eliminate any that we know we can
             // delete.
 
@@ -580,7 +580,6 @@ class Journalist {
             // references.
             const deleted = {}
             const deletions = {}
-            const dependencies = JSON.parse(JSON.stringify(leaf.entry.value.dependencies))
 
             // Could save some file operations by maybe doing the will be deleted
             // removals first, but this logic is cleaner.
@@ -785,7 +784,7 @@ class Journalist {
             id: this._nextId(true),
             leaf: true,
             items: items,
-            dependencies: JSON.parse(JSON.stringify(child.entry.value.dependencies)),
+            entries: [],
             right: child.entry.value.right,
             append: this._filename()
         })
@@ -813,32 +812,23 @@ class Journalist {
             }
         }
 
+
         // Write any queued writes, they would have been in memory, in the page
         // that was split above. Once we await, items can be inserted or removed
         // from the page in memory. Our synchronous operations are over.
         const append = this._filename()
-        const writes = this._queue(child.entry.value.id).writes.splice(0)
-        writes.push({
+        const dependents = [{
             header: { method: 'dependent', id: child.entry.value.id, append },
             body: null
         }, {
             header: { method: 'dependent', id: right.value.id, append: right.value.append },
             body: null
-        })
+        }]
+        const writes = this._queue(child.entry.value.id).writes.splice(0)
+        writes.push.apply(writes, dependents)
         await this._writeLeaf(child.entry.value.id, writes)
 
-        // TODO Maybe keep the merge, load records in the page and add then,
-        // then reconstruct dependencies by replaying them.
-        const dependencies = {
-            left: new Dependencies(child.entry.value.dependencies),
-            right: new Dependencies(right.value.dependencies),
-        }
-
-        dependencies.left.page(child.entry.value, append)
-        dependencies.left.page(child.entry.value).add(child.entry.value, append)
-        dependencies.left.page(child.entry.value).add(right.value)
-
-        dependencies.right.page(right.value)
+        child.entry.value.entries.push.apply(child.entry.value.entries, dependents)
 
         // Curious race condition here, though, where we've flushed the page to
         // split
@@ -849,6 +839,7 @@ class Journalist {
         const commit = new Commit(this)
 
         const prepare = []
+
 
         // Record the split of the right page in a new stub.
         prepare.push({
@@ -864,6 +855,10 @@ class Journalist {
                 length: length,
             }]
         })
+        right.value.entries = [{
+            header: { method: 'load', id: child.entry.value.id, append: child.entry.value.append },
+            entries: child.entry.value.entries
+        }]
 
         // Record the split of the left page in a new stub, for which we create
         // a new append file.
@@ -880,6 +875,10 @@ class Journalist {
                 length: partition
             }]
         })
+        child.entry.value.entries = [{
+            header: { method: 'load', id: child.entry.value.id, append: child.entry.value.append },
+            entries: child.entry.value.entries
+        }]
         child.entry.value.append = append
 
         // Commit the stubs before we commit the updated branch.
@@ -1201,6 +1200,13 @@ class Journalist {
                 right: left.entry.value.right
             }]
         })
+        left.entry.value.entries = [{
+            method: 'load', id: left.entry.value.id, append: left.entry.value.append,
+            entries: left.entry.value.entries
+        }, {
+            method: 'merge', id: right.entry.value.id, append: right.entry.value.append,
+            entries: right.entry.value.entries
+        }]
         left.entry.value.append = append
 
         // Commit the stub before we commit the updated branch.
