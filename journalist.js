@@ -17,8 +17,6 @@ const Turnstile = require('turnstile')
 Turnstile.Queue = require('turnstile/queue')
 Turnstile.Set = require('turnstile/set')
 
-const Fracture = require('fracture')
-
 function traceIf (condition) {
     if (condition) return function (...vargs) {
         console.log.apply(console, vargs)
@@ -53,12 +51,12 @@ class Journalist {
         this._recorder = recorder(() => '0')
         this._root = null
         this._operationId = 0xffffffff
-        const appending = new Fracture(destructible.durable('appender'))
+        const turnstiles = Math.min(coalesece(options.turnstiles, 3), 3)
+        const appending = new Turnstile(destructible.durable('appender'), { turnstiles })
+        // TODO Convert to Turnstile.Set.
         this._appending = new Turnstile.Queue(appending, this._append, this)
         this._queues = {}
-        this._blockId = 0xffffffff
         this._blocks = [{}]
-        // TODO Convert to Turnstile.Set.
         const housekeeping = new Turnstile(destructible.durable('housekeeper'))
         this._housekeeping = new Turnstile.Set(housekeeping, this._housekeeper, this)
         this._id = 0
@@ -368,6 +366,11 @@ class Journalist {
         await fs.appendFile(this._path('pages', id, append), Buffer.concat(buffers))
     }
 
+    // TODO Not difficult, merge queue and block. If you want to block, then
+    // when you get the queue, push promise onto a blocks queue, or simply
+    // assign a block. Or, add a block class, { appending: <promise>, blocking:
+    // <promise> } where appending is flipped when it enters the abend class and
+    // blocking is awaited, and blocking can be left null.
     _queue (id) {
         let queue = this._queues[id]
         if (queue == null) {
@@ -381,18 +384,22 @@ class Journalist {
         return queue
     }
 
-    // We prevent deadlock on the hash during merge by returning the same block
-    // object if it has already been obtained for an existing page.
+    // Block writing to a leaf. We do this by adding a block object to the next
+    // write that will be pulled from the append queue. This append function
+    // will notify that it has received the block by resolving the `enter`
+    // future and then wait on the `Promise` of the `exit` `Future`. We will
+    // only ever invoke `_block` from our housekeeping thread and so we assert
+    // that we've not blocked the same page twice. The housekeeping logic is
+    // particular about the leaves it blocks, so it should never overlap itself,
+    // and there should never be another strand trying to block appends. We will
+    // lock at most two pages at once so we must always have at least two
+    // turnstiles running for the `_append` `Turnstile`.
 
     //
-    _block (blockId, id) {
-        const index = this._index(id)
-        let block = this._blocks[index][blockId]
-        if (block == null) {
-            this._blocks[index][blockId] = block = { enter: new Future, exit: new Future }
-            this._appending.push({ method: 'block', index, blockId }, index)
-        }
-        return block
+    _block (id) {
+        const queue = this._queue(id)
+        assert(queue.block == null)
+        return queue.block = { enter: new Future, exit: new Future }
     }
 
     // Writes appear to be able to run with impunity. What was the logic there?
@@ -411,6 +418,7 @@ class Journalist {
 
     //
     async _append ({ body }) {
+        // TODO Doesn't `await null` do the same thing now?
         await callback((callback) => process.nextTick(callback))
         const { method } = body
         switch (method) {
@@ -418,6 +426,10 @@ class Journalist {
             const { id } = body
             const queue = this._queues[id]
             delete this._queues[id]
+            if (queue.block != null) {
+                queue.block.enter.resolve()
+                await queue.block.exit.promise
+            }
             // We flush a page's writes before we merge it into its left
             // sibling so there will always a queue entry for a page that has
             // been merged. It will never have any writes so we can skip writing
@@ -436,13 +448,6 @@ class Journalist {
                 await this._writeLeaf(id, queue.writes)
             }
             queue.entry.release()
-            break
-        case 'block':
-            const { index, blockId } = body
-            const block = this._blocks[index][blockId]
-            delete this._blocks[index][blockId]
-            block.enter.resolve()
-            await block.exit.promise
             break
         }
     }
@@ -481,8 +486,7 @@ class Journalist {
         const entries = []
         const leaf = await this.descend({ key })
 
-        const blockId = this._blockId = increment(this._blockId)
-        const block = this._block(blockId, leaf.entry.value.id)
+        const block = this._block(leaf.entry.value.id)
         await block.enter.promise
 
         const items = leaf.entry.value.items.slice(0)
@@ -758,9 +762,10 @@ class Journalist {
     //
     async _splitLeaf (key, child, entries) {
         // TODO Add right page to block.
-        const blockId = this._blockId = increment(this._blockId)
-        const block = this._block(blockId, child.entry.value.id)
+        const blocks = []
+        const block = this._block(child.entry.value.id)
         await block.enter.promise
+        blocks.push(block)
 
         const parent = await this.descend({ key, level: child.level - 1 }, entries)
 
@@ -787,6 +792,7 @@ class Journalist {
             right: child.entry.value.right,
             append: this._filename()
         })
+        blocks.push(this._block(right.value.id))
         entries.push(right)
         right.heft = heft
 
@@ -893,7 +899,7 @@ class Journalist {
         // we want to release the lock on the leaf as soon as possible.
         await commit.prepare()
         await commit.commit()
-        block.exit.resolve()
+        blocks.map(block => block.exit.resolve())
         await commit.prepare()
         await commit.commit()
         await commit.dispose()
@@ -1114,10 +1120,9 @@ class Journalist {
 
         const surgery = await this._surgery(right, pivot)
 
-        const blockId = this._blockId = increment(this._blockId)
         const blocks = [
-            this._block(blockId, left.entry.value.id),
-            this._block(blockId, right.entry.value.id)
+            this._block(left.entry.value.id),
+            this._block(right.entry.value.id)
         ]
 
         // Block writes to both pages.
