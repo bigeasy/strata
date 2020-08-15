@@ -1,6 +1,6 @@
 {
     "private":              true,
-    "name":                 "b-tree.async",
+    "name":                 "b-tree",
     "version":              "9.9.9",
     "description":
 
