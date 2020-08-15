@@ -32,7 +32,7 @@
                             "destructible":                 "5.2.0-alpha.6",
                             "extant":                       "^1.0.11",
                             "hash.fnv":                     "^1.0.5",
-                            "interrupt":                    "^9.0.0-alpha.4",
+                            "interrupt":                    "^10.0.3",
                             "prospective":                  "^0.1.0-alpha.4",
                             "rimraf":                       "^3.0.0",
                             "turnstile":                    "6.0.0-alpha.2"
