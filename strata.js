@@ -32,9 +32,12 @@ class Strata {
         return this._journalist.open()
     }
 
-    async search (key) {
+    async search (key, fork = false) {
+        const query = key === Infinity
+            ? { key: null, rightward: true, fork: false }
+            : { key, rightward: false, fork: fork }
         DESCEND: for (;;) {
-            const descent = await this._journalist.descend({ key })
+            const descent = await this._journalist.descend(query)
             const cursor = new Cursor(this._journalist, descent, key)
             UNLOCK: while (cursor.page.lock != null) {
                 descent.entry.release()

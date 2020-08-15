@@ -219,11 +219,15 @@ class Journalist {
     }
 
     // TODO If `key` is `null` then just go left.
-    _descend (entries, { key, level = -1, fork = false }) {
+    _descend (entries, { key, level = -1, fork = false, rightward = false }) {
         const descent = { miss: null, keyed: null, level: 0, index: 0, entry: null }
-        let entry = null, forking = false
+        let entry = null
         entries.push(entry = this._hold(-1))
         for (;;) {
+            // When you go rightward at the outset or fork you might hit this
+            // twice, but it won't matter because you're not going to use the
+            // pivot anyway.
+            //
             // You'll struggle to remember this, but it is true...
             if (descent.index != 0) {
                 // The last key we visit is the key for the leaf page, if we're
@@ -246,7 +250,7 @@ class Journalist {
                 // here.
                 if (descent.pivot.key == key && fork) {
                     descent.index--
-                    forking = true
+                    rightward = true
                 }
             }
 
@@ -266,10 +270,14 @@ class Journalist {
                 return { miss: id }
             }
 
-            // Binary search the page for the key.
+            // Binary search the page for the key, or just go right or left
+            // directly if there is no key.
             const offset = entry.value.leaf ? entry.value.ghosts : 1
-            const index = forking ? entry.value.items.length - 1
-                                  : find(this.comparator, entry.value, key, offset)
+            const index = rightward
+                ? entry.value.items.length - 1
+                : key != null
+                    ? find(this.comparator, entry.value, key, offset)
+                    : 0
 
             // If the page is a leaf, assert that we're looking for a leaf and
             // return the leaf page.
@@ -294,7 +302,7 @@ class Journalist {
 
             descent.level++
         }
-        if (fork && !forking) {
+        if (fork && !rightward) {
             return null
         }
         return descent

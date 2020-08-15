@@ -1,4 +1,4 @@
-require('proof')(2, async (okay) => {
+require('proof')(4, async (okay) => {
     const Destructible = require('destructible')
 
     const Strata = require('../strata')
@@ -26,8 +26,8 @@ require('proof')(2, async (okay) => {
     })
 
     await async function () {
-        const cache = new Cache
         const destructible = new Destructible([ 'split.t', 'split' ])
+        const cache = new Cache
         const strata = new Strata(destructible, { directory, cache })
         await strata.open()
         const cursor = (await strata.search('f')).get()
@@ -67,6 +67,45 @@ require('proof')(2, async (okay) => {
             right = cursor.page.right
         } while (right != null)
         okay(items, [ 'a', 'b', 'c', 'd', 'e', 'f' ], 'traverse')
+        await strata.close()
+        await destructible.destructed
+    } ()
+    await async function () {
+        const destructible = new Destructible([ 'split.t', 'forward' ])
+        const cache = new Cache
+        const strata = new Strata(destructible, { directory, cache })
+        await strata.open()
+        let right = null
+        const items = []
+        do {
+            const cursor = (await strata.search(right)).get()
+            for (let i = cursor.index; i < cursor.page.items.length; i++) {
+                items.push(cursor.page.items[i].value)
+            }
+            cursor.release()
+            right = cursor.page.right
+        } while (right != null)
+        okay(items, [ 'a', 'b', 'c', 'd', 'e', 'f' ], 'forward')
+        await strata.close()
+        await destructible.destructed
+    } ()
+    await async function () {
+        const destructible = new Destructible([ 'split.t', 'forward' ])
+        const cache = new Cache
+        const strata = new Strata(destructible, { directory, cache })
+        await strata.open()
+        let left = Infinity, fork = false, cursor
+        const items = []
+        do {
+            cursor = (await strata.search(left, fork)).get()
+            for (let i = cursor.index; i >= cursor.ghosts; i--) {
+                items.push(cursor.page.items[i].value)
+            }
+            cursor.release()
+            left = cursor.page.items[0].key
+            fork = true
+        } while (cursor.page.id != '0.1')
+        okay(items, [ 'a', 'b', 'c', 'd', 'e', 'f' ].reverse(), 'reverse')
         await strata.close()
         await destructible.destructed
     } ()
