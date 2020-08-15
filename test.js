@@ -5,14 +5,14 @@ const ascension = require('ascension')
 const fileSystem = require('fs')
 const fs = require('fs').promises
 const shifter = require('./shifter')(() => '0')
-const recorder = require('../recorder')(() => '0')
-const fnv = require('../fnv')
+const recorder = require('./recorder')(() => '0')
+const fnv = require('./fnv')
 
 const appendable = ascension([ Number, Number ], function (file) {
     return file.split('.')
 })
 
-exports.directory = path.resolve(__dirname, './tmp')
+exports.directory = path.resolve(__dirname, './test/tmp')
 
 exports.reset = async function (directory) {
     await callback(callback => rimraf(directory, callback))

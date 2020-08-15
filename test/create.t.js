@@ -4,7 +4,7 @@ require('proof')(2, async (okay) => {
 
     const Strata = require('../strata')
     const Cache = require('../cache')
-    const utilities = require('./utilities')
+    const utilities = require('../test')
     const path = require('path')
     const directory = path.join(utilities.directory, 'create')
     const fs = require('fs').promises
