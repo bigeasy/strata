@@ -20,6 +20,9 @@ class Unlocker {
 }
 
 class Strata {
+    static MIN = Symbol('min')
+    static MAX = Symbol('min')
+
     constructor (destructible, options) {
         this._journalist = new Journalist(destructible, options)
     }
@@ -33,9 +36,11 @@ class Strata {
     }
 
     async search (key, fork = false) {
-        const query = key === Infinity
-            ? { key: null, rightward: true, fork: false }
-            : { key, rightward: false, fork: fork }
+        const query = key === Strata.MIN
+            ? { key: null, rightward: false, fork: false }
+            : key === Strata.MAX
+                ? { key: null, rightward: true, fork: false }
+                : { key, rightward: false, fork: fork }
         DESCEND: for (;;) {
             const descent = await this._journalist.descend(query)
             const cursor = new Cursor(this._journalist, descent, key)

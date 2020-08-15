@@ -75,7 +75,7 @@ require('proof')(4, async (okay) => {
         const cache = new Cache
         const strata = new Strata(destructible, { directory, cache })
         await strata.open()
-        let right = null
+        let right = Strata.MIN
         const items = []
         do {
             const cursor = (await strata.search(right)).get()
@@ -94,7 +94,7 @@ require('proof')(4, async (okay) => {
         const cache = new Cache
         const strata = new Strata(destructible, { directory, cache })
         await strata.open()
-        let left = Infinity, fork = false, cursor
+        let left = Strata.MAX, fork = false, cursor
         const items = []
         do {
             cursor = (await strata.search(left, fork)).get()
