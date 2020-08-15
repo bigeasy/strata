@@ -1,7 +1,7 @@
 {
     "private":              true,
     "name":                 "b-tree",
-    "version":              "2.0.0-alpha.0",
+    "version":              "2.0.0-alpha.1",
     "description":
 
       "Async/Await I/O B-tree in pure JavaScript for Node.js.",
