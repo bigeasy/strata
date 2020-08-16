@@ -3,7 +3,7 @@ require('proof')(3, async (okay) => {
     const destructible = new Destructible('delete.t')
     const Strata = require('../strata')
     const Cache = require('../cache')
-    const utilities = require('../test')
+    const utilities = require('../utilities')
     const path = require('path')
     const directory = path.join(utilities.directory, 'delete')
     await utilities.reset(directory)
