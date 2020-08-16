@@ -41,7 +41,7 @@ class Strata {
             ? { key: null, rightward: false, fork: false }
             : key === Strata.MAX
                 ? { key: null, rightward: true, fork: false }
-                : { key, rightward: false, fork: fork }
+                : { key, rightward: false, fork: fork, approximate: true }
         DESCEND: for (;;) {
             const descent = await this._journalist.descend(query)
             const cursor = new Cursor(this._journalist, descent, key)

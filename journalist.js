@@ -166,7 +166,11 @@ class Journalist {
                     }
                     break
                 case 'delete': {
-                        page.items.splice(entry.header.index, 1)
+                        if (entry.header.index == 0) {
+                            page.ghosts = 1
+                        } else {
+                            page.items.splice(entry.header.index, 1)
+                        }
                         page.deletes++
                     }
                     break
@@ -219,7 +223,7 @@ class Journalist {
     }
 
     // TODO If `key` is `null` then just go left.
-    _descend (entries, { key, level = -1, fork = false, rightward = false }) {
+    _descend (entries, { key, level = -1, fork = false, rightward = false, approximate = false }) {
         const descent = { miss: null, keyed: null, level: 0, index: 0, entry: null }
         let entry = null
         entries.push(entry = this._hold(-1))
@@ -303,7 +307,11 @@ class Journalist {
             descent.level++
         }
         if (fork && !rightward) {
-            return null
+            if (approximate) {
+                descent.index < 0 ? descent.index++ : descent.index--
+            } else {
+                return null
+            }
         }
         return descent
     }

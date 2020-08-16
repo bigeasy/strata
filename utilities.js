@@ -37,7 +37,6 @@ exports.vivify = async function (directory) {
             const records = []
             while (entries.length != 0) {
                 const record = shifter(entries), header = record[0].header
-                console.log(header)
                 switch (header.method) {
                 case 'right':
                     records.push([ header.method, header.right ])
