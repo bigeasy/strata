@@ -20,8 +20,9 @@ class Unlocker {
 }
 
 class Strata {
-    static MIN = Symbol('min')
-    static MAX = Symbol('min')
+    static MIN = Symbol('MIN')
+
+    static MAX = Symbol('MAX')
 
     constructor (destructible, options) {
         this._journalist = new Journalist(destructible, options)
