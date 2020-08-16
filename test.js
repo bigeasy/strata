@@ -47,6 +47,13 @@ exports.vivify = async function (directory) {
                 case 'delete':
                     records.push([ header.method, header.index ])
                     break
+                case 'load': {
+                        const { id, append } = header
+                        const load = (await fs.readFile(path.resolve(pages, id, append), 'utf8')).split(/\n/)
+                        load.pop()
+                        entries.unshift.apply(entries, load.map(line => JSON.parse(line)))
+                    }
+                    break
                 }
             }
             vivified[file] = records
