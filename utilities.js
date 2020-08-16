@@ -37,9 +37,10 @@ exports.vivify = async function (directory) {
             const records = []
             while (entries.length != 0) {
                 const record = shifter(entries), header = record[0].header
+                console.log(header)
                 switch (header.method) {
                 case 'right':
-                    record.push([ header.method, header.right ])
+                    records.push([ header.method, header.right ])
                     break
                 case 'insert':
                     records.push([ header.method, header.index, record[1] ])
