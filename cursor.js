@@ -27,6 +27,8 @@ class Cursor {
         }
         const comparator = this._journalist.comparator
         index = find(comparator, this.page, key, index)
+        // TODO What about inserting at zero? Only if we are at the first page,
+        // right?
         const unambiguous = -1 < index // <- TODO ?
             || ~ index < this.page.items.length
             || this.page.right == null
