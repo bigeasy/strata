@@ -32,7 +32,7 @@ class Cursor {
         const unambiguous = -1 < index // <- TODO ?
             || ~ index < this.page.items.length
             || this.page.right == null
-        if (!unambiguous && comparator(key, page.right) >= 0) {
+        if (!unambiguous && comparator(key, this.page.right) >= 0) {
             return null
         }
         return index
