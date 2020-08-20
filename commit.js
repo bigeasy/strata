@@ -167,7 +167,10 @@ class Commit {
         // Write out a new page slowly, a record at a time.
         for (let index = 0, I = items.length; index < I; index++) {
             const { key, value } = items[index]
-            buffers.push(recorder({ method: 'insert', index }, [ key, value ]))
+            buffers.push(recorder({ method: 'insert', index }, [
+                this._journalist.serializer.key.serialize(key),
+                this._journalist.serializer.value.serialize(value)
+            ]))
         }
         buffers.push(recorder({
             method: 'dependent', id: id, append: second

@@ -55,7 +55,10 @@ class Cursor {
             id: this.page.id,
             record: record,
             header: { method: 'insert', index: index },
-            parts: [ key, value ]
+            parts: [
+                this._journalist.serializer.key.serialize(key),
+                this._journalist.serializer.value.serialize(value)
+            ]
         }, this._promises)
 
         this.page.items.splice(index, 0, record)

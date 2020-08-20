@@ -66,7 +66,7 @@ class Journalist {
             key: options.serializer,
             value: options.serializer
         } : options.serializer, {})
-        this._serializer = {
+        this.serializer = {
             key: serializer(coalesce(_serializer.key, 'json')),
             value: serializer(coalesce(_serializer.value, 'json'))
         }
@@ -191,8 +191,8 @@ class Journalist {
                     break
                 case 'insert': {
                         page.items.splice(entry.header.index, 0, {
-                            key: entry.parts[0],
-                            value: entry.parts[1],
+                            key: this.serializer.key.deserialize(entry.parts[0]),
+                            value: this.serializer.value.deserialize(entry.parts[1]),
                             heft: entry.sizes.reduce((sum, size) => sum + size, 0)
                         })
                     }

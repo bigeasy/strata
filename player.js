@@ -45,21 +45,17 @@ class Player {
                 }
                 break
             case 'payload': {
-                    const length = header.length.reduce((sum, value) => sum + value, 0)
+                    const length = header.lengths.reduce((sum, value) => sum + value, 0)
                     if (chunk.length - start < length) {
                         break SPLIT
                     }
                     const checksum = this._checksum.call(null, chunk, start, start + length)
                     assert.equal(checksums[1], checksum)
-                    assert.equal(header.json.length, header.length.length)
                     const parts = []
-                    for (let i = 0, I = header.length.length; i < I; i++) {
-                        sizes.push(header.length[i])
-                        let part = chunk.slice(start, start + header.length[i] - 1)
-                        if (header.json[i]) {
-                            part = JSON.parse(part.toString())
-                        }
-                        offset = start = start + header.length[i]
+                    for (const length of header.lengths) {
+                        sizes.push(length)
+                        let part = chunk.slice(start, start + length - 1)
+                        offset = start = start + length
                         parts.push(part)
                     }
                     entries.push({
