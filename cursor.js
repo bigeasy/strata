@@ -48,7 +48,8 @@ class Cursor {
 
         // Heft will be set when the record is serialized.
         assert(key && value)
-        // TODO Does not appear to be used.
+        // Create a record to add to the page. Also give to Journalist so it can
+        // set the heft.
         const record = { key: key, value: value, heft: 0 }
 
         this._journalist.append({
