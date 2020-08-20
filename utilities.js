@@ -85,8 +85,8 @@ exports.serialize = async function (directory, files) {
                 switch (record[0]) {
                 case 'right':
                     return {
-                        header: { method: 'right', right: record[1] },
-                        parts: []
+                        header: { method: 'right' },
+                        parts: [ Buffer.from(JSON.stringify(record[1])) ]
                     }
                 case 'insert':
                     return {

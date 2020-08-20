@@ -161,7 +161,7 @@ class Journalist {
                 switch (entry.header.method) {
                 case 'right': {
                         // TODO Need to use the key section of the record.
-                        page.right = entry.header.right
+                        page.right = this.serializer.key.deserialize(entry.parts[0])
                     }
                     break
                 case 'load': {
@@ -184,6 +184,7 @@ class Journalist {
                 case 'merge': {
                         const { page: right } = await this._read(entry.header.id, entry.header.append)
                         page.items.push.apply(page.items, right.items.slice(right.ghosts))
+                        page.right = right.right
                         page.entries.push({
                             method: 'merge', header: entry.header, entries: right.entries
                         })
@@ -1214,6 +1215,10 @@ class Journalist {
         // asynchronous `Cursor`s will be invalid and they'll have to descend
         // again. User writes will continue in memory, but leaf page writes are
         // currently blocked. We start by flushing any cached writes.
+        //
+        // TODO Apparently we don't add a dependent record to the left since it
+        // has the same id, we'd depend on ourselves, but vacuum ought to erase
+        // it.
         const writes = {
             left: this._queue(left.entry.value.id).writes.splice(0),
             right: this._queue(right.entry.value.id).writes.splice(0).concat({
@@ -1247,11 +1252,11 @@ class Journalist {
                 method: 'merge',
                 id: right.entry.value.id,
                 append: right.entry.value.append
-            }, {
-                method: 'right',
-                right: left.entry.value.right
             }]
         })
+        // TODO Okay, forgot what `entries` is and it appears to be just the
+        // entries needed to determine dependencies so we can unlink files when
+        // we vaccum.
         left.entry.value.entries = [{
             method: 'load', id: left.entry.value.id, append: left.entry.value.append,
             entries: left.entry.value.entries

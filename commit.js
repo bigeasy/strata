@@ -163,7 +163,9 @@ class Commit {
         const filename = this._path(`${id}-${first}`)
         const recorder = this._journalist._recorder
         const buffers = []
-        buffers.push(recorder({ method: 'right', right }, []))
+        buffers.push(recorder({ method: 'right' }, [
+            this._journalist.serializer.key.serialize(right)
+        ]))
         // Write out a new page slowly, a record at a time.
         for (let index = 0, I = items.length; index < I; index++) {
             const { key, value } = items[index]
