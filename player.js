@@ -3,16 +3,82 @@ const EOL = Buffer.from('\n')
 
 class Player {
     constructor (checksum) {
-        this._remainder = Buffer.alloc(0)
         this._checksum = checksum
+        this._remainder = Buffer.alloc(0)
         this._entry = {
-            checksums: null,
+            state: 'checksum',
             header: null,
-            push: { header: null, body: null, sizes: [] }
+            checksums: null,
+            sizes: []
         }
     }
 
     split (chunk) {
+        const entries = []
+        let { state, header, checksums, sizes } = this._entry, start = 0
+        let offset = this._remainder.length
+        chunk = Buffer.concat([ this._remainder, chunk ])
+        SPLIT: for (;;) {
+            switch (state) {
+            case 'checksum': {
+                    const index = chunk.indexOf(0xa, offset)
+                    if (!~index) {
+                        break SPLIT
+                    }
+                    sizes.push(index - start + 1)
+                    checksums = JSON.parse(chunk.slice(start, index + 1))
+                    start = offset = index + 1
+                    state = 'header'
+                }
+                break
+            case 'header': {
+                    const index = chunk.indexOf(0xa, offset)
+                    if (!~index) {
+                        break SPLIT
+                    }
+                    sizes.push(index - start + 1)
+                    const buffer = chunk.slice(start, index + 1)
+                    assert.equal(checksums[0], this._checksum.call(null, buffer, 0, buffer.length))
+                    header = JSON.parse(buffer.toString())
+                    state = 'payload'
+                    start = offset = index + 1
+                }
+                break
+            case 'payload': {
+                    const length = header.length.reduce((sum, value) => sum + value, 0)
+                    if (chunk.length - start < length) {
+                        break SPLIT
+                    }
+                    const checksum = this._checksum.call(null, chunk, start, start + length)
+                    assert.equal(checksums[1], checksum)
+                    assert.equal(header.json.length, header.length.length)
+                    const parts = []
+                    for (let i = 0, I = header.length.length; i < I; i++) {
+                        sizes.push(header.length[i])
+                        let part = chunk.slice(start, start + header.length[i] - 1)
+                        if (header.json[i]) {
+                            part = JSON.parse(part.toString())
+                        }
+                        offset = start = start + header.length[i]
+                        parts.push(part)
+                    }
+                    entries.push({
+                        header: header.header,
+                        parts: parts,
+                        sizes: sizes
+                    })
+                    sizes = []
+                    state = 'checksum'
+                }
+                break
+            }
+        }
+        this._remainder = chunk.slice(start)
+        this._entry = { state, start, header, checksums, sizes }
+        return entries
+    }
+
+    _split (chunk) {
         const buffer = Buffer.concat([ this._remainder, chunk ])
         const buffers = []
         let begin = 0
@@ -28,7 +94,7 @@ class Player {
             if (this._entry.checksums == null) {
                 this._entry.checksums = JSON.parse(buffer.toString())
             } else if (this._entry.header == null) {
-                assert(checksum(buffer, 0, buffer.length) == this._entry.checksums[0])
+                assert(checksum(buffer, 0, buffer.length) === this._entry.checksums[0])
                 this._entry.header = JSON.parse(buffer.toString())
                 this._entry.push.header = this._entry.header.header
                 this._entry.push.sizes.push(buffer.length)

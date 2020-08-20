@@ -1,21 +1,20 @@
 module.exports = function (checksum) {
     const EOL = Buffer.from('\n')
-    return function (header, body = null) {
-        const buffers = [], checksums = []
-        let length = 0, json = false
-        if (body != null) {
-            if (!Buffer.isBuffer(body)) {
-                json = true
-                body = Buffer.from(JSON.stringify(body))
-            }
-            buffers.push(EOL, body)
-            length = body.length + 1
-            checksums.push(checksum(body, 0, body.length))
+    return function (header, parts) {
+        const payload = [], buffers = [], checksums = [], length = [], json = []
+        for (const part of parts) {
+            json.push(!Buffer.isBuffer(part))
+            const buffer = json[json.length - 1]
+                ? Buffer.from(JSON.stringify(part))
+                : part
+            payload.push(buffer, EOL)
+            length.push(buffer.length + 1)
         }
-        header = Buffer.from(JSON.stringify({ json, length, header }))
-        buffers.push(EOL, header)
-        checksums.push(checksum(header, 0, header.length))
-        buffers.push(EOL, Buffer.from(JSON.stringify(checksums.reverse())))
-        return Buffer.concat(buffers.reverse())
+        buffers.unshift(Buffer.concat(payload))
+        checksums.unshift(checksum(buffers[0], 0, buffers[0].length))
+        buffers.unshift(Buffer.concat([ Buffer.from(JSON.stringify({ json, length, header })), EOL ]))
+        checksums.unshift(checksum(buffers[0], 0, buffers[0].length))
+        buffers.unshift(Buffer.from(JSON.stringify(checksums)), EOL)
+        return Buffer.concat(buffers)
     }
 }

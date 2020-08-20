@@ -3,10 +3,10 @@ module.exports = function (checksum) {
         if (array.length == 0) {
             return null
         }
-        var checksum = array.shift(), header = array.shift()
-        if (header.length == 0) {
-            return [ header, null ]
+        const checksum = array.shift(), header = array.shift(), key = array.shift()
+        if (header.length.length == 1) {
+            return [ header, key, null ]
         }
-        return [ header, array.shift() ]
+        return [ header, key, array.shift() ]
     }
 }

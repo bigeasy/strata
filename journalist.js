@@ -8,7 +8,7 @@ const find = require('./find')
 const assert = require('assert')
 const Cursor = require('./cursor')
 const callback = require('prospective/callback')
-const coalesece = require('extant')
+const coalesce = require('extant')
 const Future = require('prospective/future')
 const Commit = require('./commit')
 const fnv = require('./fnv')
@@ -32,17 +32,48 @@ function increment (value) {
     return value + 1 & 0xffffffff
 }
 
+function serializer (option) {
+    switch (option) {
+    case 'buffer':
+        return {
+            serialize: function (buffer) { return buffer },
+            deserialize: function (buffer) { return buffer }
+        }
+    case 'json':
+        return {
+            serialize: function (json) {
+                return Buffer.from(JSON.stringify(json))
+            },
+            deserialize: function (buffer) {
+                return JSON.parse(buffer.toString())
+            }
+        }
+    default:
+        assert(typeof option.serialize == 'function')
+        assert(typeof option.deserialize == 'function')
+        return option
+    }
+}
+
 class Journalist {
     constructor (destructible, options) {
-        const leaf = coalesece(options.leaf, {})
+        const leaf = coalesce(options.leaf, {})
         this.leaf = {
-            split: coalesece(leaf.split, 5),
-            merge: coalesece(leaf.merge, 1)
+            split: coalesce(leaf.split, 5),
+            merge: coalesce(leaf.merge, 1)
         }
-        const branch = coalesece(options.branch, {})
+        const _serializer = coalesce(typeof options.serializer == 'string' ? {
+            key: options.serializer,
+            value: options.serializer
+        } : options.serializer, {})
+        this._serializer = {
+            key: serializer(coalesce(_serializer.key, 'json')),
+            value: serializer(coalesce(_serializer.value, 'json'))
+        }
+        const branch = coalesce(options.branch, {})
         this.branch = {
-            split: coalesece(branch.split, 5),
-            merge: coalesece(branch.merge, 1)
+            split: coalesce(branch.split, 5),
+            merge: coalesce(branch.merge, 1)
         }
         this.cache = options.cache
         this.instance = 0
@@ -51,7 +82,7 @@ class Journalist {
         this._recorder = recorder(() => '0')
         this._root = null
         this._operationId = 0xffffffff
-        const turnstiles = Math.min(coalesece(options.turnstiles, 3), 3)
+        const turnstiles = Math.min(coalesce(options.turnstiles, 3), 3)
         const appending = new Turnstile(destructible.durable('appender'), { turnstiles })
         // TODO Convert to Turnstile.Set.
         this._appending = new Turnstile.Queue(appending, this._append, this)
@@ -129,6 +160,7 @@ class Journalist {
             for (let entry of player.split(chunk)) {
                 switch (entry.header.method) {
                 case 'right': {
+                        // TODO Need to use the key section of the record.
                         page.right = entry.header.right
                     }
                     break
@@ -159,9 +191,9 @@ class Journalist {
                     break
                 case 'insert': {
                         page.items.splice(entry.header.index, 0, {
-                            key: entry.header.key,
-                            value: entry.body,
-                            heft: entry.sizes[0] + entry.sizes[1]
+                            key: entry.parts[0],
+                            value: entry.parts[1],
+                            heft: entry.sizes.reduce((sum, size) => sum + size, 0)
                         })
                     }
                     break
@@ -343,7 +375,7 @@ class Journalist {
     }
 
     async close () {
-        if (!this.closed) {
+        if (!this.destroyed && !this.closed) {
             assert(!this.destroyed, 'already destroyed')
             this.closed = true
             // Trying to figure out how to wait for the Turnstile to drain. We
@@ -371,7 +403,7 @@ class Journalist {
         const recorder = this._recorder
         const entry = this._hold(id)
         const buffers = writes.map(write => {
-            const buffer = recorder(write.header, write.body)
+            const buffer = recorder(write.header, write.parts)
             // TODO Where is heft removal?
             if (write.header.method == 'insert') {
                 entry.heft += (write.record.heft = buffer.length)
@@ -840,10 +872,10 @@ class Journalist {
         const append = this._filename()
         const dependents = [{
             header: { method: 'dependent', id: child.entry.value.id, append },
-            body: null
+            parts: []
         }, {
             header: { method: 'dependent', id: right.value.id, append: right.value.append },
-            body: null
+            parts: []
         }]
         const writes = this._queue(child.entry.value.id).writes.splice(0)
         writes.push.apply(writes, dependents)
@@ -1190,7 +1222,7 @@ class Journalist {
                     id: left.entry.value.id,
                     append: left.entry.value.append
                 },
-                body: null
+                parts: []
             })
         }
 

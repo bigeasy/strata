@@ -86,23 +86,23 @@ exports.serialize = async function (directory, files) {
                 case 'right':
                     return {
                         header: { method: 'right', right: record[1] },
-                        body: null
+                        parts: []
                     }
                 case 'insert':
                     return {
-                        header: { method: 'insert', index: record[1], key: record[2] },
-                        body: record[2]
+                        header: { method: 'insert', index: record[1] },
+                        parts: [ record[2], record[2] ]
                     }
                 case 'delete':
                     return {
                         header: { method: 'delete', index: record[1] },
-                        body: null
+                        parts: []
                     }
                 default:
                     console.log(record)
                     break
                 }
-            }).map(entry => recorder(entry.header, entry.body))
+            }).map(entry => recorder(entry.header, entry.parts))
             const file = path.resolve(directory, 'pages', id, '0.0')
             await fs.writeFile(file, Buffer.concat(writes))
         }

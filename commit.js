@@ -163,15 +163,15 @@ class Commit {
         const filename = this._path(`${id}-${first}`)
         const recorder = this._journalist._recorder
         const buffers = []
-        buffers.push(recorder({ method: 'right', right }))
+        buffers.push(recorder({ method: 'right', right }, []))
         // Write out a new page slowly, a record at a time.
         for (let index = 0, I = items.length; index < I; index++) {
             const { key, value } = items[index]
-            buffers.push(recorder({ method: 'insert', index, key }, value))
+            buffers.push(recorder({ method: 'insert', index }, [ key, value ]))
         }
         buffers.push(recorder({
             method: 'dependent', id: id, append: second
-        }))
+        }, []))
         const buffer = Buffer.concat(buffers)
         const hash = fnv(buffer)
         await fs.writeFile(filename, buffer)
@@ -224,7 +224,7 @@ class Commit {
             // loads) a previous page.
             case 'stub': {
                     const recorder = this._journalist._recorder
-                    const buffer = Buffer.concat(operation.records.map(record => recorder(record)))
+                    const buffer = Buffer.concat(operation.records.map(record => recorder(record, [])))
                     const hash = fnv(buffer)
                     const filename = `${operation.page.id}-${operation.page.append}`
                     const from = path.join('commit', filename)

@@ -48,13 +48,14 @@ class Cursor {
 
         // Heft will be set when the record is serialized.
         assert(key && value)
+        // TODO Does not appear to be used.
         const record = { key: key, value: value, heft: 0 }
 
         this._journalist.append({
             id: this.page.id,
             record: record,
-            header: { method: 'insert', index: index, key: key },
-            body: value
+            header: { method: 'insert', index: index },
+            parts: [ key, value ]
         }, this._promises)
 
         this.page.items.splice(index, 0, record)
@@ -66,7 +67,7 @@ class Cursor {
         this._journalist.append({
             id: this.page.id,
             header: { method: 'delete', index: index },
-            body: null
+            parts: []
         }, this._promises)
 
         if (ghost) {
