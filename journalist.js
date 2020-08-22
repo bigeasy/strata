@@ -28,10 +28,6 @@ const appendable = require('./appendable')
 
 const Strata = { Error: require('./error') }
 
-function increment (value) {
-    return value + 1 & 0xffffffff
-}
-
 function serializer (option) {
     switch (option) {
     case 'buffer':
@@ -81,6 +77,7 @@ class Journalist {
         this.comparator = options.comparator || ascension([ String ], (value) => [ value ])
         this._recorder = recorder(() => '0')
         this._root = null
+        // Operation id wraps at 32-bits, cursors should not be open that long.
         this._operationId = 0xffffffff
         const turnstiles = Math.min(coalesce(options.turnstiles, 3), 3)
         const appending = new Turnstile(destructible.durable('appender'), { turnstiles })
@@ -424,7 +421,7 @@ class Journalist {
         let queue = this._queues[id]
         if (queue == null) {
             queue = this._queues[id] = {
-                id: this._operationId = increment(this._operationId),
+                id: this._operationId = (this._operationId + 1 & 0xffffffff) >>> 0,
                 writes: [],
                 entry: this._hold(id),
                 promise: this._appending.enqueue({ method: 'write', id }, this._index(id))
