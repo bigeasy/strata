@@ -84,13 +84,10 @@ class Cursor {
     }
 
     async flush () {
-        const promises = []
-        for (let id in this._promises) {
-            promises.push(this._promises[id])
-        }
+        const promises = this._promises
         this._promises = {}
-        for (let promise of promises) {
-            await promise
+        for (const id in this._promises) {
+            await this._promises[id]
         }
     }
 
