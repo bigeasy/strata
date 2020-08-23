@@ -28,43 +28,12 @@ const appendable = require('./appendable')
 
 const Strata = { Error: require('./error') }
 
-function serializer (option) {
-    switch (option) {
-    case 'buffer':
-        return {
-            serialize: function (buffer) { return buffer },
-            deserialize: function (buffer) { return buffer }
-        }
-    case 'json':
-        return {
-            serialize: function (json) {
-                return Buffer.from(JSON.stringify(json))
-            },
-            deserialize: function (buffer) {
-                return JSON.parse(buffer.toString())
-            }
-        }
-    default:
-        assert(typeof option.serialize == 'function')
-        assert(typeof option.deserialize == 'function')
-        return option
-    }
-}
-
 class Journalist {
     constructor (destructible, options) {
         const leaf = coalesce(options.leaf, {})
         this.leaf = {
             split: coalesce(leaf.split, 5),
             merge: coalesce(leaf.merge, 1)
-        }
-        const _serializer = coalesce(typeof options.serializer == 'string' ? {
-            key: options.serializer,
-            value: options.serializer
-        } : options.serializer, {})
-        this.serializer = {
-            key: serializer(coalesce(_serializer.key, 'json')),
-            value: serializer(coalesce(_serializer.value, 'json'))
         }
         const branch = coalesce(options.branch, {})
         this.branch = {
@@ -74,7 +43,45 @@ class Journalist {
         this.cache = options.cache
         this.instance = 0
         this.directory = options.directory
-        this.comparator = options.comparator || ascension([ String ], (value) => [ value ])
+        this.serializer = function () {
+            const serializer = coalesce(options.serializer, 'json')
+            switch (serializer) {
+            case 'json':
+                return {
+                    parts: {
+                        serialize: function (parts) {
+                            return parts.map(part => Buffer.from(JSON.stringify(part)))
+                        },
+                        deserialize: function (parts) {
+                            return parts.map(part => JSON.parse(part.toString()))
+                        }
+                    },
+                    key: {
+                        serialize: function (key) {
+                            return Buffer.from(JSON.stringify(key))
+                        },
+                        deserialize: function (key) {
+                            return JSON.parse(key.toString())
+                        }
+                    }
+                }
+            case 'buffer':
+                return {
+                    parts: {
+                        serialize: function (parts) { return parts },
+                        deserialize: function (parts) { return parts }
+                    },
+                    key: {
+                        serialize: function (part) { return part },
+                        deserialize: function (part) { return part }
+                    }
+                }
+            default:
+                return serializer
+            }
+        } ()
+        this.extractor = coalesce(options.extractor, parts => parts[0])
+        this.comparator = coalesce(options.comparator, ascension([ String ], (value) => [ value ]))
         this._recorder = recorder(() => '0')
         this._root = null
         // Operation id wraps at 32-bits, cursors should not be open that long.
@@ -159,6 +166,7 @@ class Journalist {
                 case 'right': {
                         // TODO Need to use the key section of the record.
                         page.right = this.serializer.key.deserialize(entry.parts[0])
+                        assert(page.right != null)
                     }
                     break
                 case 'load': {
@@ -188,9 +196,10 @@ class Journalist {
                     }
                     break
                 case 'insert': {
+                        const parts = this.serializer.parts.deserialize(entry.parts)
                         page.items.splice(entry.header.index, 0, {
-                            key: this.serializer.key.deserialize(entry.parts[0]),
-                            value: this.serializer.value.deserialize(entry.parts[1]),
+                            key: this.extractor(parts),
+                            parts: parts,
                             heft: entry.sizes.reduce((sum, size) => sum + size, 0)
                         })
                     }

@@ -21,8 +21,6 @@ require('proof')(3, async (okay) => {
             'insert', 2, 'c'
         ]],
         '0.3': [[
-            'right', null
-        ], [
             'insert', 0, 'd'
         ], [
             'insert', 1, 'e'
@@ -55,7 +53,7 @@ require('proof')(3, async (okay) => {
             const strata = new Strata(destructible.ephemeral('reopen'), { directory, cache })
             await strata.open()
             const cursor = (await strata.search('d')).get()
-            okay(cursor.items[cursor.index].value, 'd', 'found')
+            okay(cursor.items[cursor.index].parts[0], 'd', 'found')
             cursor.release()
             await strata.close()
         }
@@ -69,7 +67,7 @@ require('proof')(3, async (okay) => {
             do {
                 const cursor = (await strata.search(right)).get()
                 for (let i = cursor.index; i < cursor.page.items.length; i++) {
-                    items.push(cursor.page.items[i].value)
+                    items.push(cursor.page.items[i].parts[0])
                 }
                 cursor.release()
                 right = cursor.page.right

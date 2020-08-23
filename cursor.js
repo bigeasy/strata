@@ -7,8 +7,8 @@ class Cursor {
     constructor (journalist, descent, key) {
         this._entry = descent.entry
         this.page = this._entry.value
-        this.found = descent.index >= 0
         this.sought = key
+        this.found = descent.index >= 0
         this.index = descent.index < 0 ? ~descent.index : descent.index
         this.items = this.page.items
         this.ghosts = this.page.ghosts
@@ -21,6 +21,7 @@ class Cursor {
     // directly on the `items` array and we're only going to use `indexOf` to search
     // forward for insertion points, and only forward.
 
+    //
     indexOf (key, index) {
         if (this.page.deleted) {
             return null
@@ -38,7 +39,17 @@ class Cursor {
         return index
     }
 
-    insert (value, key, index) {
+    // Insert a record into the b-tree. Parts is an array of objects in their
+    // deserialized form that will be serialized using the parts serializer. The
+    // key for the record will be obtained using the key extractor.
+    //
+    // The index should be either the index returned from the initial descent of
+    // the tree for the value used to desecend the tree or for subsequent
+    // inserts using `Cursor.indexOf` if `Cursor.indexOf` does not return
+    // `null`.
+
+    //
+    insert (index, parts) {
         Strata.Error.assert(
             index > -1 &&
             (
@@ -46,20 +57,17 @@ class Cursor {
                 this.page.id == '0.1'
             ), 'invalid.insert.index', { index: this.index })
 
-        // Heft will be set when the record is serialized.
-        assert(key && value)
+        const key = this._journalist.extractor(parts)
+
+        const record = { key: this._journalist.extractor(parts), parts: parts, heft: 0 }
+
         // Create a record to add to the page. Also give to Journalist so it can
         // set the heft.
-        const record = { key: key, value: value, heft: 0 }
-
         this._journalist.append({
             id: this.page.id,
-            record: record,
             header: { method: 'insert', index: index },
-            parts: [
-                this._journalist.serializer.key.serialize(key),
-                this._journalist.serializer.value.serialize(value)
-            ]
+            parts: this._journalist.serializer.parts.serialize(parts),
+            record: record
         }, this._promises)
 
         this.page.items.splice(index, 0, record)

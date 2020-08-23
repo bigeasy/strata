@@ -91,10 +91,7 @@ exports.serialize = async function (directory, files) {
                 case 'insert':
                     return {
                         header: { method: 'insert', index: record[1] },
-                        parts: [
-                            Buffer.from(JSON.stringify(record[2])),
-                            Buffer.from(JSON.stringify(record[2]))
-                        ]
+                        parts: [ Buffer.from(JSON.stringify(record[2])) ]
                     }
                 case 'delete':
                     return {

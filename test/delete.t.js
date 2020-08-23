@@ -51,7 +51,7 @@ require('proof')(3, async (okay) => {
             do {
                 const cursor = (await strata.search(right)).get()
                 for (let i = cursor.index; i < cursor.items.length; i++) {
-                    items.push(cursor.items[i].value)
+                    items.push(cursor.items[i].parts[0])
                 }
                 cursor.release()
                 right = cursor.page.right

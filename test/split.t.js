@@ -1,4 +1,4 @@
-require('proof')(4, async (okay) => {
+require('proof')(5, async (okay) => {
     const Destructible = require('destructible')
 
     const Strata = require('../strata')
@@ -11,8 +11,6 @@ require('proof')(4, async (okay) => {
     await utilities.serialize(directory, {
         '0.0': [[ '0.1', null ]],
         '0.1': [[
-            'right', null
-        ], [
             'insert', 0, 'a'
         ], [
             'insert', 1, 'b'
@@ -31,13 +29,12 @@ require('proof')(4, async (okay) => {
         const strata = new Strata(destructible, { directory, cache })
         await strata.open()
         const cursor = (await strata.search('f')).get()
-        cursor.insert('f', 'f', cursor.index)
+        cursor.insert(cursor.index, [ 'f' ])
         cursor.release()
         await cursor.flush()
         await strata.close()
         cache.purge(0)
-        // **TODO** broken test...
-        // okay(cache.heft, 0, 'cache purged')
+        okay(cache.heft, 0, 'cache purged')
         await destructible.destructed
     } ()
     await async function () {
@@ -46,7 +43,7 @@ require('proof')(4, async (okay) => {
         const strata = new Strata(destructible, { directory, cache })
         await strata.open()
         const cursor = (await strata.search('f')).get()
-        okay(cursor.items[cursor.index].value, 'f', 'found')
+        okay(cursor.items[cursor.index].parts[0], 'f', 'found')
         cursor.release()
         await strata.close()
         await destructible.destructed
@@ -61,7 +58,7 @@ require('proof')(4, async (okay) => {
         do {
             const cursor = (await strata.search(right)).get()
             for (let i = cursor.index; i < cursor.page.items.length; i++) {
-                items.push(cursor.page.items[i].value)
+                items.push(cursor.page.items[i].parts[0])
             }
             cursor.release()
             right = cursor.page.right
@@ -80,7 +77,7 @@ require('proof')(4, async (okay) => {
         do {
             const cursor = (await strata.search(right)).get()
             for (let i = cursor.index; i < cursor.page.items.length; i++) {
-                items.push(cursor.page.items[i].value)
+                items.push(cursor.page.items[i].parts[0])
             }
             cursor.release()
             right = cursor.page.right
@@ -99,7 +96,7 @@ require('proof')(4, async (okay) => {
         do {
             cursor = (await strata.search(left, fork)).get()
             for (let i = cursor.index; i >= cursor.ghosts; i--) {
-                items.push(cursor.page.items[i].value)
+                items.push(cursor.page.items[i].parts[0])
             }
             cursor.release()
             left = cursor.page.items[0].key
