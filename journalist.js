@@ -126,7 +126,7 @@ class Journalist {
             .sort((left, right) => right - left)
         this.instance = instances[0] + 1
         await fs.mkdir(this._path('instances', this.instance))
-        for (let instance of instances) {
+        for (const instance of instances) {
             await fs.rmdir(this._path('instances', instance))
         }
     }
@@ -160,8 +160,8 @@ class Journalist {
         }
         const player = new Player(function () { return '0' })
         const readable = fileSystem.createReadStream(this._path('pages', id, append))
-        for await (let chunk of readable) {
-            for (let entry of player.split(chunk)) {
+        for await (const chunk of readable) {
+            for (const entry of player.split(chunk)) {
                 switch (entry.header.method) {
                 case 'right': {
                         // TODO Need to use the key section of the record.
