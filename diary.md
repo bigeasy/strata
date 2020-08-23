@@ -1,3 +1,7 @@
+## Sat Aug 22 21:18:25 CDT 2020
+
+git log -n 1 bc45430aedcb1dc35256d321b83009ce28821f2f
+
 ## Thu Aug 20 08:51:02 CDT 2020
 
 At some point we went from records to key/value. Used to be the case that there
