@@ -58,10 +58,10 @@ class Journalist {
                     },
                     key: {
                         serialize: function (key) {
-                            return Buffer.from(JSON.stringify(key))
+                            return [ Buffer.from(JSON.stringify(key)) ]
                         },
-                        deserialize: function (key) {
-                            return JSON.parse(key.toString())
+                        deserialize: function (parts) {
+                            return JSON.parse(parts[0].toString())
                         }
                     }
                 }
@@ -72,8 +72,8 @@ class Journalist {
                         deserialize: function (parts) { return parts }
                     },
                     key: {
-                        serialize: function (part) { return part },
-                        deserialize: function (part) { return part }
+                        serialize: function (part) { return [ part ] },
+                        deserialize: function (parts) { return parts[0] }
                     }
                 }
             default:
@@ -107,11 +107,11 @@ class Journalist {
             return ! /^\./.test(file)
         }).length == 0, 'create.directory.not.empty', { directory })
 
-        this._root = this._create({ id: -1, items: [{ id: '0.0' }] })
+        this._root = this._create({ id: -1, leaf: false, items: [{ id: '0.0' }] })
 
         await fs.mkdir(this._path('instance', '0'), { recursive: true })
         await fs.mkdir(this._path('pages', '0.0'), { recursive: true })
-        const buffer = Buffer.from(JSON.stringify([{ id: '0.1', key: null }]))
+        const buffer = this._recorder.call(null, { id: '0.1' }, [])
         const hash = fnv(buffer)
         await fs.writeFile(this._path('pages', '0.0', hash), buffer)
         await fs.mkdir(this._path('pages', '0.1'), { recursive: true })
@@ -165,7 +165,7 @@ class Journalist {
                 switch (entry.header.method) {
                 case 'right': {
                         // TODO Need to use the key section of the record.
-                        page.right = this.serializer.key.deserialize(entry.parts[0])
+                        page.right = this.serializer.key.deserialize(entry.parts)
                         assert(page.right != null)
                     }
                     break
@@ -230,12 +230,21 @@ class Journalist {
             return this._read(id, await this._appendable(id))
         }
         const hash = await this._hashable(id)
+        const player = new Player(function () { return '0' })
         const buffer = await fs.readFile(this._path('pages', id, hash))
         const actual = fnv(buffer)
         Strata.Error.assert(actual == hash, 'bad branch hash', {
             id, actual, expected: hash
         })
-        const items = JSON.parse(buffer.toString())
+        const items = []
+        for (const entry of player.split(buffer)) {
+            items.push({
+                id: entry.header.id,
+                key: entry.parts.length != 0
+                    ? this.serializer.key.deserialize(entry.parts)
+                    : null
+            })
+        }
         return { page: { id, leaf, items, hash }, heft: buffer.length }
     }
 

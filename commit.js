@@ -124,7 +124,14 @@ class Commit {
     //
     async emplace (entry) {
         await fs.mkdir(this._commit, { recursive: true })
-        const buffer = Buffer.from(JSON.stringify(entry.value.items))
+        const buffers = []
+        for (const { id, key } of entry.value.items) {
+            const parts = key != null
+                ? this._journalist.serializer.key.serialize(key)
+                : []
+            buffers.push(this._journalist._recorder({ id }, parts))
+        }
+        const buffer = Buffer.concat(buffers)
         const hash = fnv(buffer)
         entry.heft = buffer.length
         // TODO `this._path()`
@@ -164,9 +171,7 @@ class Commit {
         const recorder = this._journalist._recorder
         const buffers = []
         if (right != null) {
-            buffers.push(recorder({ method: 'right' }, [
-                this._journalist.serializer.key.serialize(right)
-            ]))
+            buffers.push(recorder({ method: 'right' }, this._journalist.serializer.key.serialize(right)))
         }
         // Write out a new page slowly, a record at a time.
         for (let index = 0, I = items.length; index < I; index++) {

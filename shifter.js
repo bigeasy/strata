@@ -3,10 +3,7 @@ module.exports = function (checksum) {
         if (array.length == 0) {
             return null
         }
-        const checksum = array.shift(), header = array.shift(), key = array.shift()
-        if (header.lengths.length == 1) {
-            return [ header, key, null ]
-        }
-        return [ header, key, array.shift() ]
+        const checksum = array.shift(), header = array.shift()
+        return [ header ].concat(array.splice(0, header.lengths.length))
     }
 }

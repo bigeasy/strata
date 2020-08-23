@@ -58,11 +58,16 @@ exports.vivify = async function (directory) {
             }
             vivified[file] = records
         } else {
-            const hash = dir.filter(function (file) {
-                return /^[0-9a-f]+$/.test(file)
-            }).pop()
+            const hash = dir.filter(file => /^[0-9a-f]+$/.test(file)).pop()
             const lines = (await fs.readFile(path.resolve(pages, file, hash), 'utf8')).split(/\n/)
-            vivified[file] = JSON.parse(lines[0]).map(entry => [ entry.id, entry.key ])
+            lines.pop()
+            const entries = lines.map(line => JSON.parse(line))
+            const items = []
+            while (entries.length) {
+                const record = shifter(entries)
+                items.push([ record[0].header.id, record.length == 2 ? record[1] : null ])
+            }
+            vivified[file] = items
         }
     }
     return vivified
@@ -74,9 +79,12 @@ exports.serialize = async function (directory, files) {
         instance = Math.max(+id.split('.')[0], instance)
         await fs.mkdir(path.resolve(directory, 'pages', id), { recursive: true })
         if (+id.split('.')[1] % 2 == 0) {
-            const buffer = Buffer.from(JSON.stringify(files[id].map(record => {
-                return { id: record[0], key: record[1] }
-            })))
+            const buffers = files[id].map(record => {
+                return recorder({
+                    id: record[0]
+                }, record[1] != null ? [ Buffer.from(JSON.stringify(record[1])) ] : [])
+            })
+            const buffer = Buffer.concat(buffers)
             const hash = fnv(buffer)
             const file = path.resolve(directory, 'pages', id, hash)
             await fs.writeFile(file, buffer)
