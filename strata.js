@@ -19,6 +19,12 @@ class Unlocker {
     }
 }
 
+const NULL_CURSOR = {
+    page: { ghosts: 0 },
+    indexOf: function () { return null },
+    release: function () {}
+}
+
 class Strata {
     static MIN = Symbol('MIN')
 
@@ -34,6 +40,10 @@ class Strata {
 
     open () {
         return this._journalist.open()
+    }
+
+    static nullCursor () {
+        return NULL_CURSOR
     }
 
     async search (key, fork = false) {
