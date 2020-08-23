@@ -10,10 +10,16 @@ class Cursor {
         this.sought = key
         this.found = descent.index >= 0
         this.index = descent.index < 0 ? ~descent.index : descent.index
-        this.items = this.page.items
-        this.ghosts = this.page.ghosts
         this._journalist = journalist
         this._promises = {}
+    }
+
+    get items () {
+        throw new Error('removed')
+    }
+
+    get ghosts () {
+        throw new Error('removed')
     }
 
     // You must never use `indexOf` to scan backward for insert points, only to scan

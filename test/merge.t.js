@@ -54,7 +54,7 @@ require('proof')(3, async (okay) => {
             const strata = new Strata(destructible.ephemeral('reopen'), { directory, cache })
             await strata.open()
             const cursor = (await strata.search('d')).get()
-            okay(cursor.items[cursor.index].parts[0], 'd', 'found')
+            okay(cursor.page.items[cursor.index].parts[0], 'd', 'found')
             cursor.release()
             await strata.close()
         }

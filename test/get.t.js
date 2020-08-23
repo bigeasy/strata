@@ -18,7 +18,7 @@ require('proof')(3, async (okay) => {
     const search = await strata.search('a')
     const cursor = search.get()
     okay(search.get() === cursor, 'get again')
-    okay(cursor.items[cursor.index], {
+    okay(cursor.page.items[cursor.index], {
         key: 'a', parts: [ 'a' ], heft: 69
     }, 'got')
     cursor.release()

@@ -48,12 +48,11 @@ require('proof')(2, async (okay) => {
         const items = []
         do {
             cursor = (await strata.search(left, fork)).get()
-            for (let i = cursor.index; i >= cursor.ghosts; i--) {
+            for (let i = cursor.index; i >= cursor.page.ghosts; i--) {
                 items.push(cursor.page.items[i].parts[0])
             }
             cursor.release()
             left = cursor.page.items[0].key
-            console.log(left)
             fork = true
         } while (cursor.page.id != '0.1')
         okay(items, expected.slice().reverse(), 'reverse')
