@@ -433,7 +433,8 @@ class Journalist {
                 id: this._operationId = (this._operationId + 1 & 0xffffffff) >>> 0,
                 writes: [],
                 entry: this._hold(id),
-                promise: this._appending.enqueue({ method: 'write', id }, this._index(id))
+                written: false,
+                promise: this._appending.enqueue({ id }, this._index(id))
             }
         }
         return queue
@@ -472,50 +473,45 @@ class Journalist {
     // they are written before the split? Must be.
 
     //
-    async _append ({ body }) {
+    async _append ({ body: { id } }) {
         // TODO Doesn't `await null` do the same thing now?
         await callback((callback) => process.nextTick(callback))
-        const { method } = body
-        switch (method) {
-        case 'write':
-            const { id } = body
-            const queue = this._queues[id]
-            delete this._queues[id]
-            if (queue.block != null) {
-                queue.block.enter.resolve()
-                await queue.block.exit.promise
-            }
-            // We flush a page's writes before we merge it into its left
-            // sibling so there will always a queue entry for a page that has
-            // been merged. It will never have any writes so we can skip writing
-            // and thereby avoid putting it back into the housekeeping queue.
-            if (queue.writes.length != 0) {
-                const page = queue.entry.value
-                if (
-                    page.items.length >= this.leaf.split ||
-                    (
-                        ! (page.id == '0.1' && page.right == null) &&
-                        page.items.length <= this.leaf.merge
-                    )
-                ) {
-                    this._housekeeping.add(page.items[0].key)
-                }
-                await this._writeLeaf(id, queue.writes)
-            }
-            queue.entry.release()
-            break
+        const queue = this._queues[id]
+        delete this._queues[id]
+        if (queue.block != null) {
+            queue.block.enter.resolve()
+            await queue.block.exit.promise
         }
+        // We flush a page's writes before we merge it into its left
+        // sibling so there will always a queue entry for a page that has
+        // been merged. It will never have any writes so we can skip writing
+        // and thereby avoid putting it back into the housekeeping queue.
+        if (queue.writes.length != 0) {
+            const page = queue.entry.value
+            if (
+                page.items.length >= this.leaf.split ||
+                (
+                    ! (page.id == '0.1' && page.right == null) &&
+                    page.items.length <= this.leaf.merge
+                )
+            ) {
+                this._housekeeping.add(page.items[0].key)
+            }
+            await this._writeLeaf(id, queue.writes)
+        }
+        queue.entry.release()
+        queue.written = true
     }
 
     _index (id) {
         return id.split('.').reduce((sum, value) => sum + +value, 0) % this._appending.turnstile.health.turnstiles
     }
 
-    append (entry, promises) {
+    append (entry, writes) {
         const queue = this._queue(entry.id)
         queue.writes.push(entry)
-        if (promises[queue.id] == null) {
-            promises[queue.id] = queue.promise
+        if (writes[queue.id] == null) {
+            writes[queue.id] = queue
         }
     }
 

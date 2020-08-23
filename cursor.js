@@ -49,7 +49,7 @@ class Cursor {
     // `null`.
 
     //
-    insert (index, parts) {
+    insert (index, parts, writes = {}) {
         Strata.Error.assert(
             index > -1 &&
             (
@@ -68,19 +68,19 @@ class Cursor {
             header: { method: 'insert', index: index },
             parts: this._journalist.serializer.parts.serialize(parts),
             record: record
-        }, this._promises)
+        }, writes)
 
         this.page.items.splice(index, 0, record)
     }
 
-    remove (index) {
+    remove (index, writes = {}) {
         const ghost = this.page.id != '0.1' && index == 0
 
         this._journalist.append({
             id: this.page.id,
             header: { method: 'delete', index: index },
             parts: []
-        }, this._promises)
+        }, writes)
 
         if (ghost) {
             this.page.ghosts++
@@ -88,14 +88,6 @@ class Cursor {
         } else {
             const [ spliced ] = this.page.items.splice(index, 1)
             this._entry.heft -= spliced.heft
-        }
-    }
-
-    async flush () {
-        const promises = this._promises
-        this._promises = {}
-        for (const id in this._promises) {
-            await this._promises[id]
         }
     }
 

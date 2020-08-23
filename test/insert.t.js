@@ -18,12 +18,14 @@ require('proof')(2, async (okay) => {
 
     await strata.create()
 
+    const writes = {}
+
     const cursor = (await strata.search('a')).get()
-    cursor.insert(cursor.index, [ 'a' ])
-    cursor.insert(~cursor.indexOf('b', cursor.index), [ 'b' ])
+    cursor.insert(cursor.index, [ 'a' ], writes)
+    cursor.insert(~cursor.indexOf('b', cursor.index), [ 'b' ], writes)
     cursor.release()
 
-    await cursor.flush()
+    Strata.flush(writes)
     await strata.close()
 
     cache.purge(0)

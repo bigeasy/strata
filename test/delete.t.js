@@ -23,8 +23,9 @@ require('proof')(3, async (okay) => {
             const strata = new Strata(destructible.durable('strata'), { directory, cache })
             await strata.open()
             const cursor = (await strata.search('a')).get()
-            cursor.remove(cursor.index)
-            await cursor.flush()
+            const writes = {}
+            cursor.remove(cursor.index, writes)
+            Strata.flush(writes)
             cursor.release()
             await strata.close()
             const vivified = await utilities.vivify(directory)

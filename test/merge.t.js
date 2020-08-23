@@ -32,6 +32,7 @@ require('proof')(3, async (okay) => {
             const cache = new Cache
             const strata = new Strata(destructible.ephemeral('merge'), { directory, cache })
             await strata.open()
+            const writes = {}
             const cursor = (await strata.search('e')).get()
             // TODO Come back and insert an error into `remove`. Then attempt to
             // resolve that error somehow into `flush`. Implies that Turnstile
@@ -40,9 +41,9 @@ require('proof')(3, async (okay) => {
             // waiting on a promise when the background fails and hang
             // indefinately. Any one error, like a `shutdown` error would stop
             // it.
-            cursor.remove(cursor.index)
+            cursor.remove(cursor.index, writes)
             cursor.release()
-            await cursor.flush()
+            Strata.flush(writes)
             await strata.close()
             cache.purge(0)
             okay(cache.heft, 0, 'cache purged')

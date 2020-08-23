@@ -22,9 +22,10 @@ require('proof')(3, async (okay) => {
             const strata = new Strata(destructible.ephemeral('split'), { directory, cache })
             await strata.open()
             const cursor = (await strata.search(leaf[0])).get()
-            cursor.insert(cursor.index, leaf)
+            const writes = {}
+            cursor.insert(cursor.index, leaf, writes)
             cursor.release()
-            await cursor.flush()
+            Strata.flush(writes)
             await strata.close()
             cache.purge(0)
             okay(cache.heft, 0, 'cache purged')
