@@ -841,7 +841,8 @@ class Journalist {
             items: items,
             entries: [],
             right: child.entry.value.right,
-            append: this._filename()
+            append: this._filename(),
+            ghosts: 0
         })
         blocks.push(this._block(right.value.id))
         entries.push(right)
