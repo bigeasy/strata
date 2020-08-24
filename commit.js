@@ -145,26 +145,6 @@ class Commit {
         }
     }
 
-    async _vacuum (id, first, second, items) {
-        await fs.mkdir(this._commit, { recursive: true })
-        const filename = this._path(`${id}-${first}`)
-        const recorder = this._journalist._recorder
-        // Write out a new page slowly, a record at a time.
-        for (let index = 0, I = items.length; index < I; index++) {
-            const { key, body } = items[index]
-            await fs.appendFile(filename, recorder({ method: 'insert', index, key }, body))
-        }
-        await fs.appendFile(filename, recorder({
-            method: 'dependent', id: id, append: second
-        }))
-        return {
-            method: 'rename',
-            from: path.join('commit', `${id}-${first}`),
-            to: path.join('pages', id, first),
-            hash: hash
-        }
-    }
-
     async vacuum (id, first, second, items, right) {
         await fs.mkdir(this._commit, { recursive: true })
         const filename = this._path(`${id}-${first}`)
@@ -258,73 +238,6 @@ class Commit {
                     const entry = await this._journalist.load(page.id)
                     entry.value.hash = hash
                     entry.release()
-                }
-                break
-            case 'split': {
-                    // Appears that I'm writing out the page items in their
-                    // entirety when I know the keys are extracted from the
-                    // records, or at least they where once upon a time. Nope.
-                    // Looks like that changed. Keys are now explicit.
-                    //
-                    // Well that simplifies all these operations, doesn't it.
-                    //
-                    // No, I'm not really doing leaf splits yet. They are based
-                    // on a previous page. If I recall, the plan for vacuum is
-                    // based on stubs as a linked list. Suppose you can put down
-                    // a stub, the rewrite what it was based on, so all pages
-                    // after the first split become linked lists.
-                    const { page } = await this._journalist.read(operation[1][0])
-                    page.append = operation[1][1]
-                    const right = {
-                        id: operation[2][0],
-                        items: page.items.splice(operation[3]),
-                        append: operation[2][1]
-                    }
-                    await this._emplace(page)
-                    await this._emplace(right)
-                }
-                break
-            case 'splice': {
-                    const { page } = await this._journalist.read(operation.id)
-                    page.items.splice.apply(page.items, operation.splice)
-                    await this._emplace(page)
-                }
-                break
-            case 'drain': {
-                    // Ugh. Why is `operation` an array? Why can't it be an
-                    // object so that the properties serve as a reminder?
-                    //
-                    // Interesting. I'm straight up reading and writing the
-                    // files, which makes sense I suppose. Is this not a problem
-                    // for the leaves, though?
-                    const { root } = this._journalist.read('0.0')
-                    const right = {
-                        id: operation[2],
-                        items: root.splice(operation[1])
-                    }
-                    const left = {
-                        id: operation[3],
-                        items: root.splice(0)
-                    }
-                    root.items = [{
-                        id: left.id,
-                        key: null
-                    }, {
-                        id: right.id,
-                        key: right.items[0].key
-                    }]
-                    right.items[0].key = null
-                    await this._emplace(root)
-                    await this._emplace(left)
-                    await this._emplace(right)
-                }
-                break
-            case 'fill': {
-                    const { root } = await this._journalist.read('0.0')
-                    const { page } = await this._journalist.read(items[0].id)
-                    root.items = page.items
-                    await this._emplace(root)
-                    await this._prepare([ 'unlink', path.join('pages', page.id) ])
                 }
                 break
             case 'unlink': {
