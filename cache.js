@@ -101,6 +101,14 @@ class Cache {
         let iterator = this._head._previous
         while (this.heft > heft && iterator._cache != null) {
             if (iterator._references == 0) {
+                // TODO Get rid of this assertion after a while. Also remove
+                // heft update in `Journalist` it has a TODO.
+                if (iterator.value.leaf) {
+                    const page = iterator.value
+                    assert.equal(iterator.heft, page.items.splice(page.ghosts).reduce((sum, item) => {
+                        return sum + item.hef
+                    }, 1))
+                }
                 this._remove(iterator)
             }
             iterator = iterator._previous

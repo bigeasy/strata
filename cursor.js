@@ -90,6 +90,7 @@ class Cursor {
 
         if (ghost) {
             this.page.ghosts++
+            this._entry.heft -= this.page.items[0].heft
         } else {
             const [ spliced ] = this.page.items.splice(index, 1)
             this._entry.heft -= spliced.heft

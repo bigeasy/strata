@@ -220,7 +220,7 @@ class Journalist {
                 }
             }
         }
-        const heft = page.items.reduce((sum, record) => sum + record.heft, 0)
+        const heft = page.items.reduce((sum, record) => sum + record.heft, 1)
         return { page, heft }
     }
 
@@ -248,10 +248,6 @@ class Journalist {
         return { page: { id, leaf, items, hash }, heft: buffer.length }
     }
 
-    // What is going on here? Why is there an `entry.heft` and an
-    // `entry.value.heft`?
-
-    //
     async load (id) {
         const entry = this._hold(id)
         if (entry.value == null) {
@@ -420,7 +416,10 @@ class Journalist {
         const entry = this._hold(id)
         const buffers = writes.map(write => {
             const buffer = recorder(write.header, write.parts)
-            // TODO Where is heft removal?
+            // TODO Where is heft removal? Probably not here, since we'd remove
+            // the heft of the specific entry, not the removal record.
+            // TODO Using a different calculation for heft, should be lengths?
+            // Think they add up to the same.
             if (write.header.method == 'insert') {
                 entry.heft += (write.record.heft = buffer.length)
             }
@@ -786,7 +785,7 @@ class Journalist {
             id: this._nextId(false),
             leaf: false,
             items: branch.entry.value.items.splice(partition),
-            heft: 0,
+            heft: 1,
             hash: null
         })
         entries.push(right)
@@ -843,7 +842,7 @@ class Journalist {
         const length = child.entry.value.items.length
         const partition = Math.floor(length / 2)
         const items = child.entry.value.items.splice(partition)
-        const heft = items.reduce((sum, item) => sum + item.heft, 0)
+        const heft = items.reduce((sum, item) => sum + item.heft, 1)
         const right = this._create({
             id: this._nextId(true),
             leaf: true,
@@ -860,13 +859,14 @@ class Journalist {
         // Set the right key of the left page.
         child.entry.value.right = right.value.items[0].key
 
-        // Set the heft of the left page and entry.
-        child.entry.heft -= heft
+        // Set the heft of the left page and entry. Moved this down.
+        // child.entry.heft -= heft - 1
 
         // Insert a reference to the right page in the parent branch page.
         parent.entry.value.items.splice(parent.index + 1, 0, {
             key: right.value.items[0].key,
             id: right.value.id,
+            // TODO For branches, let's always just re-run the sum.
             heft: 0
         })
 
@@ -877,7 +877,6 @@ class Journalist {
                 this._housekeeping.add(page.items[0].key)
             }
         }
-
 
         // Write any queued writes, they would have been in memory, in the page
         // that was split above. Once we await, items can be inserted or removed
@@ -893,6 +892,19 @@ class Journalist {
         const writes = this._queue(child.entry.value.id).writes.splice(0)
         writes.push.apply(writes, dependents)
         await this._writeLeaf(child.entry.value.id, writes)
+
+        // TODO We adjust heft now that we've written out all the relevant
+        // leaves, but we kind of have a race now, more items could have been
+        // added or removed in the interim. Seems like we should just
+        // recalcuate, but we can also assert.
+
+        // Maybe the only real issue is that the writes above are going to
+        // update the left of the split page regardless of whether or not the
+        // record is to the left or the right. This might be fine.
+
+        //
+        right.heft = items.reduce((sum, item) => sum + item.heft, 1)
+        child.entry.heft -= right.heft - 1
 
         child.entry.value.entries.push.apply(child.entry.value.entries, dependents)
 
@@ -1040,7 +1052,6 @@ class Journalist {
         const child = await this.descend({ key, level: 1 }, entries)
 
         root.entry.value.items = child.entry.value.items
-        root.heft = child.heft
 
         // Create our journaled tree alterations.
         const commit = new Commit(this)
@@ -1106,9 +1117,6 @@ class Journalist {
         if (surgery.splice.index == 0) {
             surgery.splice.entry.value.items[0].key = null
         }
-
-        // Heft will be adjusted by serialization, but let's do this for now.
-        left.entry.heft += right.entry.heft
 
         // Create our journaled tree alterations.
         const commit = new Commit(this)
@@ -1193,13 +1201,19 @@ class Journalist {
 
         // Add the items in the right page to the end of the left page.
         const items = left.entry.value.items
-        items.push.apply(items, right.entry.value.items.splice(right.entry.value.ghosts))
+        const merged = right.entry.value.items.splice(right.entry.value.ghosts)
+        items.push.apply(items, merged)
 
         // Set right reference of left page.
         left.entry.value.right = right.entry.value.right
 
         // Adjust heft of left entry.
-        left.entry.heft += right.entry.heft
+        left.entry.heft += right.entry.heft - 1
+
+        // TODO Remove after a while, used only for assertion in `Cache`.
+        right.entry.heft -= merged.reduce((sum, value) => {
+            return sum + value.heft
+        }, 0)
 
         // Mark the right page deleted, it will cause `indexOf` in the `Cursor`
         // to return `null` indicating that the user must release the `Cursor`
