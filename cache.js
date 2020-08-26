@@ -106,7 +106,7 @@ class Cache {
                 if (iterator.value.leaf) {
                     const page = iterator.value
                     assert.equal(iterator.heft, page.items.splice(page.ghosts).reduce((sum, item) => {
-                        return sum + item.hef
+                        return sum + item.heft
                     }, 1))
                 }
                 this._remove(iterator)
