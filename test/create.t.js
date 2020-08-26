@@ -24,5 +24,9 @@ require('proof')(2, async (okay) => {
     }, 'created')
     cache.purge(0)
     okay(cache.entries, 0, 'cache empty')
+
+    await strata.open()
+    await strata.close()
+
     await destructible.destructed
 })

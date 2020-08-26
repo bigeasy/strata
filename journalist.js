@@ -109,7 +109,7 @@ class Journalist {
 
         this._root = this._create({ id: -1, leaf: false, items: [{ id: '0.0' }] })
 
-        await fs.mkdir(this._path('instance', '0'), { recursive: true })
+        await fs.mkdir(this._path('instances', '0'), { recursive: true })
         await fs.mkdir(this._path('pages', '0.0'), { recursive: true })
         const buffer = this._recorder.call(null, { id: '0.1' }, [])
         const hash = fnv(buffer)
