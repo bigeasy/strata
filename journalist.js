@@ -29,8 +29,11 @@ const appendable = require('./appendable')
 const Strata = { Error: require('./error') }
 
 class Journalist {
+    static _instance = 0
+
     constructor (destructible, options) {
         const leaf = coalesce(options.leaf, {})
+        this._instance = Journalist._instance++
         this.leaf = {
             split: coalesce(leaf.split, 5),
             merge: coalesce(leaf.merge, 1)
@@ -259,11 +262,11 @@ class Journalist {
     }
 
     _create (page) {
-        return this.cache.hold([ this.directory, page.id ], page)
+        return this.cache.hold([ this.directory, page.id, this._instance ], page)
     }
 
     _hold (id) {
-        return this.cache.hold([ this.directory, id ], null)
+        return this.cache.hold([ this.directory, id, this._instance ], null)
     }
 
     // TODO If `key` is `null` then just go left.
