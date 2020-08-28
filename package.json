@@ -32,7 +32,7 @@
                             "extant":                       "^1.0.11",
                             "hash.fnv":                     "^1.0.5",
                             "interrupt":                    "^10.0.3",
-                            "prospective":                  "^0.2.0",
+                            "prospective":                  "^0.3.0",
                             "rimraf":                       "^3.0.0",
                             "turnstile":                    "6.0.0-alpha.3"
     },
