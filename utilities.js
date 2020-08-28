@@ -8,9 +8,7 @@ const shifter = require('./shifter')(() => '0')
 const recorder = require('./recorder')(() => '0')
 const fnv = require('./fnv')
 
-const appendable = ascension([ Number, Number ], function (file) {
-    return file.split('.')
-})
+const appendable = require('./appendable')
 
 exports.directory = path.resolve(__dirname, './test/tmp')
 

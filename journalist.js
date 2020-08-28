@@ -1,22 +1,41 @@
+// Sort function generator.
 const ascension = require('ascension')
+
+// Node.js API.
+const assert = require('assert')
+const path = require('path')
 const fileSystem = require('fs')
 const fs = require('fs').promises
-const path = require('path')
-const recorder = require('./recorder')
-const Player = require('./player')
-const find = require('./find')
-const assert = require('assert')
-const Cursor = require('./cursor')
-const callback = require('prospective/callback')
-const coalesce = require('extant')
-const Future = require('prospective/future')
-const Commit = require('./commit')
-const fnv = require('./fnv')
 
+const callback = require('prospective/callback')
+
+// Return the first non null-like value.
+const coalesce = require('extant')
+
+// Wraps a `Promise` in an object to act as a mutex.
+const Future = require('prospective/future')
+
+// An `async`/`await` work queue.
 const Turnstile = require('turnstile')
 Turnstile.Queue = require('turnstile/queue')
 Turnstile.Set = require('turnstile/set')
 
+// Journaled file system operations for tree rebalancing.
+const Commit = require('./commit')
+
+// A non-crypographic (fast) 32-bit hash for record integrity.
+const fnv = require('./fnv')
+
+// Serialize a single b-tree record.
+const recorder = require('./recorder')
+
+// Incrementally read a b-tree page chunk by chunk.
+const Player = require('./player')
+
+// Binary search for a record in a b-tree page.
+const find = require('./find')
+
+// Currently unused.
 function traceIf (condition) {
     if (condition) return function (...vargs) {
         console.log.apply(console, vargs)
@@ -24,8 +43,10 @@ function traceIf (condition) {
     return function () {}
 }
 
+// Sort function for file names that orders by their creation order.
 const appendable = require('./appendable')
 
+// An `Error` type specific to Strata.
 const Strata = { Error: require('./error') }
 
 class Journalist {
@@ -119,6 +140,9 @@ class Journalist {
         await fs.writeFile(this._path('pages', '0.0', hash), buffer)
         await fs.mkdir(this._path('pages', '0.1'), { recursive: true })
         await fs.writeFile(this._path('pages', '0.1', '0.0'), Buffer.alloc(0))
+        this._id++
+        this._id++
+        this._id++
     }
 
     async open () {
@@ -143,6 +167,7 @@ class Journalist {
     }
 
     async _appendable (id) {
+        const stack = new Error().stack
         const dir = await fs.readdir(this._path('pages', id))
         return dir.filter(file => /^\d+\.\d+$/.test(file)).sort(appendable).pop()
     }
@@ -152,7 +177,7 @@ class Journalist {
             id,
             leaf: true,
             items: [],
-            entries: [],
+            vacuum: [],
             deletes: 0,
             // TODO Rename merged.
             deleted: false,
@@ -177,8 +202,8 @@ class Journalist {
                         const { page: loaded } = await this._read(id, append)
                         page.items = loaded.items
                         page.right = loaded.right
-                        page.entries.push({
-                            method: 'load', header: entry.header, entries: loaded.entries
+                        page.vacuum.push({
+                            method: 'load', header: entry.header, vacuum: loaded.vacuum
                         })
                     }
                     break
@@ -193,8 +218,8 @@ class Journalist {
                         const { page: right } = await this._read(entry.header.id, entry.header.append)
                         page.items.push.apply(page.items, right.items.slice(right.ghosts))
                         page.right = right.right
-                        page.entries.push({
-                            method: 'merge', header: entry.header, entries: right.entries
+                        page.vacuum.push({
+                            method: 'merge', header: entry.header, vacuum: right.vacuum
                         })
                     }
                     break
@@ -217,7 +242,7 @@ class Journalist {
                     }
                     break
                 case 'dependent': {
-                        page.entries.push(entry.header)
+                        page.vacuum.push(entry.header)
                     }
                     break
                 }
@@ -414,7 +439,13 @@ class Journalist {
     }
 
     async _writeLeaf (id, writes) {
-        const append = await this._appendable(id)
+        const append = await (async () => {
+            try {
+                return await this._appendable(id)
+            } catch (error) {
+                throw error
+            }
+        }) ()
         const recorder = this._recorder
         const entry = this._hold(id)
         const buffers = writes.map(write => {
@@ -485,18 +516,22 @@ class Journalist {
 
     //
     async _append ({ body: { id } }) {
-        // TODO Doesn't `await null` do the same thing now?
+        // TODO Doesn't `await null` do the same thing now? And why do I want to
+        // do this anyway? It's silly.
         await callback((callback) => process.nextTick(callback))
         const queue = this._queues[id]
-        delete this._queues[id]
+        // Block before deleting the queue or else a cursor append will create a
+        // new queue entry, with a new lock, and it will sneak through the
+        // append queue.
         if (queue.block != null) {
             queue.block.enter.resolve()
             await queue.block.exit.promise
         }
-        // We flush a page's writes before we merge it into its left
-        // sibling so there will always a queue entry for a page that has
-        // been merged. It will never have any writes so we can skip writing
-        // and thereby avoid putting it back into the housekeeping queue.
+        delete this._queues[id]
+        // We flush a page's writes before we merge it into its left sibling so
+        // there will always a queue entry for a page that has been merged. It
+        // will never have any writes so we can skip writing and thereby avoid
+        // putting it back into the housekeeping queue.
         if (queue.writes.length != 0) {
             const page = queue.entry.value
             if (
@@ -506,12 +541,18 @@ class Journalist {
                     page.items.length <= this.leaf.merge
                 )
             ) {
-                this._housekeeping.add(page.items[0].key)
+                this._housekeep(page.items[0].key)
             }
             await this._writeLeaf(id, queue.writes)
         }
         queue.entry.release()
         queue.written = true
+    }
+
+    _housekeep (key) {
+        const serialized = this.serializer.key.serialize(key)
+        const stringified = JSON.stringify(serialized.map(buffer => buffer.toString('base64')))
+        this._housekeeping.add(serialized, key)
     }
 
     _index (id) {
@@ -544,6 +585,18 @@ class Journalist {
         return `${this.instance}.${this._id++}`
     }
 
+    // TODO Concerned about vacuum making things slow relative to other
+    // databases and how to tune it for performance. Splits don't leave data on
+    // disk that doesn't need to be there, but they do mean that a split page
+    // read will read in records that it will then discard with a split. Merge
+    // implies a lot of deletion. Then their may be a page that never splits or
+    // merges, it stays within that window but constantly inserts and deletes a
+    // handful of records leaving a lot of deleted records.
+    //
+    // However, as I'm using it now, there are trees vacuum doesn't buy me much.
+    // Temporary trees in the MVCC implementations, they are really just logs.
+
+    //
     async _vacuum (key) {
         const entries = []
         const leaf = await this.descend({ key })
@@ -556,26 +609,39 @@ class Journalist {
         const first = this._filename()
         const second = this._filename()
 
-        const dependencies = function map ({ id, append }, entries, dependencies = {}) {
-            assert(dependencies[`${id}/${append}`] == null)
-            const page = dependencies[`${id}/${append}`] = {}
-            for (const entry of entries) {
-                switch (entry.header.method) {
+        console.log('vacuum', leaf.entry.value.id)
+
+        const dependencies = function map ({ id, append }, dependencies, mapped = {}) {
+            console.log(require('util').inspect({ id, append, dependencies }, { depth: null }))
+            if (mapped[`${id}/${append}`] != null) {
+                process.exit()
+            }
+            assert(mapped[`${id}/${append}`] == null)
+            const page = mapped[`${id}/${append}`] = {}
+            try {
+            for (const dependency of dependencies) {
+                switch (dependency.header.method) {
                 case 'load':
                 case 'merge': {
-                        map(entry.header, entry.entries, dependencies)
+                        console.log('load/merge', id, append, dependency)
+                        map(dependency.header, dependency.vacuum, mapped)
                     }
                     break
                 case 'dependent': {
-                        const { id, append } = entry.header
+                        const { id, append } = dependency.header
+                        console.log('dependent', id, append, dependency)
                         assert(!page[`${id}/${append}`])
                         page[`${id}/${append}`] = true
                     }
                     break
                 }
             }
-            return dependencies
-        } (leaf.entry.value, leaf.entry.value.entries)
+            } catch (error) {
+                console.log(error.message)
+                process.exit()
+            }
+            return mapped
+        } (leaf.entry.value, leaf.entry.value.vacuum)
 
         await (async () => {
             // Flush any existing writes. We're still write blocked.
@@ -814,22 +880,46 @@ class Journalist {
         // await this._possibleSplit(right.value, partition, level)
     }
 
-    // TODO We need to block writes to the new page as well. Once we go async
-    // again, someone could descend the tree and start writing to the new page
-    // before we get a chance to write the new page stub.
+    // Split leaf. We always split a new page off to the right. Because we
+    // always merge two pages together into the left page our left-most page id
+    // will never change, it will always be `0.1`.
     //
-    // ^^^ Coming back to the project and this was not done. You'd simply
-    // calculate the new id before requesting your blocks, request two blocks.
+    // Split is performed by creating two new stub append log. One for the
+    // existing page which is now the left page and one for the new right page.
+    // When either of these pages loads they will load the old existing page,
+    // then split the page and continue with new records added to the subsequent
+    // append log.
 
     //
     async _splitLeaf (key, child, entries) {
-        // TODO Add right page to block.
-        const blocks = []
-        const block = this._block(child.entry.value.id)
-        await block.enter.promise
-        blocks.push(block)
-
+        // Descend to the parent branch page.
         const parent = await this.descend({ key, level: child.level - 1 }, entries)
+
+        console.log('splitting', child.entry.value.id)
+
+        // Create the right page now so we can lock it. We're going to
+        // synchronously add it to the tree and then do the housekeeping to
+        // persist the split asynchronously. While we're async, someone could
+        // descend the tree and start writing. In fact, this is very likely to
+        // happen during a batch insert by the user.
+        const right = this._create({
+            id: this._nextId(true),
+            leaf: true,
+            items: [],
+            vacuum: [],
+            right: child.entry.value.right,
+            append: this._filename(),
+            ghosts: 0
+        })
+        console.log(right.value.id)
+        entries.push(right)
+        const blocks = [
+            this._block(child.entry.value.id),
+            this._block(right.value.id)
+        ]
+        for (const block of blocks) {
+            await block.enter.promise
+        }
 
         // Race is the wrong word, it's our synchronous time. We have to split
         // the page and then write them out. Anyone writing to this leaf has to
@@ -841,24 +931,11 @@ class Journalist {
         // memory which is offical, the page writes are lagging.
 
         // Split page creating a right page.
-        const left = child.entry.value
         const length = child.entry.value.items.length
         const partition = Math.floor(length / 2)
         const items = child.entry.value.items.splice(partition)
-        const heft = items.reduce((sum, item) => sum + item.heft, 1)
-        const right = this._create({
-            id: this._nextId(true),
-            leaf: true,
-            items: items,
-            entries: [],
-            right: child.entry.value.right,
-            append: this._filename(),
-            ghosts: 0
-        })
-        blocks.push(this._block(right.value.id))
-        entries.push(right)
-        right.heft = heft
-
+        right.value.items = items
+        right.heft = items.reduce((sum, item) => sum + item.heft, 1)
         // Set the right key of the left page.
         child.entry.value.right = right.value.items[0].key
 
@@ -877,19 +954,29 @@ class Journalist {
         // the split again.
         for (const page of [ right.value, child.entry.value ]) {
             if (page.items.length >= this.leaf.split) {
-                this._housekeeping.add(page.items[0].key)
+                this._housekeep(page.items[0].key)
             }
         }
 
         // Write any queued writes, they would have been in memory, in the page
-        // that was split above. Once we await, items can be inserted or removed
-        // from the page in memory. Our synchronous operations are over.
+        // that was split above. We based our split on these writes.
+        //
+        // Once we await our synchronous operations are over. The user can
+        // append new writes to the existing queue entry. The user will have
+        // checked that their page is still valid and will descend the tree if
+        // `Cursor.indexOf` can't find a valid index for their page, so we don't
+        // have to worry about the user inserting a record in the split page
+        // when it should be inserted into the right page.
         const append = this._filename()
         const dependents = [{
-            header: { method: 'dependent', id: child.entry.value.id, append },
+            header: {
+                method: 'dependent', id: child.entry.value.id, append, was: 'split'
+            },
             parts: []
         }, {
-            header: { method: 'dependent', id: right.value.id, append: right.value.append },
+            header: {
+                method: 'dependent', id: right.value.id, append: right.value.append, was: 'split'
+            },
             parts: []
         }]
         const writes = this._queue(child.entry.value.id).writes.splice(0)
@@ -909,7 +996,7 @@ class Journalist {
         right.heft = items.reduce((sum, item) => sum + item.heft, 1)
         child.entry.heft -= right.heft - 1
 
-        child.entry.value.entries.push.apply(child.entry.value.entries, dependents)
+        child.entry.value.vacuum.push.apply(child.entry.value.vacuum, dependents)
 
         // Curious race condition here, though, where we've flushed the page to
         // split
@@ -920,7 +1007,6 @@ class Journalist {
         const commit = new Commit(this)
 
         const prepare = []
-
 
         // Record the split of the right page in a new stub.
         prepare.push({
@@ -936,9 +1022,10 @@ class Journalist {
                 length: length,
             }]
         })
-        right.value.entries = [{
-            header: { method: 'load', id: child.entry.value.id, append: child.entry.value.append },
-            entries: child.entry.value.entries
+        right.value.vacuum = [{
+            header: { method: 'load', id: child.entry.value.id, append: child.entry.value.append,
+                was: 'right' },
+            vacuum: child.entry.value.vacuum
         }]
 
         // Record the split of the left page in a new stub, for which we create
@@ -956,9 +1043,10 @@ class Journalist {
                 length: partition
             }]
         })
-        child.entry.value.entries = [{
-            header: { method: 'load', id: child.entry.value.id, append: child.entry.value.append },
-            entries: child.entry.value.entries
+        child.entry.value.vacuum = [{
+            header: { method: 'load', id: child.entry.value.id, append: child.entry.value.append,
+                was: 'child' },
+            vacuum: child.entry.value.vacuum
         }]
         child.entry.value.append = append
 
@@ -984,6 +1072,11 @@ class Journalist {
         entries.forEach(entry => entry.release())
         await this._possibleSplit(parent.entry.value, key, parent.level)
 
+        // TODO This is expensive, if we do it ever time, and silly if we're not
+        // filling a page with deletions, a vacuum will reduce the number of
+        // files, but not significantly reduce the size on disk, nor would it
+        // really reduce the amount of time it takes to load. For now I'm
+        // vacuuming dilligently in order to test vacuum and find bugs.
         await this._vacuum(key)
         await this._vacuum(right.value.items[0].key)
     }
@@ -1336,7 +1429,7 @@ class Journalist {
     }
 
     // TODO Must wait for housekeeping to finish before closing.
-    async _housekeeper ({ body: key }) {
+    async _housekeeper ({ vargs: [ key ] }) {
         const entries = []
         const child = await this.descend({ key }, entries)
         if (child.entry.value.items.length >= this.leaf.split) {
