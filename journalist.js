@@ -202,9 +202,7 @@ class Journalist {
                         const { page: loaded } = await this._read(id, append)
                         page.items = loaded.items
                         page.right = loaded.right
-                        page.vacuum.push({
-                            method: 'load', header: entry.header, vacuum: loaded.vacuum
-                        })
+                        page.vacuum.push({ header: entry.header, vacuum: loaded.vacuum })
                     }
                     break
                 case 'slice': {
@@ -218,9 +216,7 @@ class Journalist {
                         const { page: right } = await this._read(entry.header.id, entry.header.append)
                         page.items.push.apply(page.items, right.items.slice(right.ghosts))
                         page.right = right.right
-                        page.vacuum.push({
-                            method: 'merge', header: entry.header, vacuum: right.vacuum
-                        })
+                        page.vacuum.push({ header: entry.header, vacuum: right.vacuum })
                     }
                     break
                 case 'insert': {
@@ -242,7 +238,7 @@ class Journalist {
                     }
                     break
                 case 'dependent': {
-                        page.vacuum.push(entry.header)
+                        page.vacuum.push(entry)
                     }
                     break
                 }
@@ -435,6 +431,7 @@ class Journalist {
                 this._root.remove()
                 this._root = null
             }
+            this.reallyClosed = true
         }
     }
 
@@ -609,36 +606,23 @@ class Journalist {
         const first = this._filename()
         const second = this._filename()
 
-        console.log('vacuum', leaf.entry.value.id)
-
         const dependencies = function map ({ id, append }, dependencies, mapped = {}) {
-            console.log(require('util').inspect({ id, append, dependencies }, { depth: null }))
-            if (mapped[`${id}/${append}`] != null) {
-                process.exit()
-            }
             assert(mapped[`${id}/${append}`] == null)
             const page = mapped[`${id}/${append}`] = {}
-            try {
             for (const dependency of dependencies) {
                 switch (dependency.header.method) {
                 case 'load':
                 case 'merge': {
-                        console.log('load/merge', id, append, dependency)
                         map(dependency.header, dependency.vacuum, mapped)
                     }
                     break
                 case 'dependent': {
                         const { id, append } = dependency.header
-                        console.log('dependent', id, append, dependency)
                         assert(!page[`${id}/${append}`])
                         page[`${id}/${append}`] = true
                     }
                     break
                 }
-            }
-            } catch (error) {
-                console.log(error.message)
-                process.exit()
             }
             return mapped
         } (leaf.entry.value, leaf.entry.value.vacuum)
@@ -895,8 +879,6 @@ class Journalist {
         // Descend to the parent branch page.
         const parent = await this.descend({ key, level: child.level - 1 }, entries)
 
-        console.log('splitting', child.entry.value.id)
-
         // Create the right page now so we can lock it. We're going to
         // synchronously add it to the tree and then do the housekeeping to
         // persist the split asynchronously. While we're async, someone could
@@ -911,7 +893,6 @@ class Journalist {
             append: this._filename(),
             ghosts: 0
         })
-        console.log(right.value.id)
         entries.push(right)
         const blocks = [
             this._block(child.entry.value.id),
