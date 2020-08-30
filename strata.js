@@ -46,6 +46,17 @@ class Strata {
         return NULL_CURSOR
     }
 
+    // What was the lock for? It was to ensure that another strand doesn't
+    // change the location of the index between in time it takes return from the
+    // async call to `Strata.search`.
+    //
+    // TODO A race condition occurred to you. What if the page is deleted in
+    // during some window and the cursor is invalid, but our descent is itself
+    // synchornous, except now we can see below that it isn't, the call to
+    // `Journalist.descend` introduces the problem we tried to resolve with our
+    // lock, so we ought to move the lock into `Journalist`.
+
+    //
     async search (key, fork = false) {
         const query = key === Strata.MIN
             ? { key: null, rightward: false, fork: false }
