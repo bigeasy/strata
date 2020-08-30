@@ -62,7 +62,7 @@ class Cursor {
     // `null`.
 
     //
-    insert (index, parts, writes = {}) {
+    insert (index, key, parts, writes = {}) {
         Strata.Error.assert(
             index > -1 &&
             (
@@ -70,9 +70,7 @@ class Cursor {
                 this.page.id == '0.1'
             ), 'invalid.insert.index', { index: this.index })
 
-        const key = this._journalist.extractor(parts)
-
-        const record = { key: this._journalist.extractor(parts), parts: parts, heft: 0 }
+        const record = { key: key, parts: parts, heft: 0 }
 
         // Create a record to add to the page. Also give to Journalist so it can
         // set the heft.

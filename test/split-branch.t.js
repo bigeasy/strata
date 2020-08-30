@@ -23,7 +23,7 @@ require('proof')(3, async (okay) => {
             await strata.open()
             const writes = {}
             const cursor = (await strata.search(leaf[0])).get()
-            cursor.insert(cursor.index, leaf, writes)
+            cursor.insert(cursor.index, leaf[0], leaf, writes)
             cursor.release()
             Strata.flush(writes)
             await strata.close()
