@@ -34,15 +34,22 @@ class Cursor {
         }
         const comparator = this._journalist.comparator
         index = find(comparator, this.page, key, index)
-        // TODO What about inserting at zero? Only if we are at the first page,
-        // right?
-        const unambiguous = -1 < index // <- TODO ?
-            || ~ index < this.page.items.length
-            || this.page.right == null
-        if (!unambiguous && comparator(key, this.page.right) >= 0) {
-            return null
+        // Unambiguous if we actually found it.
+        if (-1 < index) {
+            return index
         }
-        return index
+        // We only insert before the key on the left most page.
+        if (~index == 0) {
+            return this.page.id == '0.1' ? index : null
+        }
+        // No problem if the index is within the exiting set of items, or if
+        // this is the right most page.
+        if (~index < this.page.items.length || this.page.right == null) {
+            return index
+        }
+        // Otherwise we should ensure that the key is less than the key of the
+        // right to the right.
+        return comparator(key, this.page.right) < 0 ? index : null
     }
 
     // Insert a record into the b-tree. Parts is an array of objects in their
