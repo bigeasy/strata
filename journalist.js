@@ -345,6 +345,13 @@ class Journalist {
             // TODO Move this down below the leaf return and do not search if
             // we are searching for a leaf.
 
+            // If the page is a leaf, assert that we're looking for a leaf and
+            // return the leaf page.
+            if (entry.value.leaf) {
+                assert.equal(level, -1, 'could not find branch')
+                break
+            }
+
             // Binary search the page for the key, or just go right or left
             // directly if there is no key.
             const offset = entry.value.leaf ? entry.value.ghosts : 1
@@ -353,14 +360,6 @@ class Journalist {
                 : key != null
                     ? find(this.comparator, entry.value, key, offset)
                     : 0
-
-            // If the page is a leaf, assert that we're looking for a leaf and
-            // return the leaf page.
-            if (entry.value.leaf) {
-                descent.index = index
-                assert.equal(level, -1, 'could not find branch')
-                break
-            }
 
             // If the index is less than zero we didn't find the exact key, so
             // we're looking at the bitwise not of the insertion point which is
