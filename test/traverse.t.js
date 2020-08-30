@@ -20,7 +20,7 @@ require('proof')(2, async (okay) => {
 
     const expected = [ 'a', 'b', 'c', 'd', 'e', 'f', 'h', 'i' ]
 
-    await async function () {
+    {
         const destructible = new Destructible([ 'split.t', 'forward' ])
         const cache = new Cache
         const strata = new Strata(destructible, { directory, cache })
@@ -39,8 +39,8 @@ require('proof')(2, async (okay) => {
         okay(items, expected, 'forward')
         await strata.close()
         await destructible.destructed
-    } ()
-    await async function () {
+    }
+    {
         const destructible = new Destructible([ 'split.t', 'reverse' ])
         const cache = new Cache
         const strata = new Strata(destructible, { directory, cache })
@@ -59,5 +59,5 @@ require('proof')(2, async (okay) => {
         okay(items, expected.slice().reverse(), 'reverse')
         await strata.close()
         await destructible.destructed
-    } ()
+    }
 })

@@ -23,7 +23,7 @@ require('proof')(5, async (okay) => {
         ]]
     })
 
-    await async function () {
+    {
         const destructible = new Destructible([ 'split.t', 'split' ])
         const cache = new Cache
         const strata = new Strata(destructible, { directory, cache })
@@ -38,8 +38,8 @@ require('proof')(5, async (okay) => {
         cache.purge(0)
         okay(cache.heft, 0, 'cache purged')
         await destructible.destructed
-    } ()
-    await async function () {
+    }
+    {
         const destructible = new Destructible([ 'split.t', 'reopen' ])
         const cache = new Cache
         const strata = new Strata(destructible, { directory, cache })
@@ -50,8 +50,8 @@ require('proof')(5, async (okay) => {
         cursor.release()
         await strata.close()
         await destructible.destructed
-    } ()
-    await async function () {
+    }
+    {
         const destructible = new Destructible([ 'split.t', 'traverse' ])
         const cache = new Cache
         const strata = new Strata(destructible, { directory, cache })
@@ -70,8 +70,8 @@ require('proof')(5, async (okay) => {
         okay(items, [ 'a', 'b', 'c', 'd', 'e', 'f' ], 'traverse')
         await strata.close()
         await destructible.destructed
-    } ()
-    await async function () {
+    }
+    {
         const destructible = new Destructible([ 'split.t', 'forward' ])
         const cache = new Cache
         const strata = new Strata(destructible, { directory, cache })
@@ -90,8 +90,8 @@ require('proof')(5, async (okay) => {
         okay(items, [ 'a', 'b', 'c', 'd', 'e', 'f' ], 'forward')
         await strata.close()
         await destructible.destructed
-    } ()
-    await async function () {
+   }
+   {
         const destructible = new Destructible([ 'split.t', 'forward' ])
         const cache = new Cache
         const strata = new Strata(destructible, { directory, cache })
@@ -110,5 +110,5 @@ require('proof')(5, async (okay) => {
         okay(items, [ 'a', 'b', 'c', 'd', 'e', 'f' ].reverse(), 'reverse')
         await strata.close()
         await destructible.destructed
-    } ()
+    }
 })

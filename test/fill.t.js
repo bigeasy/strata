@@ -47,61 +47,58 @@ require('proof')(3, async (okay) => {
         ]]
     })
 
-    destructible.durable('test', async function () {
-        async function merge () {
-            const cache = new Cache
-            const strata = new Strata(destructible.ephemeral('merge'), { directory, cache })
-            await strata.open()
-            const cursor = await strata.search('b')
-            // TODO Come back and insert an error into `remove`. Then attempt to
-            // resolve that error somehow into `flush`. Implies that Turnstile
-            // propagates an error. Essentially, how do you get the foreground
-            // to surrender when the background has failed. `flush` could be
-            // waiting on a promise when the background fails and hang
-            // indefinately. Any one error, like a `shutdown` error would stop
-            // it.
-            const { index } = cursor.indexOf('b')
-            const writes = {}
-            cursor.remove(index, writes)
+    // Merge
+    {
+        const cache = new Cache
+        const strata = new Strata(destructible.ephemeral('merge'), { directory, cache })
+        await strata.open()
+        const cursor = await strata.search('b')
+        // TODO Come back and insert an error into `remove`. Then attempt to
+        // resolve that error somehow into `flush`. Implies that Turnstile
+        // propagates an error. Essentially, how do you get the foreground
+        // to surrender when the background has failed. `flush` could be
+        // waiting on a promise when the background fails and hang
+        // indefinately. Any one error, like a `shutdown` error would stop
+        // it.
+        const { index } = cursor.indexOf('b')
+        const writes = {}
+        cursor.remove(index, writes)
+        cursor.release()
+        Strata.flush(writes)
+        await strata.close()
+        cache.purge(0)
+        okay(cache.heft, 0, 'cache purged')
+    }
+    // Reopen.
+    {
+        const cache = new Cache
+        const strata = new Strata(destructible.ephemeral('reopen'), { directory, cache })
+        await strata.open()
+        const cursor = await strata.search('c')
+        const { index } = cursor.indexOf('c')
+        okay(cursor.page.items[index].parts[0], 'c', 'found')
+        cursor.release()
+        await strata.close()
+    }
+    // Traverse.
+    {
+        const cache = new Cache
+        const strata = new Strata(destructible.ephemeral('traverse'), { directory, cache })
+        await strata.open()
+        let right = 'a'
+        const items = []
+        do {
+            const cursor = await strata.search(right)
+            const { index } = cursor.indexOf(right)
+            for (let i = index; i < cursor.page.items.length; i++) {
+                items.push(cursor.page.items[i].parts[0])
+            }
             cursor.release()
-            Strata.flush(writes)
-            await strata.close()
-            cache.purge(0)
-            okay(cache.heft, 0, 'cache purged')
-        }
-        await merge()
-        async function reopen () {
-            const cache = new Cache
-            const strata = new Strata(destructible.ephemeral('reopen'), { directory, cache })
-            await strata.open()
-            const cursor = await strata.search('c')
-            const { index } = cursor.indexOf('c')
-            okay(cursor.page.items[index].parts[0], 'c', 'found')
-            cursor.release()
-            await strata.close()
-        }
-        await reopen()
-        async function traverse () {
-            const cache = new Cache
-            const strata = new Strata(destructible.ephemeral('traverse'), { directory, cache })
-            await strata.open()
-            let right = 'a'
-            const items = []
-            do {
-                const cursor = await strata.search(right)
-                const { index } = cursor.indexOf(right)
-                for (let i = index; i < cursor.page.items.length; i++) {
-                    items.push(cursor.page.items[i].parts[0])
-                }
-                cursor.release()
-                right = cursor.page.right
-            } while (right != null)
-            okay(items, [ 'a', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k' ], 'traverse')
-            await strata.close()
-        }
-        await traverse()
-        destructible.destroy()
-    })
-
+            right = cursor.page.right
+        } while (right != null)
+        okay(items, [ 'a', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k' ], 'traverse')
+        await strata.close()
+    }
+    destructible.destroy()
     await destructible.destructed
 })
