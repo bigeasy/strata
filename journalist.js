@@ -342,6 +342,9 @@ class Journalist {
                 return { miss: id }
             }
 
+            // TODO Move this down below the leaf return and do not search if
+            // we are searching for a leaf.
+
             // Binary search the page for the key, or just go right or left
             // directly if there is no key.
             const offset = entry.value.leaf ? entry.value.ghosts : 1
@@ -391,22 +394,22 @@ class Journalist {
     // Conceivably, this could continue indefinitely.
 
     //
-    async descend (query, entries = []) {
-        const _entries = [[]]
+    async descend (query, callerEntries = []) {
+        const entries = [[]]
         for (;;) {
-            _entries.push([])
-            const descent = this._descend(_entries[1], query)
-            _entries.shift().forEach(entry => entry.release())
+            entries.push([])
+            const descent = this._descend(entries[1], query)
+            entries.shift().forEach(entry => entry.release())
             if (descent == null) {
-                _entries.shift().forEach((entry) => entry.release())
+                entries.shift().forEach((entry) => entry.release())
                 return null
             }
             if (descent.miss == null) {
-                entries.push(descent.entry = _entries[0].pop())
-                _entries.shift().forEach(entry => entry.release())
+                callerEntries.push(descent.entry = entries[0].pop())
+                entries.shift().forEach(entry => entry.release())
                 return descent
             }
-            _entries[0].push(await this.load(descent.miss))
+            entries[0].push(await this.load(descent.miss))
         }
     }
 

@@ -52,7 +52,7 @@ require('proof')(3, async (okay) => {
             const cache = new Cache
             const strata = new Strata(destructible.ephemeral('merge'), { directory, cache })
             await strata.open()
-            const cursor = (await strata.search('b')).get()
+            const cursor = await strata.search('b')
             // TODO Come back and insert an error into `remove`. Then attempt to
             // resolve that error somehow into `flush`. Implies that Turnstile
             // propagates an error. Essentially, how do you get the foreground
@@ -60,8 +60,9 @@ require('proof')(3, async (okay) => {
             // waiting on a promise when the background fails and hang
             // indefinately. Any one error, like a `shutdown` error would stop
             // it.
+            const { index } = cursor.indexOf('b')
             const writes = {}
-            cursor.remove(cursor.index, writes)
+            cursor.remove(index, writes)
             cursor.release()
             Strata.flush(writes)
             await strata.close()
@@ -73,8 +74,9 @@ require('proof')(3, async (okay) => {
             const cache = new Cache
             const strata = new Strata(destructible.ephemeral('reopen'), { directory, cache })
             await strata.open()
-            const cursor = (await strata.search('c')).get()
-            okay(cursor.page.items[cursor.index].parts[0], 'c', 'found')
+            const cursor = await strata.search('c')
+            const { index } = cursor.indexOf('c')
+            okay(cursor.page.items[index].parts[0], 'c', 'found')
             cursor.release()
             await strata.close()
         }
@@ -86,8 +88,9 @@ require('proof')(3, async (okay) => {
             let right = 'a'
             const items = []
             do {
-                const cursor = (await strata.search(right)).get()
-                for (let i = cursor.index; i < cursor.page.items.length; i++) {
+                const cursor = await strata.search(right)
+                const { index } = cursor.indexOf(right)
+                for (let i = index; i < cursor.page.items.length; i++) {
                     items.push(cursor.page.items[i].parts[0])
                 }
                 cursor.release()

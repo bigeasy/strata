@@ -28,9 +28,10 @@ require('proof')(5, async (okay) => {
         const cache = new Cache
         const strata = new Strata(destructible, { directory, cache })
         await strata.open()
-        const cursor = (await strata.search('f')).get()
         const writes = {}
-        cursor.insert(cursor.index, 'f', [ 'f' ], writes)
+        const cursor = await strata.search('f')
+        const { index } = cursor.indexOf('f')
+        cursor.insert(index, 'f', [ 'f' ], writes)
         cursor.release()
         await Strata.flush(writes)
         await strata.close()
@@ -43,8 +44,9 @@ require('proof')(5, async (okay) => {
         const cache = new Cache
         const strata = new Strata(destructible, { directory, cache })
         await strata.open()
-        const cursor = (await strata.search('f')).get()
-        okay(cursor.page.items[cursor.index].parts[0], 'f', 'found')
+        const cursor = await strata.search('f')
+        const { index } = cursor.indexOf('f')
+        okay(cursor.page.items[index].parts[0], 'f', 'found')
         cursor.release()
         await strata.close()
         await destructible.destructed
@@ -57,8 +59,9 @@ require('proof')(5, async (okay) => {
         let right = 'a'
         const items = []
         do {
-            const cursor = (await strata.search(right)).get()
-            for (let i = cursor.index; i < cursor.page.items.length; i++) {
+            const cursor = await strata.search(right)
+            const { index } = cursor.indexOf(right)
+            for (let i = index; i < cursor.page.items.length; i++) {
                 items.push(cursor.page.items[i].parts[0])
             }
             cursor.release()
@@ -76,8 +79,9 @@ require('proof')(5, async (okay) => {
         let right = Strata.MIN
         const items = []
         do {
-            const cursor = (await strata.search(right)).get()
-            for (let i = cursor.index; i < cursor.page.items.length; i++) {
+            const cursor = await strata.search(right)
+            const { index } = cursor.indexOf(right)
+            for (let i = index; i < cursor.page.items.length; i++) {
                 items.push(cursor.page.items[i].parts[0])
             }
             cursor.release()
@@ -95,8 +99,8 @@ require('proof')(5, async (okay) => {
         let left = Strata.MAX, fork = false, cursor
         const items = []
         do {
-            cursor = (await strata.search(left, fork)).get()
-            for (let i = cursor.index; i >= cursor.page.ghosts; i--) {
+            cursor = await strata.search(left, fork)
+            for (let i = cursor.page.items.length - 1; i >= cursor.page.ghosts; i--) {
                 items.push(cursor.page.items[i].parts[0])
             }
             cursor.release()

@@ -20,9 +20,10 @@ require('proof')(2, async (okay) => {
 
     const writes = {}
 
-    const cursor = (await strata.search('a')).get()
-    cursor.insert(cursor.index, 'a', [ 'a' ], writes)
-    cursor.insert(~cursor.indexOf('b', cursor.index), 'b', [ 'b' ], writes)
+    const cursor = await strata.search('a')
+    const { index } = cursor.indexOf('a')
+    cursor.insert(index, 'a', [ 'a' ], writes)
+    cursor.insert(cursor.indexOf('b', index).index, 'B', [ 'b' ], writes)
     cursor.release()
 
     Strata.flush(writes)

@@ -5,13 +5,19 @@ const find = require('./find')
 
 class Cursor {
     constructor (journalist, descent, key) {
-        this._entry = descent.entry
-        this.page = this._entry.value
+        this.page = descent.entry.value
         this.sought = key
-        this.found = descent.index >= 0
-        this.index = descent.index < 0 ? ~descent.index : descent.index
+        this._entry = descent.entry
         this._journalist = journalist
         this._promises = {}
+    }
+
+    get found () {
+        throw new Error('removed')
+    }
+
+    get index () {
+        throw new Error('removed')
     }
 
     get items () {
@@ -28,28 +34,32 @@ class Cursor {
     // forward for insertion points, and only forward.
 
     //
-    indexOf (key, index) {
+    indexOf (key, offset = 0) {
         if (this.page.deleted) {
             return null
         }
         const comparator = this._journalist.comparator
-        index = find(comparator, this.page, key, index)
+        let index = find(comparator, this.page, key, Math.max(offset, this.page.ghosts))
         // Unambiguous if we actually found it.
         if (-1 < index) {
-            return index
+            return { index: index, found: true }
         }
         // We only insert before the key on the left most page.
         if (~index == 0) {
-            return this.page.id == '0.1' ? index : null
+            return this.page.id == '0.1'
+                ? { index: ~index, found: false }
+                : { index: null, found: false }
         }
         // No problem if the index is within the exiting set of items, or if
         // this is the right most page.
         if (~index < this.page.items.length || this.page.right == null) {
-            return index
+            return { index: ~index, found: false }
         }
         // Otherwise we should ensure that the key is less than the key of the
         // right to the right.
-        return comparator(key, this.page.right) < 0 ? index : null
+        return comparator(key, this.page.right) < 0
+            ? { index: ~index, found: false }
+            : { index: null, found: false }
     }
 
     // Insert a record into the b-tree. Parts is an array of objects in their
@@ -66,9 +76,9 @@ class Cursor {
         Strata.Error.assert(
             index > -1 &&
             (
-                this.index > 0 ||
+                index > 0 ||
                 this.page.id == '0.1'
-            ), 'invalid.insert.index', { index: this.index })
+            ), 'invalid.insert.index', { index: index })
 
         const record = { key: key, parts: parts, heft: 0 }
 

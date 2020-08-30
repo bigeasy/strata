@@ -27,90 +27,96 @@ require('proof')(8, async (okay) => {
         const strata = new Strata(destructible, { directory, cache })
         await strata.open()
         {
-            const cursor = (await strata.search(Strata.MIN)).get()
-            okay({
-                id: cursor.page.id,
-                index: cursor.index
-            }, {
-                id: '0.1',
-                index: 0
-            }, 'min')
+            const cursor = await strata.search(Strata.MIN)
+            okay(cursor.page.id, '0.1', 'min')
             cursor.release()
         }
         {
-            const cursor = (await strata.search(Strata.MAX)).get()
-            okay({
-                id: cursor.page.id,
-                index: cursor.index
-            }, {
-                id: '1.3',
-                index: 2
-            }, 'max')
+            const cursor = await strata.search(Strata.MAX)
+            okay(cursor.page.id, '1.3', 'max')
             cursor.release()
         }
         {
-            const cursor = (await strata.search('d')).get()
+            const cursor = await strata.search('d')
+            const { index, found } = cursor.indexOf('d')
             okay({
                 id: cursor.page.id,
-                index: cursor.index
+                index: index,
+                found: found
             },  {
                 id: '1.1',
-                index: 0
+                index: 0,
+                found: true
             }, 'find')
             cursor.release()
         }
         {
-            const cursor = (await strata.search('d', true)).get()
+            const cursor = await strata.search('d', true)
+            const { index, found } = cursor.indexOf('d')
             okay({
                 id: cursor.page.id,
-                index: cursor.index
+                index: index,
+                found: found
             }, {
                 id: '0.1',
-                index: 2
+                index: null,
+                found: false
             }, 'fork')
             cursor.release()
         }
         {
-            const cursor = (await strata.search('e', true)).get()
+            const cursor = await strata.search('e', true)
+            const { index, found } = cursor.indexOf('e')
             okay({
                 id: cursor.page.id,
-                index: cursor.index
+                index: index,
+                found: found
             }, {
                 id: '1.1',
-                index: 0
+                index: 1,
+                found: true
             }, 'approximate fork')
             cursor.release()
         }
         {
-            const cursor = (await strata.search('j', true)).get()
+            const cursor = await strata.search('j', true)
+            const { index, found } = cursor.indexOf('e')
             okay({
                 id: cursor.page.id,
-                index: cursor.index
+                index: index,
+                found: false
             }, {
                 id: '1.3',
-                index: 1
+                index: 1,
+                found: false
             }, 'approximate fork missing')
             cursor.release()
         }
         {
-            const cursor = (await strata.search('g', true)).get()
+            const cursor = await strata.search('g', true)
+            const { index, found } = cursor.indexOf('g')
             okay({
                 id: cursor.page.id,
-                index: cursor.index
+                index: index,
+                found: found
             }, {
                 id: '1.1',
-                index: 2
+                index: 3,
+                found: false
             }, 'approximate fork missing end of page')
             cursor.release()
         }
         {
-            const cursor = (await strata.search('h')).get()
+            const cursor = await strata.search('h')
+            const { index, found } = cursor.indexOf('h')
             okay({
                 id: cursor.page.id,
-                index: cursor.index
+                index: index,
+                found: false
             }, {
                 id: '1.3',
-                index: 1
+                index: 1,
+                found: found
             }, 'ghost')
             cursor.release()
         }

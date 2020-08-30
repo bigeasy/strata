@@ -28,8 +28,9 @@ require('proof')(2, async (okay) => {
         let right = Strata.MIN
         const items = []
         do {
-            const cursor = (await strata.search(right)).get()
-            for (let i = cursor.index; i < cursor.page.items.length; i++) {
+            const cursor = await strata.search(right)
+            const { index } = cursor.indexOf(right)
+            for (let i = index; i < cursor.page.items.length; i++) {
                 items.push(cursor.page.items[i].parts[0])
             }
             cursor.release()
@@ -47,8 +48,8 @@ require('proof')(2, async (okay) => {
         let left = Strata.MAX, fork = false, cursor
         const items = []
         do {
-            cursor = (await strata.search(left, fork)).get()
-            for (let i = cursor.index; i >= cursor.page.ghosts; i--) {
+            cursor = await strata.search(left, fork)
+            for (let i = cursor.page.items.length - 1; i >= cursor.page.ghosts; i--) {
                 items.push(cursor.page.items[i].parts[0])
             }
             cursor.release()

@@ -22,9 +22,10 @@ require('proof')(3, async (okay) => {
             const cache = new Cache
             const strata = new Strata(destructible.durable('strata'), { directory, cache })
             await strata.open()
-            const cursor = (await strata.search('a')).get()
+            const cursor = await strata.search('a')
             const writes = {}
-            cursor.remove(cursor.index, writes)
+            const { index, found } = cursor.indexOf('a')
+            cursor.remove(index, writes)
             Strata.flush(writes)
             cursor.release()
             await strata.close()
@@ -50,8 +51,9 @@ require('proof')(3, async (okay) => {
             let right = 'a'
             const items = []
             do {
-                const cursor = (await strata.search(right)).get()
-                for (let i = cursor.index; i < cursor.page.items.length; i++) {
+                const cursor = await strata.search(right)
+                const { index, found } = cursor.indexOf('a', cursor.page.ghosts)
+                for (let i = index; i < cursor.page.items.length; i++) {
                     items.push(cursor.page.items[i].parts[0])
                 }
                 cursor.release()
