@@ -32,6 +32,9 @@ class Strata {
 
     constructor (destructible, options) {
         this._journalist = new Journalist(destructible, options)
+        const { comparator, extractor }  = this._journalist
+        this.compare = function (left, right) { return comparator(left, right) }
+        this.extract = function (parts) { return extractor(parts) }
     }
 
     create () {

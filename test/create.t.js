@@ -1,4 +1,4 @@
-require('proof')(2, async (okay) => {
+require('proof')(4, async (okay) => {
     const Destructible = require('destructible')
     const destructible = new Destructible('create.t')
 
@@ -24,6 +24,9 @@ require('proof')(2, async (okay) => {
     }, 'created')
     cache.purge(0)
     okay(cache.entries, 0, 'cache empty')
+
+    okay(strata.compare('a', 'a'), 0, 'compare')
+    okay(strata.extract([ 'a' ]), 'a', 'extract')
 
     await strata.open()
     await strata.close()
