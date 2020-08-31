@@ -36,7 +36,7 @@ class Cursor {
     //
     indexOf (key, offset = 0) {
         if (this.page.deleted) {
-            return null
+            return { index: null, found: false }
         }
         const comparator = this._journalist.comparator
         let index = find(comparator, this.page, key, Math.max(offset, this.page.ghosts))
