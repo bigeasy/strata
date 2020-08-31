@@ -38,6 +38,8 @@ class Racer {
         this._count = 0
         this._latch = { promise: null, resolve: () => {} }
         this._events = []
+        this.compare = strata.compare
+        this.extract = strata.extract
     }
 
     [Symbol.asyncIterator] () {
