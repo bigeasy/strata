@@ -49,9 +49,20 @@ const appendable = require('./appendable')
 // An `Error` type specific to Strata.
 const Strata = { Error: require('./error') }
 
+// Journalist is the crux of Strata. It exists as a separate object possibly for
+// legacy reasons, and it will stay that way because it makes `Strata` and
+// `Cursor` something a user can read to understand the interface.
+
+//
 class Journalist {
+    // Used to identify the pages of this instance in the page cache which can
+    // be shared across different Strata. We do not want to pull pages from the
+    // cache based only on the directory path and page id because we may close
+    // and reopen a Strata and we'd pull pages from the previous instance.
     static _instance = 0
 
+    // Journalist accepts the destructible and user options passed to `new
+    // Strata`
     constructor (destructible, options) {
         const leaf = coalesce(options.leaf, {})
         this._instance = Journalist._instance++
@@ -234,6 +245,11 @@ class Journalist {
                         } else {
                             page.items.splice(entry.header.index, 1)
                         }
+                        // TODO We do not want to vacuum automatically, we want
+                        // it to be optional, possibly delayed. Expecially for
+                        // MVCC where we are creating short-lived trees, we
+                        // don't care that they are slow to load due to splits
+                        // and we don't have deletes.
                         page.deletes++
                     }
                     break
