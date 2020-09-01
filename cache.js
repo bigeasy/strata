@@ -105,7 +105,7 @@ class Cache {
                 // heft update in `Journalist` it has a TODO.
                 if (iterator.value.leaf) {
                     const page = iterator.value
-                    assert.equal(iterator.heft, page.items.slice(page.ghosts).reduce((sum, item) => {
+                    assert.equal(iterator.heft, page.items.slice(0).reduce((sum, item) => {
                         return sum + item.heft
                     }, 1))
                 }
