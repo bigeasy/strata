@@ -449,7 +449,6 @@ class Journalist {
                 this._root.remove()
                 this._root = null
             }
-            this.reallyClosed = true
         }
     }
 
