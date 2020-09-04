@@ -19,7 +19,7 @@ require('proof')(3, async (okay) => {
     })
     {
         const cache = new Cache
-        const strata = new Strata(destructible.durable('strata'), { directory, cache })
+        const strata = new Strata(destructible.ephemeral('strata'), { directory, cache })
         await strata.open()
         const cursor = await strata.search('a')
         const writes = {}
@@ -60,5 +60,6 @@ require('proof')(3, async (okay) => {
         okay(items, [ 'b', 'c' ], 'traverse')
         await strata.close()
     }
+    destructible.destroy()
     await destructible.destructed
 })

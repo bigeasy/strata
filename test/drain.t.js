@@ -59,7 +59,9 @@ require('proof')(3, async (okay) => {
         await strata.close()
     }
 
-    // TODO Destruction is off...
+//    console.log('here')
+
     destructible.destroy()
+
     await destructible.destructed
 })

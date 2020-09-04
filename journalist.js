@@ -133,9 +133,10 @@ class Journalist {
         this.closed = false
         this.destroyed = false
         destructible.destruct(() => this.destroyed = true)
+        this._destructible = destructible
     }
 
-    async create () {
+    async __create () {
         const directory = this.directory, stat = await fs.stat(directory)
         Strata.Error.assert(stat.isDirectory(), 'create.not.directory', { directory })
         Strata.Error.assert((await fs.readdir(directory)).filter(file => {
@@ -156,7 +157,12 @@ class Journalist {
         this._id++
     }
 
-    async open () {
+    create () {
+        return this._destructible.ephemeral('create', this.__create(), true)
+    }
+
+    async _open () {
+        // TODO Run commit log on reopen.
         this._root = this._create({ id: -1, items: [{ id: '0.0' }] })
         const instances = (await fs.readdir(this._path('instances')))
             .filter(file => /^\d+$/.test(file))
@@ -167,6 +173,10 @@ class Journalist {
         for (const instance of instances) {
             await fs.rmdir(this._path('instances', instance))
         }
+    }
+
+    open () {
+        return this._destructible.ephemeral('open', this._open(), true)
     }
 
     async _hashable (id) {
@@ -409,7 +419,7 @@ class Journalist {
     // Conceivably, this could continue indefinitely.
 
     //
-    async descend (query, callerEntries = []) {
+    async descend (query, callerEntries, internal = true) {
         const entries = [[]]
         for (;;) {
             entries.push([])
@@ -424,7 +434,11 @@ class Journalist {
                 entries.shift().forEach(entry => entry.release())
                 return descent
             }
-            entries[0].push(await this.load(descent.miss))
+            const load = this.load(descent.miss)
+            const entry = internal
+                ? await load
+                : await this._destructible.ephemeral('load', load, true)
+            entries[0].push(entry)
         }
     }
 
@@ -530,6 +544,7 @@ class Journalist {
 
     //
     async _append ({ body: { id } }) {
+        this._destructible.working()
         // TODO Doesn't `await null` do the same thing now? And why do I want to
         // do this anyway? It's silly.
         await callback((callback) => process.nextTick(callback))
@@ -574,6 +589,7 @@ class Journalist {
     }
 
     append (entry, writes) {
+        this._destructible.operational()
         const queue = this._queue(entry.id)
         queue.writes.push(entry)
         if (writes[queue.id] == null) {
@@ -613,7 +629,7 @@ class Journalist {
     //
     async _vacuum (key) {
         const entries = []
-        const leaf = await this.descend({ key })
+        const leaf = await this.descend({ key }, entries)
 
         const block = this._block(leaf.entry.value.id)
         await block.enter.promise
@@ -762,7 +778,7 @@ class Journalist {
             await commit.dispose()
         }) ()
 
-        leaf.entry.release()
+        entries.forEach(entry => entry.release())
     }
 
     // Assume there is nothing to block or worry about with the branch pages.
@@ -1428,6 +1444,7 @@ class Journalist {
 
     // TODO Must wait for housekeeping to finish before closing.
     async _housekeeper ({ vargs: [ key ] }) {
+        this._destructible.working()
         const entries = []
         const child = await this.descend({ key }, entries)
         if (child.entry.value.items.length >= this.leaf.split) {

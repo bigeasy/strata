@@ -48,8 +48,9 @@ class Strata {
             : key === Strata.MAX
                 ? { key: null, rightward: true, fork: false }
                 : { key, rightward: false, fork: fork, approximate: true }
-        const descent = await this._journalist.descend(query)
-        return new Cursor(this._journalist, descent, key)
+        const entries = []
+        const descent = await this._journalist.descend(query, entries, false)
+        return new Cursor(this._journalist, descent, entries.pop(), key)
     }
 
     static async flush (writes) {
