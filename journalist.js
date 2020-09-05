@@ -134,28 +134,31 @@ class Journalist {
         this.destroyed = false
         this._destructible = destructible
         this._leftovers = []
-        destructible.destruct(async () => {
+        destructible.destruct(() => {
             this.destroyed = true
-            // Trying to figure out how to wait for the Turnstile to drain. We
-            // can't terminate the housekeeping turnstile then the acceptor
-            // turnstile because they depend on each other, so we're going to
-            // loop. We wait for one to drain, then the other, then check to see
-            // if anything is in the queues to determine if we can leave the
-            // loop. Actually, we only need to check the size of the first queue
-            // in the loop, the second will be empty when `drain` returns.
-            //
-            // **TODO** Really want to just push keys into a file for inspection
-            // when we reopen for housekeeping.
-            do {
-                await this._housekeeping.turnstile.drain()
-                await this._appending.turnstile.drain()
-            } while (this._housekeeping.turnstile.size != 0)
-            await this._appending.turnstile.terminate()
-            await this._housekeeping.turnstile.terminate()
-            if (this._root != null) {
-                this._root.remove()
-                this._root = null
-            }
+            destructible.ephemeral('shutdown', async () => {
+                // Trying to figure out how to wait for the Turnstile to drain.
+                // We can't terminate the housekeeping turnstile then the
+                // acceptor turnstile because they depend on each other, so
+                // we're going to loop. We wait for one to drain, then the
+                // other, then check to see if anything is in the queues to
+                // determine if we can leave the loop. Actually, we only need to
+                // check the size of the first queue in the loop, the second
+                // will be empty when `drain` returns.
+                //
+                // **TODO** Really want to just push keys into a file for
+                // inspection when we reopen for housekeeping.
+                do {
+                    await this._housekeeping.turnstile.drain()
+                    await this._appending.turnstile.drain()
+                } while (this._housekeeping.turnstile.size != 0)
+                await this._appending.turnstile.terminate()
+                await this._housekeeping.turnstile.terminate()
+                if (this._root != null) {
+                    this._root.remove()
+                    this._root = null
+                }
+            })
         })
     }
 
