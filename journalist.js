@@ -132,8 +132,31 @@ class Journalist {
         this._id = 0
         this.closed = false
         this.destroyed = false
-        destructible.destruct(() => this.destroyed = true)
         this._destructible = destructible
+        this._leftovers = []
+        destructible.destruct(async () => {
+            this.destroyed = true
+            // Trying to figure out how to wait for the Turnstile to drain. We
+            // can't terminate the housekeeping turnstile then the acceptor
+            // turnstile because they depend on each other, so we're going to
+            // loop. We wait for one to drain, then the other, then check to see
+            // if anything is in the queues to determine if we can leave the
+            // loop. Actually, we only need to check the size of the first queue
+            // in the loop, the second will be empty when `drain` returns.
+            //
+            // **TODO** Really want to just push keys into a file for inspection
+            // when we reopen for housekeeping.
+            do {
+                await this._housekeeping.turnstile.drain()
+                await this._appending.turnstile.drain()
+            } while (this._housekeeping.turnstile.size != 0)
+            await this._appending.turnstile.terminate()
+            await this._housekeeping.turnstile.terminate()
+            if (this._root != null) {
+                this._root.remove()
+                this._root = null
+            }
+        })
     }
 
     async __create () {
@@ -442,28 +465,9 @@ class Journalist {
         }
     }
 
-    async close () {
-        if (!this.destroyed && !this.closed) {
-            assert(!this.destroyed, 'already destroyed')
-            this.closed = true
-            // Trying to figure out how to wait for the Turnstile to drain. We
-            // can't terminate the housekeeping turnstile then the acceptor
-            // turnstile because they depend on each other, so we're going to
-            // loop. We wait for one to drain, then the other, then check to see
-            // if anything is in the queues to determine if we can leave the
-            // loop. Actually, we only need to check the size of the first queue
-            // in the loop, the second will be empty when `drain` returns.
-            do {
-                await this._housekeeping.turnstile.drain()
-                await this._appending.turnstile.drain()
-            } while (this._housekeeping.turnstile.size != 0)
-            await this._housekeeping.turnstile.terminate()
-            await this._appending.turnstile.terminate()
-            if (this._root != null) {
-                this._root.remove()
-                this._root = null
-            }
-        }
+    close () {
+        this._destructible.destroy()
+        return this._destructible.destructed
     }
 
     async _writeLeaf (id, writes) {
@@ -878,7 +882,7 @@ class Journalist {
         const promotion = right.value.items[0].key
         right.value.items[0].key = null
         branch.entry.value.items = branch.entry.value.items.splice(0, partition)
-        parent.entry.value.items.splice(parent.index + 1, 0, { key: promotion, id: rightId })
+        parent.entry.value.items.splice(parent.index + 1, 0, { key: promotion, id: right.value.id })
         const commit = new Commit(this)
         const prepare = []
         // Write the new branch to a temporary file.

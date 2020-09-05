@@ -39,5 +39,6 @@ require('proof')(4, async (okay) => {
     }
 
     destructible.destroy()
+    console.log('here')
     await destructible.destructed
 })

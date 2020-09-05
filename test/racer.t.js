@@ -37,7 +37,7 @@ require('proof')(1, async okay => {
     })
 
     // Test actually delaying a query.
-    const strata = new Strata(destructible, { directory, cache })
+    const strata = new Strata(destructible.durable('strata'), { directory, cache })
 
     const racer = new Racer(strata, function ({ key }) {
         if (key == 'e') {
