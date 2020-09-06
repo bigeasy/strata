@@ -470,7 +470,7 @@ class Journalist {
 
     close () {
         this._destructible.destroy()
-        return this._destructible.destructed
+        return this._destructible.rejected
     }
 
     async _writeLeaf (id, writes) {

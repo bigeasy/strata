@@ -59,5 +59,5 @@ require('proof')(1, async okay => {
         await racer.close()
     })
 
-    await destructible.destructed
+    await destructible.rejected
 })

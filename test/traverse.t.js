@@ -38,7 +38,7 @@ require('proof')(2, async (okay) => {
         } while (right != null)
         okay(items, expected, 'forward')
         await strata.close()
-        await destructible.destructed
+        await destructible.rejected
     }
     {
         const destructible = new Destructible([ 'split.t', 'reverse' ])
@@ -58,6 +58,6 @@ require('proof')(2, async (okay) => {
         } while (cursor.page.id != '0.1')
         okay(items, expected.slice().reverse(), 'reverse')
         await strata.close()
-        await destructible.destructed
+        await destructible.rejected
     }
 })

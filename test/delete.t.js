@@ -61,5 +61,5 @@ require('proof')(3, async (okay) => {
         await strata.close()
     }
     destructible.destroy()
-    await destructible.destructed
+    await destructible.rejected
 })

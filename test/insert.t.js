@@ -42,5 +42,5 @@ require('proof')(2, async (okay) => {
         ]
     }, 'inserted')
 
-    await destructible.destructed
+    await destructible.rejected
 })
