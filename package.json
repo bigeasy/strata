@@ -34,7 +34,7 @@
                             "interrupt":                    "^10.0.3",
                             "prospective":                  "^0.3.0",
                             "rimraf":                       "^3.0.0",
-                            "turnstile":                    "6.0.0-alpha.14"
+                            "turnstile":                    "6.0.0-alpha.15"
     },
     "devDependencies":
     {
