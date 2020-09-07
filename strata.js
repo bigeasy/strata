@@ -13,6 +13,7 @@ class Strata {
     static MAX = Symbol('MAX')
 
     constructor (destructible, options) {
+        this.destructible = destructible
         this._journalist = new Journalist(destructible, options)
         const { comparator, extractor }  = this._journalist
         this.compare = function (left, right) { return comparator(left, right) }
@@ -60,10 +61,6 @@ class Strata {
                 await queue.promise
             }
         }
-    }
-
-    close () {
-        return this._journalist.close()
     }
 }
 

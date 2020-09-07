@@ -1,6 +1,5 @@
 require('proof')(4, async (okay) => {
     const Destructible = require('destructible')
-    const destructible = new Destructible('create.t')
 
     const Strata = require('../strata')
     const Cache = require('../cache')
@@ -16,10 +15,9 @@ require('proof')(4, async (okay) => {
     const cache = new Cache
 
     {
-        const strata = new Strata(destructible.ephemeral('strata'), { directory, cache })
+        const strata = new Strata(new Destructible('strata'), { directory, cache })
         await strata.create()
-        await strata.close()
-        await strata.close()
+        await strata.destructible.destroy().rejected
         const vivified = await utilities.vivify(directory)
         okay(vivified, {
             '0.0': [ [ '0.1', null ] ],
@@ -33,12 +31,8 @@ require('proof')(4, async (okay) => {
     }
 
     {
-        const strata = new Strata(destructible.ephemeral('strata'), { directory, cache })
+        const strata = new Strata(new Destructible('strata'), { directory, cache })
         await strata.open()
-        await strata.close()
+        await strata.destructible.destroy().rejected
     }
-
-    destructible.destroy()
-    console.log('here')
-    await destructible.rejected
 })

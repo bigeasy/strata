@@ -1,6 +1,5 @@
 require('proof')(3, async (okay) => {
     const Destructible = require('destructible')
-    const destructible = new Destructible('fill.t')
 
     const Strata = require('../strata')
     const Cache = require('../cache')
@@ -50,7 +49,7 @@ require('proof')(3, async (okay) => {
     // Merge
     {
         const cache = new Cache
-        const strata = new Strata(destructible.ephemeral('merge'), { directory, cache })
+        const strata = new Strata(new Destructible('merge'), { directory, cache })
         await strata.open()
         const cursor = await strata.search('b')
         // TODO Come back and insert an error into `remove`. Then attempt to
@@ -65,25 +64,25 @@ require('proof')(3, async (okay) => {
         cursor.remove(index, writes)
         cursor.release()
         Strata.flush(writes)
-        await strata.close()
+        await strata.destructible.destroy().rejected
         cache.purge(0)
         okay(cache.heft, 0, 'cache purged')
     }
     // Reopen.
     {
         const cache = new Cache
-        const strata = new Strata(destructible.ephemeral('reopen'), { directory, cache })
+        const strata = new Strata(new Destructible('reopen'), { directory, cache })
         await strata.open()
         const cursor = await strata.search('c')
         const { index } = cursor.indexOf('c')
         okay(cursor.page.items[index].parts[0], 'c', 'found')
         cursor.release()
-        await strata.close()
+        await strata.destructible.destroy().rejected
     }
     // Traverse.
     {
         const cache = new Cache
-        const strata = new Strata(destructible.ephemeral('traverse'), { directory, cache })
+        const strata = new Strata(new Destructible('traverse'), { directory, cache })
         await strata.open()
         let right = 'a'
         const items = []
@@ -97,8 +96,6 @@ require('proof')(3, async (okay) => {
             right = cursor.page.right
         } while (right != null)
         okay(items, [ 'a', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k' ], 'traverse')
-        await strata.close()
+        await strata.destructible.destroy().rejected
     }
-    destructible.destroy()
-    await destructible.rejected
 })

@@ -1,6 +1,5 @@
 require('proof')(3, async (okay) => {
     const Destructible = require('destructible')
-    const destructible = new Destructible('split-branch.t')
 
     const Strata = require('../strata')
     const Cache = require('../cache')
@@ -19,7 +18,7 @@ require('proof')(3, async (okay) => {
     // Split.
     {
         const cache = new Cache
-        const strata = new Strata(destructible.ephemeral('split'), { directory, cache })
+        const strata = new Strata(new Destructible('split'), { directory, cache })
         await strata.open()
         const writes = {}
         const cursor = await strata.search(leaf[0])
@@ -27,25 +26,25 @@ require('proof')(3, async (okay) => {
         cursor.insert(index, leaf[0], leaf, writes)
         cursor.release()
         Strata.flush(writes)
-        await strata.close()
+        await strata.destructible.destroy().rejected
         cache.purge(0)
         okay(cache.heft, 0, 'cache purged')
     }
     // Reopen.
     {
         const cache = new Cache
-        const strata = new Strata(destructible.ephemeral('reopen'), { directory, cache })
+        const strata = new Strata(new Destructible('reopen'), { directory, cache })
         await strata.open()
         const cursor = await strata.search(leaf[0])
         const { index } = cursor.indexOf(leaf[0])
         okay(cursor.page.items[index].parts[0], leaf[0], 'found')
         cursor.release()
-        await strata.close()
+        await strata.destructible.destroy().rejected
     }
     // Traverse.
     {
         const cache = new Cache
-        const strata = new Strata(destructible.ephemeral('traverse'), { directory, cache })
+        const strata = new Strata(new Destructible('traverse'), { directory, cache })
         await strata.open()
         let right = leaf[0]
         const items = []
@@ -59,8 +58,6 @@ require('proof')(3, async (okay) => {
             right = cursor.page.right
         } while (right != null)
         okay(items, leaf, 'traverse')
-        await strata.close()
+        await strata.destructible.destroy().rejected
     }
-    destructible.destroy()
-    await destructible.rejected
 })

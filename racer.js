@@ -40,6 +40,11 @@ class Racer {
         this._events = []
         this.compare = strata.compare
         this.extract = strata.extract
+        this.destructible = strata.destructible
+        this.destructible.destruct(() => {
+            this._done = true
+            this._latch.resolve()
+        })
     }
 
     [Symbol.asyncIterator] () {
@@ -89,12 +94,6 @@ class Racer {
     }
 
     static flush = Strata.flush
-
-    async close () {
-        await this._strata.close()
-        this._done = true
-        this._latch.resolve()
-    }
 }
 
 module.exports = Racer

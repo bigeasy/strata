@@ -34,10 +34,9 @@ require('proof')(5, async (okay) => {
         cursor.insert(index, 'f', [ 'f' ], writes)
         cursor.release()
         await Strata.flush(writes)
-        await strata.close()
+        await strata.destructible.destroy().rejected
         cache.purge(0)
         okay(cache.heft, 0, 'cache purged')
-        await destructible.rejected
     }
     {
         const destructible = new Destructible([ 'split.t', 'reopen' ])
@@ -48,8 +47,7 @@ require('proof')(5, async (okay) => {
         const { index } = cursor.indexOf('f')
         okay(cursor.page.items[index].parts[0], 'f', 'found')
         cursor.release()
-        await strata.close()
-        await destructible.rejected
+        await strata.destructible.destroy().rejected
     }
     {
         const destructible = new Destructible([ 'split.t', 'traverse' ])
@@ -68,8 +66,7 @@ require('proof')(5, async (okay) => {
             right = cursor.page.right
         } while (right != null)
         okay(items, [ 'a', 'b', 'c', 'd', 'e', 'f' ], 'traverse')
-        await strata.close()
-        await destructible.rejected
+        await strata.destructible.destroy().rejected
     }
     {
         const destructible = new Destructible([ 'split.t', 'forward' ])
@@ -88,8 +85,7 @@ require('proof')(5, async (okay) => {
             right = cursor.page.right
         } while (right != null)
         okay(items, [ 'a', 'b', 'c', 'd', 'e', 'f' ], 'forward')
-        await strata.close()
-        await destructible.rejected
+        await strata.destructible.destroy().rejected
    }
    {
         const destructible = new Destructible([ 'split.t', 'forward' ])
@@ -108,7 +104,6 @@ require('proof')(5, async (okay) => {
             fork = true
         } while (cursor.page.id != '0.1')
         okay(items, [ 'a', 'b', 'c', 'd', 'e', 'f' ].reverse(), 'reverse')
-        await strata.close()
-        await destructible.rejected
+        await strata.destructible.destroy().rejected
     }
 })

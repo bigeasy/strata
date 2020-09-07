@@ -11,10 +11,8 @@ require('proof')(2, async (okay) => {
     const directory = path.join(utilities.directory, 'insert')
     await utilities.reset(directory)
 
-    const destructible = new Destructible('insert.t')
-
     const cache = new Cache
-    const strata = new Strata(destructible.durable('strata'), { directory, cache })
+    const strata = new Strata(new Destructible('strata'), { directory, cache })
 
     await strata.create()
 
@@ -27,7 +25,7 @@ require('proof')(2, async (okay) => {
     cursor.release()
 
     Strata.flush(writes)
-    await strata.close()
+    await strata.destructible.destroy().rejected
 
     cache.purge(0)
 
@@ -41,6 +39,4 @@ require('proof')(2, async (okay) => {
             [ 'insert', 1, 'b' ]
         ]
     }, 'inserted')
-
-    await destructible.rejected
 })

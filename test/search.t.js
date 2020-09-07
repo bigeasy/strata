@@ -120,7 +120,7 @@ require('proof')(8, async (okay) => {
             }, 'ghost')
             cursor.release()
         }
-        await strata.close()
+        await strata.destructible.destroy().rejected
         await destructible.rejected
     } ()
 })

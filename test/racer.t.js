@@ -1,8 +1,6 @@
 require('proof')(1, async okay => {
     const Destructible = require('destructible')
 
-    const destructible = new Destructible('racer.t')
-
     const utilities = require('../utilities')
     const path = require('path')
 
@@ -16,9 +14,9 @@ require('proof')(1, async okay => {
     const cache = new Cache
 
     // Test created as well as invoking the initial null latch.
-    const created = new Strata(destructible.ephemeral('created'), { directory, cache })
+    const created = new Strata(new Destructible('created'), { directory, cache })
     await created.create()
-    await created.close()
+    await created.destructible.destroy().rejected
 
     await utilities.reset(directory)
     await utilities.serialize(directory, {
@@ -35,6 +33,8 @@ require('proof')(1, async okay => {
             'insert', 4, 'e'
         ]]
     })
+
+    const destructible = new Destructible('racer.t')
 
     // Test actually delaying a query.
     const strata = new Strata(destructible.durable('strata'), { directory, cache })
@@ -56,7 +56,6 @@ require('proof')(1, async okay => {
         await racer.open()
         ; (await racer.search('d')).release()
         ; (await racer.search('e')).release()
-        await racer.close()
     })
 
     await destructible.rejected

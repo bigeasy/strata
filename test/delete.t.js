@@ -1,6 +1,5 @@
 require('proof')(3, async (okay) => {
     const Destructible = require('destructible')
-    const destructible = new Destructible('delete.t')
     const Strata = require('../strata')
     const Cache = require('../cache')
     const utilities = require('../utilities')
@@ -19,7 +18,7 @@ require('proof')(3, async (okay) => {
     })
     {
         const cache = new Cache
-        const strata = new Strata(destructible.ephemeral('strata'), { directory, cache })
+        const strata = new Strata(new Destructible('delete.t/purge'), { directory, cache })
         await strata.open()
         const cursor = await strata.search('a')
         const writes = {}
@@ -27,7 +26,7 @@ require('proof')(3, async (okay) => {
         cursor.remove(index, writes)
         Strata.flush(writes)
         cursor.release()
-        await strata.close()
+        await strata.destructible.destroy().rejected
         const vivified = await utilities.vivify(directory)
         okay(vivified, {
             '0.0': [ [ '0.1', null ] ],
@@ -44,7 +43,7 @@ require('proof')(3, async (okay) => {
     }
     {
         const cache = new Cache
-        const strata = new Strata(destructible.ephemeral('traverse'), { directory, cache })
+        const strata = new Strata(new Destructible('delete.t/traverse'), { directory, cache })
         await strata.open()
         let right = 'a'
         const items = []
@@ -58,8 +57,6 @@ require('proof')(3, async (okay) => {
             right = cursor.page.right
         } while (right != null)
         okay(items, [ 'b', 'c' ], 'traverse')
-        await strata.close()
+        await strata.destructible.destroy().rejected
     }
-    destructible.destroy()
-    await destructible.rejected
 })
