@@ -1,6 +1,5 @@
 const path = require('path')
 const callback = require('prospective/callback')
-const rimraf = require('rimraf')
 const ascension = require('ascension')
 const fileSystem = require('fs')
 const fs = require('fs').promises
@@ -13,7 +12,7 @@ const appendable = require('./appendable')
 exports.directory = path.resolve(__dirname, './test/tmp')
 
 exports.reset = async function (directory) {
-    await callback(callback => rimraf(directory, callback))
+    await fs.rmdir(directory, { recursive: true })
     await fs.mkdir(directory, { recursive: true })
 }
 

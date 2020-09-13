@@ -3,7 +3,6 @@ const fs = require('fs').promises
 const path = require('path')
 
 const fnv = require('./fnv')
-const rimraf = require('rimraf')
 
 const callback = require('prospective/callback')
 
@@ -61,7 +60,7 @@ class Commit {
     }
 
     async _unlink (file) {
-        await callback(callback => rimraf(file, callback))
+        await fs.rmdir(file, { recursive: true })
     }
 
     // How is this not a race condition? I see that we're setting the heft if
