@@ -35,6 +35,8 @@ const Player = require('./player')
 // Binary search for a record in a b-tree page.
 const find = require('./find')
 
+const Partition = require('./partition')
+
 // Currently unused.
 function traceIf (condition) {
     if (condition) return function (...vargs) {
@@ -116,7 +118,18 @@ class Journalist {
             }
         } ()
         this.extractor = coalesce(options.extractor, parts => parts[0])
-        this.comparator = coalesce(options.comparator, ascension([ String ], (value) => [ value ]))
+        if (options.comparator == null) {
+        }
+        this.comparator = function () {
+            if (options.comparator == null) {
+                const comparator = ascension([ String ], value => [ value ])
+                return { leaf: comparator, branch: comparator }
+            } else if (typeof options.comparator == 'function') {
+                return { leaf: options.comparator, branch: options.comparator }
+            } else {
+                return options.comparator
+            }
+        } ()
         this._recorder = recorder(() => '0')
         this._root = null
         // Operation id wraps at 32-bits, cursors should not be open that long.
@@ -410,7 +423,7 @@ class Journalist {
             const index = rightward
                 ? entry.value.items.length - 1
                 : key != null
-                    ? find(this.comparator, entry.value, key, offset)
+                    ? find(this.comparator.leaf, entry.value, key, offset)
                     : 0
 
             // If the index is less than zero we didn't find the exact key, so
@@ -948,7 +961,28 @@ class Journalist {
 
         // Split page creating a right page.
         const length = child.entry.value.items.length
-        const partition = Math.floor(length / 2)
+        const partition = Partition(this.comparator.branch, child.entry.value.items)
+        // If we cannot partition because the leaf and branch have different
+        // partition comparators and the branch comparator considers all keys
+        // identical, we give up and return. We will have gone through the
+        // housekeeping queue to get here, and if the user keeps inserting keys
+        // that are identical according to the branch comparator, we'll keep
+        // making our futile attempts to split. Currently, though, we're only
+        // going to see this behavior in Amalgamate when someone is staging an
+        // update to the same key, say inserting it and deleting it over and
+        // over, and then if they are doing it as part of transaction, we'd only
+        // attempt once for each batch of writes. We could test the partition
+        // before the entry into the housekeeping queue but then we have a
+        // racing unit test to write to get this branch to execute, so I won't
+        // bother until someone actually complains. It would mean a stage with
+        // 100s of updates to one key that occur before the stage can merge
+        // before start to his this early exit.
+        if (partition == null) {
+            entries.forEach(entry => entry.release())
+            blocks.forEach(block => block.exit.resolve())
+            right.remove()
+            return
+        }
         const items = child.entry.value.items.splice(partition)
         right.value.items = items
         right.heft = items.reduce((sum, item) => sum + item.heft, 1)
@@ -1079,7 +1113,7 @@ class Journalist {
         // we want to release the lock on the leaf as soon as possible.
         await commit.prepare()
         await commit.commit()
-        blocks.map(block => block.exit.resolve())
+        blocks.forEach(block => block.exit.resolve())
         await commit.prepare()
         await commit.commit()
         await commit.dispose()
