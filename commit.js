@@ -146,7 +146,7 @@ class Commit {
 
     async vacuum (id, first, second, items, right) {
         await fs.mkdir(this._commit, { recursive: true })
-        const filename = this._path(`${id}-${first}`)
+        const filename = `${id}-${first}`
         const recorder = this._journalist._recorder
         const buffers = []
         if (right != null) {
@@ -162,11 +162,27 @@ class Commit {
         }, []))
         const buffer = Buffer.concat(buffers)
         const hash = fnv(buffer)
-        await fs.writeFile(filename, buffer)
+        await fs.writeFile(this._path(filename), buffer)
         return {
             method: 'rename',
-            from: path.join('commit', `${id}-${first}`),
+            from: path.join('commit', filename),
             to: path.join('pages', id, first),
+            hash: hash
+        }
+    }
+
+    async stub (id, append, records) {
+        await fs.mkdir(this._commit, { recursive: true })
+        const buffer = Buffer.concat(records.map(record => {
+            return this._journalist._recorder(record.header, record.parts)
+        }))
+        const hash = fnv(buffer)
+        const filename = `${id}-${append}`
+        await fs.writeFile(this._path(filename), buffer)
+        return {
+            method: 'rename',
+            from: path.join('commit', filename),
+            to: path.join('pages', id, append),
             hash: hash
         }
     }
@@ -205,19 +221,6 @@ class Commit {
                     await fs.writeFile(path.join(this._commit, '_commit'), buffer)
                     const from = path.join('commit', '_commit')
                     const to = path.join('commit', `commit.${hash}`)
-                    await this._prepare([ 'rename', from, to, hash ])
-                }
-                break
-            // Write out a stub leaf page that splits, merges or vacuums (simply
-            // loads) a previous page.
-            case 'stub': {
-                    const recorder = this._journalist._recorder
-                    const buffer = Buffer.concat(operation.records.map(record => recorder(record, [])))
-                    const hash = fnv(buffer)
-                    const filename = `${operation.page.id}-${operation.page.append}`
-                    const from = path.join('commit', filename)
-                    const to = path.join('pages', operation.page.id, operation.page.append)
-                    await fs.writeFile(this._path(filename), buffer)
                     await this._prepare([ 'rename', from, to, hash ])
                 }
                 break

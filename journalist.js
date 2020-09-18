@@ -680,32 +680,36 @@ class Journalist {
             const writes = this._queue(leaf.entry.value.id).writes.splice(0)
             await this._writeLeaf(leaf.entry.value.id, writes)
 
+            const commit = new Commit(this)
+
             // Create our journaled tree alterations.
             const prepare = []
 
             // Create a stub that loads the existing page.
             const previous = leaf.entry.value.append
-            prepare.push({
-                method: 'stub',
-                page: { id: leaf.entry.value.id, append: first },
-                records: [{
+            prepare.push(await commit.stub(leaf.entry.value.id, first, [{
+                header: {
                     method: 'load',
                     id: leaf.entry.value.id,
                     append: previous
-                }, {
+                },
+                parts: []
+            }, {
+                header: {
                     method: 'dependent',
                     id: leaf.entry.value.id,
                     append: second
-                }]
-            }, {
-                method: 'stub',
-                page: { id: leaf.entry.value.id, append: second },
-                records: [{
+                },
+                parts: []
+            }]))
+            prepare.push(await commit.stub(leaf.entry.value.id, second, [{
+                header: {
                     method: 'load',
                     id: leaf.entry.value.id,
                     append: first
-                }]
-            })
+                },
+                parts: []
+            }]))
             leaf.entry.value.append = second
             leaf.entry.value.entries = [{
                 header: { method: 'load', id: leaf.entry.value.id, append: first },
@@ -714,7 +718,6 @@ class Journalist {
                 }]
             }]
 
-            const commit = new Commit(this)
             await commit.write(prepare)
             await commit.prepare()
             await commit.commit()
@@ -1059,19 +1062,21 @@ class Journalist {
         const prepare = []
 
         // Record the split of the right page in a new stub.
-        prepare.push({
-            method: 'stub',
-            page: { id: right.value.id, append: right.value.append },
-            records: [{
+        prepare.push(await commit.stub(right.value.id, right.value.append, [{
+            header: {
                 method: 'load',
                 id: child.entry.value.id,
                 append: child.entry.value.append
-            }, {
+            },
+            parts: []
+        }, {
+            header: {
                 method: 'slice',
                 index: partition,
                 length: length,
-            }]
-        })
+            },
+            parts: []
+        }]))
         right.value.vacuum = [{
             header: { method: 'load', id: child.entry.value.id, append: child.entry.value.append,
                 was: 'right' },
@@ -1080,19 +1085,21 @@ class Journalist {
 
         // Record the split of the left page in a new stub, for which we create
         // a new append file.
-        prepare.push({
-            method: 'stub',
-            page: { id: child.entry.value.id, append },
-            records: [{
+        prepare.push(await commit.stub(child.entry.value.id, append, [{
+            header: {
                 method: 'load',
                 id: child.entry.value.id,
                 append: child.entry.value.append
-            }, {
+            },
+            parts: []
+        }, {
+            header: {
                 method: 'slice',
                 index: 0,
                 length: partition
-            }]
-        })
+            },
+            parts: []
+        }]))
         child.entry.value.vacuum = [{
             header: { method: 'load', id: child.entry.value.id, append: child.entry.value.append,
                 was: 'child' },
@@ -1413,19 +1420,21 @@ class Journalist {
 
         // Record the split of the right page in a new stub.
         const append = this._filename()
-        prepare.push({
-            method: 'stub',
-            page: { id: left.entry.value.id, append: append },
-            records: [{
+        prepare.push(await commit.stub(left.entry.value.id, append, [{
+            header: {
                 method: 'load',
                 id: left.entry.value.id,
                 append: left.entry.value.append
-            }, {
+            },
+            parts: []
+        }, {
+            header: {
                 method: 'merge',
                 id: right.entry.value.id,
                 append: right.entry.value.append
-            }]
-        })
+            },
+            parts: []
+        }]))
         // TODO Okay, forgot what `entries` is and it appears to be just the
         // entries needed to determine dependencies so we can unlink files when
         // we vaccum.
