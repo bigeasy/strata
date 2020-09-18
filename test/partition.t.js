@@ -30,6 +30,7 @@ require('proof')(12, async okay => {
 
     const ascension = require('ascension')
     const comparator = {
+        zero: object => { return { value: object.value, index: 0 } },
         leaf: ascension([ String, Number ], object => [ object.value, object.index ]),
         branch: ascension([ String ], object => [ object.value ])
     }

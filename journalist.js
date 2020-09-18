@@ -121,11 +121,12 @@ class Journalist {
         if (options.comparator == null) {
         }
         this.comparator = function () {
+            const zero = object => object
             if (options.comparator == null) {
                 const comparator = ascension([ String ], value => [ value ])
-                return { leaf: comparator, branch: comparator }
+                return { leaf: comparator, branch: comparator, zero }
             } else if (typeof options.comparator == 'function') {
-                return { leaf: options.comparator, branch: options.comparator }
+                return { leaf: options.comparator, branch: options.comparator, zero }
             } else {
                 return options.comparator
             }
@@ -1002,7 +1003,7 @@ class Journalist {
             return
         }
         const items = child.entry.value.items.splice(partition)
-        right.value.key = items[0].key
+        right.value.key = this.comparator.zero(items[0].key)
         right.value.items = items
         right.heft = items.reduce((sum, item) => sum + item.heft, 1)
         // Set the right key of the left page.
