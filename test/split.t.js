@@ -42,11 +42,13 @@ require('proof')(5, async (okay) => {
         const destructible = new Destructible([ 'split.t', 'reopen' ])
         const cache = new Cache
         const strata = new Strata(destructible, { directory, cache })
-        await strata.open()
-        const cursor = await strata.search('f')
-        const { index } = cursor.indexOf('f')
-        okay(cursor.page.items[index].parts[0], 'f', 'found')
-        cursor.release()
+        await Destructible.rescue(async function () {
+            await strata.open()
+            const cursor = await strata.search('f')
+            const { index } = cursor.indexOf('f')
+            okay(cursor.page.items[index].parts[0], 'f', 'found')
+            cursor.release()
+        })
         await strata.destructible.destroy().rejected
     }
     {

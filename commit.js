@@ -144,7 +144,7 @@ class Commit {
         }
     }
 
-    async vacuum (id, first, second, items, right) {
+    async vacuum ({ id, first, second, items, right, key }) {
         await fs.mkdir(this._commit, { recursive: true })
         const filename = `${id}-${first}`
         const recorder = this._journalist._recorder
@@ -156,6 +156,9 @@ class Commit {
         for (let index = 0, I = items.length; index < I; index++) {
             const parts = this._journalist.serializer.parts.serialize(items[index].parts)
             buffers.push(recorder({ method: 'insert', index }, parts))
+        }
+        if (key != null) {
+            buffers.push(recorder({ method: 'key' }, this._journalist.serializer.key.serialize(key)))
         }
         buffers.push(recorder({
             method: 'dependent', id: id, append: second

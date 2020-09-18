@@ -86,6 +86,7 @@ exports.serialize = async function (directory, files) {
             const file = path.resolve(directory, 'pages', id, hash)
             await fs.writeFile(file, buffer)
         } else {
+            let key = null
             const writes = files[id].map((record, index) => {
                 switch (record[0]) {
                 case 'right':
@@ -94,6 +95,9 @@ exports.serialize = async function (directory, files) {
                         parts: [ Buffer.from(JSON.stringify(record[1])) ]
                     }
                 case 'insert':
+                    if (record[1] == 0 && id != '0.1') {
+                        key = [ Buffer.from(JSON.stringify(record[2])) ]
+                    }
                     return {
                         header: { method: 'insert', index: record[1] },
                         parts: [ Buffer.from(JSON.stringify(record[2])) ]
@@ -108,6 +112,9 @@ exports.serialize = async function (directory, files) {
                     break
                 }
             }).map(entry => recorder(entry.header, entry.parts))
+            if (key != null) {
+                writes.push(recorder({ method: 'key' }, key))
+            }
             const file = path.resolve(directory, 'pages', id, '0.0')
             await fs.writeFile(file, Buffer.concat(writes))
         }

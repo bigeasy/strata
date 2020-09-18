@@ -238,6 +238,7 @@ class Journalist {
             leaf: true,
             items: [],
             vacuum: [],
+            key: null,
             deletes: 0,
             // TODO Rename merged.
             deleted: false,
@@ -262,6 +263,7 @@ class Journalist {
                         const { page: loaded } = await this._read(id, append)
                         page.items = loaded.items
                         page.right = loaded.right
+                        page.key = loaded.key
                         page.vacuum.push({ header: entry.header, vacuum: loaded.vacuum })
                     }
                     break
@@ -306,9 +308,15 @@ class Journalist {
                         page.vacuum.push(entry)
                     }
                     break
+                case 'key': {
+                        page.key = this.serializer.key.deserialize(entry.parts)
+                        break
+                    }
+                    break
                 }
             }
         }
+        assert(page.id == '0.1' ? page.key == null : page.key != null)
         const heft = page.items.reduce((sum, record) => sum + record.heft, 1)
         return { page, heft }
     }
@@ -735,7 +743,14 @@ class Journalist {
                 path: path.join('pages', leaf.entry.value.id, first)
             })
 
-            prepare.push(await commit.vacuum(leaf.entry.value.id, first, second, items, leaf.entry.value.right))
+            prepare.push(await commit.vacuum({
+                id: leaf.entry.value.id,
+                first: first,
+                second: second,
+                items: items,
+                right: leaf.entry.value.right,
+                key: leaf.entry.value.key
+            }))
             // Merged pages themselves can just be deleted, but when we do, we
             // need to... Seems like both split and merge can use the same
             // mechanism, this dependent reference. So, every page we load has a
@@ -987,6 +1002,7 @@ class Journalist {
             return
         }
         const items = child.entry.value.items.splice(partition)
+        right.value.key = items[0].key
         right.value.items = items
         right.heft = items.reduce((sum, item) => sum + item.heft, 1)
         // Set the right key of the left page.
@@ -1076,6 +1092,9 @@ class Journalist {
                 length: length,
             },
             parts: []
+        }, {
+            header: { method: 'key' },
+            parts: this.serializer.key.serialize(right.value.key)
         }]))
         right.value.vacuum = [{
             header: { method: 'load', id: child.entry.value.id, append: child.entry.value.append,

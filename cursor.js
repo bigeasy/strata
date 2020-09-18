@@ -28,6 +28,27 @@ class Cursor {
         throw new Error('removed')
     }
 
+    // TODO New problem. `indexOf` searches for an insert position, so now we
+    // have no way to search for a record to retrieve when the record we're
+    // searching for does not exist but if it did it would be the first record
+    // in the page. It will exist and be at position zero making it an invalid
+    // insertion point.
+    //
+    // TODO Oh, now I see. We are using partial keys to split, so if we search
+    // for a complete key where the exclude parts are less than the excluded
+    // parts in the key, we are going to arrive at a page where `indexOf` will
+    // point to a place before the key for the page. We can either accommodate
+    // this in `indexOf` or for partial keys we can zero the key, add it to the
+    // split page and ghost it if the key is not the actual zeroed key.
+    //
+    // TODO Was going to insert a zeroed key, but realize that there will be no
+    // record to go with it, so the first entry would have to be a special type,
+    // one that would consider the parts a key and not a record. Somewhere a
+    // flag is set. Somehow we detect the type and serialize specially. This
+    // suggests that the key for the page should be specified for every page, as
+    // part of the 'split' or as a special record like 'right', it would just be
+    // 'key', maybe it is used for split, split, then set the key.
+    //
     // You must never use `indexOf` to scan backward for insert points, only to scan
     // backward for reading. Actually, let's assume that scanning will operate
     // directly on the `items` array and we're only going to use `indexOf` to search
