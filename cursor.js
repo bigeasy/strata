@@ -67,7 +67,7 @@ class Cursor {
         }
         // We only insert before the key on the left most page.
         if (~index == 0) {
-            return this.page.id == '0.1' || comparator(this.page.key, key) < 0
+            return this.page.id == '0.1' || comparator(this.page.key, key) <= 0
                 ? { index: ~index, found: false }
                 : { index: null, found: false }
         }
