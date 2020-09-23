@@ -162,10 +162,7 @@ class Journalist {
                 //
                 // **TODO** Really want to just push keys into a file for
                 // inspection when we reopen for housekeeping.
-                do {
-                    await this._housekeeping.turnstile.drain()
-                    await this._appending.turnstile.drain()
-                } while (this._housekeeping.turnstile.size != 0)
+                await this.drain()
                 await this._appending.turnstile.terminate()
                 await this._housekeeping.turnstile.terminate()
                 if (this._root != null) {
