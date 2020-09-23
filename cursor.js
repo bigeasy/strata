@@ -101,36 +101,40 @@ class Cursor {
                 this.page.id == '0.1'
             ), 'invalid.insert.index', { index: index })
 
-        const record = { key: key, parts: parts, heft: 0 }
+        const header = { method: 'insert', index: index }
+        const buffer = this._journalist.serialize(header, parts)
+        const record = { key: key, parts: parts, heft: buffer.length }
+
+        this._entry.heft += record.heft
 
         // Create a record to add to the page. Also give to Journalist so it can
         // set the heft.
-        this._journalist.append({
-            id: this.page.id,
-            header: { method: 'insert', index: index },
-            parts: this._journalist.serializer.parts.serialize(parts),
-            record: record
-        }, writes)
+        this._journalist.append(this.page.id, buffer, writes)
 
         this.page.items.splice(index, 0, record)
+
+        return record.heft
     }
 
     remove (index, writes = {}) {
         const ghost = this.page.id != '0.1' && index == 0
 
-        this._journalist.append({
-            id: this.page.id,
-            header: { method: 'delete', index: index },
-            parts: []
-        }, writes)
+        const header = { method: 'delete', index: index }
+        const buffer = this._journalist.serialize(header, [])
+
+        this._journalist.append(this.page.id, buffer, writes)
+
+        let heft
 
         if (ghost) {
             this.page.ghosts++
-            this._entry.heft -= this.page.items[0].heft
+            this._entry.heft -= heft = this.page.items[0].heft
         } else {
             const [ spliced ] = this.page.items.splice(index, 1)
-            this._entry.heft -= spliced.heft
+            this._entry.heft -= heft = spliced.heft
         }
+
+        return heft
     }
 
     release () {

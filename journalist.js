@@ -500,19 +500,8 @@ class Journalist {
         }) ()
         const recorder = this._recorder
         const entry = this._hold(id)
-        const buffers = writes.map(write => {
-            const buffer = recorder(write.header, write.parts)
-            // TODO Where is heft removal? Probably not here, since we'd remove
-            // the heft of the specific entry, not the removal record.
-            // TODO Using a different calculation for heft, should be lengths?
-            // Think they add up to the same.
-            if (write.header.method == 'insert') {
-                entry.heft += (write.record.heft = buffer.length)
-            }
-            return buffer
-        })
         entry.release()
-        await fs.appendFile(this._path('pages', id, append), Buffer.concat(buffers))
+        await fs.appendFile(this._path('pages', id, append), Buffer.concat(writes))
     }
 
     // TODO Not difficult, merge queue and block. If you want to block, then
@@ -612,10 +601,10 @@ class Journalist {
         return id.split('.').reduce((sum, value) => sum + +value, 0) % this._appending.turnstile.health.turnstiles
     }
 
-    append (entry, writes) {
+    append (id, buffer, writes) {
         this._destructible.operational()
-        const queue = this._queue(entry.id)
-        queue.writes.push(entry)
+        const queue = this._queue(id)
+        queue.writes.push(buffer)
         if (writes[queue.id] == null) {
             writes[queue.id] = queue
         }
@@ -637,6 +626,10 @@ class Journalist {
     // TODO Why are you using the `_id` for both file names and page ids?
     _filename (id) {
         return `${this.instance}.${this._id++}`
+    }
+
+    serialize (header, parts) {
+        return this._recorder(header, this.serializer.parts.serialize(parts))
     }
 
     // TODO Concerned about vacuum making things slow relative to other
@@ -1050,7 +1043,7 @@ class Journalist {
             parts: []
         }]
         const writes = this._queue(child.entry.value.id).writes.splice(0)
-        writes.push.apply(writes, dependents)
+        writes.push.apply(writes, dependents.map(write => this.serialize(write.header, [])))
         await this._writeLeaf(child.entry.value.id, writes)
 
         // TODO We adjust heft now that we've written out all the relevant
@@ -1420,14 +1413,12 @@ class Journalist {
         // it.
         const writes = {
             left: this._queue(left.entry.value.id).writes.splice(0),
-            right: this._queue(right.entry.value.id).writes.splice(0).concat({
-                header: {
+            right: this._queue(right.entry.value.id).writes.splice(0).concat(
+                this.serialize({
                     method: 'dependent',
                     id: left.entry.value.id,
                     append: left.entry.value.append
-                },
-                parts: []
-            })
+                }, []))
         }
 
         await this._writeLeaf(left.entry.value.id, writes.left)

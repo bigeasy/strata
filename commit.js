@@ -177,7 +177,10 @@ class Commit {
     async stub (id, append, records) {
         await fs.mkdir(this._commit, { recursive: true })
         const buffer = Buffer.concat(records.map(record => {
-            return this._journalist._recorder(record.header, record.parts)
+            if (Buffer.isBuffer(record)) {
+                return record
+            }
+            return record.buffer ? record.buffer : this._journalist.serialize(record.header, record.parts)
         }))
         const hash = fnv(buffer)
         const filename = `${id}-${append}`
