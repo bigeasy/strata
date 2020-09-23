@@ -12,22 +12,6 @@ class Cursor {
         this._promises = {}
     }
 
-    get found () {
-        throw new Error('removed')
-    }
-
-    get index () {
-        throw new Error('removed')
-    }
-
-    get items () {
-        throw new Error('removed')
-    }
-
-    get ghosts () {
-        throw new Error('removed')
-    }
-
     // You must never use `indexOf` to scan backward for insert points, only to
     // scan backward for reading. Actually, let's assume that scanning will
     // operate directly on the `items` array and we're only going to use
@@ -72,7 +56,7 @@ class Cursor {
     // `null`.
 
     //
-    insert (index, key, parts, writes = {}) {
+    insert (index, key, parts, writes) {
         Strata.Error.assert(
             index > -1 &&
             (
@@ -95,7 +79,7 @@ class Cursor {
         return record.heft
     }
 
-    remove (index, writes = {}) {
+    remove (index, writes) {
         const header = { method: 'delete', index: index }
         const buffer = this._journalist.serialize(header, [])
 
@@ -103,6 +87,8 @@ class Cursor {
 
         const [ spliced ] = this.page.items.splice(index, 1)
         this._entry.heft -= spliced.heft
+
+        this.page.deletes++
 
         return spliced.heft
     }

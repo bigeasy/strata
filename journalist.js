@@ -578,7 +578,7 @@ class Journalist {
                     page.items.length <= this.leaf.merge
                 )
             ) {
-                this._housekeep(page.items[0].key)
+                this._housekeep(page.key)
             }
             await this._writeLeaf(id, queue.writes)
         }
@@ -603,6 +603,13 @@ class Journalist {
         if (writes[queue.id] == null) {
             writes[queue.id] = queue
         }
+    }
+
+    async drain () {
+        do {
+            await this._housekeeping.turnstile.drain()
+            await this._appending.turnstile.drain()
+        } while (this._housekeeping.turnstile.size != 0)
     }
 
     _path (...vargs) {
@@ -994,14 +1001,14 @@ class Journalist {
         right.value.items = items
         right.heft = items.reduce((sum, item) => sum + item.heft, 1)
         // Set the right key of the left page.
-        child.entry.value.right = right.value.items[0].key
+        child.entry.value.right = right.value.key
 
         // Set the heft of the left page and entry. Moved this down.
         // child.entry.heft -= heft - 1
 
         // Insert a reference to the right page in the parent branch page.
         parent.entry.value.items.splice(parent.index + 1, 0, {
-            key: right.value.items[0].key,
+            key: right.value.key,
             id: right.value.id,
             // TODO For branches, let's always just re-run the sum.
             heft: 0
@@ -1011,7 +1018,7 @@ class Journalist {
         // the split again.
         for (const page of [ right.value, child.entry.value ]) {
             if (page.items.length >= this.leaf.split) {
-                this._housekeep(page.items[0].key)
+                this._housekeep(page.key)
             }
         }
 
@@ -1142,7 +1149,7 @@ class Journalist {
         // really reduce the amount of time it takes to load. For now I'm
         // vacuuming dilligently in order to test vacuum and find bugs.
         await this._vacuum(key)
-        await this._vacuum(right.value.items[0].key)
+        await this._vacuum(right.value.key)
     }
 
     async _selectMerger (key, child, entries) {
@@ -1155,7 +1162,7 @@ class Journalist {
         if (left != null) {
             mergers.push({
                 count: left.entry.value.items.length,
-                key: child.entry.value.items[0].key,
+                key: child.entry.value.key || child.entry.value.items[0].key,
                 level: level
             })
         }

@@ -54,6 +54,10 @@ class Strata {
         return new Cursor(this._journalist, descent, entries.pop(), key)
     }
 
+    drain () {
+        return this._journalist.drain()
+    }
+
     static async flush (writes) {
         for (const id in writes) {
             const queue = writes[id]

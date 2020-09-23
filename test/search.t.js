@@ -1,4 +1,4 @@
-require('proof')(8, async (okay) => {
+require('proof')(10, async (okay) => {
     const Destructible = require('destructible')
 
     const Strata = require('../strata')
@@ -33,6 +33,12 @@ require('proof')(8, async (okay) => {
         {
             const cursor = await strata.search(Strata.MAX)
             okay(cursor.page.id, '1.3', 'max')
+            cursor.release()
+        }
+        {
+            const cursor = await strata.search(Strata.MAX)
+            const { index } = cursor.indexOf('a')
+            okay(index, null, 'wrong page')
             cursor.release()
         }
         {
@@ -119,7 +125,17 @@ require('proof')(8, async (okay) => {
             }, 'missing key')
             cursor.release()
         }
+        {
+            const racer = await strata.search('h')
+            const cursor = await strata.search('h')
+            cursor.remove(0, {})
+            cursor.remove(0, {})
+            cursor.release()
+            await strata.drain()
+            const { index } = racer.indexOf('h')
+            okay(index, null, 'page deleted')
+            racer.release()
+        }
         await strata.destructible.destroy().rejected
-        await destructible.rejected
     } ()
 })
