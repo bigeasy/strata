@@ -49,7 +49,7 @@ require('proof')(3, async (okay) => {
         const items = []
         do {
             const cursor = await strata.search(right)
-            const { index, found } = cursor.indexOf('a', cursor.page.ghosts)
+            const { index, found } = cursor.indexOf('a')
             for (let i = index; i < cursor.page.items.length; i++) {
                 items.push(cursor.page.items[i].parts[0])
             }

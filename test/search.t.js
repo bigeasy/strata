@@ -14,13 +14,12 @@ require('proof')(8, async (okay) => {
         '1.1': [[ 'right', 'h' ], [ 'insert', 0, 'd' ], [ 'insert', 1, 'e' ], [ 'insert', 2, 'f' ]],
         '1.3': [
             [ 'insert', 0, 'h' ], [ 'insert', 1, 'i' ], [ 'insert', 2, 'k' ], [ 'insert', 3, 'l' ],
-            [ 'delete', 0 ], [ 'delete', 3 ]
+            [ 'delete', 0 ], [ 'delete', 2 ]
         ]
     })
 
     const expected = [ 'a', 'b', 'c', 'd', 'e', 'f', 'h', 'i' ]
 
-    // TODO Inserting a ghost... Do you undelete or do you insert a new record?
     await async function () {
         const destructible = new Destructible('search.t')
         const cache = new Cache
@@ -80,7 +79,7 @@ require('proof')(8, async (okay) => {
         }
         {
             const cursor = await strata.search('j', true)
-            const { index, found } = cursor.indexOf('e')
+            const { index, found } = cursor.indexOf('j')
             okay({
                 id: cursor.page.id,
                 index: index,
@@ -115,9 +114,9 @@ require('proof')(8, async (okay) => {
                 found: false
             }, {
                 id: '1.3',
-                index: 1,
+                index: 0,
                 found: found
-            }, 'ghost')
+            }, 'missing key')
             cursor.release()
         }
         await strata.destructible.destroy().rejected

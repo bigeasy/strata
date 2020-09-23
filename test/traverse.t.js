@@ -14,7 +14,7 @@ require('proof')(2, async (okay) => {
         '1.1': [[ 'right', 'g' ], [ 'insert', 0, 'd' ], [ 'insert', 1, 'e' ], [ 'insert', 2, 'f' ]],
         '1.3': [
             [ 'insert', 0, 'g' ], [ 'insert', 1, 'h' ], [ 'insert', 2, 'i' ], [ 'insert', 3, 'j' ],
-            [ 'delete', 0 ], [ 'delete', 3 ]
+            [ 'delete', 0 ], [ 'delete', 2 ]
         ]
     })
 
@@ -48,11 +48,11 @@ require('proof')(2, async (okay) => {
         const items = []
         do {
             cursor = await strata.search(left, fork)
-            for (let i = cursor.page.items.length - 1; i >= cursor.page.ghosts; i--) {
+            for (let i = cursor.page.items.length - 1; i >= 0; i--) {
                 items.push(cursor.page.items[i].parts[0])
             }
             cursor.release()
-            left = cursor.page.items[0].key
+            left = cursor.page.key
             fork = true
         } while (cursor.page.id != '0.1')
         okay(items, expected.slice().reverse(), 'reverse')

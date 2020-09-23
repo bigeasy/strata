@@ -2,7 +2,7 @@ const Journalist = require('./journalist')
 const Cursor = require('./cursor')
 
 const NULL_CURSOR = {
-    page: { ghosts: 0, items: [], id: null },
+    page: { items: [], id: null },
     indexOf: function () { return { index: null, found: false } },
     release: function () {}
 }

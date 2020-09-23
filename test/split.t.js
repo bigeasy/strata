@@ -98,7 +98,7 @@ require('proof')(5, async (okay) => {
         const items = []
         do {
             cursor = await strata.search(left, fork)
-            for (let i = cursor.page.items.length - 1; i >= cursor.page.ghosts; i--) {
+            for (let i = cursor.page.items.length - 1; i >= 0; i--) {
                 items.push(cursor.page.items[i].parts[0])
             }
             cursor.release()

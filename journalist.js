@@ -245,7 +245,6 @@ class Journalist {
             deleted: false,
             lock: null,
             right: null,
-            ghosts: 0,
             append
         }
         const player = new Player(function () { return '0' })
@@ -277,7 +276,7 @@ class Journalist {
                     break
                 case 'merge': {
                         const { page: right } = await this._read(entry.header.id, entry.header.append)
-                        page.items.push.apply(page.items, right.items.slice(right.ghosts))
+                        page.items.push.apply(page.items, right.items)
                         page.right = right.right
                         page.vacuum.push({ header: entry.header, vacuum: right.vacuum })
                     }
@@ -292,11 +291,7 @@ class Journalist {
                     }
                     break
                 case 'delete': {
-                        if (entry.header.index == 0) {
-                            page.ghosts = 1
-                        } else {
-                            page.items.splice(entry.header.index, 1)
-                        }
+                        page.items.splice(entry.header.index, 1)
                         // TODO We do not want to vacuum automatically, we want
                         // it to be optional, possibly delayed. Expecially for
                         // MVCC where we are creating short-lived trees, we
@@ -428,7 +423,7 @@ class Journalist {
 
             // Binary search the page for the key, or just go right or left
             // directly if there is no key.
-            const offset = entry.value.leaf ? entry.value.ghosts : 1
+            const offset = entry.value.leaf ? 0 : 1
             const index = rightward
                 ? entry.value.items.length - 1
                 : key != null
@@ -950,8 +945,7 @@ class Journalist {
             items: [],
             vacuum: [],
             right: child.entry.value.right,
-            append: this._filename(),
-            ghosts: 0
+            append: this._filename()
         })
         entries.push(right)
         const blocks = [
@@ -1367,7 +1361,7 @@ class Journalist {
 
         // Add the items in the right page to the end of the left page.
         const items = left.entry.value.items
-        const merged = right.entry.value.items.splice(right.entry.value.ghosts)
+        const merged = right.entry.value.items.splice(0)
         items.push.apply(items, merged)
 
         // Set right reference of left page.
