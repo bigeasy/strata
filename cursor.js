@@ -57,13 +57,6 @@ class Cursor {
 
     //
     insert (index, key, parts, writes) {
-        Strata.Error.assert(
-            index > -1 &&
-            (
-                index > 0 ||
-                this.page.id == '0.1'
-            ), 'invalid.insert.index', { index: index })
-
         const header = { method: 'insert', index: index }
         const buffer = this._journalist.serialize(header, parts)
         const record = { key: key, parts: parts, heft: buffer.length }
