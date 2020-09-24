@@ -575,7 +575,7 @@ class Journalist {
                     page.items.length <= this.leaf.merge
                 )
             ) {
-                this._housekeep(page.key)
+                this._housekeep(page.key || page.items[0].key)
             }
             await this._writeLeaf(id, queue.writes)
         }
@@ -628,7 +628,7 @@ class Journalist {
     }
 
     serialize (header, parts) {
-        return this._recorder(header, this.serializer.parts.serialize(parts))
+        return this._recorder(header, parts.length == 0 ? parts : this.serializer.parts.serialize(parts))
     }
 
     // TODO Concerned about vacuum making things slow relative to other
@@ -999,6 +999,7 @@ class Journalist {
         right.heft = items.reduce((sum, item) => sum + item.heft, 1)
         // Set the right key of the left page.
         child.entry.value.right = right.value.key
+        child.entry.heft -= right.heft - 1
 
         // Set the heft of the left page and entry. Moved this down.
         // child.entry.heft -= heft - 1
@@ -1015,7 +1016,7 @@ class Journalist {
         // the split again.
         for (const page of [ right.value, child.entry.value ]) {
             if (page.items.length >= this.leaf.split) {
-                this._housekeep(page.key)
+                this._housekeep(page.key || page.items[0].key)
             }
         }
 
@@ -1054,8 +1055,10 @@ class Journalist {
         // record is to the left or the right. This might be fine.
 
         //
+        /*
         right.heft = items.reduce((sum, item) => sum + item.heft, 1)
         child.entry.heft -= right.heft - 1
+        */
 
         child.entry.value.vacuum.push.apply(child.entry.value.vacuum, dependents)
 

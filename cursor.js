@@ -70,11 +70,11 @@ class Cursor {
 
         this._entry.heft += record.heft
 
+        this.page.items.splice(index, 0, record)
+
         // Create a record to add to the page. Also give to Journalist so it can
         // set the heft.
         this._journalist.append(this.page.id, buffer, writes)
-
-        this.page.items.splice(index, 0, record)
 
         return record.heft
     }
