@@ -549,7 +549,7 @@ class Journalist {
 
     //
     async _append ({ body: { id } }) {
-        this._destructible.working()
+        this._destructible.operational()
         // TODO Doesn't `await null` do the same thing now? And why do I want to
         // do this anyway? It's silly.
         await callback((callback) => process.nextTick(callback))
