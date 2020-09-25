@@ -83,7 +83,7 @@ class Cursor {
 
         this.page.deletes++
 
-        return spliced.heft
+        return -spliced.heft
     }
 
     release () {
