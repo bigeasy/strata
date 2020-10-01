@@ -561,6 +561,7 @@ class Journalist {
             queue.block.enter.resolve()
             await queue.block.exit.promise
         }
+        queue.block = null
         // TODO Okay, we release here, so what prevents another turnstile from
         // starting with another call to `_queue`?
         // We flush a page's writes before we merge it into its left sibling so
@@ -581,8 +582,12 @@ class Journalist {
             const writes = queue.writes
             queue.writes = []
             await this._writeLeaf(id, writes)
+            console.log(queue.writes.length)
         }
         delete this._queues[id]
+        if (queue.block != null) {
+            this._queue(id).block = queue.block
+        }
         queue.entry.release()
         queue.written = true
     }
