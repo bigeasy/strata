@@ -561,12 +561,13 @@ class Journalist {
             queue.block.enter.resolve()
             await queue.block.exit.promise
         }
-        delete this._queues[id]
+        // TODO Okay, we release here, so what prevents another turnstile from
+        // starting with another call to `_queue`?
         // We flush a page's writes before we merge it into its left sibling so
         // there will always a queue entry for a page that has been merged. It
         // will never have any writes so we can skip writing and thereby avoid
         // putting it back into the housekeeping queue.
-        if (queue.writes.length != 0) {
+        while (queue.writes.length != 0) {
             const page = queue.entry.value
             if (
                 page.items.length >= this.leaf.split ||
@@ -577,8 +578,11 @@ class Journalist {
             ) {
                 this._housekeep(page.key || page.items[0].key)
             }
-            await this._writeLeaf(id, queue.writes)
+            const writes = queue.writes
+            queue.writes = []
+            await this._writeLeaf(id, writes)
         }
+        delete this._queues[id]
         queue.entry.release()
         queue.written = true
     }
