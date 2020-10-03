@@ -1,4 +1,4 @@
-require('proof')(10, async (okay) => {
+require('proof')(11, async (okay) => {
     const Destructible = require('destructible')
 
     const Strata = require('../strata')
@@ -19,6 +19,20 @@ require('proof')(10, async (okay) => {
     })
 
     const expected = [ 'a', 'b', 'c', 'd', 'e', 'f', 'h', 'i' ]
+
+    {
+        const destructible = new Destructible('search.t')
+        const cache = new Cache
+        const strata = new Strata(destructible, { directory, cache })
+        await strata.open()
+        const search = strata.search2(Strata.MIN)
+        while (search.promises.length != 0) {
+            await search.promises.shift()
+        }
+        const { cursor } = search
+        okay(cursor.page.id, '0.1', 'min external')
+        await strata.destructible.destroy().rejected
+    }
 
     await async function () {
         const destructible = new Destructible('search.t')

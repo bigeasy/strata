@@ -482,6 +482,24 @@ class Journalist {
         }
     }
 
+    descend2 (promises, query, found) {
+        const entries = []
+        const descent = this._descend(entries, query)
+        if (descent.miss) {
+            promises.push((async () => {
+                entries.push(await this.load(descent.miss))
+                this.descend2(promises, query, found)
+                entries.forEach(entry => entry.release())
+            }) ())
+        } else {
+            if (descent != null) {
+                descent.entry = entries.pop()
+            }
+            entries.forEach(entry => entry.release())
+            found(descent)
+        }
+    }
+
     async _writeLeaf (id, writes) {
         const append = await (async () => {
             try {
