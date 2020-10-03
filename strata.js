@@ -57,17 +57,22 @@ class Strata {
         return new Cursor(this._journalist, descent, key)
     }
 
-    search2 (key, fork = false) {
+    search2 (key, fork, found) {
         const query = key === Strata.MIN
             ? { key: null, rightward: false, fork: false }
             : key === Strata.MAX
                 ? { key: null, rightward: true, fork: false }
                 : { key, rightward: false, fork: fork, approximate: true }
-        const search = { cursor: null, promises: [] }
-        this._journalist.descend2(search.promises, query, descent => {
-            search.cursor = new Cursor(this._journalist, descent, key)
+        const promises = []
+        this._journalist.descend2(promises, query, descent => {
+            const cursor = new Cursor(this._journalist, descent, key)
+            try {
+                found(cursor)
+            } finally {
+                cursor.release()
+            }
         })
-        return search
+        return promises
     }
 
     drain () {

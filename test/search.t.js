@@ -25,14 +25,14 @@ require('proof')(13, async (okay) => {
         const cache = new Cache
         const strata = new Strata(destructible, { directory, cache })
         await strata.open()
-        const search = strata.search2(Strata.MIN)
-        while (search.promises.length != 0) {
-            await search.promises.shift()
+        const promises = strata.search2(Strata.MIN, false, cursor => {
+            okay(cursor.page.id, '0.1', 'min external')
+            okay(cursor.index, 0, 'index set')
+            okay(!cursor.found, 'min not found')
+        })
+        while (promises.length != 0) {
+            await promises.shift()
         }
-        const { cursor } = search
-        okay(cursor.page.id, '0.1', 'min external')
-        okay(cursor.index, 0, 'index set')
-        okay(!cursor.found, 'min not found')
         await strata.destructible.destroy().rejected
     }
 
