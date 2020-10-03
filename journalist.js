@@ -582,7 +582,6 @@ class Journalist {
             const writes = queue.writes
             queue.writes = []
             await this._writeLeaf(id, writes)
-            console.log(queue.writes.length)
         }
         delete this._queues[id]
         if (queue.block != null) {

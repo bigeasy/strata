@@ -1,5 +1,6 @@
 const Journalist = require('./journalist')
 const Cursor = require('./cursor')
+const assert = require('assert')
 
 const NULL_CURSOR = {
     page: { items: [], id: null },
@@ -51,7 +52,9 @@ class Strata {
                 : { key, rightward: false, fork: fork, approximate: true }
         const entries = []
         const descent = await this._journalist.descend(query, entries, false)
-        return new Cursor(this._journalist, descent, entries.pop(), key)
+        const entry = entries.pop()
+        assert(entry === descent.entry)
+        return new Cursor(this._journalist, descent, key)
     }
 
     drain () {
