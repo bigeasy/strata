@@ -7,6 +7,8 @@ class Cursor {
     constructor (journalist, descent, key) {
         this.page = descent.entry.value
         this.sought = key
+        this.index = descent.index < 0 ? ~descent.index : descent.index
+        this.found = descent.index >= 0
         this._entry = descent.entry
         this._journalist = journalist
         this._promises = {}

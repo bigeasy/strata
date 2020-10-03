@@ -1,4 +1,4 @@
-require('proof')(11, async (okay) => {
+require('proof')(13, async (okay) => {
     const Destructible = require('destructible')
 
     const Strata = require('../strata')
@@ -31,6 +31,8 @@ require('proof')(11, async (okay) => {
         }
         const { cursor } = search
         okay(cursor.page.id, '0.1', 'min external')
+        okay(cursor.index, 0, 'index set')
+        okay(!cursor.found, 'min not found')
         await strata.destructible.destroy().rejected
     }
 
