@@ -18,7 +18,7 @@ require('proof')(2, async (okay) => {
 
     const writes = {}
 
-    const promises = strata.search2('a', cursor => {
+    const promises = strata.search('a', cursor => {
         cursor.insert(cursor.index, 'a', [ 'a' ], writes)
         cursor.insert(cursor.indexOf('b', cursor.index).index, 'B', [ 'b' ], writes)
     })

@@ -30,7 +30,7 @@ require('proof')(11, async (okay) => {
         const strata = new Strata(destructible, { directory, cache })
         await strata.open()
         {
-            const promises = strata.search2(Strata.MIN, false, cursor => {
+            const promises = strata.search(Strata.MIN, false, cursor => {
                 okay(cursor.page.id, '0.1', 'min external')
                 okay(cursor.index, 0, 'index set')
                 okay(!cursor.found, 'min not found')
@@ -40,7 +40,7 @@ require('proof')(11, async (okay) => {
             }
         }
         {
-            const promises = strata.search2(Strata.MAX, cursor => {
+            const promises = strata.search(Strata.MAX, cursor => {
                 okay(cursor.page.id, '1.3', 'max')
             })
             while (promises.length != 0) {
@@ -48,7 +48,7 @@ require('proof')(11, async (okay) => {
             }
         }
         {
-            const promises = strata.search2('d', cursor => {
+            const promises = strata.search('d', cursor => {
                 okay({
                     id: cursor.page.id,
                     index: cursor.index,
@@ -64,7 +64,7 @@ require('proof')(11, async (okay) => {
             }
         }
         {
-            const promises = strata.search2('d', true, cursor => {
+            const promises = strata.search('d', true, cursor => {
                 okay({
                     id: cursor.page.id,
                     index: cursor.index,
@@ -80,7 +80,7 @@ require('proof')(11, async (okay) => {
             }
         }
         {
-            const promises = strata.search2('e', true, cursor => {
+            const promises = strata.search('e', true, cursor => {
                 okay({
                     id: cursor.page.id,
                     index: cursor.index,
@@ -98,7 +98,7 @@ require('proof')(11, async (okay) => {
             }
         }
         {
-            const promises = strata.search2('j', true, cursor => {
+            const promises = strata.search('j', true, cursor => {
                 okay({
                     id: cursor.page.id,
                     index: cursor.index,
@@ -116,7 +116,7 @@ require('proof')(11, async (okay) => {
             }
         }
         {
-            const promises = strata.search2('g', true, cursor => {
+            const promises = strata.search('g', true, cursor => {
                 okay({
                     id: cursor.page.id,
                     index: cursor.index,
@@ -134,7 +134,7 @@ require('proof')(11, async (okay) => {
             }
         }
         {
-            const promises = strata.search2('h', cursor => {
+            const promises = strata.search('h', cursor => {
                 okay({
                     id: cursor.page.id,
                     index: cursor.index,
@@ -152,7 +152,7 @@ require('proof')(11, async (okay) => {
             }
         }
         {
-            const promises = strata.search2('i', true, cursor => {
+            const promises = strata.search('i', true, cursor => {
                 okay({
                     id: cursor.page.id,
                     index: cursor.index,

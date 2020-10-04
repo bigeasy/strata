@@ -59,7 +59,7 @@ require('proof')(3, async (okay) => {
         // indefinately. Any one error, like a `shutdown` error would stop
         // it.
         const writes = {}
-        const promises = await strata.search2('b', cursor => {
+        const promises = await strata.search('b', cursor => {
             cursor.remove(cursor.index, writes)
         })
         while (promises.length != 0) {
@@ -75,7 +75,7 @@ require('proof')(3, async (okay) => {
         const cache = new Cache
         const strata = new Strata(new Destructible('reopen'), { directory, cache })
         await strata.open()
-        const promises = strata.search2('c', cursor => {
+        const promises = strata.search('c', cursor => {
             okay(cursor.page.items[cursor.index].parts[0], 'c', 'found')
         })
         while (promises.length != 0) {
@@ -91,7 +91,7 @@ require('proof')(3, async (okay) => {
         let right = 'a'
         const items = []
         do {
-            const promises = strata.search2(right, cursor => {
+            const promises = strata.search(right, cursor => {
                 for (let i = cursor.index; i < cursor.page.items.length; i++) {
                     items.push(cursor.page.items[i].parts[0])
                 }

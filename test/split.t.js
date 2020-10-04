@@ -29,7 +29,7 @@ require('proof')(5, async (okay) => {
         const strata = new Strata(destructible, { directory, cache })
         await strata.open()
         const writes = {}
-        const promises = strata.search2('f', cursor => {
+        const promises = strata.search('f', cursor => {
             cursor.insert(cursor.index, 'f', [ 'f' ], writes)
         })
         while (promises.length != 0) {
@@ -46,7 +46,7 @@ require('proof')(5, async (okay) => {
         const strata = new Strata(destructible, { directory, cache })
         await Destructible.rescue(async function () {
             await strata.open()
-            const promises = strata.search2('f', cursor => {
+            const promises = strata.search('f', cursor => {
                 okay(cursor.page.items[cursor.index].parts[0], 'f', 'found')
             })
             while (promises.length != 0) {
@@ -63,7 +63,7 @@ require('proof')(5, async (okay) => {
         let right = 'a'
         const items = []
         do {
-            const promises = strata.search2(right, cursor => {
+            const promises = strata.search(right, cursor => {
                 for (let i = cursor.index; i < cursor.page.items.length; i++) {
                     items.push(cursor.page.items[i].parts[0])
                 }
@@ -84,7 +84,7 @@ require('proof')(5, async (okay) => {
         let right = Strata.MIN
         const items = []
         do {
-            const promises = strata.search2(right, cursor => {
+            const promises = strata.search(right, cursor => {
                 for (let i = cursor.index; i < cursor.page.items.length; i++) {
                     items.push(cursor.page.items[i].parts[0])
                 }
@@ -105,7 +105,7 @@ require('proof')(5, async (okay) => {
         let left = Strata.MAX, fork = false, cursor, id
         const items = []
         do {
-            const promises = strata.search2(left, fork, cursor => {
+            const promises = strata.search(left, fork, cursor => {
                 for (let i = cursor.page.items.length - 1; i >= 0; i--) {
                     items.push(cursor.page.items[i].parts[0])
                 }

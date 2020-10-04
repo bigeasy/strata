@@ -44,20 +44,7 @@ class Strata {
     // lock, so we ought to move the lock into `Journalist`.
 
     //
-    async _search (key, fork = false) {
-        const query = key === Strata.MIN
-            ? { key: null, rightward: false, fork: false }
-            : key === Strata.MAX
-                ? { key: null, rightward: true, fork: false }
-                : { key, rightward: false, fork: fork, approximate: true }
-        const entries = []
-        const descent = await this._journalist.descend(query, entries, false)
-        const entry = entries.pop()
-        assert(entry === descent.entry)
-        return new Cursor(this._journalist, descent, key)
-    }
-
-    search2 (key, ...vargs) {
+    search (key, ...vargs) {
         const [ fork, found ] = vargs.length == 2 ? vargs : [ false, vargs[0] ]
         const query = key === Strata.MIN
             ? { key: null, rightward: false, fork: false }
