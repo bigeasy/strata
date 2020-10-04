@@ -20,12 +20,12 @@ require('proof')(3, async (okay) => {
         const cache = new Cache
         const strata = new Strata(new Destructible('delete.t/purge'), { directory, cache })
         await strata.open()
-        const cursor = await strata.search('a')
         const writes = {}
-        const { index, found } = cursor.indexOf('a')
-        cursor.remove(index, writes)
-        Strata.flush(writes)
-        cursor.release()
+        const promises = strata.search2('a', cursor => cursor.remove(cursor.index, writes))
+        while (promises.length != 0) {
+            await promises.shift()
+        }
+        await Strata.flush(writes)
         await strata.destructible.destroy().rejected
         const vivified = await utilities.vivify(directory)
         okay(vivified, {
@@ -48,13 +48,15 @@ require('proof')(3, async (okay) => {
         let right = 'a'
         const items = []
         do {
-            const cursor = await strata.search(right)
-            const { index, found } = cursor.indexOf('a')
-            for (let i = index; i < cursor.page.items.length; i++) {
-                items.push(cursor.page.items[i].parts[0])
+            const promises = strata.search2(right, cursor => {
+                for (let i = cursor.index; i < cursor.page.items.length; i++) {
+                    items.push(cursor.page.items[i].parts[0])
+                }
+                right = cursor.page.right
+            })
+            while (promises.length != 0) {
+                await promises.shift()
             }
-            cursor.release()
-            right = cursor.page.right
         } while (right != null)
         okay(items, [ 'b', 'c' ], 'traverse')
         await strata.destructible.destroy().rejected

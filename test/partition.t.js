@@ -43,13 +43,16 @@ require('proof')(12, async okay => {
         await Destructible.rescue(async function () {
             await strata.create()
             const writes = {}
-            const cursor = await strata.search({ value: 'a', index: 0 })
-            for (let i = 0; i < 10; i++) {
-                const entry = { value: 'a', index: i }
-                const { index } = cursor.indexOf(entry)
-                cursor.insert(index, entry, [ entry ], writes)
+            const promises = strata.search2({ value: 'a', index: 0 }, cursor => {
+                for (let i = 0; i < 10; i++) {
+                    const entry = { value: 'a', index: i }
+                    const { index } = cursor.indexOf(entry)
+                    cursor.insert(index, entry, [ entry ], writes)
+                }
+            })
+            while (promises.length != 0) {
+                await promises.shift()
             }
-            cursor.release()
             await Strata.flush(writes)
         })
         await strata.destructible.destroy().rejected
@@ -65,12 +68,15 @@ require('proof')(12, async okay => {
         await Destructible.rescue(async function () {
             await strata.open()
             const writes = {}
-            const cursor = await strata.search({ value: 'a', index: 0 })
-            okay(cursor.page.items.length, 10, 'unsplit')
-            const entry = { value: 'b', index: 0 }
-            const { index } = cursor.indexOf(entry)
-            cursor.insert(index, entry, [ entry ], writes)
-            cursor.release()
+            const promises = strata.search2({ value: 'a', index: 0 }, cursor => {
+                okay(cursor.page.items.length, 10, 'unsplit')
+                const entry = { value: 'b', index: 0 }
+                const { index } = cursor.indexOf(entry)
+                cursor.insert(index, entry, [ entry ], writes)
+            })
+            while (promises.length != 0) {
+                await promises.shift()
+            }
             await Strata.flush(writes)
         })
         await strata.destructible.destroy().rejected
@@ -85,14 +91,13 @@ require('proof')(12, async okay => {
         })
         await Destructible.rescue(async function () {
             await strata.open()
-            const writes = {}
-            const cursor = await strata.search({ value: 'a', index: 0 })
-            okay(cursor.page.items.length, 10, 'split')
-            okay(cursor.page.right, { value: 'b', index: 0 }, 'split right')
-            const entry = { value: 'b', index: 0 }
-            const { index } = cursor.indexOf(entry)
-            cursor.release()
-            await Strata.flush(writes)
+            const promises = strata.search2({ value: 'a', index: 0 }, cursor => {
+                okay(cursor.page.items.length, 10, 'split')
+                okay(cursor.page.right, { value: 'b', index: 0 }, 'split right')
+            })
+            while (promises.length != 0) {
+                await promises.shift()
+            }
         })
         await strata.destructible.destroy().rejected
         cache.purge(0)

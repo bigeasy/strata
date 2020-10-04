@@ -1,4 +1,4 @@
-require('proof')(13, async (okay) => {
+require('proof')(10, async (okay) => {
     const Destructible = require('destructible')
 
     const Strata = require('../strata')
@@ -20,138 +20,137 @@ require('proof')(13, async (okay) => {
 
     const expected = [ 'a', 'b', 'c', 'd', 'e', 'f', 'h', 'i' ]
 
+    // TODO What to do if we approimate fork the first item in the tree?
+    // TODO Does approimate fork of last item of tree work as expected?
+    // TODO Does approimate fork of item past end of tree work?
+    // Options are `-1` or `null`.
     {
         const destructible = new Destructible('search.t')
         const cache = new Cache
         const strata = new Strata(destructible, { directory, cache })
         await strata.open()
-        const promises = strata.search2(Strata.MIN, false, cursor => {
-            okay(cursor.page.id, '0.1', 'min external')
-            okay(cursor.index, 0, 'index set')
-            okay(!cursor.found, 'min not found')
-        })
-        while (promises.length != 0) {
-            await promises.shift()
+        {
+            const promises = strata.search2(Strata.MIN, false, cursor => {
+                okay(cursor.page.id, '0.1', 'min external')
+                okay(cursor.index, 0, 'index set')
+                okay(!cursor.found, 'min not found')
+            })
+            while (promises.length != 0) {
+                await promises.shift()
+            }
+        }
+        {
+            const promises = strata.search2(Strata.MAX, cursor => {
+                okay(cursor.page.id, '1.3', 'max')
+            })
+            while (promises.length != 0) {
+                await promises.shift()
+            }
+        }
+        {
+            const promises = strata.search2('d', cursor => {
+                okay({
+                    id: cursor.page.id,
+                    index: cursor.index,
+                    found: cursor.found
+                },  {
+                    id: '1.1',
+                    index: 0,
+                    found: true
+                }, 'find')
+            })
+            while (promises.length != 0) {
+                await promises.shift()
+            }
+        }
+        {
+            const promises = strata.search2('d', true, cursor => {
+                okay({
+                    id: cursor.page.id,
+                    index: cursor.index,
+                    found: cursor.found
+                }, {
+                    id: '0.1',
+                    index: 2,
+                    found: false
+                }, 'fork')
+            })
+            while (promises.length != 0) {
+                await promises.shift()
+            }
+        }
+        {
+            const promises = strata.search2('e', true, cursor => {
+                okay({
+                    id: cursor.page.id,
+                    index: cursor.index,
+                    found: cursor.found,
+                    item: cursor.page.items[cursor.index].key
+                }, {
+                    id: '1.1',
+                    index: 0,
+                    found: false,
+                    item: 'd'
+                }, 'fork approimate')
+            })
+            while (promises.length != 0) {
+                await promises.shift()
+            }
+        }
+        {
+            const promises = strata.search2('j', true, cursor => {
+                okay({
+                    id: cursor.page.id,
+                    index: cursor.index,
+                    found: cursor.found,
+                    item: cursor.page.items[cursor.index].key
+                }, {
+                    id: '1.3',
+                    index: 0,
+                    found: false,
+                    item: 'i'
+                }, 'approximate fork missing')
+            })
+            while (promises.length != 0) {
+                await promises.shift()
+            }
+        }
+        {
+            const promises = strata.search2('g', true, cursor => {
+                okay({
+                    id: cursor.page.id,
+                    index: cursor.index,
+                    found: cursor.found,
+                    item: cursor.page.items[cursor.index].key
+                }, {
+                    id: '1.1',
+                    index: 2,
+                    found: false,
+                    item: 'f'
+                }, 'approximate fork missing end of page')
+            })
+            while (promises.length != 0) {
+                await promises.shift()
+            }
+        }
+        {
+            const promises = strata.search2('h', cursor => {
+                okay({
+                    id: cursor.page.id,
+                    index: cursor.index,
+                    found: cursor.found,
+                    item: cursor.page.items[cursor.index].key
+                }, {
+                    id: '1.3',
+                    index: 0,
+                    found: false,
+                    item: 'i'
+                }, 'missing key')
+            })
+            while (promises.length != 0) {
+                await promises.shift()
+            }
         }
         await strata.destructible.destroy().rejected
     }
-
-    await async function () {
-        const destructible = new Destructible('search.t')
-        const cache = new Cache
-        const strata = new Strata(destructible, { directory, cache })
-        await strata.open()
-        {
-            const cursor = await strata.search(Strata.MIN)
-            okay(cursor.page.id, '0.1', 'min')
-            cursor.release()
-        }
-        {
-            const cursor = await strata.search(Strata.MAX)
-            okay(cursor.page.id, '1.3', 'max')
-            cursor.release()
-        }
-        {
-            const cursor = await strata.search(Strata.MAX)
-            const { index } = cursor.indexOf('a')
-            okay(index, null, 'wrong page')
-            cursor.release()
-        }
-        {
-            const cursor = await strata.search('d')
-            const { index, found } = cursor.indexOf('d')
-            okay({
-                id: cursor.page.id,
-                index: index,
-                found: found
-            },  {
-                id: '1.1',
-                index: 0,
-                found: true
-            }, 'find')
-            cursor.release()
-        }
-        {
-            const cursor = await strata.search('d', true)
-            const { index, found } = cursor.indexOf('d')
-            okay({
-                id: cursor.page.id,
-                index: index,
-                found: found
-            }, {
-                id: '0.1',
-                index: null,
-                found: false
-            }, 'fork')
-            cursor.release()
-        }
-        {
-            const cursor = await strata.search('e', true)
-            const { index, found } = cursor.indexOf('e')
-            okay({
-                id: cursor.page.id,
-                index: index,
-                found: found
-            }, {
-                id: '1.1',
-                index: 1,
-                found: true
-            }, 'approximate fork')
-            cursor.release()
-        }
-        {
-            const cursor = await strata.search('j', true)
-            const { index, found } = cursor.indexOf('j')
-            okay({
-                id: cursor.page.id,
-                index: index,
-                found: false
-            }, {
-                id: '1.3',
-                index: 1,
-                found: false
-            }, 'approximate fork missing')
-            cursor.release()
-        }
-        {
-            const cursor = await strata.search('g', true)
-            const { index, found } = cursor.indexOf('g')
-            okay({
-                id: cursor.page.id,
-                index: index,
-                found: found
-            }, {
-                id: '1.1',
-                index: 3,
-                found: false
-            }, 'approximate fork missing end of page')
-            cursor.release()
-        }
-        {
-            const cursor = await strata.search('h')
-            const { index, found } = cursor.indexOf('h')
-            okay({
-                id: cursor.page.id,
-                index: index,
-                found: false
-            }, {
-                id: '1.3',
-                index: 0,
-                found: found
-            }, 'missing key')
-            cursor.release()
-        }
-        {
-            const racer = await strata.search('h')
-            const cursor = await strata.search('h')
-            cursor.remove(0, {})
-            cursor.remove(0, {})
-            cursor.release()
-            await strata.drain()
-            const { index } = racer.indexOf('h')
-            okay(index, null, 'page deleted')
-            racer.release()
-        }
-        await strata.destructible.destroy().rejected
-    } ()
 })

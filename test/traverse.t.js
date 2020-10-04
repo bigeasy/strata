@@ -28,13 +28,15 @@ require('proof')(2, async (okay) => {
         let right = Strata.MIN
         const items = []
         do {
-            const cursor = await strata.search(right)
-            const { index } = cursor.indexOf(right)
-            for (let i = index; i < cursor.page.items.length; i++) {
-                items.push(cursor.page.items[i].parts[0])
+            const promises = strata.search2(right, cursor => {
+                for (let i = cursor.index; i < cursor.page.items.length; i++) {
+                    items.push(cursor.page.items[i].parts[0])
+                }
+                right = cursor.page.right
+            })
+            while (promises.length != 0) {
+                await promises.shift()
             }
-            cursor.release()
-            right = cursor.page.right
         } while (right != null)
         okay(items, expected, 'forward')
         await strata.destructible.destroy().rejected
@@ -44,17 +46,21 @@ require('proof')(2, async (okay) => {
         const cache = new Cache
         const strata = new Strata(destructible, { directory, cache })
         await strata.open()
-        let left = Strata.MAX, fork = false, cursor
+        let left = Strata.MAX, fork = false, cursor, id
         const items = []
         do {
-            cursor = await strata.search(left, fork)
-            for (let i = cursor.page.items.length - 1; i >= 0; i--) {
-                items.push(cursor.page.items[i].parts[0])
+            const promises = strata.search2(left, fork, cursor => {
+                for (let i = cursor.page.items.length - 1; i >= 0; i--) {
+                    items.push(cursor.page.items[i].parts[0])
+                }
+                left = cursor.page.key
+                fork = true
+                id = cursor.page.id
+            })
+            while (promises.length != 0) {
+                await promises.shift()
             }
-            cursor.release()
-            left = cursor.page.key
-            fork = true
-        } while (cursor.page.id != '0.1')
+        } while (id != '0.1')
         okay(items, expected.slice().reverse(), 'reverse')
         await strata.destructible.destroy().rejected
     }

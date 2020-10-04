@@ -386,6 +386,8 @@ class Journalist {
                 // TODO Earlier I had this at KILLROY below. And I adjust the
                 // level, but I don't reference the level, so it's probably fine
                 // here.
+                //
+                // TODO What? Where is the comparator?!
                 if (descent.pivot.key == key && fork) {
                     descent.index--
                     rightward = true
@@ -445,7 +447,12 @@ class Journalist {
         }
         if (fork && !rightward) {
             if (approximate) {
-                descent.index < 0 ? descent.index++ : descent.index--
+                // TODO Again a problem if zero, it becomes 1 or something.
+                if (descent.index < 0) {
+                    descent.index++
+                } else {
+                    descent.index = ~(descent.index - 1)
+                }
             } else {
                 return null
             }

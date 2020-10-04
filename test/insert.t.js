@@ -18,11 +18,13 @@ require('proof')(2, async (okay) => {
 
     const writes = {}
 
-    const cursor = await strata.search('a')
-    const { index } = cursor.indexOf('a')
-    cursor.insert(index, 'a', [ 'a' ], writes)
-    cursor.insert(cursor.indexOf('b', index).index, 'B', [ 'b' ], writes)
-    cursor.release()
+    const promises = strata.search2('a', cursor => {
+        cursor.insert(cursor.index, 'a', [ 'a' ], writes)
+        cursor.insert(cursor.indexOf('b', cursor.index).index, 'B', [ 'b' ], writes)
+    })
+    while (promises.length != 0) {
+        await promises.shift()
+    }
 
     Strata.flush(writes)
     await strata.destructible.destroy().rejected
