@@ -1,4 +1,4 @@
-require('proof')(10, async (okay) => {
+require('proof')(11, async (okay) => {
     const Destructible = require('destructible')
 
     const Strata = require('../strata')
@@ -146,6 +146,22 @@ require('proof')(10, async (okay) => {
                     found: false,
                     item: 'i'
                 }, 'missing key')
+            })
+            while (promises.length != 0) {
+                await promises.shift()
+            }
+        }
+        {
+            const promises = strata.search2('i', true, cursor => {
+                okay({
+                    id: cursor.page.id,
+                    index: cursor.index,
+                    found: cursor.found
+                }, {
+                    id: '1.3',
+                    index: null,
+                    found: false
+                }, 'fork at zero index')
             })
             while (promises.length != 0) {
                 await promises.shift()

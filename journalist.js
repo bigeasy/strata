@@ -448,7 +448,12 @@ class Journalist {
         if (fork && !rightward) {
             if (approximate) {
                 // TODO Again a problem if zero, it becomes 1 or something.
-                if (descent.index < 0) {
+                if (descent.index == 0 || descent.index == -1) {
+                    if (descent.index == -1) {
+                        throw new Error
+                    }
+                    descent.index = null
+                } else if (descent.index < 0) {
                     descent.index++
                 } else {
                     descent.index = ~(descent.index - 1)
