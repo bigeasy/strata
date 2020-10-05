@@ -21,7 +21,8 @@ require('proof')(3, async (okay) => {
         const strata = new Strata(new Destructible('delete.t/purge'), { directory, cache })
         await strata.open()
         const writes = {}
-        const promises = strata.search('a', cursor => cursor.remove(cursor.index, writes))
+        const promises = []
+        strata.search(promises, 'a', cursor => cursor.remove(cursor.index, writes))
         while (promises.length != 0) {
             await promises.shift()
         }
@@ -48,7 +49,8 @@ require('proof')(3, async (okay) => {
         let right = 'a'
         const items = []
         do {
-            const promises = strata.search(right, cursor => {
+            const promises = []
+            strata.search(promises, right, cursor => {
                 for (let i = cursor.index; i < cursor.page.items.length; i++) {
                     items.push(cursor.page.items[i].parts[0])
                 }

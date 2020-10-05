@@ -44,14 +44,13 @@ class Strata {
     // lock, so we ought to move the lock into `Journalist`.
 
     //
-    search (key, ...vargs) {
+    search (promises, key, ...vargs) {
         const [ fork, found ] = vargs.length == 2 ? vargs : [ false, vargs[0] ]
         const query = key === Strata.MIN
             ? { key: null, rightward: false, fork: false }
             : key === Strata.MAX
                 ? { key: null, rightward: true, fork: false }
                 : { key, rightward: false, fork: fork, approximate: true }
-        const promises = []
         this._journalist.descend2(promises, query, descent => {
             const cursor = new Cursor(this._journalist, descent, key)
             try {

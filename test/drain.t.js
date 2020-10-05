@@ -20,7 +20,8 @@ require('proof')(3, async (okay) => {
         const strata = new Strata(new Destructible('split'), { directory, cache })
         await strata.open()
         const writes = {}
-        const promises = strata.search(leaf[0], cursor => {
+        const promises = []
+        strata.search(promises, leaf[0], cursor => {
             cursor.insert(cursor.index, leaf[0], [ leaf[0] ], writes)
         })
         while (promises.length != 0) {
@@ -35,7 +36,8 @@ require('proof')(3, async (okay) => {
         const cache = new Cache
         const strata = new Strata(new Destructible('reopen'), { directory, cache })
         await strata.open()
-        const promises = strata.search(leaf[0], cursor => {
+        const promises = []
+        strata.search(promises, leaf[0], cursor => {
             okay(cursor.page.items[cursor.index].parts[0], leaf[0], 'found')
         })
         while (promises.length != 0) {
@@ -50,7 +52,8 @@ require('proof')(3, async (okay) => {
         let right = leaf[0]
         const items = []
         do {
-            const promises = strata.search(right, cursor => {
+            const promises = []
+            strata.search(promises, right, cursor => {
                 for (let i = cursor.index; i < cursor.page.items.length; i++) {
                     items.push(cursor.page.items[i].parts[0])
                 }

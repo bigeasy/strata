@@ -43,7 +43,8 @@ require('proof')(12, async okay => {
         await Destructible.rescue(async function () {
             await strata.create()
             const writes = {}
-            const promises = strata.search({ value: 'a', index: 0 }, cursor => {
+            const promises = []
+            strata.search(promises, { value: 'a', index: 0 }, cursor => {
                 for (let i = 0; i < 10; i++) {
                     const entry = { value: 'a', index: i }
                     const { index } = cursor.indexOf(entry)
@@ -68,7 +69,8 @@ require('proof')(12, async okay => {
         await Destructible.rescue(async function () {
             await strata.open()
             const writes = {}
-            const promises = strata.search({ value: 'a', index: 0 }, cursor => {
+            const promises = []
+            strata.search(promises, { value: 'a', index: 0 }, cursor => {
                 okay(cursor.page.items.length, 10, 'unsplit')
                 const entry = { value: 'b', index: 0 }
                 const { index } = cursor.indexOf(entry)
@@ -91,7 +93,8 @@ require('proof')(12, async okay => {
         })
         await Destructible.rescue(async function () {
             await strata.open()
-            const promises = strata.search({ value: 'a', index: 0 }, cursor => {
+            const promises = []
+            strata.search(promises, { value: 'a', index: 0 }, cursor => {
                 okay(cursor.page.items.length, 10, 'split')
                 okay(cursor.page.right, { value: 'b', index: 0 }, 'split right')
             })
