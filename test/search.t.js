@@ -168,7 +168,7 @@ require('proof')(11, async (okay) => {
                     found: cursor.found
                 }, {
                     id: '1.3',
-                    index: null,
+                    index: -1,
                     found: false
                 }, 'fork at zero index')
             })

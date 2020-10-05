@@ -425,7 +425,8 @@ class Journalist {
             // If the page is a leaf, assert that we're looking for a leaf and
             // return the leaf page.
             if (entry.value.leaf) {
-                descent.index = index
+                descent.found = index >= 0
+                descent.index = index < 0 ? ~index : index
                 assert.equal(level, -1, 'could not find branch')
                 break
             }
@@ -447,17 +448,8 @@ class Journalist {
         }
         if (fork && !rightward) {
             if (approximate) {
-                // TODO Again a problem if zero, it becomes 1 or something.
-                if (descent.index == 0 || descent.index == -1) {
-                    if (descent.index == -1) {
-                        throw new Error
-                    }
-                    descent.index = null
-                } else if (descent.index < 0) {
-                    descent.index++
-                } else {
-                    descent.index = ~(descent.index - 1)
-                }
+                descent.index--
+                descent.found = false
             } else {
                 return null
             }
