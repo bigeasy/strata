@@ -2,12 +2,6 @@ const Journalist = require('./journalist')
 const Cursor = require('./cursor')
 const assert = require('assert')
 
-const NULL_CURSOR = {
-    page: { items: [], id: null },
-    indexOf: function () { return { index: null, found: false } },
-    release: function () {}
-}
-
 class Strata {
     static MIN = Symbol('MIN')
 
@@ -27,10 +21,6 @@ class Strata {
 
     open () {
         return this._journalist.open()
-    }
-
-    static nullCursor () {
-        return NULL_CURSOR
     }
 
     // What was the lock for? It was to ensure that another strand doesn't
