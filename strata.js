@@ -59,7 +59,6 @@ class Strata {
                 cursor.release()
             }
         })
-        return trampoline
     }
 
     drain () {
