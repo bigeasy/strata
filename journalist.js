@@ -487,13 +487,13 @@ class Journalist {
         }
     }
 
-    descend2 (promises, query, found) {
+    descend2 (trampoline, query, found) {
         const entries = []
         const descent = this._descend(entries, query)
         if (descent.miss) {
-            promises.push((async () => {
+            trampoline.push((async () => {
                 entries.push(await this.load(descent.miss))
-                this.descend2(promises, query, found)
+                this.descend2(trampoline, query, found)
                 entries.forEach(entry => entry.release())
             }) ())
         } else {

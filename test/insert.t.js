@@ -1,6 +1,7 @@
 require('proof')(2, async (okay) => {
     const path = require('path')
 
+    const Trampoline = require('skip')
     const Destructible = require('destructible')
 
     const Strata = require('../strata')
@@ -18,13 +19,13 @@ require('proof')(2, async (okay) => {
 
     const writes = {}
 
-    const promises = []
-    strata.search(promises, 'a', cursor => {
+    const trampoline = new Trampoline
+    strata.search(trampoline, 'a', cursor => {
         cursor.insert(cursor.index, 'a', [ 'a' ], writes)
         cursor.insert(cursor.indexOf('b', cursor.index).index, 'B', [ 'b' ], writes)
     })
-    while (promises.length != 0) {
-        await promises.shift()
+    while (trampoline.seek()) {
+        await trampoline.shift()
     }
 
     Strata.flush(writes)

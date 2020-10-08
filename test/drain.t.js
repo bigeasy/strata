@@ -1,4 +1,5 @@
 require('proof')(3, async (okay) => {
+    const Trampoline = require('skip')
     const Destructible = require('destructible')
 
     const Strata = require('../strata')
@@ -20,12 +21,12 @@ require('proof')(3, async (okay) => {
         const strata = new Strata(new Destructible('split'), { directory, cache })
         await strata.open()
         const writes = {}
-        const promises = []
-        strata.search(promises, leaf[0], cursor => {
+        const trampoline = new Trampoline
+        strata.search(trampoline, leaf[0], cursor => {
             cursor.insert(cursor.index, leaf[0], [ leaf[0] ], writes)
         })
-        while (promises.length != 0) {
-            await promises.shift()
+        while (trampoline.seek()) {
+            await trampoline.shift()
         }
         Strata.flush(writes)
         await strata.destructible.destroy().rejected
@@ -36,12 +37,12 @@ require('proof')(3, async (okay) => {
         const cache = new Cache
         const strata = new Strata(new Destructible('reopen'), { directory, cache })
         await strata.open()
-        const promises = []
-        strata.search(promises, leaf[0], cursor => {
+        const trampoline = new Trampoline
+        strata.search(trampoline, leaf[0], cursor => {
             okay(cursor.page.items[cursor.index].parts[0], leaf[0], 'found')
         })
-        while (promises.length != 0) {
-            await promises.shift()
+        while (trampoline.seek()) {
+            await trampoline.shift()
         }
         await strata.destructible.destroy().rejected
     }
@@ -52,15 +53,15 @@ require('proof')(3, async (okay) => {
         let right = leaf[0]
         const items = []
         do {
-            const promises = []
-            strata.search(promises, right, cursor => {
+            const trampoline = new Trampoline
+            strata.search(trampoline, right, cursor => {
                 for (let i = cursor.index; i < cursor.page.items.length; i++) {
                     items.push(cursor.page.items[i].parts[0])
                 }
                 right = cursor.page.right
             })
-            while (promises.length != 0) {
-                await promises.shift()
+            while (trampoline.seek()) {
+                await trampoline.shift()
             }
         } while (right != null)
         okay(items, leaf, 'traverse')

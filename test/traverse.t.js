@@ -1,4 +1,5 @@
 require('proof')(2, async (okay) => {
+    const Trampoline = require('skip')
     const Destructible = require('destructible')
 
     const Strata = require('../strata')
@@ -28,15 +29,15 @@ require('proof')(2, async (okay) => {
         let right = Strata.MIN
         const items = []
         do {
-            const promises = []
-            strata.search(promises, right, cursor => {
+            const trampoline = new Trampoline
+            strata.search(trampoline, right, cursor => {
                 for (let i = cursor.index; i < cursor.page.items.length; i++) {
                     items.push(cursor.page.items[i].parts[0])
                 }
                 right = cursor.page.right
             })
-            while (promises.length != 0) {
-                await promises.shift()
+            while (trampoline.seek()) {
+                await trampoline.shift()
             }
         } while (right != null)
         okay(items, expected, 'forward')
@@ -50,8 +51,8 @@ require('proof')(2, async (okay) => {
         let left = Strata.MAX, fork = false, cursor, id
         const items = []
         do {
-            const promises = []
-            strata.search(promises, left, fork, cursor => {
+            const trampoline = new Trampoline
+            strata.search(trampoline, left, fork, cursor => {
                 for (let i = cursor.page.items.length - 1; i >= 0; i--) {
                     items.push(cursor.page.items[i].parts[0])
                 }
@@ -59,8 +60,8 @@ require('proof')(2, async (okay) => {
                 fork = true
                 id = cursor.page.id
             })
-            while (promises.length != 0) {
-                await promises.shift()
+            while (trampoline.seek()) {
+                await trampoline.shift()
             }
         } while (id != '0.1')
         okay(items, expected.slice().reverse(), 'reverse')

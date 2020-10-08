@@ -1,4 +1,5 @@
 require('proof')(11, async (okay) => {
+    const Trampoline = require('skip')
     const Destructible = require('destructible')
 
     const Strata = require('../strata')
@@ -30,28 +31,28 @@ require('proof')(11, async (okay) => {
         const strata = new Strata(destructible, { directory, cache })
         await strata.open()
         {
-            const promises = []
-            strata.search(promises, Strata.MIN, false, cursor => {
+            const trampoline = new Trampoline
+            strata.search(trampoline, Strata.MIN, false, cursor => {
                 okay(cursor.page.id, '0.1', 'min external')
                 okay(cursor.index, 0, 'index set')
                 okay(!cursor.found, 'min not found')
             })
-            while (promises.length != 0) {
-                await promises.shift()
+            while (trampoline.seek()) {
+                await trampoline.shift()
             }
         }
         {
-            const promises = []
-            strata.search(promises, Strata.MAX, cursor => {
+            const trampoline = new Trampoline
+            strata.search(trampoline, Strata.MAX, cursor => {
                 okay(cursor.page.id, '1.3', 'max')
             })
-            while (promises.length != 0) {
-                await promises.shift()
+            while (trampoline.seek()) {
+                await trampoline.shift()
             }
         }
         {
-            const promises = []
-            strata.search(promises, 'd', cursor => {
+            const trampoline = new Trampoline
+            strata.search(trampoline, 'd', cursor => {
                 okay({
                     id: cursor.page.id,
                     index: cursor.index,
@@ -62,13 +63,13 @@ require('proof')(11, async (okay) => {
                     found: true
                 }, 'find')
             })
-            while (promises.length != 0) {
-                await promises.shift()
+            while (trampoline.seek()) {
+                await trampoline.shift()
             }
         }
         {
-            const promises = []
-            strata.search(promises, 'd', true, cursor => {
+            const trampoline = new Trampoline
+            strata.search(trampoline, 'd', true, cursor => {
                 okay({
                     id: cursor.page.id,
                     index: cursor.index,
@@ -79,13 +80,13 @@ require('proof')(11, async (okay) => {
                     found: false
                 }, 'fork')
             })
-            while (promises.length != 0) {
-                await promises.shift()
+            while (trampoline.seek()) {
+                await trampoline.shift()
             }
         }
         {
-            const promises = []
-            strata.search(promises, 'e', true, cursor => {
+            const trampoline = new Trampoline
+            strata.search(trampoline, 'e', true, cursor => {
                 okay({
                     id: cursor.page.id,
                     index: cursor.index,
@@ -98,13 +99,13 @@ require('proof')(11, async (okay) => {
                     item: 'd'
                 }, 'fork approimate')
             })
-            while (promises.length != 0) {
-                await promises.shift()
+            while (trampoline.seek()) {
+                await trampoline.shift()
             }
         }
         {
-            const promises = []
-            strata.search(promises, 'j', true, cursor => {
+            const trampoline = new Trampoline
+            strata.search(trampoline, 'j', true, cursor => {
                 okay({
                     id: cursor.page.id,
                     index: cursor.index,
@@ -117,13 +118,13 @@ require('proof')(11, async (okay) => {
                     item: 'i'
                 }, 'approximate fork missing')
             })
-            while (promises.length != 0) {
-                await promises.shift()
+            while (trampoline.seek()) {
+                await trampoline.shift()
             }
         }
         {
-            const promises = []
-            strata.search(promises, 'g', true, cursor => {
+            const trampoline = new Trampoline
+            strata.search(trampoline, 'g', true, cursor => {
                 okay({
                     id: cursor.page.id,
                     index: cursor.index,
@@ -136,13 +137,13 @@ require('proof')(11, async (okay) => {
                     item: 'f'
                 }, 'approximate fork missing end of page')
             })
-            while (promises.length != 0) {
-                await promises.shift()
+            while (trampoline.seek()) {
+                await trampoline.shift()
             }
         }
         {
-            const promises = []
-            strata.search(promises, 'h', cursor => {
+            const trampoline = new Trampoline
+            strata.search(trampoline, 'h', cursor => {
                 okay({
                     id: cursor.page.id,
                     index: cursor.index,
@@ -155,13 +156,13 @@ require('proof')(11, async (okay) => {
                     item: 'i'
                 }, 'missing key')
             })
-            while (promises.length != 0) {
-                await promises.shift()
+            while (trampoline.seek()) {
+                await trampoline.shift()
             }
         }
         {
-            const promises = []
-            strata.search(promises, 'i', true, cursor => {
+            const trampoline = new Trampoline
+            strata.search(trampoline, 'i', true, cursor => {
                 okay({
                     id: cursor.page.id,
                     index: cursor.index,
@@ -172,8 +173,8 @@ require('proof')(11, async (okay) => {
                     found: false
                 }, 'fork at zero index')
             })
-            while (promises.length != 0) {
-                await promises.shift()
+            while (trampoline.seek()) {
+                await trampoline.shift()
             }
         }
         await strata.destructible.destroy().rejected

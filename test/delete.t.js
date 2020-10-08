@@ -2,6 +2,7 @@ require('proof')(3, async (okay) => {
     const Destructible = require('destructible')
     const Strata = require('../strata')
     const Cache = require('../cache')
+    const Trampoline = require('skip')
     const utilities = require('../utilities')
     const path = require('path')
     const directory = path.join(utilities.directory, 'delete')
@@ -21,10 +22,10 @@ require('proof')(3, async (okay) => {
         const strata = new Strata(new Destructible('delete.t/purge'), { directory, cache })
         await strata.open()
         const writes = {}
-        const promises = []
-        strata.search(promises, 'a', cursor => cursor.remove(cursor.index, writes))
-        while (promises.length != 0) {
-            await promises.shift()
+        const trampoline = new Trampoline
+        strata.search(trampoline, 'a', cursor => cursor.remove(cursor.index, writes))
+        while (trampoline.seek()) {
+            await trampoline.shift()
         }
         await Strata.flush(writes)
         await strata.destructible.destroy().rejected
@@ -49,15 +50,15 @@ require('proof')(3, async (okay) => {
         let right = 'a'
         const items = []
         do {
-            const promises = []
-            strata.search(promises, right, cursor => {
+            const trampoline = new Trampoline
+            strata.search(trampoline, right, cursor => {
                 for (let i = cursor.index; i < cursor.page.items.length; i++) {
                     items.push(cursor.page.items[i].parts[0])
                 }
                 right = cursor.page.right
             })
-            while (promises.length != 0) {
-                await promises.shift()
+            while (trampoline.seek()) {
+                await trampoline.shift()
             }
         } while (right != null)
         okay(items, [ 'b', 'c' ], 'traverse')
