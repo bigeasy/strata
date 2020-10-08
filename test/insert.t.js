@@ -28,7 +28,7 @@ require('proof')(2, async (okay) => {
         await trampoline.shift()
     }
 
-    Strata.flush(writes)
+    await Strata.flush(writes)
     await strata.destructible.destroy().rejected
 
     cache.purge(0)

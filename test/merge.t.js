@@ -46,7 +46,7 @@ require('proof')(3, async (okay) => {
         // surrender when the background has failed. `flush` could be waiting on
         // a promise when the background fails and hang indefinately. Any one
         // error, like a `shutdown` error would stop it.
-        Strata.flush(writes)
+        await Strata.flush(writes)
         await strata.destructible.destroy().rejected
         cache.purge(0)
         okay(cache.heft, 0, 'cache purged')
