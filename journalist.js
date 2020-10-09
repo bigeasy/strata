@@ -662,6 +662,17 @@ class Journalist {
         return this._recorder(header, parts.length == 0 ? parts : this.serializer.parts.serialize(parts))
     }
 
+    async _stub (commit, prepare, id, append, records) {
+        const buffer = Buffer.concat(records.map(record => {
+            if (Buffer.isBuffer(record)) {
+                return record
+            }
+            return record.buffer ? record.buffer : this.serialize(record.header, record.parts)
+        }))
+        const filename = path.join('pages', id, append)
+        prepare.push(await commit.writeFile(filename, buffer))
+    }
+
     async _writeBranch (commit, prepare, entry) {
         const buffers = []
         for (const { id, key } of entry.value.items) {
@@ -1133,7 +1144,7 @@ class Journalist {
         const prepare = []
 
         // Record the split of the right page in a new stub.
-        prepare.push(await commit.stub(right.value.id, right.value.append, [{
+        this._stub(commit, prepare, right.value.id, right.value.append, [{
             header: {
                 method: 'load',
                 id: child.entry.value.id,
@@ -1150,7 +1161,7 @@ class Journalist {
         }, {
             header: { method: 'key' },
             parts: this.serializer.key.serialize(right.value.key)
-        }]))
+        }])
         right.value.vacuum = [{
             header: { method: 'load', id: child.entry.value.id, append: child.entry.value.append,
                 was: 'right' },
