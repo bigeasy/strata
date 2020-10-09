@@ -69,87 +69,6 @@ class Commit {
         return fs.rmdir(file, { recursive: true })
     }
 
-    // How is this not a race condition? I see that we're setting the heft if
-    // the page is cached in memory, but we're not holding it. If the page is
-    // loading before our commit is over, it will have the wrong heft, will it
-    // not?
-    //
-    // But, it doesn't matter all that much, does it? The heft is advisory.
-    // Until we commit, some of these pages will not be visited. If we where to
-    // hold onto the cache entries and release them on destruction, the heft
-    // wouldn't matter until then, because...
-    //
-    // Oh, wait, I recall that we don't care about adjusting heft if the record
-    // does exist because we will hold it in the Journalist during the commit.
-    // The remove is for when we're replaying as part of a recovery.
-    //
-    // Note that I still don't recall what my reasoning was on truncated writes.
-    // Assume that I assumed that Strata is a primative and could act as a
-    // write-ahead log. Not sure how I go about recovering from a truncation,
-    // though. Cross that bridge. It's a primitive.
-    //
-    // Now I'm not seeing why I'm doing the heft adjustment here. I'm already
-    // holding on in the Journalist and adjusting heft there. Repeating the
-    // operations here, so why not just have drain run in this commit object?
-
-    // Split, drain and fill are all pretty direct as far as commit operations
-    // go. You can give an address, or not in the case of fill and drain, and
-    // the operation is straight forward. From the Jouranlist on branch merge,
-    // though, we ought to make the decision in there and leave the two pages.
-    //
-    // Oh, I remember. Branch heft is the buffer length, and we won't know the
-    // buffer length until we serialize the record.
-
-    // append is the Strata instance plus an ever increasing integer for for
-    // that instance joined by a dot.
-
-    // Similarly, page ids are ths Strata instance plus an ever increasing
-    // integer for that instance where the integer is the next even integer for
-    // branch pages and the next odd integer for leaf pages.
-    //
-    // In storage, the page is a directory, the append is the file name. In the
-    // commit the filename is the page id and apppend id hyphen joined.
-    //
-    // The commit is prefixed with the word `commit-` and each step is a file
-    // that is decimal integer and hexidecimal integer, that is, step number and
-    // hash of contents.
-    //
-    // We check for a commit, if one exists, we write out the steps as step
-    // files. The step files are numbered so we work through them in order. The
-    // first step deletes the commit so we won't write the steps again. Each
-    // step file is read, it's acton performed, the step file is deleted. After
-    // we've run all the steps we delete the commit directory recusively, not
-    // from a step file but in any case, because we might have emplacement files
-    // that where never prepared and committed.
-    //
-    // We delete the commit directory recursively to get rid of everything, so
-    // we have to maybe make it in all the functions as a first step, but that's
-    // okay, I'm not going to fuss about it.
-
-    //
-    async emplace (entry) {
-        await fs.mkdir(this._commit, { recursive: true })
-        const buffers = []
-        for (const { id, key } of entry.value.items) {
-            const parts = key != null
-                ? this._journalist.serializer.key.serialize(key)
-                : []
-            buffers.push(this._journalist._recorder({ id }, parts))
-        }
-        const buffer = Buffer.concat(buffers)
-        const hash = fnv(buffer)
-        entry.heft = buffer.length
-        // TODO `this._path()`
-        await fs.writeFile(path.join(this._commit, `${entry.value.id}-${hash}`), buffer)
-        const from = path.join('commit', `${entry.value.id}-${hash}`)
-        const to = path.join('pages', entry.value.id, hash)
-        return {
-            method: 'emplace',
-            page: { id: entry.value.id, hash: entry.value.hash },
-            hash
-        }
-    }
-
     async writeFile (formatter, buffer, { overwrite = false } = {}) {
         const hash = fnv(buffer)
         const filename = typeof formatter == 'function' ? formatter({ hash, buffer }) : formatter
@@ -163,25 +82,6 @@ class Commit {
         const temporary = path.join(this._commit, formatted)
         await fs.mkdir(temporary, { recursive: true })
         return { method: 'emplace2', temporary: path.join('commit', filename), filename, overwrite, hash: null }
-    }
-
-    async stub (id, append, records) {
-        await fs.mkdir(this._commit, { recursive: true })
-        const buffer = Buffer.concat(records.map(record => {
-            if (Buffer.isBuffer(record)) {
-                return record
-            }
-            return record.buffer ? record.buffer : this._journalist.serialize(record.header, record.parts)
-        }))
-        const hash = fnv(buffer)
-        const filename = `${id}-${append}`
-        await fs.writeFile(this._path(filename), buffer)
-        return {
-            method: 'rename',
-            from: path.join('commit', filename),
-            to: path.join('pages', id, append),
-            hash: hash
-        }
     }
 
     // Okay. Now I see. I wanted the commit to be light and easy and minimal, so
