@@ -662,6 +662,23 @@ class Journalist {
         return this._recorder(header, parts.length == 0 ? parts : this.serializer.parts.serialize(parts))
     }
 
+    async _writeBranch (commit, prepare, entry) {
+        const buffers = []
+        for (const { id, key } of entry.value.items) {
+            const parts = key != null
+                ? this.serializer.key.serialize(key)
+                : []
+            buffers.push(this._recorder({ id }, parts))
+        }
+        const buffer = Buffer.concat(buffers)
+        entry.heft = buffer.length
+        const previous = path.join('pages', entry.value.id, entry.value.hash)
+        prepare.push(commit.unlink(previous))
+        const write = await commit.writeFile(({ hash }) => path.join('pages', entry.value.id, hash), buffer)
+        entry.value.hash = write.hash
+        prepare.push(write)
+    }
+
     // TODO Concerned about vacuum making things slow relative to other
     // databases and how to tune it for performance. Splits don't leave data on
     // disk that doesn't need to be there, but they do mean that a split page
@@ -1156,7 +1173,8 @@ class Journalist {
         prepare.push({ method: 'commit' })
 
         // Write the new branch to a temporary file.
-        prepare.push(await commit.emplace(parent.entry))
+        // prepare.push(await commit.emplace(parent.entry))
+        await this._writeBranch(commit, prepare, parent.entry)
 
         // Record the commit.
         await commit.write(prepare)

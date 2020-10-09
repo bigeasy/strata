@@ -1,17 +1,19 @@
+// Node.js API.
 const assert = require('assert')
 const fs = require('fs').promises
 const path = require('path')
 
+// A non-cryptographic hash to assert the validity of the contents of a file.
 const fnv = require('./fnv')
 
-const callback = require('prospective/callback')
-
+// An error to raise if journaling fails.
 const Strata = { Error: require('./error') }
 
 class Commit {
     constructor (journalist) {
         this._journalist = journalist
         this._index = 0
+        this.directory = journalist.directory
         this._commit = path.join(journalist.directory, 'commit')
     }
 
@@ -59,8 +61,12 @@ class Commit {
         return path.join(this._commit, file)
     }
 
-    async _unlink (file) {
-        await fs.rmdir(file, { recursive: true })
+    unlink (filename) {
+        return { method: 'unlink', path: filename }
+    }
+
+    _unlink (file) {
+        return fs.rmdir(file, { recursive: true })
     }
 
     // How is this not a race condition? I see that we're setting the heft if
@@ -142,6 +148,21 @@ class Commit {
             page: { id: entry.value.id, hash: entry.value.hash },
             hash
         }
+    }
+
+    async writeFile (formatter, buffer, { overwrite = false } = {}) {
+        const hash = fnv(buffer)
+        const filename = typeof formatter == 'function' ? formatter({ hash, buffer }) : formatter
+        const temporary = path.join(this._commit, filename)
+        await fs.mkdir(path.dirname(temporary), { recursive: true })
+        await fs.writeFile(temporary, buffer)
+        return { method: 'emplace2', temporary, filename, overwrite, hash }
+    }
+
+    async mkdir (dirname, { overwrite = false }) {
+        const temporary = path.join(this._commit, formatted)
+        await fs.mkdir(temporary, { recursive: true })
+        return { method: 'emplace2', temporary, filename, overwrite, hash: null }
     }
 
     async vacuum ({ id, first, second, items, right, key }) {
@@ -235,6 +256,14 @@ class Commit {
                     await this._prepare([ 'rename', from, to, hash ])
                 }
                 break
+            case 'emplace2': {
+                    const { page, hash, temporary, filename, overwrite } = operation
+                    if (overwrite) {
+                        await this._prepare([ 'unlink2', filename ])
+                    }
+                    await this._prepare([ 'rename2', temporary, filename, hash ])
+                }
+                break
             case 'emplace': {
                     const { page, hash } = operation
                     const from = path.join('commit', `${page.id}-${hash}`)
@@ -280,6 +309,16 @@ class Commit {
                 }).shift()
                 await fs.unlink(this._path(commit))
                 break
+            case 'rename2': {
+                    const from = operation.shift()
+                    const to = path.join(this.directory, operation.shift())
+                    await fs.mkdir(path.dirname(to), { recursive: true })
+                    await fs.rename(from, to)
+                    const buffer = await fs.readFile(to)
+                    const hash = fnv(buffer)
+                    Strata.Error.assert(hash == operation.shift(), 'rename failed')
+                }
+                break
             case 'rename':
                 const from = path.join(this._journalist.directory, operation.shift())
                 const to = path.join(this._journalist.directory, operation.shift())
@@ -288,6 +327,9 @@ class Commit {
                 const buffer = await fs.readFile(to)
                 const hash = fnv(buffer)
                 Strata.Error.assert(hash == operation.shift(), 'rename failed')
+                break
+            case 'unlink2':
+                await this._unlink(path.join(this.directory, operation.shift()))
                 break
             case 'unlink':
                 await this._unlink(path.join(this._journalist.directory, operation.shift()))
