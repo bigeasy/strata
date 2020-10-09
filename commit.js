@@ -156,13 +156,13 @@ class Commit {
         const temporary = path.join(this._commit, filename)
         await fs.mkdir(path.dirname(temporary), { recursive: true })
         await fs.writeFile(temporary, buffer)
-        return { method: 'emplace2', temporary, filename, overwrite, hash }
+        return { method: 'emplace2', temporary: path.join('commit', filename), filename, overwrite, hash }
     }
 
     async mkdir (dirname, { overwrite = false }) {
         const temporary = path.join(this._commit, formatted)
         await fs.mkdir(temporary, { recursive: true })
-        return { method: 'emplace2', temporary, filename, overwrite, hash: null }
+        return { method: 'emplace2', temporary: path.join('commit', filename), filename, overwrite, hash: null }
     }
 
     async vacuum ({ id, first, second, items, right, key }) {
@@ -310,7 +310,7 @@ class Commit {
                 await fs.unlink(this._path(commit))
                 break
             case 'rename2': {
-                    const from = operation.shift()
+                    const from = path.join(this.directory, operation.shift())
                     const to = path.join(this.directory, operation.shift())
                     await fs.mkdir(path.dirname(to), { recursive: true })
                     await fs.rename(from, to)
