@@ -165,36 +165,6 @@ class Commit {
         return { method: 'emplace2', temporary: path.join('commit', filename), filename, overwrite, hash: null }
     }
 
-    async vacuum ({ id, first, second, items, right, key }) {
-        await fs.mkdir(this._commit, { recursive: true })
-        const filename = `${id}-${first}`
-        const recorder = this._journalist._recorder
-        const buffers = []
-        if (right != null) {
-            buffers.push(recorder({ method: 'right' }, this._journalist.serializer.key.serialize(right)))
-        }
-        // Write out a new page slowly, a record at a time.
-        for (let index = 0, I = items.length; index < I; index++) {
-            const parts = this._journalist.serializer.parts.serialize(items[index].parts)
-            buffers.push(recorder({ method: 'insert', index }, parts))
-        }
-        if (key != null) {
-            buffers.push(recorder({ method: 'key' }, this._journalist.serializer.key.serialize(key)))
-        }
-        buffers.push(recorder({
-            method: 'dependent', id: id, append: second
-        }, []))
-        const buffer = Buffer.concat(buffers)
-        const hash = fnv(buffer)
-        await fs.writeFile(this._path(filename), buffer)
-        return {
-            method: 'rename',
-            from: path.join('commit', filename),
-            to: path.join('pages', id, first),
-            hash: hash
-        }
-    }
-
     async stub (id, append, records) {
         await fs.mkdir(this._commit, { recursive: true })
         const buffer = Buffer.concat(records.map(record => {

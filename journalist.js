@@ -784,14 +784,26 @@ class Journalist {
                 path: path.join('pages', leaf.entry.value.id, first)
             })
 
-            prepare.push(await commit.vacuum({
-                id: leaf.entry.value.id,
-                first: first,
-                second: second,
-                items: items,
-                right: leaf.entry.value.right,
-                key: leaf.entry.value.key
-            }))
+            const recorder = this._recorder
+            const buffers = []
+            const { id, right, key } = leaf.entry.value
+
+            if (right != null) {
+                buffers.push(recorder({ method: 'right' }, this.serializer.key.serialize(right)))
+            }
+            // Write out a new page slowly, a record at a time.
+            for (let index = 0, I = items.length; index < I; index++) {
+                const parts = this.serializer.parts.serialize(items[index].parts)
+                buffers.push(recorder({ method: 'insert', index }, parts))
+            }
+            if (key != null) {
+                buffers.push(recorder({ method: 'key' }, this.serializer.key.serialize(key)))
+            }
+            buffers.push(recorder({
+                method: 'dependent', id: id, append: second
+            }, []))
+
+            prepare.push(await commit.writeFile(path.join('pages', id, first), Buffer.concat(buffers)))
             // Merged pages themselves can just be deleted, but when we do, we
             // need to... Seems like both split and merge can use the same
             // mechanism, this dependent reference. So, every page we load has a
