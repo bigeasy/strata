@@ -58,6 +58,7 @@ require('proof')(3, async (okay) => {
         await strata.open()
         const trampoline = new Trampoline
         strata.search(trampoline, 'd', cursor => {
+            console.log(cursor.index, cursor.page.id, cursor.page.items)
             okay(cursor.page.items[cursor.index].parts[0], 'd', 'found')
         })
         while (trampoline.seek()) {
