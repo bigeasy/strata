@@ -10,19 +10,19 @@ const fnv = require('./fnv')
 const Strata = { Error: require('./error') }
 
 class Commit {
-    constructor (journalist) {
-        this._journalist = journalist
+    constructor (directory, { tmp = 'commit' } = {}) {
+        assert(typeof directory == 'string')
         this._index = 0
-        this.directory = journalist.directory
-        this._commit = path.join(journalist.directory, 'commit')
+        this.directory = directory
+        this._commit = path.join(directory, tmp)
     }
 
     // TODO Should be a hash of specific files to filter, not a regex.
-    async write (commit) {
+    async write (prepare) {
         const dir = await this._readdir()
         const unemplaced = dir.filter(file => ! /\d+\.\d+-\d+\.\d+\.[0-9a-f]/)
         assert.deepStrictEqual(unemplaced, [], 'commit directory not empty')
-        await this._write('commit', commit)
+        await this._write('commit', prepare)
     }
 
     // Believe we can just write out into the commit directory, we don't need to
@@ -75,13 +75,13 @@ class Commit {
         const temporary = path.join(this._commit, filename)
         await fs.mkdir(path.dirname(temporary), { recursive: true })
         await fs.writeFile(temporary, buffer)
-        return { method: 'emplace2', temporary: path.join('commit', filename), filename, overwrite, hash }
+        return { method: 'emplace2', filename, overwrite, hash }
     }
 
     async mkdir (dirname, { overwrite = false }) {
         const temporary = path.join(this._commit, formatted)
         await fs.mkdir(temporary, { recursive: true })
-        return { method: 'emplace2', temporary: path.join('commit', filename), filename, overwrite, hash: null }
+        return { method: 'emplace2', filename, overwrite, hash: null }
     }
 
     // Okay. Now I see. I wanted the commit to be light and easy and minimal, so
@@ -127,24 +127,11 @@ class Commit {
                 }
                 break
             case 'emplace2': {
-                    const { page, hash, temporary, filename, overwrite } = operation
+                    const { page, hash, filename, overwrite } = operation
                     if (overwrite) {
                         await this._prepare([ 'unlink2', filename ])
                     }
-                    await this._prepare([ 'rename2', temporary, filename, hash ])
-                }
-                break
-            case 'emplace': {
-                    const { page, hash } = operation
-                    const from = path.join('commit', `${page.id}-${hash}`)
-                    const to = path.join('pages', page.id, hash)
-                    await this._prepare([ 'rename', from, to, hash ])
-                    if (page.hash !== null) {
-                        await this._prepare([ 'unlink', path.join('pages', page.id, page.hash) ])
-                    }
-                    const entry = await this._journalist.load(page.id)
-                    entry.value.hash = hash
-                    entry.release()
+                    await this._prepare([ 'rename2', filename, hash ])
                 }
                 break
             case 'unlink': {
@@ -180,8 +167,9 @@ class Commit {
                 await fs.unlink(this._path(commit))
                 break
             case 'rename2': {
-                    const from = path.join(this.directory, operation.shift())
-                    const to = path.join(this.directory, operation.shift())
+                    const filename = operation.shift()
+                    const from = path.join(this._commit, filename)
+                    const to = path.join(this.directory, filename)
                     await fs.mkdir(path.dirname(to), { recursive: true })
                     await fs.rename(from, to)
                     const buffer = await fs.readFile(to)
@@ -190,9 +178,10 @@ class Commit {
                 }
                 break
             case 'rename':
-                const from = path.join(this._journalist.directory, operation.shift())
-                const to = path.join(this._journalist.directory, operation.shift())
+                const from = path.join(this.directory, operation.shift())
+                const to = path.join(this.directory, operation.shift())
                 await fs.mkdir(path.dirname(to), { recursive: true })
+                // When replayed from failure we'll get `ENOENT`.
                 await fs.rename(from, to)
                 const buffer = await fs.readFile(to)
                 const hash = fnv(buffer)
@@ -202,7 +191,7 @@ class Commit {
                 await this._unlink(path.join(this.directory, operation.shift()))
                 break
             case 'unlink':
-                await this._unlink(path.join(this._journalist.directory, operation.shift()))
+                await this._unlink(path.join(this.directory, operation.shift()))
                 break
             case 'end':
                 break

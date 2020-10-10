@@ -742,7 +742,7 @@ class Journalist {
             const writes = this._queue(leaf.entry.value.id).writes.splice(0)
             await this._writeLeaf(leaf.entry.value.id, writes)
 
-            const commit = new Commit(this)
+            const commit = new Commit(this.directory)
 
             // Create our journaled tree alterations.
             const prepare = []
@@ -790,7 +790,7 @@ class Journalist {
 
         await (async () => {
             const prepare = []
-            const commit = new Commit(this)
+            const commit = new Commit(this.directory)
 
             prepare.push({
                 method: 'unlink',
@@ -937,7 +937,7 @@ class Journalist {
             key: right.value.items[0].key
         }]
         right.value.items[0].key = null
-        const commit = new Commit(this)
+        const commit = new Commit(this.directory)
         const prepare = []
         // Write the new branch to a temporary file.
         await this._writeBranch(commit, prepare, right)
@@ -978,7 +978,7 @@ class Journalist {
         right.value.items[0].key = null
         branch.entry.value.items = branch.entry.value.items.splice(0, partition)
         parent.entry.value.items.splice(parent.index + 1, 0, { key: promotion, id: right.value.id })
-        const commit = new Commit(this)
+        const commit = new Commit(this.directory)
         const prepare = []
         // Write the new branch to a temporary file.
         await this._writeBranch(commit, prepare, right)
@@ -1141,7 +1141,7 @@ class Journalist {
         // TODO Make header a nested object.
 
         // Create our journaled tree alterations.
-        const commit = new Commit(this)
+        const commit = new Commit(this.directory)
 
         const prepare = []
 
@@ -1294,7 +1294,7 @@ class Journalist {
         root.entry.value.items = child.entry.value.items
 
         // Create our journaled tree alterations.
-        const commit = new Commit(this)
+        const commit = new Commit(this.directory)
         const prepare = []
 
         // Write the merged page.
@@ -1359,7 +1359,7 @@ class Journalist {
         }
 
         // Create our journaled tree alterations.
-        const commit = new Commit(this)
+        const commit = new Commit(this.directory)
 
         const prepare = []
 
@@ -1499,7 +1499,7 @@ class Journalist {
         await this._writeLeaf(right.entry.value.id, writes.right)
 
         // Create our journaled tree alterations.
-        const commit = new Commit(this)
+        const commit = new Commit(this.directory)
 
         const prepare = []
 
