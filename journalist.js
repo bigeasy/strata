@@ -662,7 +662,7 @@ class Journalist {
         return this._recorder(header, parts.length == 0 ? parts : this.serializer.parts.serialize(parts))
     }
 
-    async _stub (commit, prepare, id, append, records) {
+    async _stub (commit, id, append, records) {
         const buffer = Buffer.concat(records.map(record => {
             if (Buffer.isBuffer(record)) {
                 return record
@@ -670,10 +670,10 @@ class Journalist {
             return record.buffer ? record.buffer : this.serialize(record.header, record.parts)
         }))
         const filename = path.join('pages', id, append)
-        prepare.push(await commit.writeFile(filename, buffer))
+        await commit.writeFile(filename, buffer)
     }
 
-    async _writeBranch (commit, prepare, entry) {
+    async _writeBranch (commit, entry) {
         const buffers = []
         for (const { id, key } of entry.value.items) {
             const parts = key != null
@@ -685,11 +685,10 @@ class Journalist {
         entry.heft = buffer.length
         if (entry.value.hash != null) {
             const previous = path.join('pages', entry.value.id, entry.value.hash)
-            prepare.push(commit.unlink(previous))
+            commit.unlink(previous)
         }
         const write = await commit.writeFile(({ hash }) => path.join('pages', entry.value.id, hash), buffer)
         entry.value.hash = write.hash
-        prepare.push(write)
     }
 
     // TODO Concerned about vacuum making things slow relative to other
@@ -742,14 +741,14 @@ class Journalist {
             const writes = this._queue(leaf.entry.value.id).writes.splice(0)
             await this._writeLeaf(leaf.entry.value.id, writes)
 
-            const commit = new Commit(this.directory)
-
             // Create our journaled tree alterations.
             const prepare = []
+            const commit = new Commit(this.directory, { prepare })
+
 
             // Create a stub that loads the existing page.
             const previous = leaf.entry.value.append
-            this._stub(commit, prepare, leaf.entry.value.id, first, [{
+            this._stub(commit, leaf.entry.value.id, first, [{
                 header: {
                     method: 'load',
                     id: leaf.entry.value.id,
@@ -764,7 +763,7 @@ class Journalist {
                 },
                 parts: []
             }])
-            this._stub(commit, prepare, leaf.entry.value.id, second, [{
+            this._stub(commit, leaf.entry.value.id, second, [{
                 header: {
                     method: 'load',
                     id: leaf.entry.value.id,
@@ -790,12 +789,9 @@ class Journalist {
 
         await (async () => {
             const prepare = []
-            const commit = new Commit(this.directory)
+            const commit = new Commit(this.directory, { prepare })
 
-            prepare.push({
-                method: 'unlink',
-                path: path.join('pages', leaf.entry.value.id, first)
-            })
+            commit.unlink(path.join('pages', leaf.entry.value.id, first))
 
             const recorder = this._recorder
             const buffers = []
@@ -816,7 +812,7 @@ class Journalist {
                 method: 'dependent', id: id, append: second
             }, []))
 
-            prepare.push(await commit.writeFile(path.join('pages', id, first), Buffer.concat(buffers)))
+            await commit.writeFile(path.join('pages', id, first), Buffer.concat(buffers))
             // Merged pages themselves can just be deleted, but when we do, we
             // need to... Seems like both split and merge can use the same
             // mechanism, this dependent reference. So, every page we load has a
@@ -865,10 +861,7 @@ class Journalist {
             // Delete all merged pages.
             for (const deletion in deletions) {
                 const [ id, append ] = deletion.split('/')
-                prepare.push({
-                    method: 'unlink',
-                    path: path.join('pages', id, append)
-                })
+                commit.unlink(path.join('pages', id, append))
             }
 
             await commit.write(prepare)
@@ -937,12 +930,12 @@ class Journalist {
             key: right.value.items[0].key
         }]
         right.value.items[0].key = null
-        const commit = new Commit(this.directory)
         const prepare = []
+        const commit = new Commit(this.directory, { prepare })
         // Write the new branch to a temporary file.
-        await this._writeBranch(commit, prepare, right)
-        await this._writeBranch(commit, prepare, left)
-        await this._writeBranch(commit, prepare, root.entry)
+        await this._writeBranch(commit, right)
+        await this._writeBranch(commit, left)
+        await this._writeBranch(commit, root.entry)
         // Record the commit.
         await commit.write(prepare)
         await commit.prepare()
@@ -978,12 +971,12 @@ class Journalist {
         right.value.items[0].key = null
         branch.entry.value.items = branch.entry.value.items.splice(0, partition)
         parent.entry.value.items.splice(parent.index + 1, 0, { key: promotion, id: right.value.id })
-        const commit = new Commit(this.directory)
         const prepare = []
+        const commit = new Commit(this.directory, { prepare })
         // Write the new branch to a temporary file.
-        await this._writeBranch(commit, prepare, right)
-        await this._writeBranch(commit, prepare, branch.entry)
-        await this._writeBranch(commit, prepare, parent.entry)
+        await this._writeBranch(commit, right)
+        await this._writeBranch(commit, branch.entry)
+        await this._writeBranch(commit, parent.entry)
         // Record the commit.
         await commit.write(prepare)
         await commit.prepare()
@@ -1141,12 +1134,11 @@ class Journalist {
         // TODO Make header a nested object.
 
         // Create our journaled tree alterations.
-        const commit = new Commit(this.directory)
-
         const prepare = []
+        const commit = new Commit(this.directory, { prepare })
 
         // Record the split of the right page in a new stub.
-        this._stub(commit, prepare, right.value.id, right.value.append, [{
+        this._stub(commit, right.value.id, right.value.append, [{
             header: {
                 method: 'load',
                 id: child.entry.value.id,
@@ -1172,7 +1164,7 @@ class Journalist {
 
         // Record the split of the left page in a new stub, for which we create
         // a new append file.
-        this._stub(commit, prepare, child.entry.value.id, append, [{
+        this._stub(commit, child.entry.value.id, append, [{
             header: {
                 method: 'load',
                 id: child.entry.value.id,
@@ -1198,7 +1190,7 @@ class Journalist {
         prepare.push({ method: 'commit' })
 
         // Write the new branch to a temporary file.
-        await this._writeBranch(commit, prepare, parent.entry)
+        await this._writeBranch(commit, parent.entry)
 
         // Record the commit.
         await commit.write(prepare)
@@ -1294,17 +1286,14 @@ class Journalist {
         root.entry.value.items = child.entry.value.items
 
         // Create our journaled tree alterations.
-        const commit = new Commit(this.directory)
         const prepare = []
+        const commit = new Commit(this.directory, { prepare })
 
         // Write the merged page.
-        await this._writeBranch(commit, prepare, root.entry)
+        await this._writeBranch(commit, root.entry)
 
         // Delete the page merged into the merged page.
-        prepare.push({
-            method: 'unlink',
-            path: path.join('pages', child.entry.value.id)
-        })
+        commit.unlink(path.join('pages', child.entry.value.id))
 
         // Record the commit.
         await commit.write(prepare)
@@ -1359,33 +1348,26 @@ class Journalist {
         }
 
         // Create our journaled tree alterations.
-        const commit = new Commit(this.directory)
-
         const prepare = []
+        const commit = new Commit(this.directory, { prepare })
 
         // Write the merged page.
-        await this._writeBranch(commit, prepare, left.entry)
+        await this._writeBranch(commit, left.entry)
 
         // Delete the page merged into the merged page.
-        prepare.push({
-            method: 'unlink',
-            path: path.join('pages', right.entry.value.id)
-        })
+        commit.unlink(path.join('pages', right.entry.value.id))
 
         // If we replaced the key in the pivot, write the pivot.
         if (surgery.replacement != null) {
-            await this._writeBranch(commit, prepare, pivot.entry)
+            await this._writeBranch(commit, pivot.entry)
         }
 
         // Write the page we spliced.
-        await this._writeBranch(commit, prepare, surgery.splice.entry)
+        await this._writeBranch(commit, surgery.splice.entry)
 
         // Delete any removed branches.
         for (const deletion in surgery.deletions) {
-            prepare.push({
-                method: 'unlink',
-                path: path.join('pages', deletion.entry.value.id)
-            })
+            commit.unlink(path.join('pages', deletion.entry.value.id))
         }
 
         // Record the commit.
@@ -1499,13 +1481,12 @@ class Journalist {
         await this._writeLeaf(right.entry.value.id, writes.right)
 
         // Create our journaled tree alterations.
-        const commit = new Commit(this.directory)
-
         const prepare = []
+        const commit = new Commit(this.directory, { prepare })
 
         // Record the split of the right page in a new stub.
         const append = this._filename()
-        this._stub(commit, prepare, left.entry.value.id, append, [{
+        this._stub(commit, left.entry.value.id, append, [{
             header: {
                 method: 'load',
                 id: left.entry.value.id,
@@ -1537,18 +1518,15 @@ class Journalist {
 
         // If we replaced the key in the pivot, write the pivot.
         if (surgery.replacement != null) {
-            await this._writeBranch(commit, prepare, pivot.entry)
+            await this._writeBranch(commit, pivot.entry)
         }
 
         // Write the page we spliced.
-        await this._writeBranch(commit, prepare, surgery.splice.entry)
+        await this._writeBranch(commit, surgery.splice.entry)
 
         // Delete any removed branches.
         for (const deletion in surgery.deletions) {
-            prepare.push({
-                method: 'unlink',
-                path: path.join('pages', deletion.entry.value.id)
-            })
+            commit.unlink(path.join('pages', deletion.entry.value.id))
         }
 
         // Record the commit.

@@ -10,11 +10,12 @@ const fnv = require('./fnv')
 const Strata = { Error: require('./error') }
 
 class Commit {
-    constructor (directory, { tmp = 'commit' } = {}) {
+    constructor (directory, { tmp = 'commit', prepare = [] } = {}) {
         assert(typeof directory == 'string')
         this._index = 0
         this.directory = directory
         this._commit = path.join(directory, tmp)
+        this.__prepare = prepare
     }
 
     // TODO Should be a hash of specific files to filter, not a regex.
@@ -62,7 +63,7 @@ class Commit {
     }
 
     unlink (filename) {
-        return { method: 'unlink', path: filename }
+        this.__prepare.push({ method: 'unlink', path: filename })
     }
 
     _unlink (file) {
@@ -75,7 +76,9 @@ class Commit {
         const temporary = path.join(this._commit, filename)
         await fs.mkdir(path.dirname(temporary), { recursive: true })
         await fs.writeFile(temporary, buffer)
-        return { method: 'emplace2', filename, overwrite, hash }
+        const entry = { method: 'emplace2', filename, overwrite, hash }
+        this.__prepare.push(entry)
+        return entry
     }
 
     async mkdir (dirname, { overwrite = false }) {
