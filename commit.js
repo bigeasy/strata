@@ -2,19 +2,55 @@
 const assert = require('assert')
 const fs = require('fs').promises
 const path = require('path')
+const os = require('os')
 
 // A non-cryptographic hash to assert the validity of the contents of a file.
 const fnv = require('./fnv')
 
+// Catch exceptions by type, message, property.
+const rescue = require('rescue')
+
 // An error to raise if journaling fails.
 const Strata = { Error: require('./error') }
 
+// Commit is a utility for atomic file operations leveraging the atomicity of
+// `unlink` and `rename` on UNIX filesystems. With it you can perform a set of
+// file operations that must occur together or not at all as part of a
+// transaction. You create a script of file operations and once you commit the
+// script you can be certain that the operations will be performed even if your
+// program crash restarts, even if the crash restart is due to a full disk.
+//
+// Once you successfully commit, if the commit fails due to a full disk it can
+// be resumed once you've made space on the disk and restarted your program.
+//
+// Commit has resonable limitations because it is primarily an atomicity utility
+// and not a filesystem utility.
+//
+// Commit operates on a specific directory and will not operate outside the
+// directory. It will not work across UNIX filesystems, so the directory should
+// not include mounted filesystems or if it does, do not use Commit to write to
+// those mounted filesystems.
+//
+// Commit file path are arguments must be relative paths. Commit does not
+// perform extensive checking of those paths, it assumes that you've performed
+// path sanitation and are not using path names entered from a user interface. A
+// relative path that resolves to files outside of the directory is certain to
+// cause problems. Also, I've only ever use old school UNIX filenames in the
+// ASCII so I'm unfamiliar with the pitfalls of internationalization, emojiis
+// and the like.
+
+//
 class Commit {
     constructor (directory, { tmp = 'commit', prepare = [] } = {}) {
         assert(typeof directory == 'string')
         this._index = 0
         this.directory = directory
+        this._staged = {}
         this._commit = path.join(directory, tmp)
+        this._tmp = {
+            filename: tmp,
+            path: path.join(directory, tmp)
+        }
         this.__prepare = prepare
     }
 
@@ -70,13 +106,47 @@ class Commit {
         return fs.rmdir(file, { recursive: true })
     }
 
+    async filename (filename) {
+        const normalized = path.normalize(filename)
+        if (this._staged[filename]) {
+            return this._staged[filename]
+        }
+        try {
+            await fs.stat(path.join(this.directory, filename))
+            return filename
+        } catch (error) {
+            rescue(error, [{ code: 'ENOENT' }])
+            return null
+        }
+    }
+
     async writeFile (formatter, buffer, { overwrite = false } = {}) {
         const hash = fnv(buffer)
-        const filename = typeof formatter == 'function' ? formatter({ hash, buffer }) : formatter
+        const abnormal = typeof formatter == 'function' ? formatter({ hash, buffer }) : formatter
+        const filename = path.normalize(abnormal)
+        if (this._staged[filename]) {
+            if (!overwrite) {
+                const error = new Error
+                error.code = 'EEXISTS'
+                error.errno = -os.constants.errno.EEXISTS
+                error.path = filename
+                throw error
+            }
+            const stat = fs.stat(this._staged[filename])
+            if (stat.isDirectory()) {
+                const error = new Error
+                error.code = 'EISDIR'
+                error.errno = -os.constants.errno.EISDIR
+                error.path = filename
+                throw error
+            }
+            await fs.unlink(this._stages[filename])
+        }
+        this._staged[filename] = path.join(this._tmp.filename, filename)
         const temporary = path.join(this._commit, filename)
         await fs.mkdir(path.dirname(temporary), { recursive: true })
         await fs.writeFile(temporary, buffer)
-        const entry = { method: 'emplace2', filename, overwrite, hash }
+        const entry = { method: 'emplace', filename, overwrite, hash }
         this.__prepare.push(entry)
         return entry
     }
@@ -84,7 +154,7 @@ class Commit {
     async mkdir (dirname, { overwrite = false }) {
         const temporary = path.join(this._commit, formatted)
         await fs.mkdir(temporary, { recursive: true })
-        return { method: 'emplace2', filename, overwrite, hash: null }
+        return { method: 'emplace', filename, overwrite, hash: null }
     }
 
     // Okay. Now I see. I wanted the commit to be light and easy and minimal, so
@@ -121,15 +191,15 @@ class Commit {
                     const filename = path.join(path.basename(this._commit), `commit.${hash}`)
                     await fs.mkdir(path.dirname(path.join(this._commit, filename)), { recursive: true })
                     await fs.writeFile(path.join(this._commit, filename), buffer)
-                    await this._prepare([ 'rename2', filename, hash ])
+                    await this._prepare([ 'rename', filename, hash ])
                 }
                 break
-            case 'emplace2': {
+            case 'emplace': {
                     const { page, hash, filename, overwrite } = operation
                     if (overwrite) {
-                        await this._prepare([ 'unlink2', filename ])
+                        await this._prepare([ 'unlink', filename ])
                     }
-                    await this._prepare([ 'rename2', filename, hash ])
+                    await this._prepare([ 'rename', filename, hash ])
                 }
                 break
             case 'unlink': {
@@ -164,7 +234,7 @@ class Commit {
                 }).shift()
                 await fs.unlink(this._path(commit))
                 break
-            case 'rename2': {
+            case 'rename': {
                     const filename = operation.shift()
                     const from = path.join(this._commit, filename)
                     const to = path.join(this.directory, filename)
@@ -175,19 +245,6 @@ class Commit {
                     const hash = fnv(buffer)
                     Strata.Error.assert(hash == operation.shift(), 'rename failed')
                 }
-                break
-            case 'rename':
-                const from = path.join(this.directory, operation.shift())
-                const to = path.join(this.directory, operation.shift())
-                await fs.mkdir(path.dirname(to), { recursive: true })
-                // When replayed from failure we'll get `ENOENT`.
-                await fs.rename(from, to)
-                const buffer = await fs.readFile(to)
-                const hash = fnv(buffer)
-                Strata.Error.assert(hash == operation.shift(), 'rename failed')
-                break
-            case 'unlink2':
-                await this._unlink(path.join(this.directory, operation.shift()))
                 break
             case 'unlink':
                 await this._unlink(path.join(this.directory, operation.shift()))
