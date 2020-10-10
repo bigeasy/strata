@@ -121,11 +121,6 @@ class Commit {
                     await this._prepare([ 'rename2', filename, hash ])
                 }
                 break
-            case 'rename': {
-                    const { from, to, hash } = operation
-                    await this._prepare([ 'rename', from, to, hash ])
-                }
-                break
             case 'emplace2': {
                     const { page, hash, filename, overwrite } = operation
                     if (overwrite) {
