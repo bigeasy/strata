@@ -115,10 +115,10 @@ class Commit {
                     const entries = operations.splice(0)
                     const buffer = Buffer.from(entries.map(JSON.stringify).join('\n') + '\n')
                     const hash = fnv(buffer)
-                    await fs.writeFile(path.join(this._commit, '_commit'), buffer)
-                    const from = path.join('commit', '_commit')
-                    const to = path.join('commit', `commit.${hash}`)
-                    await this._prepare([ 'rename', from, to, hash ])
+                    const filename = path.join(path.basename(this._commit), `commit.${hash}`)
+                    await fs.mkdir(path.dirname(path.join(this._commit, filename)), { recursive: true })
+                    await fs.writeFile(path.join(this._commit, filename), buffer)
+                    await this._prepare([ 'rename2', filename, hash ])
                 }
                 break
             case 'rename': {
@@ -171,6 +171,7 @@ class Commit {
                     const from = path.join(this._commit, filename)
                     const to = path.join(this.directory, filename)
                     await fs.mkdir(path.dirname(to), { recursive: true })
+                    // When replayed from failure we'll get `ENOENT`.
                     await fs.rename(from, to)
                     const buffer = await fs.readFile(to)
                     const hash = fnv(buffer)
