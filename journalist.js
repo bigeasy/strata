@@ -21,7 +21,7 @@ Turnstile.Queue = require('turnstile/queue')
 Turnstile.Set = require('turnstile/set')
 
 // Journaled file system operations for tree rebalancing.
-const Commit = require('./commit')
+const Commit = require('journalist')
 
 // A non-crypographic (fast) 32-bit hash for record integrity.
 const fnv = require('./fnv')
