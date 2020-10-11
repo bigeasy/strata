@@ -4,13 +4,13 @@ const Strata = { Error: require('./error') }
 const find = require('./find')
 
 class Cursor {
-    constructor (journalist, descent, key) {
+    constructor (sheaf, descent, key) {
         this.page = descent.entry.value
         this.sought = key
         this.index = descent.index
         this.found = descent.found
         this._entry = descent.entry
-        this._journalist = journalist
+        this._sheaf = sheaf
         this._promises = {}
     }
 
@@ -24,7 +24,7 @@ class Cursor {
         if (this.page.deleted) {
             return { index: null, found: false }
         }
-        const comparator = this._journalist.comparator.leaf
+        const comparator = this._sheaf.comparator.leaf
         let index = find(comparator, this.page, key, offset)
         // Unambiguous if we actually found it.
         if (-1 < index) {
@@ -60,25 +60,23 @@ class Cursor {
     //
     insert (index, key, parts, writes) {
         const header = { method: 'insert', index: index }
-        const buffer = this._journalist.serialize(header, parts)
+        const buffer = this._sheaf.serialize(header, parts)
         const record = { key: key, parts: parts, heft: buffer.length }
 
         this._entry.heft += record.heft
 
         this.page.items.splice(index, 0, record)
 
-        // Create a record to add to the page. Also give to Journalist so it can
-        // set the heft.
-        this._journalist.append(this.page.id, buffer, writes)
+        this._sheaf.append(this.page.id, buffer, writes)
 
         return record.heft
     }
 
     remove (index, writes) {
         const header = { method: 'delete', index: index }
-        const buffer = this._journalist.serialize(header, [])
+        const buffer = this._sheaf.serialize(header, [])
 
-        this._journalist.append(this.page.id, buffer, writes)
+        this._sheaf.append(this.page.id, buffer, writes)
 
         const [ spliced ] = this.page.items.splice(index, 1)
         this._entry.heft -= spliced.heft

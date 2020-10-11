@@ -102,7 +102,7 @@ class Cache {
         while (this.heft > heft && iterator._cache != null) {
             if (iterator._references == 0) {
                 // TODO Get rid of this assertion after a while. Also remove
-                // heft update in `Journalist` it has a TODO.
+                // heft update in `Sheaf` it has a TODO.
                 if (iterator.value.leaf) {
                     const page = iterator.value
                     assert.equal(iterator.heft, page.items.slice(0).reduce((sum, item) => {

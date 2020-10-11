@@ -51,23 +51,22 @@ const appendable = require('./appendable')
 // An `Error` type specific to Strata.
 const Strata = { Error: require('./error') }
 
-// Journalist is the crux of Strata. It exists as a separate object possibly for
+// Sheaf is the crux of Strata. It exists as a separate object possibly for
 // legacy reasons, and it will stay that way because it makes `Strata` and
 // `Cursor` something a user can read to understand the interface.
 
 //
-class Journalist {
+class Sheaf {
     // Used to identify the pages of this instance in the page cache which can
     // be shared across different Strata. We do not want to pull pages from the
     // cache based only on the directory path and page id because we may close
     // and reopen a Strata and we'd pull pages from the previous instance.
     static _instance = 0
 
-    // Journalist accepts the destructible and user options passed to `new
-    // Strata`
+    // Sheaf accepts the destructible and user options passed to `new Strata`
     constructor (destructible, options) {
         const leaf = coalesce(options.leaf, {})
-        this._instance = Journalist._instance++
+        this._instance = Sheaf._instance++
         this.leaf = {
             split: coalesce(leaf.split, 5),
             merge: coalesce(leaf.merge, 1)
@@ -1572,4 +1571,4 @@ class Journalist {
     }
 }
 
-module.exports = Journalist
+module.exports = Sheaf
