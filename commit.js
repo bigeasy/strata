@@ -48,7 +48,7 @@ class Commit {
         this._staged = {}
         this._commit = path.join(directory, tmp)
         this._tmp = {
-            filename: tmp,
+            directory: tmp,
             path: path.join(directory, tmp)
         }
         this.__prepare = prepare
@@ -106,18 +106,22 @@ class Commit {
         return fs.rmdir(file, { recursive: true })
     }
 
-    async filename (filename) {
-        const normalized = path.normalize(filename)
-        if (this._staged[filename]) {
+    async _filename (filename) {
+        const relative = path.normalize(filename)
+        if (this._staged[relative]) {
             return this._staged[filename]
         }
         try {
-            await fs.stat(path.join(this.directory, filename))
-            return filename
+            await fs.stat(path.join(this.directory, relative))
+            return { relative, staged: false, operation: null }
         } catch (error) {
             rescue(error, [{ code: 'ENOENT' }])
             return null
         }
+    }
+
+    async filename (filename) {
+        return (await this._filename(filename)).relative
     }
 
     async writeFile (formatter, buffer, { overwrite = false } = {}) {
@@ -142,19 +146,59 @@ class Commit {
             }
             await fs.unlink(this._stages[filename])
         }
-        this._staged[filename] = path.join(this._tmp.filename, filename)
         const temporary = path.join(this._commit, filename)
         await fs.mkdir(path.dirname(temporary), { recursive: true })
         await fs.writeFile(temporary, buffer)
-        const entry = { method: 'emplace', filename, overwrite, hash }
-        this.__prepare.push(entry)
-        return entry
+        const operation = { method: 'emplace', filename, overwrite, hash }
+        this._staged[filename] = {
+            staged: true,
+            relative: path.join(this._tmp.directory, filename),
+            operation: operation
+        }
+        this.__prepare.push(operation)
+        return operation
     }
 
     async mkdir (dirname, { overwrite = false }) {
         const temporary = path.join(this._commit, formatted)
         await fs.mkdir(temporary, { recursive: true })
         return { method: 'emplace', filename, overwrite, hash: null }
+    }
+
+    _error (error, code, path) {
+        error.code = 'EISDIR'
+        error.errno = -os.constants.errno.EISDIR
+        error.path = filename
+        Error.captureStackTrace(error, Commit.prototype._error)
+        throw error
+    }
+
+    // This file operation will create any directory specified in the
+    // destination path.
+
+    //
+    async rename (from, to, { overwrite = false } = {}) {
+        const resolved = {
+            from: await this._filename(from),
+            to: await this._filename(to)
+        }
+        if (resolved.to && resolved.to.staged) {
+            if (!overwrite) {
+                this._error('EEXISTS', to)
+            }
+            fs.unlink(resolved.to.filename, { recursive: true })
+        }
+        if (resolved.from.staged) {
+            await fs.mkdir(path.dirname(from), { recursive: true })
+            // TODO How do I update the 'emplace' or rename?
+            const temporary = {
+                from: path.join(this.directory, resolved.from.relative),
+                to: path.join(this._tmp.path, to)
+            }
+            await fs.rename(temporary.from, temporary.to)
+            resolved.from.operation.filename = path.join(this._tmp.directory, to)
+        } else {
+        }
     }
 
     // Okay. Now I see. I wanted the commit to be light and easy and minimal, so
