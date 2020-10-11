@@ -1,4 +1,4 @@
-const Journalist = require('./journalist')
+const Journalist = require('./sheaf')
 const Cursor = require('./cursor')
 const assert = require('assert')
 
