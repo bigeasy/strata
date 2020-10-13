@@ -1550,17 +1550,4 @@ class Sheaf {
     }
 }
 
-    async function list (directory) {
-        const listing = {}
-        for (const file of (await fs.readdir(directory))) {
-            const resolved = path.join(directory, file)
-            const stat = await fs.stat(resolved)
-            if (stat.isDirectory()) {
-                listing[file] = await list(resolved)
-            } else {
-                listing[file] = await fs.readFile(resolved, 'utf8')
-            }
-        }
-        return listing
-    }
 module.exports = Sheaf
