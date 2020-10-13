@@ -684,7 +684,7 @@ class Sheaf {
         entry.heft = buffer.length
         if (entry.value.hash != null) {
             const previous = path.join('pages', entry.value.id, entry.value.hash)
-            commit.unlink(previous)
+            await commit.unlink(previous)
         }
         const write = await commit.writeFile(hash => path.join('pages', entry.value.id, hash), buffer)
         entry.value.hash = write.hash
@@ -787,7 +787,7 @@ class Sheaf {
         await (async () => {
             const commit = await Journalist.create(this.directory)
 
-            commit.unlink(path.join('pages', leaf.entry.value.id, first))
+            await commit.unlink(path.join('pages', leaf.entry.value.id, first))
 
             const recorder = this._recorder
             const buffers = []
@@ -857,7 +857,7 @@ class Sheaf {
             // Delete all merged pages.
             for (const deletion in deletions) {
                 const [ id, append ] = deletion.split('/')
-                commit.unlink(path.join('pages', id, append))
+                await commit.unlink(path.join('pages', id, append))
             }
 
             await commit.write()
@@ -1187,9 +1187,6 @@ class Sheaf {
 
         // Record the commit.
         await commit.write()
-
-        // Pretty sure that the separate prepare and commit are merely because
-        // we want to release the lock on the leaf as soon as possible.
         await Journalist.prepare(commit)
         await Journalist.commit(commit)
         blocks.forEach(block => block.exit.resolve())
@@ -1285,7 +1282,7 @@ class Sheaf {
         await this._writeBranch(commit, root.entry)
 
         // Delete the page merged into the merged page.
-        commit.rmdir(path.join('pages', child.entry.value.id))
+        await commit.rmdir(path.join('pages', child.entry.value.id))
 
         // Record the commit.
         await commit.write()
@@ -1343,7 +1340,7 @@ class Sheaf {
         await this._writeBranch(commit, left.entry)
 
         // Delete the page merged into the merged page.
-        commit.rmdir(path.join('pages', right.entry.value.id))
+        await commit.rmdir(path.join('pages', right.entry.value.id))
 
         // If we replaced the key in the pivot, write the pivot.
         if (surgery.replacement != null) {
@@ -1355,14 +1352,11 @@ class Sheaf {
 
         // Delete any removed branches.
         for (const deletion in surgery.deletions) {
-            commit.unlink(path.join('pages', deletion.entry.value.id))
+            await commit.unlink(path.join('pages', deletion.entry.value.id))
         }
 
         // Record the commit.
         await commit.write()
-
-        // Pretty sure that the separate prepare and commit are merely because
-        // we want to release the lock on the leaf as soon as possible.
         await Journalist.prepare(commit)
         await Journalist.commit(commit)
         await commit.dispose()
@@ -1513,14 +1507,11 @@ class Sheaf {
 
         // Delete any removed branches.
         for (const deletion in surgery.deletions) {
-            commit.unlink(path.join('pages', deletion.entry.value.id))
+            await commit.unlink(path.join('pages', deletion.entry.value.id))
         }
 
         // Record the commit.
         await commit.write()
-
-        // Pretty sure that the separate prepare and commit are merely because
-        // we want to release the lock on the leaf as soon as possible.
         await Journalist.prepare(commit)
         await Journalist.commit(commit)
         for (const block of blocks) {
