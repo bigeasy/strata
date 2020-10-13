@@ -21,7 +21,7 @@ Turnstile.Queue = require('turnstile/queue')
 Turnstile.Set = require('turnstile/set')
 
 // Journaled file system operations for tree rebalancing.
-const Commit = require('journalist')
+const Journalist = require('journalist')
 
 // A non-crypographic (fast) 32-bit hash for record integrity.
 const fnv = require('./fnv')
@@ -686,7 +686,7 @@ class Sheaf {
             const previous = path.join('pages', entry.value.id, entry.value.hash)
             commit.unlink(previous)
         }
-        const write = await commit.writeFile(({ hash }) => path.join('pages', entry.value.id, hash), buffer)
+        const write = await commit.writeFile(hash => path.join('pages', entry.value.id, hash), buffer)
         entry.value.hash = write.hash
     }
 
@@ -741,9 +741,7 @@ class Sheaf {
             await this._writeLeaf(leaf.entry.value.id, writes)
 
             // Create our journaled tree alterations.
-            const prepare = []
-            const commit = new Commit(this.directory, { prepare })
-
+            const commit = await Journalist.create(this.directory)
 
             // Create a stub that loads the existing page.
             const previous = leaf.entry.value.append
@@ -778,17 +776,16 @@ class Sheaf {
                 }]
             }]
 
-            await commit.write(prepare)
-            await commit.prepare()
-            await commit.commit()
+            await commit.write()
+            await Journalist.prepare(commit)
+            await Journalist.commit(commit)
             await commit.dispose()
         }) ()
 
         block.exit.resolve()
 
         await (async () => {
-            const prepare = []
-            const commit = new Commit(this.directory, { prepare })
+            const commit = await Journalist.create(this.directory)
 
             commit.unlink(path.join('pages', leaf.entry.value.id, first))
 
@@ -863,9 +860,9 @@ class Sheaf {
                 commit.unlink(path.join('pages', id, append))
             }
 
-            await commit.write(prepare)
-            await commit.prepare()
-            await commit.commit()
+            await commit.write()
+            await Journalist.prepare(commit)
+            await Journalist.commit(commit)
             await commit.dispose()
         }) ()
 
@@ -929,16 +926,15 @@ class Sheaf {
             key: right.value.items[0].key
         }]
         right.value.items[0].key = null
-        const prepare = []
-        const commit = new Commit(this.directory, { prepare })
+        const commit = await Journalist.create(this.directory)
         // Write the new branch to a temporary file.
         await this._writeBranch(commit, right)
         await this._writeBranch(commit, left)
         await this._writeBranch(commit, root.entry)
         // Record the commit.
-        await commit.write(prepare)
-        await commit.prepare()
-        await commit.commit()
+        await commit.write()
+        await Journalist.prepare(commit)
+        await Journalist.commit(commit)
         await commit.dispose()
         entries.forEach(entry => entry.release())
     }
@@ -970,16 +966,15 @@ class Sheaf {
         right.value.items[0].key = null
         branch.entry.value.items = branch.entry.value.items.splice(0, partition)
         parent.entry.value.items.splice(parent.index + 1, 0, { key: promotion, id: right.value.id })
-        const prepare = []
-        const commit = new Commit(this.directory, { prepare })
+        const commit = await Journalist.create(this.directory)
         // Write the new branch to a temporary file.
         await this._writeBranch(commit, right)
         await this._writeBranch(commit, branch.entry)
         await this._writeBranch(commit, parent.entry)
         // Record the commit.
-        await commit.write(prepare)
-        await commit.prepare()
-        await commit.commit()
+        await commit.write()
+        await Journalist.prepare(commit)
+        await Journalist.commit(commit)
         await commit.dispose()
         entries.forEach(entry => entry.release())
         await this._possibleSplit(parent.entry.value, key, parent.level)
@@ -1133,8 +1128,7 @@ class Sheaf {
         // TODO Make header a nested object.
 
         // Create our journaled tree alterations.
-        const prepare = []
-        const commit = new Commit(this.directory, { prepare })
+        const commit = await Journalist.create(this.directory)
 
         // Record the split of the right page in a new stub.
         this._stub(commit, right.value.id, right.value.append, [{
@@ -1186,21 +1180,21 @@ class Sheaf {
         child.entry.value.append = append
 
         // Commit the stubs before we commit the updated branch.
-        prepare.push({ method: 'commit' })
+        commit.partition()
 
         // Write the new branch to a temporary file.
         await this._writeBranch(commit, parent.entry)
 
         // Record the commit.
-        await commit.write(prepare)
+        await commit.write()
 
         // Pretty sure that the separate prepare and commit are merely because
         // we want to release the lock on the leaf as soon as possible.
-        await commit.prepare()
-        await commit.commit()
+        await Journalist.prepare(commit)
+        await Journalist.commit(commit)
         blocks.forEach(block => block.exit.resolve())
-        await commit.prepare()
-        await commit.commit()
+        await Journalist.prepare(commit)
+        await Journalist.commit(commit)
         await commit.dispose()
         // We can release and then perform the split because we're the only one
         // that will be changing the tree structure.
@@ -1285,22 +1279,18 @@ class Sheaf {
         root.entry.value.items = child.entry.value.items
 
         // Create our journaled tree alterations.
-        const prepare = []
-        const commit = new Commit(this.directory, { prepare })
+        const commit = await Journalist.create(this.directory)
 
         // Write the merged page.
         await this._writeBranch(commit, root.entry)
 
         // Delete the page merged into the merged page.
-        commit.unlink(path.join('pages', child.entry.value.id))
+        commit.rmdir(path.join('pages', child.entry.value.id))
 
         // Record the commit.
-        await commit.write(prepare)
-
-        // Pretty sure that the separate prepare and commit are merely because
-        // we want to release the lock on the leaf as soon as possible.
-        await commit.prepare()
-        await commit.commit()
+        await commit.write()
+        await Journalist.prepare(commit)
+        await Journalist.commit(commit)
         await commit.dispose()
 
         entries.forEach(entry => entry.release())
@@ -1347,14 +1337,13 @@ class Sheaf {
         }
 
         // Create our journaled tree alterations.
-        const prepare = []
-        const commit = new Commit(this.directory, { prepare })
+        const commit = await Journalist.create(this.directory)
 
         // Write the merged page.
         await this._writeBranch(commit, left.entry)
 
         // Delete the page merged into the merged page.
-        commit.unlink(path.join('pages', right.entry.value.id))
+        commit.rmdir(path.join('pages', right.entry.value.id))
 
         // If we replaced the key in the pivot, write the pivot.
         if (surgery.replacement != null) {
@@ -1370,12 +1359,12 @@ class Sheaf {
         }
 
         // Record the commit.
-        await commit.write(prepare)
+        await commit.write()
 
         // Pretty sure that the separate prepare and commit are merely because
         // we want to release the lock on the leaf as soon as possible.
-        await commit.prepare()
-        await commit.commit()
+        await Journalist.prepare(commit)
+        await Journalist.commit(commit)
         await commit.dispose()
 
         let leaf = left.entry
@@ -1480,8 +1469,7 @@ class Sheaf {
         await this._writeLeaf(right.entry.value.id, writes.right)
 
         // Create our journaled tree alterations.
-        const prepare = []
-        const commit = new Commit(this.directory, { prepare })
+        const commit = await Journalist.create(this.directory)
 
         // Record the split of the right page in a new stub.
         const append = this._filename()
@@ -1513,7 +1501,7 @@ class Sheaf {
         left.entry.value.append = append
 
         // Commit the stub before we commit the updated branch.
-        prepare.push({ method: 'commit' })
+        commit.partition()
 
         // If we replaced the key in the pivot, write the pivot.
         if (surgery.replacement != null) {
@@ -1529,17 +1517,17 @@ class Sheaf {
         }
 
         // Record the commit.
-        await commit.write(prepare)
+        await commit.write()
 
         // Pretty sure that the separate prepare and commit are merely because
         // we want to release the lock on the leaf as soon as possible.
-        await commit.prepare()
-        await commit.commit()
+        await Journalist.prepare(commit)
+        await Journalist.commit(commit)
         for (const block of blocks) {
             block.exit.resolve()
         }
-        await commit.prepare()
-        await commit.commit()
+        await Journalist.prepare(commit)
+        await Journalist.commit(commit)
         await commit.dispose()
 
         // We can release and then perform the split because we're the only one
@@ -1571,4 +1559,17 @@ class Sheaf {
     }
 }
 
+    async function list (directory) {
+        const listing = {}
+        for (const file of (await fs.readdir(directory))) {
+            const resolved = path.join(directory, file)
+            const stat = await fs.stat(resolved)
+            if (stat.isDirectory()) {
+                listing[file] = await list(resolved)
+            } else {
+                listing[file] = await fs.readFile(resolved, 'utf8')
+            }
+        }
+        return listing
+    }
 module.exports = Sheaf
