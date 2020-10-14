@@ -661,7 +661,7 @@ class Sheaf {
         return this._recorder(header, parts.length == 0 ? parts : this.serializer.parts.serialize(parts))
     }
 
-    async _stub (commit, id, append, records) {
+    _stub (commit, id, append, records) {
         const buffer = Buffer.concat(records.map(record => {
             if (Buffer.isBuffer(record)) {
                 return record
@@ -669,7 +669,7 @@ class Sheaf {
             return record.buffer ? record.buffer : this.serialize(record.header, record.parts)
         }))
         const filename = path.join('pages', id, append)
-        await commit.writeFile(filename, buffer)
+        return commit.writeFile(filename, buffer)
     }
 
     async _writeBranch (commit, entry) {
@@ -745,7 +745,7 @@ class Sheaf {
 
             // Create a stub that loads the existing page.
             const previous = leaf.entry.value.append
-            this._stub(commit, leaf.entry.value.id, first, [{
+            await this._stub(commit, leaf.entry.value.id, first, [{
                 header: {
                     method: 'load',
                     id: leaf.entry.value.id,
@@ -760,7 +760,7 @@ class Sheaf {
                 },
                 parts: []
             }])
-            this._stub(commit, leaf.entry.value.id, second, [{
+            await this._stub(commit, leaf.entry.value.id, second, [{
                 header: {
                     method: 'load',
                     id: leaf.entry.value.id,
@@ -1131,7 +1131,7 @@ class Sheaf {
         const commit = await Journalist.create(this.directory)
 
         // Record the split of the right page in a new stub.
-        this._stub(commit, right.value.id, right.value.append, [{
+        await this._stub(commit, right.value.id, right.value.append, [{
             header: {
                 method: 'load',
                 id: child.entry.value.id,
@@ -1157,7 +1157,7 @@ class Sheaf {
 
         // Record the split of the left page in a new stub, for which we create
         // a new append file.
-        this._stub(commit, child.entry.value.id, append, [{
+        await this._stub(commit, child.entry.value.id, append, [{
             header: {
                 method: 'load',
                 id: child.entry.value.id,
@@ -1467,7 +1467,7 @@ class Sheaf {
 
         // Record the split of the right page in a new stub.
         const append = this._filename()
-        this._stub(commit, left.entry.value.id, append, [{
+        await this._stub(commit, left.entry.value.id, append, [{
             header: {
                 method: 'load',
                 id: left.entry.value.id,
