@@ -147,8 +147,8 @@ class Sheaf {
         this.destroyed = false
         this._destructible = destructible
         this._leftovers = []
-        destructible.destruct(() => this.destroyed = true)
-        destructible.close(() => {
+        destructible.destruct(() => {
+            this.destroyed = true
             destructible.ephemeral('shutdown', async () => {
                 // Trying to figure out how to wait for the Turnstile to drain.
                 // We can't terminate the housekeeping turnstile then the
