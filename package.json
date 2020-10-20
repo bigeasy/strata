@@ -28,7 +28,7 @@
     "dependencies":
     {
                             "ascension":                    "^2.0.0",
-                            "destructible":                 "7.0.0-alpha.13",
+                            "destructible":                 "7.0.0-alpha.14",
                             "extant":                       "^1.0.11",
                             "hash.fnv":                     "^1.0.5",
                             "interrupt":                    "11.0.0-alpha.1",

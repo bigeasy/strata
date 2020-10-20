@@ -194,7 +194,7 @@ class Sheaf {
     }
 
     create () {
-        return this._destructible.ephemeral('create', this.__create(), true)
+        return this._destructible.exceptional('create', this.__create(), true)
     }
 
     async _open () {
@@ -212,7 +212,7 @@ class Sheaf {
     }
 
     open () {
-        return this._destructible.ephemeral('open', this._open(), true)
+        return this._destructible.exceptional('open', this._open(), true)
     }
 
     async _hashable (id) {
@@ -481,7 +481,7 @@ class Sheaf {
             const load = this.load(descent.miss)
             const entry = internal
                 ? await load
-                : await this._destructible.ephemeral('load', load, true)
+                : await this._destructible.exceptional('load', load, true)
             entries[0].push(entry)
         }
     }
