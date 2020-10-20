@@ -174,10 +174,10 @@ class Sheaf {
 
     async __create () {
         const directory = this.directory, stat = await fs.stat(directory)
-        Strata.Error.assert(stat.isDirectory(), 'create.not.directory', { directory })
+        Strata.Error.assert(stat.isDirectory(), 'CREATE_NOT_DIRECTORY', { directory })
         Strata.Error.assert((await fs.readdir(directory)).filter(file => {
             return ! /^\./.test(file)
-        }).length == 0, 'create.directory.not.empty', { directory })
+        }).length == 0, 'CREATE_NOT_EMPTY', { directory })
 
         this._root = this._create({ id: -1, leaf: false, items: [{ id: '0.0' }] })
 
@@ -322,7 +322,7 @@ class Sheaf {
         const player = new Player(function () { return '0' })
         const buffer = await fs.readFile(this._path('pages', id, hash))
         const actual = fnv(buffer)
-        Strata.Error.assert(actual == hash, 'bad branch hash', {
+        Strata.Error.assert(actual == hash, 'BRANCH_BAD_HASH', {
             id, actual, expected: hash
         })
         const items = []
@@ -828,7 +828,7 @@ class Sheaf {
                     try {
                         await fs.stat(this._path('pages', id, append))
                     } catch (error) {
-                        Strata.Error.assert(error.code == 'ENOENT', 'vacuum.not.enoent', error, { id, append })
+                        Strata.Error.assert(error.code == 'ENOENT', 'VACUUM_FILE_IO', error, { id, append })
                         deleted[dependent] = true
                     }
                 }

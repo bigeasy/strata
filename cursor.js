@@ -1,6 +1,5 @@
 const assert = require('assert')
 
-const Strata = { Error: require('./error') }
 const find = require('./find')
 
 class Cursor {

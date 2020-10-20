@@ -31,7 +31,7 @@
                             "destructible":                 "7.0.0-alpha.12",
                             "extant":                       "^1.0.11",
                             "hash.fnv":                     "^1.0.5",
-                            "interrupt":                    "^10.0.3",
+                            "interrupt":                    "11.0.0-alpha.1",
                             "journalist":                   "0.1.6",
                             "prospective":                  "^0.3.0",
                             "rescue":                       "7.0.0-alpha.1",
