@@ -571,7 +571,7 @@ class Sheaf {
 
     //
     async _append ({ body: { id } }) {
-        this._destructible.working()
+        this._destructible.progress()
         // TODO Doesn't `await null` do the same thing now? And why do I want to
         // do this anyway? It's silly.
         await callback((callback) => process.nextTick(callback))
@@ -1530,7 +1530,7 @@ class Sheaf {
 
     // TODO Must wait for housekeeping to finish before closing.
     async _housekeeper ({ vargs: [ key ] }) {
-        this._destructible.working()
+        this._destructible.progress()
         const entries = []
         const child = await this.descend({ key }, entries)
         if (child.entry.value.items.length >= this.leaf.split) {
