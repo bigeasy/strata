@@ -490,11 +490,11 @@ class Sheaf {
         const entries = []
         const descent = this._descend(entries, query)
         if (descent.miss) {
-            trampoline.push((async () => {
+            trampoline.promised(async () => {
                 entries.push(await this.load(descent.miss))
                 this.descend2(trampoline, query, found)
                 entries.forEach(entry => entry.release())
-            }) ())
+            })
         } else {
             if (descent != null) {
                 descent.entry = entries.pop()
