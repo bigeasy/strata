@@ -172,47 +172,43 @@ class Sheaf {
         })
     }
 
-    async __create () {
-        const directory = this.directory, stat = await fs.stat(directory)
-        Strata.Error.assert(stat.isDirectory(), 'CREATE_NOT_DIRECTORY', { directory })
-        Strata.Error.assert((await fs.readdir(directory)).filter(file => {
-            return ! /^\./.test(file)
-        }).length == 0, 'CREATE_NOT_EMPTY', { directory })
-
-        this._root = this._create({ id: -1, leaf: false, items: [{ id: '0.0' }] })
-
-        await fs.mkdir(this._path('instances', '0'), { recursive: true })
-        await fs.mkdir(this._path('pages', '0.0'), { recursive: true })
-        const buffer = this._recorder.call(null, { id: '0.1' }, [])
-        const hash = fnv(buffer)
-        await fs.writeFile(this._path('pages', '0.0', hash), buffer)
-        await fs.mkdir(this._path('pages', '0.1'), { recursive: true })
-        await fs.writeFile(this._path('pages', '0.1', '0.0'), Buffer.alloc(0))
-        this._id++
-        this._id++
-        this._id++
-    }
-
     create () {
-        return this._destructible.exceptional('create', this.__create(), true)
-    }
+        return this._destructible.exceptional('create', async () => {
+            const directory = this.directory, stat = await fs.stat(directory)
+            Strata.Error.assert(stat.isDirectory(), 'CREATE_NOT_DIRECTORY', { directory })
+            Strata.Error.assert((await fs.readdir(directory)).filter(file => {
+                return ! /^\./.test(file)
+            }).length == 0, 'CREATE_NOT_EMPTY', { directory })
 
-    async _open () {
-        // TODO Run commit log on reopen.
-        this._root = this._create({ id: -1, items: [{ id: '0.0' }] })
-        const instances = (await fs.readdir(this._path('instances')))
-            .filter(file => /^\d+$/.test(file))
-            .map(file => +file)
-            .sort((left, right) => right - left)
-        this.instance = instances[0] + 1
-        await fs.mkdir(this._path('instances', this.instance))
-        for (const instance of instances) {
-            await fs.rmdir(this._path('instances', instance))
-        }
+            this._root = this._create({ id: -1, leaf: false, items: [{ id: '0.0' }] })
+
+            await fs.mkdir(this._path('instances', '0'), { recursive: true })
+            await fs.mkdir(this._path('pages', '0.0'), { recursive: true })
+            const buffer = this._recorder.call(null, { id: '0.1' }, [])
+            const hash = fnv(buffer)
+            await fs.writeFile(this._path('pages', '0.0', hash), buffer)
+            await fs.mkdir(this._path('pages', '0.1'), { recursive: true })
+            await fs.writeFile(this._path('pages', '0.1', '0.0'), Buffer.alloc(0))
+            this._id++
+            this._id++
+            this._id++
+        })
     }
 
     open () {
-        return this._destructible.exceptional('open', this._open(), true)
+        return this._destructible.exceptional('open', async () => {
+            // TODO Run commit log on reopen.
+            this._root = this._create({ id: -1, items: [{ id: '0.0' }] })
+            const instances = (await fs.readdir(this._path('instances')))
+                .filter(file => /^\d+$/.test(file))
+                .map(file => +file)
+                .sort((left, right) => right - left)
+            this.instance = instances[0] + 1
+            await fs.mkdir(this._path('instances', this.instance))
+            for (const instance of instances) {
+                await fs.rmdir(this._path('instances', instance))
+            }
+        })
     }
 
     async _hashable (id) {
