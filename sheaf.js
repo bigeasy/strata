@@ -335,12 +335,17 @@ class Sheaf {
 
     async load (id) {
         const entry = this._hold(id)
-        if (entry.value == null) {
-            const { page, heft } = await this.read(id)
-            entry.value = page
-            entry.heft = heft
+        try {
+            if (entry.value == null) {
+                const { page, heft } = await this.read(id)
+                entry.value = page
+                entry.heft = heft
+            }
+            return entry
+        } catch (error) {
+            entry.remove()
+            throw error
         }
-        return entry
     }
 
     _create (page) {
@@ -484,19 +489,27 @@ class Sheaf {
 
     descend2 (trampoline, query, found) {
         const entries = []
-        const descent = this._descend(entries, query)
-        if (descent.miss) {
-            trampoline.promised(async () => {
-                entries.push(await this.load(descent.miss))
-                this.descend2(trampoline, query, found)
+        try {
+            const descent = this._descend(entries, query)
+            if (descent.miss) {
+                trampoline.promised(async () => {
+                    try {
+                        entries.push(await this.load(descent.miss))
+                        this.descend2(trampoline, query, found)
+                    } finally {
+                        entries.forEach(entry => entry.release())
+                    }
+                })
+            } else {
+                if (descent != null) {
+                    descent.entry = entries.pop()
+                }
                 entries.forEach(entry => entry.release())
-            })
-        } else {
-            if (descent != null) {
-                descent.entry = entries.pop()
+                found(descent)
             }
+        } catch (error) {
             entries.forEach(entry => entry.release())
-            found(descent)
+            throw error
         }
     }
 
