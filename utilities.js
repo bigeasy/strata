@@ -1,5 +1,4 @@
 const path = require('path')
-const callback = require('prospective/callback')
 const ascension = require('ascension')
 const fileSystem = require('fs')
 const fs = require('fs').promises
