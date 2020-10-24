@@ -7,8 +7,6 @@ const path = require('path')
 const fileSystem = require('fs')
 const fs = require('fs').promises
 
-const callback = require('prospective/callback')
-
 // Return the first non null-like value.
 const coalesce = require('extant')
 
@@ -583,7 +581,6 @@ class Sheaf {
         this._destructible.progress()
         // TODO Doesn't `await null` do the same thing now? And why do I want to
         // do this anyway? It's silly.
-        await callback((callback) => process.nextTick(callback))
         const queue = this._queues[id]
         // Block before deleting the queue or else a cursor append will create a
         // new queue entry, with a new lock, and it will sneak through the
