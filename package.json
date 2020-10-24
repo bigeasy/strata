@@ -1,6 +1,6 @@
 {
     "name":                 "b-tree",
-    "version":              "2.0.0-alpha.58",
+    "version":              "2.0.0-alpha.59",
     "description":
 
       "Async/Await I/O B-tree in pure JavaScript for Node.js.",
@@ -34,8 +34,8 @@
                             "interrupt":                    "11.0.0-alpha.1",
                             "journalist":                   "0.1.7",
                             "prospective":                  "^0.3.0",
-                            "rescue":                       "7.0.0-alpha.1",
                             "reciprocate":                  "0.0.0",
+                            "rescue":                       "7.0.0-alpha.1",
                             "turnstile":                    "6.0.0-alpha.25"
     },
     "devDependencies":
