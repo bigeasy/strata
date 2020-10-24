@@ -1,7 +1,7 @@
 require('proof')(2, async (okay) => {
     const path = require('path')
 
-    const Trampoline = require('skip')
+    const Trampoline = require('reciprocate')
     const Destructible = require('destructible')
 
     const Strata = require('../strata')

@@ -23,7 +23,7 @@ require('proof')(12, async okay => {
     const directory = path.join(utilities.directory, 'split')
     await utilities.reset(directory)
 
-    const Trampoline = require('skip')
+    const Trampoline = require('reciprocate')
     const Destructible = require('destructible')
 
     const Strata = require('..')

@@ -1,5 +1,5 @@
 require('proof')(3, async (okay) => {
-    const Trampoline = require('skip')
+    const Trampoline = require('reciprocate')
     const Destructible = require('destructible')
 
     const Strata = require('../strata')
