@@ -417,7 +417,7 @@ class Sheaf {
             const index = rightward
                 ? entry.value.leaf ? ~(entry.value.items.length - 1) : entry.value.items.length - 1
                 : key != null
-                    ? find(this.comparator.leaf, entry.value, key, offset)
+                    ? find(this.comparator.leaf, entry.value.items, key, offset)
                     : entry.value.leaf ? ~0 : 0
 
             // If the page is a leaf, assert that we're looking for a leaf and
