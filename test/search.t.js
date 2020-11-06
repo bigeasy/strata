@@ -28,8 +28,7 @@ require('proof')(11, async (okay) => {
     {
         const destructible = new Destructible('search.t')
         const cache = new Cache
-        const strata = new Strata(destructible, { directory, cache })
-        await strata.open()
+        const strata = await Strata.open(destructible, { directory, cache })
         {
             const trampoline = new Trampoline
             strata.search(trampoline, Strata.MIN, false, cursor => {

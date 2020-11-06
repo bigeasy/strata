@@ -50,8 +50,7 @@ require('proof')(3, async (okay) => {
     // Merge
     {
         const cache = new Cache
-        const strata = new Strata(new Destructible('merge'), { directory, cache })
-        await strata.open()
+        const strata = await Strata.open(new Destructible('merge'), { directory, cache })
         // TODO Come back and insert an error into `remove`. Then attempt to
         // resolve that error somehow into `flush`. Implies that Turnstile
         // propagates an error. Essentially, how do you get the foreground
@@ -75,8 +74,7 @@ require('proof')(3, async (okay) => {
     // Reopen.
     {
         const cache = new Cache
-        const strata = new Strata(new Destructible('reopen'), { directory, cache })
-        await strata.open()
+        const strata = await Strata.open(new Destructible('reopen'), { directory, cache })
         const trampoline = new Trampoline
         strata.search(trampoline, 'c', cursor => {
             okay(cursor.page.items[cursor.index].parts[0], 'c', 'found')
@@ -89,8 +87,7 @@ require('proof')(3, async (okay) => {
     // Traverse.
     {
         const cache = new Cache
-        const strata = new Strata(new Destructible('traverse'), { directory, cache })
-        await strata.open()
+        const strata = await Strata.open(new Destructible('traverse'), { directory, cache })
         let right = 'a'
         const items = [], trampoline = new Trampoline
         do {

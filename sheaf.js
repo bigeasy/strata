@@ -170,7 +170,7 @@ class Sheaf {
         })
     }
 
-    create () {
+    create (strata) {
         return this._destructible.exceptional('create', async () => {
             const directory = this.directory, stat = await fs.stat(directory)
             Strata.Error.assert(stat.isDirectory(), 'CREATE_NOT_DIRECTORY', { directory })
@@ -190,10 +190,11 @@ class Sheaf {
             this._id++
             this._id++
             this._id++
+            return strata
         })
     }
 
-    open () {
+    open (strata) {
         return this._destructible.exceptional('open', async () => {
             // TODO Run commit log on reopen.
             this._root = this._create({ id: -1, items: [{ id: '0.0' }] })
@@ -206,6 +207,7 @@ class Sheaf {
             for (const instance of instances) {
                 await fs.rmdir(this._path('instances', instance))
             }
+            return strata
         })
     }
 

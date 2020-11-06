@@ -38,11 +38,10 @@ require('proof')(12, async okay => {
 
     {
         const cache = new Cache
-        const strata = new Strata(new Destructible('partition.t'), {
-            directory, cache, comparator
+        const strata = await Strata.open(new Destructible('partition.t'), {
+            directory, cache, comparator, create: true
         })
         await Destructible.rescue(async function () {
-            await strata.create()
             const writes = {}
             const trampoline = new Trampoline
             strata.search(trampoline, { value: 'a', index: 0 }, cursor => {
@@ -64,11 +63,10 @@ require('proof')(12, async okay => {
 
     {
         const cache = new Cache
-        const strata = new Strata(new Destructible('partition.t'), {
+        const strata = await Strata.open(new Destructible('partition.t'), {
             directory, cache, comparator
         })
         await Destructible.rescue(async function () {
-            await strata.open()
             const writes = {}
             const trampoline = new Trampoline
             strata.search(trampoline, { value: 'a', index: 0 }, cursor => {
@@ -89,11 +87,10 @@ require('proof')(12, async okay => {
 
     {
         const cache = new Cache
-        const strata = new Strata(new Destructible('partition.t'), {
+        const strata = await Strata.open(new Destructible('partition.t'), {
             directory, cache, comparator
         })
         await Destructible.rescue(async function () {
-            await strata.open()
             const trampoline = new Trampoline
             strata.search(trampoline, { value: 'a', index: 0 }, cursor => {
                 okay(cursor.page.items.length, 10, 'split')

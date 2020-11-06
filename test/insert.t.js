@@ -13,9 +13,7 @@ require('proof')(2, async (okay) => {
     await utilities.reset(directory)
 
     const cache = new Cache
-    const strata = new Strata(new Destructible('strata'), { directory, cache })
-
-    await strata.create()
+    const strata = await Strata.open(new Destructible('strata'), { directory, cache, create: true })
 
     const writes = {}
 

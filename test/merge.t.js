@@ -30,8 +30,7 @@ require('proof')(3, async (okay) => {
     // Merge.
     {
         const cache = new Cache
-        const strata = new Strata(new Destructible('merge'), { directory, cache })
-        await strata.open()
+        const strata = await Strata.open(new Destructible('merge'), { directory, cache })
         const writes = {}
         const trampoline = new Trampoline
         strata.search(trampoline, 'e', cursor => {
@@ -54,8 +53,7 @@ require('proof')(3, async (okay) => {
     // Reopen.
     {
         const cache = new Cache
-        const strata = new Strata(new Destructible('reopen'), { directory, cache })
-        await strata.open()
+        const strata = await Strata.open(new Destructible('reopen'), { directory, cache })
         const trampoline = new Trampoline
         strata.search(trampoline, 'd', cursor => {
             console.log(cursor.index, cursor.page.id, cursor.page.items)
@@ -69,8 +67,7 @@ require('proof')(3, async (okay) => {
     // Traverse.
     {
         const cache = new Cache
-        const strata = new Strata(new Destructible('traverse'), { directory, cache })
-        await strata.open()
+        const strata = await Strata.open(new Destructible('traverse'), { directory, cache })
         let right = 'a'
         const items = []
         do {

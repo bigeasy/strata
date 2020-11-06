@@ -24,8 +24,7 @@ require('proof')(2, async (okay) => {
     {
         const destructible = new Destructible([ 'split.t', 'forward' ])
         const cache = new Cache
-        const strata = new Strata(destructible, { directory, cache })
-        await strata.open()
+        const strata = await Strata.open(destructible, { directory, cache })
         let right = Strata.MIN
         const items = []
         do {
@@ -46,8 +45,7 @@ require('proof')(2, async (okay) => {
     {
         const destructible = new Destructible([ 'split.t', 'reverse' ])
         const cache = new Cache
-        const strata = new Strata(destructible, { directory, cache })
-        await strata.open()
+        const strata = await Strata.open(destructible, { directory, cache })
         let left = Strata.MAX, fork = false, cursor, id
         const items = []
         do {

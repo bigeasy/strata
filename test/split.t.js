@@ -27,8 +27,7 @@ require('proof')(5, async (okay) => {
     {
         const destructible = new Destructible([ 'split.t', 'split' ])
         const cache = new Cache
-        const strata = new Strata(destructible, { directory, cache })
-        await strata.open()
+        const strata = await Strata.open(destructible, { directory, cache })
         const writes = {}
         const trampoline = new Trampoline
         strata.search(trampoline, 'f', cursor => {
@@ -45,9 +44,8 @@ require('proof')(5, async (okay) => {
     {
         const destructible = new Destructible([ 'split.t', 'reopen' ])
         const cache = new Cache
-        const strata = new Strata(destructible, { directory, cache })
+        const strata = await Strata.open(destructible, { directory, cache })
         await Destructible.rescue(async function () {
-            await strata.open()
             const trampoline = new Trampoline
             strata.search(trampoline, 'f', cursor => {
                 okay(cursor.page.items[cursor.index].parts[0], 'f', 'found')
@@ -61,8 +59,7 @@ require('proof')(5, async (okay) => {
     {
         const destructible = new Destructible([ 'split.t', 'traverse' ])
         const cache = new Cache
-        const strata = new Strata(destructible, { directory, cache })
-        await strata.open()
+        const strata = await Strata.open(destructible, { directory, cache })
         let right = 'a'
         const items = []
         do {
@@ -83,8 +80,7 @@ require('proof')(5, async (okay) => {
     {
         const destructible = new Destructible([ 'split.t', 'forward' ])
         const cache = new Cache
-        const strata = new Strata(destructible, { directory, cache })
-        await strata.open()
+        const strata = await Strata.open(destructible, { directory, cache })
         let right = Strata.MIN
         const items = []
         do {
@@ -105,8 +101,7 @@ require('proof')(5, async (okay) => {
    {
         const destructible = new Destructible([ 'split.t', 'forward' ])
         const cache = new Cache
-        const strata = new Strata(destructible, { directory, cache })
-        await strata.open()
+        const strata = await Strata.open(destructible, { directory, cache })
         let left = Strata.MAX, fork = false, cursor, id
         const items = []
         do {

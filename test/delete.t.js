@@ -19,8 +19,7 @@ require('proof')(3, async (okay) => {
     })
     {
         const cache = new Cache
-        const strata = new Strata(new Destructible('delete.t/purge'), { directory, cache })
-        await strata.open()
+        const strata = await Strata.open(new Destructible('delete.t/purge'), { directory, cache })
         const writes = {}
         const trampoline = new Trampoline
         strata.search(trampoline, 'a', cursor => cursor.remove(cursor.index, writes))
@@ -45,8 +44,7 @@ require('proof')(3, async (okay) => {
     }
     {
         const cache = new Cache
-        const strata = new Strata(new Destructible('delete.t/traverse'), { directory, cache })
-        await strata.open()
+        const strata = await Strata.open(new Destructible('delete.t/traverse'), { directory, cache })
         let right = 'a'
         const items = []
         do {

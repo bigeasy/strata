@@ -14,8 +14,7 @@ require('proof')(3, async (okay) => {
     await fs.mkdir(path.join(directory, 'instances', '1'))
     await fs.writeFile(path.join(directory, '.ignore'), Buffer.alloc(0))
     const cache = new Cache
-    const strata = new Strata(new Destructible('Strata'), { directory, cache })
-    await strata.open()
+    const strata = await Strata.open(new Destructible('Strata'), { directory, cache })
     const instances = await fs.readdir(path.join(directory, 'instances'))
     okay(instances, [ '2' ], 'instance')
     okay(cache.entries, 1, 'cache empty')

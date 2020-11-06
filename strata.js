@@ -15,12 +15,9 @@ class Strata {
         this.extract = function (parts) { return extractor(parts) }
     }
 
-    create () {
-        return this._sheaf.create()
-    }
-
-    open () {
-        return this._sheaf.open()
+    static open (destructible, options) {
+        const strata = new Strata(destructible, options)
+        return options.create ? strata._sheaf.create(strata) : strata._sheaf.open(strata)
     }
 
     // What was the lock for? It was to ensure that another strand doesn't
