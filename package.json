@@ -27,13 +27,14 @@
     },
     "dependencies":
     {
-                            "ascension":                    "^2.0.0",
+                            "ascension":                    "^3.0.0-alpha.0",
                             "extant":                       "^1.0.11",
                             "hash.fnv":                     "^1.0.5",
                             "interrupt":                    "11.0.0-alpha.1",
                             "journalist":                   "0.1.7",
                             "prospective":                  "^0.3.0",
-                            "turnstile":                    "6.0.0-alpha.25"
+                            "turnstile":                    "6.0.0-alpha.25",
+                            "whittle":                      "0.0.0"
     },
     "devDependencies":
     {

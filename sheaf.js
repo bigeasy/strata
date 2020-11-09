@@ -1,5 +1,7 @@
 // Sort function generator.
 const ascension = require('ascension')
+// Comparator decorator that extracts the sorted fields from an object.
+const whittle = require('whittle')
 
 // Node.js API.
 const assert = require('assert')
@@ -120,7 +122,7 @@ class Sheaf {
         this.comparator = function () {
             const zero = object => object
             if (options.comparator == null) {
-                const comparator = ascension([ String ], value => [ value ])
+                const comparator = whittle(ascension([ String ]), value => [ value ])
                 return { leaf: comparator, branch: comparator, zero }
             } else if (typeof options.comparator == 'function') {
                 return { leaf: options.comparator, branch: options.comparator, zero }

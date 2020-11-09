@@ -30,10 +30,11 @@ require('proof')(12, async okay => {
     const Cache = require('../cache')
 
     const ascension = require('ascension')
+    const whittle = require('whittle')
     const comparator = {
         zero: object => { return { value: object.value, index: 0 } },
-        leaf: ascension([ String, Number ], object => [ object.value, object.index ]),
-        branch: ascension([ String ], object => [ object.value ])
+        leaf: whittle(ascension([ String, Number ]), object => [ object.value, object.index ]),
+        branch: whittle(ascension([ String ]), object => [ object.value ])
     }
 
     {

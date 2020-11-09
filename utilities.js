@@ -1,5 +1,4 @@
 const path = require('path')
-const ascension = require('ascension')
 const fileSystem = require('fs')
 const fs = require('fs').promises
 const shifter = require('./shifter')(() => '0')
