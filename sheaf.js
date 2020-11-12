@@ -335,19 +335,19 @@ class Sheaf {
         return { page: { id, leaf, items, hash }, heft: buffer.length }
     }
 
+    // We load the page then check for a race after we've loaded. If a different
+    // strand beat us to it, we just ignore the result of our read and return
+    // the cached entry.
+
+    //
     async load (id) {
+        const { page, heft } = await this.read(id)
         const entry = this._hold(id)
-        try {
-            if (entry.value == null) {
-                const { page, heft } = await this.read(id)
-                entry.value = page
-                entry.heft = heft
-            }
-            return entry
-        } catch (error) {
-            entry.remove()
-            throw error
+        if (entry.value == null) {
+            entry.value = page
+            entry.heft = heft
         }
+        return entry
     }
 
     _create (page) {
