@@ -1217,6 +1217,27 @@ class Sheaf {
         await this._vacuum(right.value.key)
     }
 
+
+    // **TODO** Something is wrong here. We're using `child.right` to find the a
+    // right branch page but the leaf and and it's right sibling can always be
+    // under the same branch. How do we really go right?
+    //
+    // **TODO** The above is a major problem. This is super broken. We may end
+    // up merging a page into nothing.
+    //
+    // **TODO** Regarding the above. Stop and think about it and you can see
+    // that you can always pick up the right key of the page at a particular
+    // level as you descend the tree. On the way down, update a right variable
+    // with the id of the page for the node to the right of the node you
+    // followed if one exists. If the page you followed is at the end of the
+    // array do not update it. Wait... Is that what `child.right` is here? Heh.
+    // It might well be. I see am tracking right as I descend.
+    //
+    // **TODO** LOL at all that above and if you're smarter when you wrote the
+    // code than when you wrote these comments, rewrite all this into a
+    // description so you don't do this again.
+
+    //
     async _selectMerger (key, child, entries) {
         const level = child.entry.value.leaf ? -1 : child.level
         const left = await this.descend({ key, level, fork: true }, entries)
