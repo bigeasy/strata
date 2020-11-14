@@ -667,7 +667,7 @@ class Sheaf {
         return `${this.instance}.${this._id++}`
     }
 
-    serialize (header, parts) {
+    _serialize (header, parts) {
         return this._recorder(header, parts.length == 0 ? parts : this.serializer.parts.serialize(parts))
     }
 
@@ -676,7 +676,7 @@ class Sheaf {
             if (Buffer.isBuffer(record)) {
                 return record
             }
-            return record.buffer ? record.buffer : this.serialize(record.header, record.parts)
+            return record.buffer ? record.buffer : this._serialize(record.header, record.parts)
         }))
         const filename = path.join('pages', id, append)
         return commit.writeFile(filename, buffer)
@@ -1112,7 +1112,7 @@ class Sheaf {
             parts: []
         }]
         const writes = this._queue(child.entry.value.id).writes.splice(0)
-        writes.push.apply(writes, dependents.map(write => this.serialize(write.header, [])))
+        writes.push.apply(writes, dependents.map(write => this._serialize(write.header, [])))
         await this._writeLeaf(child.entry.value.id, writes)
 
         // TODO We adjust heft now that we've written out all the relevant
@@ -1462,7 +1462,7 @@ class Sheaf {
         const writes = {
             left: this._queue(left.entry.value.id).writes.splice(0),
             right: this._queue(right.entry.value.id).writes.splice(0).concat(
-                this.serialize({
+                this._serialize({
                     method: 'dependent',
                     id: left.entry.value.id,
                     append: left.entry.value.append

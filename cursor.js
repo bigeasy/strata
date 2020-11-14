@@ -47,6 +47,21 @@ class Cursor {
             : { index: null, found: false }
     }
 
+    // A way to get a heft prior to insert, but we won't know the index. We
+    // could get a partial heft, though, just the heft of the parts. Does this
+    // do any good, though? In Memento we add a part ourselves, and it changes
+    // when we insert into the tree. Maybe we somehow pre-serialize then insert
+    // into the tree a buffer and the tree doesn't do serialization? But in
+    // Strata we need to serialize when we balance, so we can't have
+    // deserialization that doesn't match serialization, not unless we specify
+    // separate serializers for insert and rewrite. Oh, and `insert` does need
+    // both the serialized and deserialized parts anyway.
+
+    //
+    serialize (parts) {
+        return this._sheaf.serializer.parts.serialize(parts)
+    }
+
     // Insert a record into the b-tree. Parts is an array of objects in their
     // deserialized form that will be serialized using the parts serializer. The
     // key for the record will be obtained using the key extractor.
@@ -57,9 +72,9 @@ class Cursor {
     // `null`.
 
     //
-    insert (index, key, parts, writes) {
+    insert (index, key, parts, writes, buffers = this.serialize(parts)) {
         const header = { method: 'insert', index: index }
-        const buffer = this._sheaf.serialize(header, parts)
+        const buffer = this._sheaf._recorder(header, buffers)
         const record = { key: key, parts: parts, heft: buffer.length }
 
         this._entry.heft += record.heft
@@ -73,7 +88,7 @@ class Cursor {
 
     remove (index, writes) {
         const header = { method: 'delete', index: index }
-        const buffer = this._sheaf.serialize(header, [])
+        const buffer = this._sheaf._recorder(header, [])
 
         this._sheaf.append(this.page.id, buffer, writes)
 
