@@ -1,3 +1,64 @@
+## Sat Nov 21 15:46:29 CST 2020
+
+Some thoughts on counted and merkelized trees.
+
+Learning from r-tree that pages can be treated as logs. For the r-tree every
+insert into a leaf requires updating the bounding boxes of branches, so I'm
+getting into the swing updating across leaf and branch files.
+
+Which suggests that for the r-tree we may as well have counted branches if every
+insert is likely to write to every page in the page. It's not entirely likely.
+If you add Seattle, WA and Miami, FL, there are great many US cities you could
+add that would fit within the bounds of the box that contains both of those
+cities, but if you're adding cities strictly East to West, you are likely
+growing the boundry box frequently.
+
+What occurs to me is that the root would get written to in every write, and it
+further occurs to me that you could overcome this problem by maintaining a
+maximum depth of counted pages. That is only the bottom two branches of the tree
+are counted, or only half the depth of the tree is counted, or some such.
+
+What you get for this is faster inserts and localized counts. You would get
+faster count reads because instead of reading the page into memory, you would
+read just the count log into memory. We would have to have a separate count
+cache aside from the page cache.
+
+And then we could have count logs. Separate logs for each page so that we could
+add this feature without having to alter this current implementation of the
+b-tree.
+
+As far as merkelization goes, I'm imagining that we can have an append order for
+each page. After loading a page we sort by the append order. We calculate the
+hash for the page. Then we sort by the record keys again. Seems that we could
+also limit this by depth. It gets fuzzy when I think about maintaining an
+external log, though. Suppose the next step in loading a page is to load the
+merkel log (I'm making up terms here, sorry) and check that hash matches.
+
+I'd considered this at some point and realized that migrating these trees would
+not be done by inserting items according to their insert order explicitly, not
+by adding them...
+
+Ugh, no. It's always got to be a hash of the entire page, doesn't it? Because
+removes are also appended, so we'd have to delay vacuum...
+
+Or does that matter? Hash what's in the log. Seems like if we're mirroring a
+tree, so long as the tree doesn't change...
+
+Oh, right they change. How do we mirror a live tree? Starts to seem like
+something we do in Memento with a Snapshot iterator.
+
+Also, how do we do versioned counts? Ouch.
+
+Oh, yeah. Our primary tree in Amalgamate can be counted and possibly save us
+some trouble, while the merge tables would have to be traversed. Wait, you would
+have removes and you'd have to check to see if they actually exist in the
+primary tree to determine if they actually decrement the count, so you may end
+up loading a bunch of pages anyway.
+
+ * [Choosing a hash function for best performance](https://stackoverflow.com/questions/10070293/choosing-a-hash-function-for-best-performance).
+
+Enough of this for now.
+
 ## Sun Sep 20 20:45:19 CDT 2020
 
 Occurs to me that an easy way to do counts or hashes is to just have an
