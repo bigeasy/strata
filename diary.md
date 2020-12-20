@@ -1,3 +1,7 @@
+## Sat Nov 21 17:15:15 CST 2020
+
+Before this is over, I'm going to want some way to share turnstiles.
+
 ## Sat Nov 21 15:46:29 CST 2020
 
 Some thoughts on counted and merkelized trees.

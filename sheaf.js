@@ -595,7 +595,11 @@ class Sheaf {
         }
         queue.block = null
         // TODO Okay, we release here, so what prevents another turnstile from
-        // starting with another call to `_queue`?
+        // starting with another call to `_queue`? Answer, the cursor append is
+        // appending to our current queue entry, which is why we have the while
+        // loop. While we where writing more appends could have been added to
+        // queue entry.
+        //
         // We flush a page's writes before we merge it into its left sibling so
         // there will always a queue entry for a page that has been merged. It
         // will never have any writes so we can skip writing and thereby avoid
