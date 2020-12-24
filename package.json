@@ -30,15 +30,16 @@
                             "ascension":                    "^3.0.0-alpha.0",
                             "extant":                       "^1.0.11",
                             "hash.fnv":                     "^1.0.5",
-                            "interrupt":                    "11.0.0-alpha.11",
-                            "journalist":                   "0.1.10",
+                            "fracture":                     "0.3.0-alpha.19",
+                            "interrupt":                    "11.0.0-alpha.13",
+                            "journalist":                   "0.1.11",
                             "prospective":                  "^0.3.0",
-                            "turnstile":                    "6.0.0-alpha.25",
+                            "turnstile":                    "6.0.0-alpha.39",
                             "whittle":                      "0.0.0"
     },
     "devDependencies":
     {
-                            "destructible":                 "7.0.0-alpha.14",
+                            "destructible":                 "7.0.0-alpha.25",
                             "proof":                        "^9.0.2",
                             "reciprocate":                  "0.0.3"
     },

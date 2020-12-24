@@ -1,6 +1,7 @@
 require('proof')(2, async (okay) => {
     const path = require('path')
 
+    const Turnstile = require('turnstile')
     const Trampoline = require('reciprocate')
     const Destructible = require('destructible')
 
@@ -13,21 +14,29 @@ require('proof')(2, async (okay) => {
     await utilities.reset(directory)
 
     const cache = new Cache
-    const strata = await Strata.open(new Destructible('strata'), { directory, cache, create: true })
 
-    const writes = {}
+    const destructible = new Destructible($ => $(), 5000, 'insert.t')
+    const turnstile = new Turnstile(destructible.durable('turnstile'))
+    destructible.rescue($ => $(), 'test', async () => {
+        const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { turnstile, directory, cache, create: true })
 
-    const trampoline = new Trampoline
-    strata.search(trampoline, 'a', cursor => {
-        cursor.insert(cursor.index, 'a', [ 'a' ], writes)
-        cursor.insert(cursor.indexOf('b', cursor.index).index, 'B', [ 'b' ], writes)
+        const writes = {}
+
+        const trampoline = new Trampoline
+        strata.search(trampoline, 'a', cursor => {
+            cursor.insert(cursor.index, 'a', [ 'a' ], writes)
+            cursor.insert(cursor.indexOf('b', cursor.index).index, 'B', [ 'b' ], writes)
+        })
+        while (trampoline.seek()) {
+            await trampoline.shift()
+        }
+
+        await Strata.flush(writes)
+
+        destructible.destroy()
     })
-    while (trampoline.seek()) {
-        await trampoline.shift()
-    }
 
-    await Strata.flush(writes)
-    await strata.destructible.destroy().rejected
+    await destructible.rejected
 
     cache.purge(0)
 

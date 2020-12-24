@@ -6,6 +6,7 @@
 require('proof')(1, async (okay) => {
     const Trampoline = require('reciprocate')
     const Destructible = require('destructible')
+    const Turnstile = require('turnstile')
 
     const Strata = require('../strata')
     const Cache = require('../cache')
@@ -20,24 +21,29 @@ require('proof')(1, async (okay) => {
     })
 
     {
-        const destructible = new Destructible([ 'load.t' ])
-        const strata = await Strata.open(destructible, { directory, cache: new Cache })
-        const items = []
-        const trampoline = new Trampoline
-        strata.search(trampoline, 'e', cursor => {
-            cursor.insert(cursor.index, 'e', [ 'e' ], {})
+        const destructible = new Destructible('housekeeping.t')
+        const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
+        const cache = new Cache
+        destructible.rescue($ => $(), 'test', async () => {
+            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, cache, turnstile  })
+            const items = []
+            const trampoline = new Trampoline
+            strata.search(trampoline, 'e', cursor => {
+                cursor.insert(cursor.index, 'e', [ 'e' ], {})
+            })
+            while (trampoline.seek()) {
+                await trampoline.shift()
+            }
+            await null
+            strata.search(trampoline, 'e', cursor => {
+                cursor.remove(cursor.index, {})
+            })
+            while (trampoline.seek()) {
+                await trampoline.shift()
+            }
+            okay('true')
+            destructible.destroy()
         })
-        while (trampoline.seek()) {
-            await trampoline.shift()
-        }
-        await null
-        strata.search(trampoline, 'e', cursor => {
-            cursor.remove(cursor.index, {})
-        })
-        while (trampoline.seek()) {
-            await trampoline.shift()
-        }
-        okay('true')
-        await strata.destructible.destroy().rejected
+        await destructible.rejected
     }
 })

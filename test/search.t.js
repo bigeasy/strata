@@ -1,6 +1,7 @@
 require('proof')(11, async (okay) => {
     const Trampoline = require('reciprocate')
     const Destructible = require('destructible')
+    const Turnstile = require('turnstile')
 
     const Strata = require('../strata')
     const Cache = require('../cache')
@@ -25,10 +26,11 @@ require('proof')(11, async (okay) => {
     // TODO Does approimate fork of last item of tree work as expected?
     // TODO Does approimate fork of item past end of tree work?
     // Options are `-1` or `null`.
-    {
-        const destructible = new Destructible('search.t')
-        const cache = new Cache
-        const strata = await Strata.open(destructible, { directory, cache })
+    const destructible = new Destructible('search.t')
+    const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
+    const cache = new Cache
+    destructible.rescue($ => $(), 'test', async () => {
+        const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, cache, turnstile })
         {
             const trampoline = new Trampoline
             strata.search(trampoline, Strata.MIN, false, cursor => {
@@ -176,6 +178,7 @@ require('proof')(11, async (okay) => {
                 await trampoline.shift()
             }
         }
-        await strata.destructible.destroy().rejected
-    }
+        destructible.destroy()
+    })
+    await destructible.rejected
 })

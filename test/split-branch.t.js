@@ -1,6 +1,7 @@
 require('proof')(3, async (okay) => {
     const Trampoline = require('reciprocate')
     const Destructible = require('destructible')
+    const Turnstile = require('turnstile')
 
     const Strata = require('../strata')
     const Cache = require('../cache')
@@ -18,53 +19,67 @@ require('proof')(3, async (okay) => {
 
     // Split.
     {
+        const destructible = new Destructible([ 'split-branch.t', 'split' ])
+        const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
         const cache = new Cache
-        const strata = await Strata.open(new Destructible('split'), { directory, cache })
-        const writes = {}
-        const trampoline = new Trampoline
-        strata.search(trampoline, leaf[0], cursor => {
-            cursor.insert(cursor.index, leaf[0], leaf, writes)
+        destructible.rescue($ => $(), 'test', async () => {
+            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, cache, turnstile  })
+            const trampoline = new Trampoline, writes = {}
+            strata.search(trampoline, leaf[0], cursor => {
+                cursor.insert(cursor.index, leaf[0], leaf, writes)
+            })
+            while (trampoline.seek()) {
+                await trampoline.shift()
+            }
+            Strata.flush(writes)
+            destructible.destroy()
         })
-        while (trampoline.seek()) {
-            await trampoline.shift()
-        }
-        Strata.flush(writes)
-        await strata.destructible.destroy().rejected
+        await destructible.rejected
         cache.purge(0)
         okay(cache.heft, 0, 'cache purged')
     }
     // Reopen.
     {
+        const destructible = new Destructible([ 'split-branch.t', 'reopen' ])
+        const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
         const cache = new Cache
-        const strata = await Strata.open(new Destructible('reopen'), { directory, cache })
-        const trampoline = new Trampoline
-        strata.search(trampoline, leaf[0], cursor => {
-            okay(cursor.page.items[cursor.index].parts[0], leaf[0], 'found')
-        })
-        while (trampoline.seek()) {
-            await trampoline.shift()
-        }
-        await strata.destructible.destroy().rejected
-    }
-    // Traverse.
-    {
-        const cache = new Cache
-        const strata = await Strata.open(new Destructible('traverse'), { directory, cache })
-        let right = leaf[0]
-        const items = []
-        do {
+        destructible.rescue($ => $(), 'test', async () => {
+            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, cache, turnstile  })
             const trampoline = new Trampoline
-            strata.search(trampoline, right, cursor => {
-                for (let i = cursor.index; i < cursor.page.items.length; i++) {
-                    items.push(cursor.page.items[i].parts[0])
-                }
-                right = cursor.page.right
+            strata.search(trampoline, leaf[0], cursor => {
+                okay(cursor.page.items[cursor.index].parts[0], leaf[0], 'found')
             })
             while (trampoline.seek()) {
                 await trampoline.shift()
             }
-        } while (right != null)
-        okay(items, leaf, 'traverse')
-        await strata.destructible.destroy().rejected
+            destructible.destroy()
+        })
+        await destructible.rejected
+    }
+    // Traverse.
+    {
+        const destructible = new Destructible([ 'split-branch.t', 'traverse' ])
+        const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
+        const cache = new Cache
+        destructible.rescue($ => $(), 'test', async () => {
+            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, cache, turnstile  })
+            let right = leaf[0]
+            const items = []
+            do {
+                const trampoline = new Trampoline
+                strata.search(trampoline, right, cursor => {
+                    for (let i = cursor.index; i < cursor.page.items.length; i++) {
+                        items.push(cursor.page.items[i].parts[0])
+                    }
+                    right = cursor.page.right
+                })
+                while (trampoline.seek()) {
+                    await trampoline.shift()
+                }
+            } while (right != null)
+            okay(items, leaf, 'traverse')
+            destructible.destroy()
+        })
+        await destructible.rejected
     }
 })

@@ -1,5 +1,6 @@
 require('proof')(4, async (okay) => {
     const Destructible = require('destructible')
+    const Turnstile = require('turnstile')
 
     const Strata = require('../strata')
     const Cache = require('../cache')
@@ -12,25 +13,37 @@ require('proof')(4, async (okay) => {
     await utilities.reset(directory)
     await fs.writeFile(path.join(directory, '.ignore'), Buffer.alloc(0))
 
-    const cache = new Cache
 
     {
-        const strata = await Strata.open(new Destructible('strata'), { directory, cache, create: true  })
-        await strata.destructible.destroy().rejected
+        const destructible = new Destructible('create.t')
+        const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
+        const cache = new Cache
+        destructible.rescue($ => $(), 'test', async () => {
+            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, cache, turnstile, create: true  })
+            okay(strata.compare('a', 'a'), 0, 'compare')
+            okay(strata.extract([ 'a' ]), 'a', 'extract')
+            destructible.destroy()
+        })
+        await destructible.rejected
+
+        cache.purge(0)
+        okay(cache.entries, 0, 'cache empty')
+
         const vivified = await utilities.vivify(directory)
         okay(vivified, {
             '0.0': [ [ '0.1', null ] ],
             '0.1': []
         }, 'created')
-        cache.purge(0)
-        okay(cache.entries, 0, 'cache empty')
-
-        okay(strata.compare('a', 'a'), 0, 'compare')
-        okay(strata.extract([ 'a' ]), 'a', 'extract')
     }
 
     {
-        const strata = await Strata.open(new Destructible('strata'), { directory, cache })
-        await strata.destructible.destroy().rejected
+        const destructible = new Destructible('create.t')
+        const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
+        const cache = new Cache
+        destructible.rescue($ => $(), 'test', async () => {
+            await Strata.open(destructible.durable($ => $(), 'strata'), { directory, cache, turnstile })
+            destructible.destroy()
+        })
+        await destructible.rejected
     }
 })

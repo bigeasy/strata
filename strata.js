@@ -54,9 +54,9 @@ class Strata {
 
     static async flush (writes) {
         for (const id in writes) {
-            const queue = writes[id]
-            if (!queue.written) {
-                await queue.promise
+            const latch = writes[id]
+            if (!latch.unlocked) {
+                await latch.promise
             }
         }
     }

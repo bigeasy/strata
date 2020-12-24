@@ -1,5 +1,6 @@
 require('proof')(3, async (okay) => {
     const Destructible = require('destructible')
+    const Turnstile = require('turnstile')
     const Strata = require('../strata')
     const Cache = require('../cache')
     const Trampoline = require('reciprocate')
@@ -18,16 +19,22 @@ require('proof')(3, async (okay) => {
         ]]
     })
     {
+        const destructible = new Destructible('delete.t')
+        const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
         const cache = new Cache
-        const strata = await Strata.open(new Destructible('delete.t/purge'), { directory, cache })
-        const writes = {}
-        const trampoline = new Trampoline
-        strata.search(trampoline, 'a', cursor => cursor.remove(cursor.index, writes))
-        while (trampoline.seek()) {
-            await trampoline.shift()
-        }
-        await Strata.flush(writes)
-        await strata.destructible.destroy().rejected
+        destructible.rescue($ => $(), 'test', async () => {
+            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, cache, turnstile })
+
+            const trampoline = new Trampoline, writes = {}
+            strata.search(trampoline, 'a', cursor => cursor.remove(cursor.index, writes))
+            while (trampoline.seek()) {
+                await trampoline.shift()
+            }
+            await Strata.flush(writes)
+
+            destructible.destroy()
+        })
+        await destructible.rejected
         const vivified = await utilities.vivify(directory)
         okay(vivified, {
             '0.0': [ [ '0.1', null ] ],
@@ -42,24 +49,31 @@ require('proof')(3, async (okay) => {
         // **TODO** Cache purge broken.
         okay(cache.heft, 0, 'cache purged')
     }
+
     {
+        const destructible = new Destructible('delete.t')
+        const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
         const cache = new Cache
-        const strata = await Strata.open(new Destructible('delete.t/traverse'), { directory, cache })
-        let right = 'a'
-        const items = []
-        do {
-            const trampoline = new Trampoline
-            strata.search(trampoline, right, cursor => {
-                for (let i = cursor.index; i < cursor.page.items.length; i++) {
-                    items.push(cursor.page.items[i].parts[0])
+        destructible.rescue($ => $(), 'test', async () => {
+            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, cache, turnstile })
+            let right = 'a'
+            const items = []
+            do {
+                const trampoline = new Trampoline
+                strata.search(trampoline, right, cursor => {
+                    for (let i = cursor.index; i < cursor.page.items.length; i++) {
+                        items.push(cursor.page.items[i].parts[0])
+                    }
+                    right = cursor.page.right
+                })
+                while (trampoline.seek()) {
+                    await trampoline.shift()
                 }
-                right = cursor.page.right
-            })
-            while (trampoline.seek()) {
-                await trampoline.shift()
-            }
-        } while (right != null)
-        okay(items, [ 'b', 'c' ], 'traverse')
-        await strata.destructible.destroy().rejected
+            } while (right != null)
+            okay(items, [ 'b', 'c' ], 'traverse')
+
+            destructible.destroy()
+        })
+        await destructible.rejected
     }
 })

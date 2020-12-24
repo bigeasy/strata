@@ -1,6 +1,7 @@
 require('proof')(2, async (okay) => {
     const Trampoline = require('reciprocate')
     const Destructible = require('destructible')
+    const Turnstile = require('turnstile')
 
     const Strata = require('../strata')
     const Cache = require('../cache')
@@ -22,47 +23,55 @@ require('proof')(2, async (okay) => {
     const expected = [ 'a', 'b', 'c', 'd', 'e', 'f', 'h', 'i' ]
 
     {
-        const destructible = new Destructible([ 'split.t', 'forward' ])
+        const destructible = new Destructible([ 'traverse.t', 'forward' ])
+        const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
         const cache = new Cache
-        const strata = await Strata.open(destructible, { directory, cache })
-        let right = Strata.MIN
-        const items = []
-        do {
-            const trampoline = new Trampoline
-            strata.search(trampoline, right, cursor => {
-                for (let i = cursor.index; i < cursor.page.items.length; i++) {
-                    items.push(cursor.page.items[i].parts[0])
+        destructible.rescue($ => $(), 'test', async () => {
+            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, cache, turnstile  })
+            let right = Strata.MIN
+            const items = []
+            do {
+                const trampoline = new Trampoline
+                strata.search(trampoline, right, cursor => {
+                    for (let i = cursor.index; i < cursor.page.items.length; i++) {
+                        items.push(cursor.page.items[i].parts[0])
+                    }
+                    right = cursor.page.right
+                })
+                while (trampoline.seek()) {
+                    await trampoline.shift()
                 }
-                right = cursor.page.right
-            })
-            while (trampoline.seek()) {
-                await trampoline.shift()
-            }
-        } while (right != null)
-        okay(items, expected, 'forward')
-        await strata.destructible.destroy().rejected
+            } while (right != null)
+            okay(items, expected, 'forward')
+            destructible.destroy()
+        })
+        await destructible.rejected
     }
     {
-        const destructible = new Destructible([ 'split.t', 'reverse' ])
+        const destructible = new Destructible([ 'traverse.t', 'reverse' ])
+        const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
         const cache = new Cache
-        const strata = await Strata.open(destructible, { directory, cache })
-        let left = Strata.MAX, fork = false, cursor, id
-        const items = []
-        do {
-            const trampoline = new Trampoline
-            strata.search(trampoline, left, fork, cursor => {
-                for (let i = cursor.page.items.length - 1; i >= 0; i--) {
-                    items.push(cursor.page.items[i].parts[0])
+        destructible.rescue($ => $(), 'test', async () => {
+            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, cache, turnstile  })
+            let left = Strata.MAX, fork = false, cursor, id
+            const items = []
+            do {
+                const trampoline = new Trampoline
+                strata.search(trampoline, left, fork, cursor => {
+                    for (let i = cursor.page.items.length - 1; i >= 0; i--) {
+                        items.push(cursor.page.items[i].parts[0])
+                    }
+                    left = cursor.page.key
+                    fork = true
+                    id = cursor.page.id
+                })
+                while (trampoline.seek()) {
+                    await trampoline.shift()
                 }
-                left = cursor.page.key
-                fork = true
-                id = cursor.page.id
-            })
-            while (trampoline.seek()) {
-                await trampoline.shift()
-            }
-        } while (id != '0.1')
-        okay(items, expected.slice().reverse(), 'reverse')
-        await strata.destructible.destroy().rejected
+            } while (id != '0.1')
+            okay(items, expected.slice().reverse(), 'reverse')
+            await destructible.destroy()
+        })
+        await destructible.rejected
     }
 })

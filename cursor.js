@@ -90,6 +90,7 @@ class Cursor {
         const header = { method: 'delete', index: index }
         const buffer = this._sheaf._recorder(header, [])
 
+        console.log(this.page)
         this._sheaf.append(this.page.id, buffer, writes)
 
         const [ spliced ] = this.page.items.splice(index, 1)

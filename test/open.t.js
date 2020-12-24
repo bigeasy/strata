@@ -1,6 +1,7 @@
 require('proof')(3, async (okay) => {
     const Destructible = require('destructible')
     const Strata = require('../strata')
+    const Turnstile = require('turnstile')
     const Cache = require('../cache')
     const utilities = require('../utilities')
     const path = require('path')
@@ -13,12 +14,20 @@ require('proof')(3, async (okay) => {
     })
     await fs.mkdir(path.join(directory, 'instances', '1'))
     await fs.writeFile(path.join(directory, '.ignore'), Buffer.alloc(0))
-    const cache = new Cache
-    const strata = await Strata.open(new Destructible('Strata'), { directory, cache })
-    const instances = await fs.readdir(path.join(directory, 'instances'))
-    okay(instances, [ '2' ], 'instance')
-    okay(cache.entries, 1, 'cache empty')
-    await strata.destructible.destroy().rejected
-    cache.purge(0)
-    okay(cache.entries, 0, 'cache empty')
+
+    {
+        const destructible = new Destructible('load.t')
+        const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
+        const cache = new Cache
+        destructible.rescue($ => $(), 'test', async () => {
+            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, cache, turnstile  })
+            const instances = await fs.readdir(path.join(directory, 'instances'))
+            okay(instances, [ '2' ], 'instance')
+            okay(cache.entries, 1, 'cache empty')
+            destructible.destroy()
+        })
+        await destructible.rejected
+        cache.purge(0)
+        okay(cache.entries, 0, 'cache empty')
+    }
 })
