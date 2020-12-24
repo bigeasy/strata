@@ -6,7 +6,7 @@ require('proof')(2, async (okay) => {
     const Destructible = require('destructible')
 
     const Strata = require('../strata')
-    const Cache = require('../cache')
+    const Cache = require('magazine')
 
     const utilities = require('../utilities')
 

@@ -3,7 +3,7 @@ require('proof')(4, async (okay) => {
     const Turnstile = require('turnstile')
 
     const Strata = require('../strata')
-    const Cache = require('../cache')
+    const Cache = require('magazine')
 
     const utilities = require('../utilities')
     const path = require('path')
@@ -27,7 +27,7 @@ require('proof')(4, async (okay) => {
         await destructible.rejected
 
         cache.purge(0)
-        okay(cache.entries, 0, 'cache empty')
+        okay(cache.count, 0, 'cache empty')
 
         const vivified = await utilities.vivify(directory)
         okay(vivified, {

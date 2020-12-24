@@ -160,7 +160,7 @@ class Sheaf {
             appender: new Fracture(destructible.durable('appender'), options.turnstile, id => ({
                 id: this._operationId = (this._operationId + 1 & 0xffffffff) >>> 0,
                 writes: [],
-                cartridge: this._hold(id),
+                cartridge: this.cache.hold(id),
                 latch: latch()
             }), this._append, this),
             housekeeper: new Fracture(destructible.durable('housekeeper'), options.turnstile, () => ({
@@ -368,7 +368,7 @@ class Sheaf {
     //
     async load (id) {
         const { page, heft } = await this.read(id)
-        const entry = this._hold(id)
+        const entry = this.cache.hold(id, null)
         if (entry.value == null) {
             entry.value = page
             entry.heft = heft
@@ -377,19 +377,14 @@ class Sheaf {
     }
 
     _create (page) {
-        return this.cache.hold([ this.directory, page.id, this._instance ], page)
-    }
-
-    _hold (id) {
-        assert(id)
-        return this.cache.hold([ this.directory, id, this._instance ], null)
+        return this.cache.hold(page.id, page)
     }
 
     // TODO If `key` is `null` then just go left.
     _descend (entries, { key, level = -1, fork = false, rightward = false, approximate = false }) {
         const descent = { miss: null, keyed: null, level: 0, index: 0, entry: null }
         let entry = null
-        entries.push(entry = this._hold(-1))
+        entries.push(entry = this.cache.hold(-1))
         for (;;) {
             // When you go rightward at the outset or fork you might hit this
             // twice, but it won't matter because you're not going to use the
@@ -433,11 +428,11 @@ class Sheaf {
 
             // Attempt to hold the page from the cache, return the id of the
             // page if we have a cache miss.
-            entries.push(entry = this._hold(id))
-            if (entry.value == null) {
-                entries.pop().remove()
+            entry = this.cache.hold(id)
+            if (entry == null) {
                 return { miss: id }
             }
+            entries.push(entry)
 
             // TODO Move this down below the leaf return and do not search if
             // we are searching for a leaf.
@@ -545,8 +540,6 @@ class Sheaf {
     async _writeLeaf (id, writes) {
         const append = await this._appendable(id)
         const recorder = this._recorder
-        const entry = this._hold(id)
-        entry.release()
         await fs.appendFile(this._path('pages', id, append), Buffer.concat(writes))
     }
 
@@ -1393,9 +1386,8 @@ class Sheaf {
         // that way we don't have to test this hard-to-test cache miss.
         while (!leaf.value.leaf) {
             const id = leaf.value.items[0].id
-            leaf = this._hold(id)
-            if (leaf.value == null) {
-                leaf.remove()
+            leaf = this.cache.hold(id)
+            if (leaf == null) {
                 entries.push(leaf = await this.load(id))
             } else {
                 entries.push(leaf)

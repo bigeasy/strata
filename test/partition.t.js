@@ -28,7 +28,7 @@ require('proof')(12, async okay => {
     const Destructible = require('destructible')
 
     const Strata = require('..')
-    const Cache = require('../cache')
+    const Cache = require('magazine')
 
     const ascension = require('ascension')
     const whittle = require('whittle')

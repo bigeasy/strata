@@ -4,7 +4,7 @@ require('proof')(3, async (okay) => {
     const Turnstile = require('turnstile')
 
     const Strata = require('../strata')
-    const Cache = require('../cache')
+    const Cache = require('magazine')
     const utilities = require('../utilities')
     const path = require('path')
     const directory = path.join(utilities.directory, 'split-branch')

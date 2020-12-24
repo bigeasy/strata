@@ -2,7 +2,7 @@ require('proof')(3, async (okay) => {
     const Destructible = require('destructible')
     const Strata = require('../strata')
     const Turnstile = require('turnstile')
-    const Cache = require('../cache')
+    const Cache = require('magazine')
     const utilities = require('../utilities')
     const path = require('path')
     const directory = path.join(utilities.directory, 'open')
@@ -23,11 +23,11 @@ require('proof')(3, async (okay) => {
             const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, cache, turnstile  })
             const instances = await fs.readdir(path.join(directory, 'instances'))
             okay(instances, [ '2' ], 'instance')
-            okay(cache.entries, 1, 'cache empty')
+            okay(cache.count, 1, 'cache not empty')
             destructible.destroy()
         })
         await destructible.rejected
         cache.purge(0)
-        okay(cache.entries, 0, 'cache empty')
+        okay(cache.count, 0, 'cache empty')
     }
 })
