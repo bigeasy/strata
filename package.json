@@ -49,5 +49,9 @@
     "scripts":
     {
                             "test": "proof test/*.t.js"
+    },
+    "dots":
+    {
+                            "title":                        "Strata"
     }
 }
