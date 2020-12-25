@@ -686,6 +686,21 @@ class Sheaf {
     // b-tree, it only uses WAL for split and merge and there you have pretty
     // much created a WAL database.
 
+    // **TODO** Vacuum is nice, but we have to run it eventually anyway. Yes we
+    // could defer vaccum, and when you read through this, you'll see that it
+    // actually does work. It has reference counting for the append files and
+    // and append file is not deleted until all the dependencies are gone.
+
+    // We can bookmark this version of the code and come back to it, but I don't
+    // see why we wouldn't go ahead and do a vacuum on split and merge. It would
+    // keep us from having linked lists of pages that we have to reference
+    // count. We can implement this vacuum logic directly in `_splitLeaf` and
+    // `_mergeLeaf`. We can make the stub construct and commit it. Then vacuum
+    // the leaf page and perform the branch split/merge all in a single
+    // Journalist commit. Also, Journalist should have the option of emitting a
+    // message so that if on recover we could set we'd established our stubs and
+    // need to vacuum them.
+
     //
     async _vacuum (key) {
         const entries = []
