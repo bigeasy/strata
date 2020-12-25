@@ -36,7 +36,7 @@
                             "magazine":                     "6.0.0-alpha.1",
                             "prospective":                  "^0.3.0",
                             "transcript":                   "0.1.3",
-                            "turnstile":                    "6.0.0-alpha.39",
+                            "turnstile":                    "6.0.0-alpha.40",
                             "whittle":                      "0.0.0"
     },
     "devDependencies":
