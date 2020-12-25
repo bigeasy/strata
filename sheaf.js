@@ -272,7 +272,6 @@ class Sheaf {
         for await (const chunk of readable) {
             for (const entry of player.split(chunk)) {
                 const header = JSON.parse(entry.parts.shift())
-                console.log(header, entry)
                 switch (header.method) {
                 case 'right': {
                         // TODO Need to use the key section of the record.
