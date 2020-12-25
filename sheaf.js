@@ -28,10 +28,10 @@ const Fracture = require('fracture')
 const fnv = require('./fnv')
 
 // Serialize a single b-tree record.
-const recorder = require('./recorder')
+const Recorder = require('transcript/recorder')
 
 // Incrementally read a b-tree page chunk by chunk.
-const Player = require('./player')
+const Player = require('transcript/player')
 
 // Binary search for a record in a b-tree page.
 const find = require('./find')
@@ -143,7 +143,7 @@ class Sheaf {
                 return options.comparator
             }
         } ()
-        this._recorder = recorder(() => '0')
+        this.$_recorder = Recorder.create(() => '0')
         this._root = null
 
         // **TODO** Do not worry about wrapping anymore.
@@ -211,7 +211,7 @@ class Sheaf {
 
             await fs.mkdir(this._path('instances', '0'), { recursive: true })
             await fs.mkdir(this._path('pages', '0.0'), { recursive: true })
-            const buffer = this._recorder.call(null, { id: '0.1' }, [])
+            const buffer = this._recordify({ id: '0.1' }, [])
             const hash = fnv(buffer)
             await fs.writeFile(this._path('pages', '0.0', hash), buffer)
             await fs.mkdir(this._path('pages', '0.1'), { recursive: true })
@@ -271,7 +271,9 @@ class Sheaf {
         const readable = fileSystem.createReadStream(this._path('pages', id, append))
         for await (const chunk of readable) {
             for (const entry of player.split(chunk)) {
-                switch (entry.header.method) {
+                const header = JSON.parse(entry.parts.shift())
+                console.log(header, entry)
+                switch (header.method) {
                 case 'right': {
                         // TODO Need to use the key section of the record.
                         page.right = this.serializer.key.deserialize(entry.parts)
@@ -279,12 +281,12 @@ class Sheaf {
                     }
                     break
                 case 'load': {
-                        const { id, append } = entry.header
+                        const { id, append } = header
                         const { page: loaded } = await this._read(id, append)
                         page.items = loaded.items
                         page.right = loaded.right
                         page.key = loaded.key
-                        page.vacuum.push({ header: entry.header, vacuum: loaded.vacuum })
+                        page.vacuum.push({ header: header, vacuum: loaded.vacuum })
                     }
                     break
                 case 'slice': {
@@ -295,15 +297,15 @@ class Sheaf {
                     }
                     break
                 case 'merge': {
-                        const { page: right } = await this._read(entry.header.id, entry.header.append)
+                        const { page: right } = await this._read(header.id, header.append)
                         page.items.push.apply(page.items, right.items)
                         page.right = right.right
-                        page.vacuum.push({ header: entry.header, vacuum: right.vacuum })
+                        page.vacuum.push({ header: header, vacuum: right.vacuum })
                     }
                     break
                 case 'insert': {
                         const parts = this.serializer.parts.deserialize(entry.parts)
-                        page.items.splice(entry.header.index, 0, {
+                        page.items.splice(header.index, 0, {
                             key: this.extractor(parts),
                             parts: parts,
                             heft: entry.sizes.reduce((sum, size) => sum + size, 0)
@@ -311,7 +313,7 @@ class Sheaf {
                     }
                     break
                 case 'delete': {
-                        page.items.splice(entry.header.index, 1)
+                        page.items.splice(header.index, 1)
                         // TODO We do not want to vacuum automatically, we want
                         // it to be optional, possibly delayed. Expecially for
                         // MVCC where we are creating short-lived trees, we
@@ -351,8 +353,9 @@ class Sheaf {
         })
         const items = []
         for (const entry of player.split(buffer)) {
+            const header = JSON.parse(entry.parts.shift())
             items.push({
-                id: entry.header.id,
+                id: header.id,
                 key: entry.parts.length != 0
                     ? this.serializer.key.deserialize(entry.parts)
                     : null
@@ -539,7 +542,6 @@ class Sheaf {
 
     async _writeLeaf (id, writes) {
         const append = await this._appendable(id)
-        const recorder = this._recorder
         await fs.appendFile(this._path('pages', id, append), Buffer.concat(writes))
     }
 
@@ -619,7 +621,11 @@ class Sheaf {
     }
 
     _serialize (header, parts) {
-        return this._recorder(header, parts.length == 0 ? parts : this.serializer.parts.serialize(parts))
+        return this._recordify(header, parts.length == 0 ? parts : this.serializer.parts.serialize(parts))
+    }
+
+    _recordify (header, parts) {
+        return this.$_recorder([[ Buffer.from(JSON.stringify(header)) ].concat(parts)])
     }
 
     _stub (commit, id, append, records) {
@@ -639,7 +645,7 @@ class Sheaf {
             const parts = key != null
                 ? this.serializer.key.serialize(key)
                 : []
-            buffers.push(this._recorder({ id }, parts))
+            buffers.push(this._recordify({ id }, parts))
         }
         const buffer = Buffer.concat(buffers)
         entry.heft = buffer.length
@@ -773,22 +779,21 @@ class Sheaf {
 
             await commit.unlink(path.join('pages', leaf.entry.value.id, first))
 
-            const recorder = this._recorder
             const buffers = []
             const { id, right, key } = leaf.entry.value
 
             if (right != null) {
-                buffers.push(recorder({ method: 'right' }, this.serializer.key.serialize(right)))
+                buffers.push(this._recordify({ method: 'right' }, this.serializer.key.serialize(right)))
             }
             // Write out a new page slowly, a record at a time.
             for (let index = 0, I = items.length; index < I; index++) {
                 const parts = this.serializer.parts.serialize(items[index].parts)
-                buffers.push(recorder({ method: 'insert', index }, parts))
+                buffers.push(this._recordify({ method: 'insert', index }, parts))
             }
             if (key != null) {
-                buffers.push(recorder({ method: 'key' }, this.serializer.key.serialize(key)))
+                buffers.push(this._recordify({ method: 'key' }, this.serializer.key.serialize(key)))
             }
-            buffers.push(recorder({
+            buffers.push(this._recordify({
                 method: 'dependent', id: id, append: second
             }, []))
 

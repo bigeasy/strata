@@ -2,8 +2,12 @@ const path = require('path')
 const fileSystem = require('fs')
 const fs = require('fs').promises
 const shifter = require('./shifter')(() => '0')
-const recorder = require('./recorder')(() => '0')
+const recorder = require('transcript/recorder').create(() => '0')
 const fnv = require('./fnv')
+
+function recordify (header, parts) {
+    return recorder([[ Buffer.from(JSON.stringify(header)) ].concat(parts)])
+}
 
 const appendable = require('./appendable')
 
@@ -31,7 +35,7 @@ exports.vivify = async function (directory) {
             const entries = lines.map(line => JSON.parse(line))
             const records = []
             while (entries.length != 0) {
-                const record = shifter(entries), header = record[0].header
+                const record = shifter(entries), header = record[0]
                 switch (header.method) {
                 case 'right':
                     records.push([ header.method, header.right ])
@@ -60,7 +64,7 @@ exports.vivify = async function (directory) {
             const items = []
             while (entries.length) {
                 const record = shifter(entries)
-                items.push([ record[0].header.id, record.length == 2 ? record[1] : null ])
+                items.push([ record[0].id, record.length == 2 ? record[1] : null ])
             }
             vivified[file] = items
         }
@@ -75,7 +79,7 @@ exports.serialize = async function (directory, files) {
         await fs.mkdir(path.resolve(directory, 'pages', id), { recursive: true })
         if (+id.split('.')[1] % 2 == 0) {
             const buffers = files[id].map(record => {
-                return recorder({
+                return recordify({
                     id: record[0]
                 }, record[1] != null ? [ Buffer.from(JSON.stringify(record[1])) ] : [])
             })
@@ -109,9 +113,9 @@ exports.serialize = async function (directory, files) {
                     console.log(record)
                     break
                 }
-            }).map(entry => recorder(entry.header, entry.parts))
+            }).map(entry => recordify(entry.header, entry.parts))
             if (key != null) {
-                writes.push(recorder({ method: 'key' }, key))
+                writes.push(recordify({ method: 'key' }, key))
             }
             const file = path.resolve(directory, 'pages', id, '0.0')
             await fs.writeFile(file, Buffer.concat(writes))

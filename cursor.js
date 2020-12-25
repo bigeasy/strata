@@ -74,7 +74,7 @@ class Cursor {
     //
     insert (index, key, parts, writes, buffers = this.serialize(parts)) {
         const header = { method: 'insert', index: index }
-        const buffer = this._sheaf._recorder(header, buffers)
+        const buffer = this._sheaf._recordify(header, buffers)
         const record = { key: key, parts: parts, heft: buffer.length }
 
         this._entry.heft += record.heft
@@ -88,9 +88,8 @@ class Cursor {
 
     remove (index, writes) {
         const header = { method: 'delete', index: index }
-        const buffer = this._sheaf._recorder(header, [])
+        const buffer = this._sheaf._recordify(header, [])
 
-        console.log(this.page)
         this._sheaf.append(this.page.id, buffer, writes)
 
         const [ spliced ] = this.page.items.splice(index, 1)
