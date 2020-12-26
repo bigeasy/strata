@@ -69,11 +69,12 @@ class Sheaf {
     // cache based only on the directory path and page id because we may close
     // and reopen a Strata and we'd pull pages from the previous instance.
     static _instance = 0
+    static __instance = 0
 
     // Sheaf accepts the destructible and user options passed to `new Strata`
     constructor (destructible, options) {
-        Strata.Error.assert(options.turnstile != null, 'OPTION_REQUIRED', { option: 'turnstile' })
-        Strata.Error.assert(options.directory != null, 'OPTION_REQUIRED', { option: 'directory' })
+        Strata.Error.assert(options.turnstile != null, 'OPTION_REQUIRED', { _option: 'turnstile' })
+        Strata.Error.assert(options.directory != null, 'OPTION_REQUIRED', { _option: 'directory' })
         assert(destructible.isSameStage(options.turnstile.destructible))
 
         const leaf = coalesce(options.leaf, {})
@@ -369,6 +370,9 @@ class Sheaf {
 
     //
     async load (id) {
+        if (this._verbose) {
+            console.log('loading', id)
+        }
         const { page, heft } = await this.read(id)
         const entry = this.cache.hold(id, null)
         if (entry.value == null) {
@@ -563,6 +567,9 @@ class Sheaf {
         try {
             this._destructible.progress()
             const page = cartridge.value
+            if (this._verbose && key == '0.1') {
+                console.log('appnd', page.id, page.items.length, page._seen, writes.length)
+            }
             if (
                 (
                     page.items.length >= this.leaf.split &&
@@ -585,6 +592,9 @@ class Sheaf {
     }
 
     append (id, buffer, writes) {
+        if (this._verbose) {
+            throw new Error
+        }
         // **TODO** Optional boolean other than `destroyed`.
         this._destructible.operational()
         const append = this._fracture.appender.enqueue(id)
@@ -869,6 +879,10 @@ class Sheaf {
             await commit.dispose()
         }) ()
 
+        if (this._verbose && leaf.entry.value.id == '0.1') {
+            console.log('vcuum', leaf.entry.value.id, leaf.entry.value.items.length)
+        }
+
         entries.forEach(entry => entry.release())
     }
 
@@ -995,7 +1009,7 @@ class Sheaf {
     // When either of these pages loads they will load the old existing page,
     // then split the page and continue with new records added to the subsequent
     // append log.
-
+    _seen = 0
     //
     async _splitLeaf (key, child, entries) {
         // Descend to the parent branch page.
@@ -1015,6 +1029,16 @@ class Sheaf {
             append: this._filename()
         })
         entries.push(right)
+
+        if (this._verbose && child.entry.value.id == '0.1') {
+            console.log('split', child.entry.value.id, child.entry.value.items.length, child.entry.value._seen, child.entry.value._splitting)
+            if (child.entry.value._seen == null) {
+                child.entry.value._seen = this._seen++
+            }
+            child.entry.value.items.forEach(item => item._seen == null && (item._seen = this._seen++))
+            console.log('items', child.entry.value.items.map(item => [ item.key[0].toString(), item.key[1], item.key[2], item._seen ]))
+            child.entry.value._splitting = true
+        }
 
         // Create our journaled tree alterations.
         const commit = await Journalist.create(this.directory)
@@ -1062,6 +1086,9 @@ class Sheaf {
             child.entry.value.right = right.value.key
             child.entry.heft -= right.heft - 1
 
+            if (this._verbose && child.entry.value.id == '0.1') {
+                console.log('splat', child.entry.value.id, child.entry.value.items.length)
+            }
             // Set the heft of the left page and entry. Moved this down.
             // child.entry.heft -= heft - 1
 
@@ -1212,6 +1239,11 @@ class Sheaf {
         // vacuuming dilligently in order to test vacuum and find bugs.
         await this._vacuum(key)
         await this._vacuum(right.value.key)
+
+        if (this._verbose && child.entry.value.id == '0.1') {
+            console.log('splid')
+            child.entry.value._splitting = false
+        }
     }
 
 
@@ -1424,6 +1456,11 @@ class Sheaf {
         const left = await this.descend({ key, level, fork: true }, entries)
         const right = await this.descend({ key, level }, entries)
 
+        if (this._verbose && left.entry.value.id == '0.1') {
+            console.log('merge', left.entry.value.id, left.entry.value.items.length)
+            console.log('merge', right.entry.value.id, right.entry.value.items.length)
+        }
+
         const pivot = await this.descend(right.pivot, entries)
 
         const surgery = await this._surgery(right, pivot)
@@ -1564,8 +1601,16 @@ class Sheaf {
         await this._possibleMerge(surgery, left.entry.value.items[0].key, false)
     }
 
+    _verbose = false
+
     // TODO Must wait for housekeeping to finish before closing.
     async _keephouse ({ canceled, value: { candidates } }) {
+        if (!this._verbose) {
+            this._verbose = candidates.length == 7
+        }
+        if (this._verbose) {
+            console.log('keephouse', candidates.length, this._verbose)
+        }
         this._destructible.progress()
         for (const key of candidates) {
             const entries = []
