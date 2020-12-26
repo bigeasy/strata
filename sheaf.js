@@ -75,7 +75,7 @@ class Sheaf {
     constructor (destructible, options) {
         Strata.Error.assert(options.turnstile != null, 'OPTION_REQUIRED', { _option: 'turnstile' })
         Strata.Error.assert(options.directory != null, 'OPTION_REQUIRED', { _option: 'directory' })
-        assert(destructible.isSameStage(options.turnstile.destructible))
+        assert(destructible.isDestroyedIfDestroyed(options.turnstile.destructible))
 
         const leaf = coalesce(options.leaf, {})
 
@@ -158,18 +158,18 @@ class Sheaf {
         // **TODO** With `Fracture` we can probably start to do balancing in
         // parallel.
         this._fracture = {
-            appender: new Fracture(destructible.durable('appender'), options.turnstile, id => ({
+            appender: new Fracture(destructible.durable($ => $(), 'appender'), options.turnstile, id => ({
                 id: this._operationId = (this._operationId + 1 & 0xffffffff) >>> 0,
                 writes: [],
                 cartridge: this.cache.hold(id),
                 latch: latch()
             }), this._append, this),
-            housekeeper: new Fracture(destructible.durable('housekeeper'), options.turnstile, () => ({
+            housekeeper: new Fracture(destructible.durable($ => $(), 'housekeeper'), options.turnstile, () => ({
                 candidates: []
             }), this._keephouse, this)
         }
 
-        options.turnstile.countdown.increment()
+        options.turnstile.deferrable.increment()
 
         this._id = 0
         this.closed = false
@@ -191,7 +191,7 @@ class Sheaf {
                 // **TODO** Really want to just push keys into a file for
                 // inspection when we reopen for housekeeping.
                 await this.drain()
-                options.turnstile.countdown.decrement()
+                options.turnstile.deferrable.decrement()
                 if (this._root != null) {
                     this._root.remove()
                     this._root = null

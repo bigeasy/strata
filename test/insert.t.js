@@ -36,7 +36,7 @@ require('proof')(2, async (okay) => {
         destructible.destroy()
     })
 
-    await destructible.rejected
+    await destructible.promise
 
     cache.purge(0)
 
