@@ -26,7 +26,7 @@ require('proof')(3, async (okay) => {
             okay(cache.count, 1, 'cache not empty')
             destructible.destroy()
         })
-        await destructible.rejected
+        await destructible.promise
         cache.purge(0)
         okay(cache.count, 0, 'cache empty')
     }

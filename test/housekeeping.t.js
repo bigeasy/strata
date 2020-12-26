@@ -44,6 +44,6 @@ require('proof')(1, async (okay) => {
             okay('true')
             destructible.destroy()
         })
-        await destructible.rejected
+        await destructible.promise
     }
 })

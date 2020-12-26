@@ -53,7 +53,7 @@ require('proof')(3, async (okay) => {
 
             destructible.destroy()
         })
-        await destructible.rejected
+        await destructible.promise
         cache.purge(0)
         okay(cache.heft, 0, 'cache purged')
     }
@@ -74,7 +74,7 @@ require('proof')(3, async (okay) => {
             }
             destructible.destroy()
         })
-        await destructible.rejected
+        await destructible.promise
     }
     // Traverse.
     {
@@ -100,6 +100,6 @@ require('proof')(3, async (okay) => {
             okay(items, [ 'a', 'b', 'c', 'd' ], 'traverse')
             destructible.destroy()
         })
-        await destructible.rejected
+        await destructible.promise
     }
 })

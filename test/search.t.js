@@ -180,5 +180,5 @@ require('proof')(11, async (okay) => {
         }
         destructible.destroy()
     })
-    await destructible.rejected
+    await destructible.promise
 })

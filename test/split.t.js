@@ -45,7 +45,7 @@ require('proof')(5, async (okay) => {
 
             destructible.destroy()
         })
-        await destructible.rejected
+        await destructible.promise
         cache.purge(0)
         okay(cache.heft, 0, 'cache purged')
     }
@@ -66,7 +66,7 @@ require('proof')(5, async (okay) => {
 
             destructible.destroy()
         })
-        await destructible.rejected
+        await destructible.promise
     }
     {
         const destructible = new Destructible([ 'split.t', 'traverse' ])
@@ -92,7 +92,7 @@ require('proof')(5, async (okay) => {
 
             destructible.destroy()
         })
-        await destructible.rejected
+        await destructible.promise
     }
     {
         const destructible = new Destructible([ 'split.t', 'forward' ])
@@ -117,7 +117,7 @@ require('proof')(5, async (okay) => {
             okay(items, [ 'a', 'b', 'c', 'd', 'e', 'f' ], 'forward')
             destructible.destroy()
         })
-        await destructible.rejected
+        await destructible.promise
    }
    {
         const destructible = new Destructible([ 'split.t', 'reverse' ])
@@ -144,6 +144,6 @@ require('proof')(5, async (okay) => {
             okay(items, [ 'a', 'b', 'c', 'd', 'e', 'f' ].reverse(), 'reverse')
             destructible.destroy()
         })
-        await destructible.rejected
+        await destructible.promise
     }
 })

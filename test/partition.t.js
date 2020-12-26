@@ -58,7 +58,7 @@ require('proof')(12, async okay => {
             await Strata.flush(writes)
             destructible.destroy()
         })
-        await destructible.rejected
+        await destructible.promise
         cache.purge(0)
         okay(cache.heft, 0, 'cache purged insert')
     }
@@ -82,7 +82,7 @@ require('proof')(12, async okay => {
             await Strata.flush(writes)
             destructible.destroy()
         })
-        await destructible.rejected
+        await destructible.promise
         cache.purge(0)
         okay(cache.heft, 0, 'cache purged unsplit')
     }
@@ -102,7 +102,7 @@ require('proof')(12, async okay => {
             }
             destructible.destroy()
         })
-        await destructible.rejected
+        await destructible.promise
         cache.purge(0)
         okay(cache.heft, 0, 'cache purged split')
     }

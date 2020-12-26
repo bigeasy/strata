@@ -33,7 +33,7 @@ require('proof')(3, async (okay) => {
             await Strata.flush(writes)
             destructible.destroy()
         })
-        await destructible.rejected
+        await destructible.promise
         cache.purge(0)
         okay(cache.heft, 0, 'cache purged')
     }
@@ -52,7 +52,7 @@ require('proof')(3, async (okay) => {
             }
             destructible.destroy()
         })
-        await destructible.rejected
+        await destructible.promise
     }
     {
         const destructible = new Destructible([ 'drain.t', 'turnstile' ])
@@ -77,6 +77,6 @@ require('proof')(3, async (okay) => {
             okay(items, leaf, 'traverse')
             destructible.destroy()
         })
-        await destructible.rejected
+        await destructible.promise
     }
 })

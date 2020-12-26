@@ -45,7 +45,7 @@ require('proof')(2, async (okay) => {
             okay(items, expected, 'forward')
             destructible.destroy()
         })
-        await destructible.rejected
+        await destructible.promise
     }
     {
         const destructible = new Destructible([ 'traverse.t', 'reverse' ])
@@ -72,6 +72,6 @@ require('proof')(2, async (okay) => {
             okay(items, expected.slice().reverse(), 'reverse')
             await destructible.destroy()
         })
-        await destructible.rejected
+        await destructible.promise
     }
 })

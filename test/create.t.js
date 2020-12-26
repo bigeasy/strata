@@ -24,7 +24,7 @@ require('proof')(4, async (okay) => {
             okay(strata.extract([ 'a' ]), 'a', 'extract')
             destructible.destroy()
         })
-        await destructible.rejected
+        await destructible.promise
 
         cache.purge(0)
         okay(cache.count, 0, 'cache empty')
@@ -44,6 +44,6 @@ require('proof')(4, async (okay) => {
             await Strata.open(destructible.durable($ => $(), 'strata'), { directory, cache, turnstile })
             destructible.destroy()
         })
-        await destructible.rejected
+        await destructible.promise
     }
 })

@@ -34,7 +34,7 @@ require('proof')(3, async (okay) => {
 
             destructible.destroy()
         })
-        await destructible.rejected
+        await destructible.promise
         const vivified = await utilities.vivify(directory)
         okay(vivified, {
             '0.0': [ [ '0.1', null ] ],
@@ -74,6 +74,6 @@ require('proof')(3, async (okay) => {
 
             destructible.destroy()
         })
-        await destructible.rejected
+        await destructible.promise
     }
 })

@@ -43,6 +43,6 @@ require('proof')(1, async (okay) => {
             okay(items, [ 'a', 'b', 'c', 'a', 'b', 'c' ], 'raceed')
             destructible.destroy()
         })
-        await destructible.rejected
+        await destructible.promise
     }
 })
