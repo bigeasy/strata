@@ -23,11 +23,11 @@ require('proof')(3, async (okay) => {
             const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, cache, turnstile  })
             const instances = await fs.readdir(path.join(directory, 'instances'))
             okay(instances, [ '2' ], 'instance')
-            okay(cache.count, 1, 'cache not empty')
+            okay(cache.size, 1, 'cache not empty')
             destructible.destroy()
         })
         await destructible.promise
         cache.purge(0)
-        okay(cache.count, 0, 'cache empty')
+        okay(cache.size, 0, 'cache empty')
     }
 })

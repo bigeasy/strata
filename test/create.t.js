@@ -27,7 +27,7 @@ require('proof')(4, async (okay) => {
         await destructible.promise
 
         cache.purge(0)
-        okay(cache.count, 0, 'cache empty')
+        okay(cache.size, 0, 'cache empty')
 
         const vivified = await utilities.vivify(directory)
         okay(vivified, {
