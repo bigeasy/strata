@@ -4,7 +4,7 @@ require('proof')(3, async (okay) => {
     const Turnstile = require('turnstile')
 
     const Strata = require('../strata')
-    const Cache = require('magazine')
+    const Magazine = require('magazine')
 
     const utilities = require('../utilities')
     const path = require('path')
@@ -32,9 +32,10 @@ require('proof')(3, async (okay) => {
     {
         const destructible = new Destructible('merge.t')
         const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
-        const cache = new Cache
+        const pages = new Magazine
+        const handles = new Strata.HandleCache(new Magazine)
         destructible.rescue($ => $(), 'test', async () => {
-            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, cache, turnstile })
+            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, pages, handles, turnstile })
             const writes = {}
             const trampoline = new Trampoline
             strata.search(trampoline, 'e', cursor => {
@@ -51,22 +52,24 @@ require('proof')(3, async (okay) => {
             // error, like a `shutdown` error would stop it.
             await Strata.flush(writes)
 
+            await handles.shrink(0)
+
             destructible.destroy()
         })
         await destructible.promise
-        cache.purge(0)
-        okay(cache.heft, 0, 'cache purged')
+        pages.purge(0)
+        okay(pages.heft, 0, 'cache purged')
     }
     // Reopen.
     {
         const destructible = new Destructible('merge.t')
         const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
-        const cache = new Cache
+        const pages = new Magazine
+        const handles = new Strata.HandleCache(new Magazine)
         destructible.rescue($ => $(), 'test', async () => {
-            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, cache, turnstile })
+            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, pages, handles, turnstile })
             const trampoline = new Trampoline
             strata.search(trampoline, 'd', cursor => {
-                console.log(cursor.index, cursor.page.id, cursor.page.items)
                 okay(cursor.page.items[cursor.index].parts[0], 'd', 'found')
             })
             while (trampoline.seek()) {
@@ -76,13 +79,13 @@ require('proof')(3, async (okay) => {
         })
         await destructible.promise
     }
-    // Traverse.
     {
         const destructible = new Destructible('merge.t')
         const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
-        const cache = new Cache
+        const pages = new Magazine
+        const handles = new Strata.HandleCache(new Magazine)
         destructible.rescue($ => $(), 'test', async () => {
-            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, cache, turnstile })
+            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, pages, handles, turnstile })
             let right = 'a'
             const items = []
             do {

@@ -2,7 +2,7 @@ require('proof')(3, async (okay) => {
     const Destructible = require('destructible')
     const Turnstile = require('turnstile')
     const Strata = require('../strata')
-    const Cache = require('magazine')
+    const Magazine = require('magazine')
     const Trampoline = require('reciprocate')
     const utilities = require('../utilities')
     const path = require('path')
@@ -21,9 +21,10 @@ require('proof')(3, async (okay) => {
     {
         const destructible = new Destructible('delete.t')
         const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
-        const cache = new Cache
+        const pages = new Magazine
+        const handles = new Strata.HandleCache(new Magazine)
         destructible.rescue($ => $(), 'test', async () => {
-            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, cache, turnstile })
+            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, pages, handles, turnstile })
 
             const trampoline = new Trampoline, writes = {}
             strata.search(trampoline, 'a', cursor => cursor.remove(cursor.index, writes))
@@ -45,17 +46,18 @@ require('proof')(3, async (okay) => {
                 [ 'delete', 0 ]
             ]
         }, 'inserted')
-        cache.purge(0)
+        pages.purge(0)
         // **TODO** Cache purge broken.
-        okay(cache.heft, 0, 'cache purged')
+        okay(pages.heft, 0, 'cache purged')
     }
 
     {
         const destructible = new Destructible('delete.t')
         const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
-        const cache = new Cache
+        const pages = new Magazine
+        const handles = new Strata.HandleCache(new Magazine)
         destructible.rescue($ => $(), 'test', async () => {
-            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, cache, turnstile })
+            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, pages, handles, turnstile })
             let right = 'a'
             const items = []
             do {

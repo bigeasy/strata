@@ -1,5 +1,6 @@
 const crypto = require('crypto')
+const fnv = require('hash.fnv')
 
 module.exports = function (buffer) {
-    return crypto.createHash('sha1').update(buffer).digest('hex')
+    return fnv(0, buffer, 0, buffer.length)
 }

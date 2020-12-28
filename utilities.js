@@ -47,8 +47,8 @@ exports.vivify = async function (directory) {
                     records.push([ header.method, header.index ])
                     break
                 case 'load': {
-                        const { id, append } = header
-                        const load = (await fs.readFile(path.resolve(pages, id, append), 'utf8')).split(/\n/)
+                        const { page, log } = header
+                        const load = (await fs.readFile(path.resolve(pages, page, log), 'utf8')).split(/\n/)
                         load.pop()
                         entries.unshift.apply(entries, load.map(line => JSON.parse(line)))
                     }
@@ -57,11 +57,11 @@ exports.vivify = async function (directory) {
             }
             vivified[file] = records
         } else {
-            const hash = dir.filter(file => /^[0-9a-f]+$/.test(file)).pop()
-            const lines = (await fs.readFile(path.resolve(pages, file, hash), 'utf8')).split(/\n/)
+            const lines = (await fs.readFile(path.resolve(pages, file, 'page'), 'utf8')).split(/\n/)
             lines.pop()
             const entries = lines.map(line => JSON.parse(line))
             const items = []
+            shifter(entries)
             while (entries.length) {
                 const record = shifter(entries)
                 items.push([ record[0].id, record.length == 2 ? record[1] : null ])
@@ -83,9 +83,9 @@ exports.serialize = async function (directory, files) {
                     id: record[0]
                 }, record[1] != null ? [ Buffer.from(JSON.stringify(record[1])) ] : [])
             })
+            buffers.unshift(recordify({ length: files[id].length }, []))
             const buffer = Buffer.concat(buffers)
-            const hash = fnv(buffer)
-            const file = path.resolve(directory, 'pages', id, hash)
+            const file = path.resolve(directory, 'pages', id, 'page')
             await fs.writeFile(file, buffer)
         } else {
             let key = null
@@ -122,6 +122,7 @@ exports.serialize = async function (directory, files) {
         }
     }
     await fs.mkdir(path.resolve(directory, 'instances', String(instance)), { recursive: true })
+    await fs.mkdir(path.resolve(directory, 'balance'))
 }
 
 exports.alphabet = function (length, letters = 26) {

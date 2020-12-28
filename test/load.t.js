@@ -4,7 +4,7 @@ require('proof')(1, async (okay) => {
     const Turnstile = require('turnstile')
 
     const Strata = require('../strata')
-    const Cache = require('magazine')
+    const Magazine = require('magazine')
 
     const utilities = require('../utilities')
     const path = require('path')
@@ -18,9 +18,10 @@ require('proof')(1, async (okay) => {
     {
         const destructible = new Destructible('load.t')
         const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
-        const cache = new Cache
+        const pages = new Magazine
+        const handles = new Strata.HandleCache(new Magazine)
         destructible.rescue($ => $(), 'test', async () => {
-            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, cache, turnstile  })
+            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, pages, handles, turnstile  })
             let right = Strata.MIN
             const items = []
             function search () {
@@ -40,7 +41,7 @@ require('proof')(1, async (okay) => {
                     await trampoline.shift()
                 }
             }
-            okay(items, [ 'a', 'b', 'c', 'a', 'b', 'c' ], 'raceed')
+            okay(items, [ 'a', 'b', 'c', 'a', 'b', 'c' ], 'raced')
             destructible.destroy()
         })
         await destructible.promise

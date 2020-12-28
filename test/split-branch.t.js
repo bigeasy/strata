@@ -1,10 +1,10 @@
-require('proof')(3, async (okay) => {
+require('proof')(4, async (okay) => {
     const Trampoline = require('reciprocate')
     const Destructible = require('destructible')
     const Turnstile = require('turnstile')
 
     const Strata = require('../strata')
-    const Cache = require('magazine')
+    const Magazine = require('magazine')
     const utilities = require('../utilities')
     const path = require('path')
     const directory = path.join(utilities.directory, 'split-branch')
@@ -21,9 +21,10 @@ require('proof')(3, async (okay) => {
     {
         const destructible = new Destructible([ 'split-branch.t', 'split' ])
         const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
-        const cache = new Cache
+        const pages = new Magazine
+        const handles = new Strata.HandleCache(new Magazine)
         destructible.rescue($ => $(), 'test', async () => {
-            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, cache, turnstile  })
+            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, pages, handles, turnstile  })
             const trampoline = new Trampoline, writes = {}
             strata.search(trampoline, leaf[0], cursor => {
                 cursor.insert(cursor.index, leaf[0], leaf, writes)
@@ -31,20 +32,24 @@ require('proof')(3, async (okay) => {
             while (trampoline.seek()) {
                 await trampoline.shift()
             }
-            Strata.flush(writes)
+            await Strata.flush(writes)
+            await strata.drain()
             destructible.destroy()
         })
         await destructible.promise
-        cache.purge(0)
-        okay(cache.heft, 0, 'cache purged')
+        await handles.shrink(0)
+        pages.purge(0)
+        okay(handles.magazine.heft, 0, 'handles purged')
+        okay(pages.heft, 0, 'cache purged')
     }
     // Reopen.
     {
         const destructible = new Destructible([ 'split-branch.t', 'reopen' ])
         const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
-        const cache = new Cache
+        const pages = new Magazine
+        const handles = new Strata.HandleCache(new Magazine)
         destructible.rescue($ => $(), 'test', async () => {
-            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, cache, turnstile  })
+            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, pages, handles, turnstile  })
             const trampoline = new Trampoline
             strata.search(trampoline, leaf[0], cursor => {
                 okay(cursor.page.items[cursor.index].parts[0], leaf[0], 'found')
@@ -60,9 +65,10 @@ require('proof')(3, async (okay) => {
     {
         const destructible = new Destructible([ 'split-branch.t', 'traverse' ])
         const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
-        const cache = new Cache
+        const pages = new Magazine
+        const handles = new Strata.HandleCache(new Magazine)
         destructible.rescue($ => $(), 'test', async () => {
-            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, cache, turnstile  })
+            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, pages, handles, turnstile  })
             let right = leaf[0]
             const items = []
             do {

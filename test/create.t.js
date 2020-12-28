@@ -3,7 +3,7 @@ require('proof')(4, async (okay) => {
     const Turnstile = require('turnstile')
 
     const Strata = require('../strata')
-    const Cache = require('magazine')
+    const Magazine = require('magazine')
 
     const utilities = require('../utilities')
     const path = require('path')
@@ -17,17 +17,18 @@ require('proof')(4, async (okay) => {
     {
         const destructible = new Destructible('create.t')
         const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
-        const cache = new Cache
+        const pages = new Magazine
+        const handles = new Strata.HandleCache(new Magazine)
         destructible.rescue($ => $(), 'test', async () => {
-            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, cache, turnstile, create: true  })
+            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, pages, handles, turnstile, create: true  })
             okay(strata.compare('a', 'a'), 0, 'compare')
             okay(strata.extract([ 'a' ]), 'a', 'extract')
             destructible.destroy()
         })
         await destructible.promise
 
-        cache.purge(0)
-        okay(cache.size, 0, 'cache empty')
+        pages.purge(0)
+        okay(pages.size, 0, 'cache empty')
 
         const vivified = await utilities.vivify(directory)
         okay(vivified, {
@@ -39,9 +40,10 @@ require('proof')(4, async (okay) => {
     {
         const destructible = new Destructible('create.t')
         const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
-        const cache = new Cache
+        const pages = new Magazine
+        const handles = new Strata.HandleCache(new Magazine)
         destructible.rescue($ => $(), 'test', async () => {
-            await Strata.open(destructible.durable($ => $(), 'strata'), { directory, cache, turnstile })
+            await Strata.open(destructible.durable($ => $(), 'strata'), { directory, pages, handles, turnstile })
             destructible.destroy()
         })
         await destructible.promise

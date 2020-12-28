@@ -1,4 +1,4 @@
-require('proof')(2, async (okay) => {
+require('proof')(3, async (okay) => {
     const path = require('path')
 
     const Turnstile = require('turnstile')
@@ -6,19 +6,20 @@ require('proof')(2, async (okay) => {
     const Destructible = require('destructible')
 
     const Strata = require('../strata')
-    const Cache = require('magazine')
+    const Magazine = require('magazine')
 
     const utilities = require('../utilities')
 
     const directory = path.join(utilities.directory, 'insert')
     await utilities.reset(directory)
 
-    const cache = new Cache
+    const pages = new Magazine
+    const handles = new Strata.HandleCache(new Magazine)
 
     const destructible = new Destructible($ => $(), 5000, 'insert.t')
     const turnstile = new Turnstile(destructible.durable('turnstile'))
     destructible.rescue($ => $(), 'test', async () => {
-        const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { turnstile, directory, cache, create: true })
+        const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { turnstile, directory, pages, handles, create: true })
 
         const writes = {}
 
@@ -33,14 +34,17 @@ require('proof')(2, async (okay) => {
 
         await Strata.flush(writes)
 
+        await strata.handles.shrink(0)
+
         destructible.destroy()
     })
 
     await destructible.promise
 
-    cache.purge(0)
+    pages.purge(0)
 
-    okay(cache.heft, 0, 'cache empty')
+    okay(handles.magazine.size, 0, 'handles purged')
+    okay(pages.heft, 0, 'cache empty')
 
     const vivified = await utilities.vivify(directory)
     okay(vivified, {

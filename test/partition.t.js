@@ -1,4 +1,4 @@
-require('proof')(12, async okay => {
+require('proof')(15, async okay => {
     const partition = require('../partition')
 
     {
@@ -28,7 +28,7 @@ require('proof')(12, async okay => {
     const Destructible = require('destructible')
 
     const Strata = require('..')
-    const Cache = require('magazine')
+    const Magazine = require('magazine')
 
     const ascension = require('ascension')
     const whittle = require('whittle')
@@ -41,9 +41,10 @@ require('proof')(12, async okay => {
     {
         const destructible = new Destructible('partition.t')
         const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
-        const cache = new Cache
+        const pages = new Magazine
+        const handles = new Strata.HandleCache(new Magazine)
         destructible.rescue($ => $(), 'test', async () => {
-            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, cache, turnstile, comparator, create: true })
+            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, pages, handles, turnstile, comparator, create: true })
             const trampoline = new Trampoline, writes = {}
             strata.search(trampoline, { value: 'a', index: 0 }, cursor => {
                 for (let i = 0; i < 10; i++) {
@@ -59,15 +60,18 @@ require('proof')(12, async okay => {
             destructible.destroy()
         })
         await destructible.promise
-        cache.purge(0)
-        okay(cache.heft, 0, 'cache purged insert')
+        pages.purge(0)
+        await handles.shrink(0)
+        okay(pages.heft, 0, 'pages purged insert')
+        okay(handles.magazine.heft, 0, 'handles purged insert')
     }
     {
         const destructible = new Destructible('partition.t')
         const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
-        const cache = new Cache
+        const pages = new Magazine
+        const handles = new Strata.HandleCache(new Magazine)
         destructible.rescue($ => $(), 'test', async () => {
-            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, cache, turnstile, comparator })
+            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, pages, handles, turnstile, comparator })
             const writes = {}
             const trampoline = new Trampoline
             strata.search(trampoline, { value: 'a', index: 0 }, cursor => {
@@ -83,15 +87,18 @@ require('proof')(12, async okay => {
             destructible.destroy()
         })
         await destructible.promise
-        cache.purge(0)
-        okay(cache.heft, 0, 'cache purged unsplit')
+        pages.purge(0)
+        await handles.shrink(0)
+        okay(pages.heft, 0, 'pages purged insert')
+        okay(handles.magazine.heft, 0, 'handles purged unsplit')
     }
     {
         const destructible = new Destructible('partition.t')
         const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
-        const cache = new Cache
+        const pages = new Magazine
+        const handles = new Strata.HandleCache(new Magazine)
         destructible.rescue($ => $(), 'test', async () => {
-            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, cache, turnstile, comparator })
+            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, pages, handles, turnstile, comparator })
             const trampoline = new Trampoline
             strata.search(trampoline, { value: 'a', index: 0 }, cursor => {
                 okay(cursor.page.items.length, 10, 'split')
@@ -103,7 +110,9 @@ require('proof')(12, async okay => {
             destructible.destroy()
         })
         await destructible.promise
-        cache.purge(0)
-        okay(cache.heft, 0, 'cache purged split')
+        pages.purge(0)
+        await handles.shrink(0)
+        okay(pages.heft, 0, 'pages purged insert')
+        okay(handles.magazine.heft, 0, 'handles purged split')
     }
 })

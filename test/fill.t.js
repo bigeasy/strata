@@ -1,10 +1,10 @@
-require('proof')(3, async (okay) => {
+require('proof')(4, async (okay) => {
     const Trampoline = require('reciprocate')
     const Destructible = require('destructible')
     const Turnstile = require('turnstile')
 
     const Strata = require('../strata')
-    const Cache = require('magazine')
+    const Magazine = require('magazine')
 
     const utilities = require('../utilities')
     const path = require('path')
@@ -52,9 +52,10 @@ require('proof')(3, async (okay) => {
     {
         const destructible = new Destructible('fill.t')
         const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
-        const cache = new Cache
+        const pages = new Magazine
+        const handles = new Strata.HandleCache(new Magazine)
         destructible.rescue($ => $(), 'test', async () => {
-            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, cache, turnstile  })
+            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, pages, handles, turnstile  })
             // TODO Come back and insert an error into `remove`. Then attempt to
             // resolve that error somehow into `flush`. Implies that Turnstile
             // propagates an error. Essentially, how do you get the foreground
@@ -73,16 +74,19 @@ require('proof')(3, async (okay) => {
             destructible.destroy()
         })
         await destructible.promise
-        cache.purge(0)
-        okay(cache.heft, 0, 'cache purged')
+        pages.purge(0)
+        await handles.shrink(0)
+        okay(pages.heft, 0, 'pages purged')
+        okay(handles.magazine.heft, 0, 'handles purged')
     }
     // Reopen.
     {
         const destructible = new Destructible([ 'fill.t', 'reopen' ])
         const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
-        const cache = new Cache
+        const pages = new Magazine
+        const handles = new Strata.HandleCache(new Magazine)
         destructible.rescue($ => $(), 'test', async () => {
-            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, cache, turnstile  })
+            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, pages, handles, turnstile  })
             const trampoline = new Trampoline
             strata.search(trampoline, 'c', cursor => {
                 okay(cursor.page.items[cursor.index].parts[0], 'c', 'found')
@@ -98,9 +102,10 @@ require('proof')(3, async (okay) => {
     {
         const destructible = new Destructible([ 'fill.t', 'traverse' ])
         const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
-        const cache = new Cache
+        const pages = new Magazine
+        const handles = new Strata.HandleCache(new Magazine)
         destructible.rescue($ => $(), 'test', async () => {
-            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, cache, turnstile  })
+            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, pages, handles, turnstile  })
             let right = 'a'
             const items = [], trampoline = new Trampoline
             do {
