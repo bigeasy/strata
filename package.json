@@ -32,7 +32,7 @@
                             "fracture":                     "0.3.0-alpha.23",
                             "hash.fnv":                     "^1.0.5",
                             "interrupt":                    "11.0.0-alpha.14",
-                            "journalist":                   "0.1.16",
+                            "journalist":                   "0.1.15",
                             "magazine":                     "6.0.0-alpha.4",
                             "rescue":                       "7.0.0-alpha.8",
                             "staccato":                     "^12.0.6",
