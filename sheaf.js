@@ -217,9 +217,9 @@ class Sheaf {
     create (strata) {
         return this._destructible.exceptional('create', async () => {
             const directory = this.directory
-            const stat = await Journalist.Error.resolve(fs.stat(directory), 'IO_ERROR')
+            const stat = await Strata.Error.resolve(fs.stat(directory), 'IO_ERROR')
             Strata.Error.assert(stat.isDirectory(), 'CREATE_NOT_DIRECTORY', { directory })
-            const dir = await Journalist.Error.resolve(fs.readdir(directory), 'IO_ERROR')
+            const dir = await Strata.Error.resolve(fs.readdir(directory), 'IO_ERROR')
             Strata.Error.assert(dir.every(file => /^\./.test(file)), 'CREATE_NOT_EMPTY', { directory })
             await Strata.Error.resolve(fs.mkdir(this._path('instances')), 'IO_ERROR')
             await Strata.Error.resolve(fs.mkdir(this._path('pages')), 'IO_ERROR')
@@ -264,9 +264,9 @@ class Sheaf {
                 .map(file => +file)
                 .sort((left, right) => right - left)
             this.instance = instances[0] + 1
-            await Journalist.Error.resolve(fs.mkdir(this._path('instances', this.instance)), 'IO_ERROR')
+            await Strata.Error.resolve(fs.mkdir(this._path('instances', this.instance)), 'IO_ERROR')
             for (const instance of instances) {
-                await Journalist.Error.resolve(fs.rmdir(this._path('instances', instance)), 'IO_ERROR')
+                await Strata.Error.resolve(fs.rmdir(this._path('instances', instance)), 'IO_ERROR')
             }
             return strata
         })
