@@ -12,46 +12,13 @@ class Strata {
     static MAX = Symbol('MAX')
 
     static Error = require('./error')
-    //
-
-    // **TODO** Really need to think of some rules for failure. They may be
-    // interim rules, like alpha release rules. For now we ask that you let
-    // stuff crash, provide as much detail as Strata will provide, we
-    // probably can't fix anything other than to try to make those crash
-    // reports better for the future.
-
-    // `libuv` suppresses `EPROGRESS` and `EINTR` errors treating them as
-    // successful, so the only remaining error would be `EIO` which probably
-    // means that the file is corrupt.
-
-    // We want this class to be independent of an particular strata so it
-    // can be shared.
-
-    //
-    static HandleCache = class extends Magazine.OpenClose {
-        constructor (magazine, sync = true) {
-            super(magazine)
-            this._sync = sync
-        }
-        subordinate () {
-            return this._subordinate(new HandleCache(this._sync))
-        }
-        async open (filename) {
-            return await Strata.Error.resolve(fs.open(filename, 'a'), 'IO_ERROR')
-        }
-        async close (handle) {
-            if (this._sync) {
-                await Strata.Error.resolve(handle.sync(), 'IO_ERROR')
-            }
-            await Strata.Error.resolve(handle.close(), 'IO_ERROR')
-        }
-    }
 
     constructor (destructible, options) {
         this.destructible = destructible
         this._sheaf = new Sheaf(destructible, options)
         const { comparator, extractor }  = this._sheaf
         this.compare = function (left, right) { return comparator.leaf(left, right) }
+        console.log('called', this.compare)
         this.extract = function (parts) { return extractor(parts) }
     }
 
@@ -66,6 +33,18 @@ class Strata {
 
     get handles () {
         return this._sheaf.handles
+    }
+
+    get extractor () {
+        return this._sheaf.extractor
+    }
+
+    get serializer () {
+        return this._sheaf.serializer
+    }
+
+    get checksum () {
+        return this._sheaf.checksum
     }
 
     // What was the lock for? It was to ensure that another strand doesn't

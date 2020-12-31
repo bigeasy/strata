@@ -29,7 +29,7 @@
     {
                             "ascension":                    "^3.0.0-alpha.0",
                             "extant":                       "^1.0.11",
-                            "fracture":                     "0.3.0-alpha.23",
+                            "fracture":                     "0.3.0-alpha.24",
                             "hash.fnv":                     "^1.0.5",
                             "interrupt":                    "11.0.0-alpha.14",
                             "journalist":                   "0.1.17",
@@ -39,11 +39,12 @@
                             "prospective":                  "^0.3.0",
                             "transcript":                   "0.1.3",
                             "turnstile":                    "6.0.0-alpha.42",
-                            "whittle":                      "0.0.0"
+                            "whittle":                      "0.0.0",
+                            "writeahead":                   "0.0.4"
     },
     "devDependencies":
     {
-                            "destructible":                 "7.0.0-alpha.27",
+                            "destructible":                 "7.0.0-alpha.29",
                             "proof":                        "^9.0.2",
                             "reciprocate":                  "0.0.3"
     },

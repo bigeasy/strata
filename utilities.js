@@ -1,9 +1,9 @@
 const path = require('path')
 const fileSystem = require('fs')
 const fs = require('fs').promises
-const shifter = require('./shifter')(() => '0')
 const recorder = require('transcript/recorder').create(() => '0')
-const fnv = require('./fnv')
+
+const FileSystem = require('./filesystem')
 
 function recordify (header, parts) {
     return recorder([[ Buffer.from(JSON.stringify(header)) ].concat(parts)])
@@ -19,56 +19,24 @@ exports.reset = async function (directory) {
 }
 
 exports.vivify = async function (directory) {
+    const reader = new FileSystem.Reader(directory)
     const vivified = {}
-    const pages = path.join(directory, 'pages')
-    for (let file of await fs.readdir(pages)) {
-        if (!/^\d+.\d+$/.test(file)) {
-            continue
-        }
-        const dir = await fs.readdir(path.resolve(directory, 'pages', file))
-        if (+file.split('.')[1] % 2 == 1) {
-            const append = dir.filter(function (file) {
-                return /^\d+\.\d+(?:\.[0-9a-f]+)?$/.test(file)
-            }).sort(appendable).pop()
-            const lines = (await fs.readFile(path.resolve(pages, file, append), 'utf8')).split(/\n/)
-            lines.pop()
-            const entries = lines.map(line => JSON.parse(line))
-            const records = []
-            while (entries.length != 0) {
-                const record = shifter(entries), header = record[0]
-                switch (header.method) {
-                case 'right':
-                    records.push([ header.method, header.right ])
-                    break
-                case 'insert':
-                    records.push([ header.method, header.index, record[1] ])
-                    break
-                case 'delete':
-                    records.push([ header.method, header.index ])
-                    break
-                case 'load': {
-                        const { page, log } = header
-                        const load = (await fs.readFile(path.resolve(pages, page, log), 'utf8')).split(/\n/)
-                        load.pop()
-                        entries.unshift.apply(entries, load.map(line => JSON.parse(line)))
-                    }
-                    break
-                }
+    async function vivify (id) {
+        const { page } = await reader.page(id)
+        if (page.leaf) {
+            const items = vivified[id] = page.items.map((item, index) => [ 'insert', index, item.parts[0] ])
+            if (page.right) {
+                items.push([ 'right', page.right[0] ])
             }
-            vivified[file] = records
         } else {
-            const lines = (await fs.readFile(path.resolve(pages, file, 'page'), 'utf8')).split(/\n/)
-            lines.pop()
-            const entries = lines.map(line => JSON.parse(line))
-            const items = []
-            shifter(entries)
-            while (entries.length) {
-                const record = shifter(entries)
-                items.push([ record[0].id, record.length == 2 ? record[1] : null ])
+            console.log(page.items)
+            const items = vivified[id] = page.items.map(item => [ item.id, item.key == null ? null : item.key[0] ])
+            for (const item of items) {
+                await vivify(item[0])
             }
-            vivified[file] = items
         }
     }
+    await vivify('0.0')
     return vivified
 }
 
@@ -110,7 +78,7 @@ exports.serialize = async function (directory, files) {
                         parts: []
                     }
                 default:
-                    console.log(record)
+                    console.log('?', record)
                     break
                 }
             }).map(entry => recordify(entry.header, entry.parts))

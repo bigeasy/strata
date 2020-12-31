@@ -1,27 +1,11 @@
-require('proof')(1, async (okay) => {
+require('proof')(5, async (okay) => {
     const Trampoline = require('reciprocate')
-    const Destructible = require('destructible')
-    const Turnstile = require('turnstile')
+    const Strata = require('..')
 
-    const Strata = require('../strata')
-    const Magazine = require('magazine')
+    const test = require('./test')
 
-    const utilities = require('../utilities')
-    const path = require('path')
-    const directory = path.join(utilities.directory, 'split')
-    await utilities.reset(directory)
-    await utilities.serialize(directory, {
-        '0.0': [[ '0.1', null ], [ '1.1', 'd' ], [ '1.3', 'g' ]],
-        '0.1': [[ 'insert', 0, 'a' ], [ 'insert', 1, 'b' ], [ 'insert', 2, 'c' ]]
-    })
-
-    {
-        const destructible = new Destructible('load.t')
-        const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
-        const pages = new Magazine
-        const handles = new Strata.HandleCache(new Magazine)
-        destructible.rescue($ => $(), 'test', async () => {
-            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, pages, handles, turnstile  })
+    for await (const harness of test('create', okay)) {
+        await harness($ => $(), 'open', async ({ strata, prefix, directory, pages }) => {
             let right = Strata.MIN
             const items = []
             function search () {
@@ -42,8 +26,11 @@ require('proof')(1, async (okay) => {
                 }
             }
             okay(items, [ 'a', 'b', 'c', 'a', 'b', 'c' ], 'raced')
-            destructible.destroy()
+        }, {
+            serialize: {
+                '0.0': [[ '0.1', null ], [ '1.1', 'd' ], [ '1.3', 'g' ]],
+                '0.1': [[ 'insert', 0, 'a' ], [ 'insert', 1, 'b' ], [ 'insert', 2, 'c' ]]
+            }
         })
-        await destructible.promise
     }
 })

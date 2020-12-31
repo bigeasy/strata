@@ -1,6 +1,11 @@
 const fs = require('fs').promises
 const Strata = { Error: require('./error') }
 
+// https://stackoverflow.com/a/41976600
+// https://stackoverflow.com/questions/694188/when-does-the-write-system-call-write-all-of-the-requested-buffer-versus-just
+// https://stackoverflow.com/questions/31737793/posix-partial-write?rq=1
+// https://stackoverflow.com/questions/694188/when-does-the-write-system-call-write-all-of-the-requested-buffer-versus-just#comment70956787_694239
+
 exports.append = async function (handle, flush, generator, sandwich = null) {
     let buffered = 0, size = 0
     const buffers = []

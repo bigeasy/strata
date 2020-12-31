@@ -1,91 +1,58 @@
-require('proof')(3, async (okay) => {
+require('proof')(13, async (okay) => {
     const Trampoline = require('reciprocate')
-    const Destructible = require('destructible')
-    const Turnstile = require('turnstile')
-
     const Strata = require('../strata')
-    const Magazine = require('magazine')
 
-    const utilities = require('../utilities')
-    const path = require('path')
-    const directory = path.join(utilities.directory, 'merge')
-    await utilities.reset(directory)
-    await utilities.serialize(directory, {
-        '0.0': [[ '0.1', null ], [ '0.3', 'd' ]],
-        '0.1': [[
-            'right', '0.3'
-        ], [
-            'insert', 0, 'a'
-        ], [
-            'insert', 1, 'b'
-        ], [
-            'insert', 2, 'c'
-        ]],
-        '0.3': [[
-            'insert', 0, 'd'
-        ], [
-            'insert', 1, 'e'
-        ]]
-    })
+    const test = require('./test')
 
-    // Merge.
-    {
-        const destructible = new Destructible('merge.t')
-        const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
-        const pages = new Magazine
-        const handles = new Strata.HandleCache(new Magazine)
-        destructible.rescue($ => $(), 'test', async () => {
-            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, pages, handles, turnstile })
-            const writes = {}
-            const trampoline = new Trampoline
+    for await (const harness of test('merge', okay, [ 'fileSystem', 'writeahead' ])) {
+        await harness($ => $(), 'merge', async ({ strata, prefix }) => {
+            console.log('called', prefix)
+            const trampoline = new Trampoline, writes = {}
             strata.search(trampoline, 'e', cursor => {
                 cursor.remove(cursor.index, writes)
             })
             while (trampoline.seek()) {
                 await trampoline.shift()
             }
-            // TODO Come back and insert an error into `remove`. Then attempt to
-            // resolve that error somehow into `flush`. Implies that Turnstile
-            // propagates an error. Essentially, how do you get the foreground to
-            // surrender when the background has failed. `flush` could be waiting on
-            // a promise when the background fails and hang indefinately. Any one
-            // error, like a `shutdown` error would stop it.
             await Strata.flush(writes)
-
-            await handles.shrink(0)
-
-            destructible.destroy()
+            // TODO (This is now very old.) Come back and insert an error into
+            // `remove`. Then attempt to resolve that error somehow into
+            // `flush`. Implies that Turnstile propagates an error. Essentially,
+            // how do you get the foreground to surrender when the background
+            // has failed. `flush` could be waiting on a promise when the
+            // background fails and hang indefinately. Any one error, like a
+            // `shutdown` error would stop it.
+            await Strata.flush(writes)
+            await strata.drain()
+        }, {
+            serialize: {
+                '0.0': [[ '0.1', null ], [ '0.3', 'd' ]],
+                '0.1': [[
+                    'right', '0.3'
+                ], [
+                    'insert', 0, 'a'
+                ], [
+                    'insert', 1, 'b'
+                ], [
+                    'insert', 2, 'c'
+                ]],
+                '0.3': [[
+                    'insert', 0, 'd'
+                ], [
+                    'insert', 1, 'e'
+                ]]
+            }
         })
-        await destructible.promise
-        pages.purge(0)
-        okay(pages.heft, 0, 'cache purged')
-    }
-    // Reopen.
-    {
-        const destructible = new Destructible('merge.t')
-        const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
-        const pages = new Magazine
-        const handles = new Strata.HandleCache(new Magazine)
-        destructible.rescue($ => $(), 'test', async () => {
-            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, pages, handles, turnstile })
+        await harness($ => $(), 'reopen', async ({ strata, prefix }) => {
             const trampoline = new Trampoline
             strata.search(trampoline, 'd', cursor => {
-                okay(cursor.page.items[cursor.index].parts[0], 'd', 'found')
+                okay(cursor.page.items[cursor.index].parts[0], 'd', `${prefix} found`)
             })
             while (trampoline.seek()) {
                 await trampoline.shift()
             }
-            destructible.destroy()
         })
-        await destructible.promise
-    }
-    {
-        const destructible = new Destructible('merge.t')
-        const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
-        const pages = new Magazine
-        const handles = new Strata.HandleCache(new Magazine)
-        destructible.rescue($ => $(), 'test', async () => {
-            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, pages, handles, turnstile })
+        await harness($ => $(), 'traverse', async ({ strata, prefix }) => {
             let right = 'a'
             const items = []
             do {
@@ -100,9 +67,7 @@ require('proof')(3, async (okay) => {
                     await trampoline.shift()
                 }
             } while (right != null)
-            okay(items, [ 'a', 'b', 'c', 'd' ], 'traverse')
-            destructible.destroy()
+            okay(items, [ 'a', 'b', 'c', 'd' ], `${prefix} traverse`)
         })
-        await destructible.promise
     }
 })

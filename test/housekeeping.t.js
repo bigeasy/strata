@@ -3,30 +3,14 @@
 // page has shrunk and is no longer ready to split.
 
 //
-require('proof')(1, async (okay) => {
+require('proof')(5, async (okay) => {
     const Trampoline = require('reciprocate')
-    const Destructible = require('destructible')
-    const Turnstile = require('turnstile')
+    const Strata = require('..')
 
-    const Strata = require('../strata')
-    const Magazine = require('magazine')
+    const test = require('./test')
 
-    const utilities = require('../utilities')
-    const path = require('path')
-    const directory = path.join(utilities.directory, 'split')
-    await utilities.reset(directory)
-    await utilities.serialize(directory, {
-        '0.0': [[ '0.1', null ]],
-        '0.1': [[ 'insert', 0, 'a' ], [ 'insert', 1, 'b' ], [ 'insert', 2, 'c' ], [ 'insert', 3, 'd' ]]
-    })
-
-    {
-        const destructible = new Destructible('housekeeping.t')
-        const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
-        const pages = new Magazine
-        const handles = new Strata.HandleCache(new Magazine)
-        destructible.rescue($ => $(), 'test', async () => {
-            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { directory, pages, handles, turnstile  })
+    for await (const harness of test('create', okay)) {
+        await harness($ => $(), 'open', async ({ strata, prefix, directory, pages }) => {
             const items = []
             const trampoline = new Trampoline
             strata.search(trampoline, 'e', cursor => {
@@ -43,8 +27,11 @@ require('proof')(1, async (okay) => {
                 await trampoline.shift()
             }
             okay('true')
-            destructible.destroy()
+        }, {
+            serialize: {
+                '0.0': [[ '0.1', null ]],
+                '0.1': [[ 'insert', 0, 'a' ], [ 'insert', 1, 'b' ], [ 'insert', 2, 'c' ], [ 'insert', 3, 'd' ]]
+            }
         })
-        await destructible.promise
     }
 })

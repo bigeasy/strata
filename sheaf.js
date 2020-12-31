@@ -1,3 +1,5 @@
+'use strict'
+
 // Sort function generator.
 const ascension = require('ascension')
 // Comparator decorator that extracts the sorted fields from an object.
@@ -28,7 +30,7 @@ const Journalist = require('journalist')
 const Fracture = require('fracture')
 
 // A non-crypographic (fast) 32-bit hash for record integrity.
-const fnv = require('./fnv')
+// const fnv = require('./fnv')
 
 // Serialize a single b-tree record.
 const Recorder = require('transcript/recorder')
@@ -53,9 +55,6 @@ function traceIf (condition) {
     return function () {}
 }
 
-// Sort function for file names that orders by their creation order.
-const appendable = require('./appendable')
-
 // An `Error` type specific to Strata.
 const Strata = { Error: require('./error') }
 
@@ -63,10 +62,6 @@ const Strata = { Error: require('./error') }
 function latch () {
     let capture
     return { unlocked: false, promise: new Promise(resolve => capture = { resolve }), ...capture }
-}
-
-function _path (...vargs) {
-    return path.join.apply(path, vargs.map(varg => String(varg)))
 }
 
 // Sheaf is the crux of Strata. It exists as a separate object possibly for
@@ -82,30 +77,14 @@ class Sheaf {
     static _instance = 0
     static __instance = 0
 
-    // Sheaf accepts the destructible and user options passed to `new Strata`
-    constructor (destructible, options) {
-        Strata.Error.assert(options.turnstile != null, 'OPTION_REQUIRED', { _option: 'turnstile' })
-        Strata.Error.assert(options.directory != null, 'OPTION_REQUIRED', { _option: 'directory' })
-        assert(destructible.isDestroyedIfDestroyed(options.turnstile.destructible))
-
-        const leaf = coalesce(options.leaf, {})
-
-        this._instance = Sheaf._instance++
-        this.leaf = {
-            split: coalesce(leaf.split, 5),
-            merge: coalesce(leaf.merge, 1)
+    static options (options) {
+        if (options.checksum == null) {
+            options.checksum = (() => '0')
         }
-        const branch = coalesce(options.branch, {})
-        this.branch = {
-            split: coalesce(branch.split, 5),
-            merge: coalesce(branch.merge, 1)
+        if (options.extractor == null) {
+            options.extractor = parts => parts[0]
         }
-        this.pages = options.pages
-        this.handles = options.handles
-        this.instance = 0
-        this.directory = options.directory
-        this._checksum = options.checksum || fnv
-        this.serializer = function () {
+        options.serializer = function () {
             const serializer = coalesce(options.serializer, 'json')
             switch (serializer) {
             case 'json':
@@ -120,6 +99,9 @@ class Sheaf {
                     },
                     key: {
                         serialize: function (key) {
+                            if (key == null) {
+                                throw new Error
+                            }
                             return [ Buffer.from(JSON.stringify(key)) ]
                         },
                         deserialize: function (parts) {
@@ -142,11 +124,17 @@ class Sheaf {
                 return serializer
             }
         } ()
-        this.extractor = coalesce(options.extractor, parts => parts[0])
-        // **TODO** Dead code.
-        if (options.comparator == null) {
+        const leaf = coalesce(options.leaf, {})
+        options.leaf = {
+            split: coalesce(leaf.split, 5),
+            merge: coalesce(leaf.merge, 1)
         }
-        this.comparator = function () {
+        const branch = coalesce(options.branch, {})
+        options.branch = {
+            split: coalesce(branch.split, 5),
+            merge: coalesce(branch.merge, 1)
+        }
+        options.comparator = function () {
             const zero = object => object
             if (options.comparator == null) {
                 const comparator = whittle(ascension([ String ]), value => [ value ])
@@ -157,19 +145,39 @@ class Sheaf {
                 return options.comparator
             }
         } ()
-        this.$_recorder = Recorder.create(() => '0')
+        return options
+    }
+
+    // Sheaf accepts the destructible and user options passed to `new Strata`
+    constructor (destructible, options) {
+        Strata.Error.assert(options.turnstile != null, 'OPTION_REQUIRED', { _option: 'turnstile' })
+        assert(destructible.isDestroyedIfDestroyed(options.turnstile.destructible))
+
+        this.options = Sheaf.options(options)
+
+        this.pages = options.pages
+        this.directory = options.directory
+        this.checksum = options.checksum
+        this.serializer = options.serializer
+        this.extractor = options.extractor
+        this.comparator = options.comparator
+        this.serializer = options.serializer
+        this.leaf = options.leaf
+        this.branch = options.branch
+
+        this.storage = options.storage.create(this)
+
+        this._recorder = Recorder.create(() => '0')
         this._root = null
+
+        this._id = 0
+        this._destructible = destructible
 
         // **TODO** Do not worry about wrapping anymore.
         // Operation id wraps at 32-bits, cursors should not be open that long.
         this._operationId = 0xffffffff
-
-
         // Concurrency and work queues. One keyed queue for page writes, the
         // other queue will only use a single key for all housekeeping.
-
-        // **TODO** With `Fracture` we can probably start to do balancing in
-        // parallel.
         this._fracture = {
             appender: new Fracture(destructible.durable($ => $(), 'appender'), options.turnstile, id => ({
                 id: this._operationId = (this._operationId + 1 & 0xffffffff) >>> 0,
@@ -184,12 +192,14 @@ class Sheaf {
 
         options.turnstile.deferrable.increment()
 
-        this._id = 0
         this.closed = false
         this.destroyed = false
-        this._destructible = destructible
-        this._leftovers = []
+
+
+        // **TODO** Not yet used, would `mkdir` any pages that need to be
+        // inspected for balance.
         this._canceled = new Set
+
         destructible.destruct(() => {
             this.destroyed = true
             destructible.ephemeral('shutdown', async () => {
@@ -215,182 +225,23 @@ class Sheaf {
     }
 
     create (strata) {
+        this._root = this._create({ id: -1, leaf: false, items: [{ id: '0.0' }] }, [])
         return this._destructible.exceptional('create', async () => {
-            const directory = this.directory
-            const stat = await Strata.Error.resolve(fs.stat(directory), 'IO_ERROR')
-            Strata.Error.assert(stat.isDirectory(), 'CREATE_NOT_DIRECTORY', { directory })
-            const dir = await Strata.Error.resolve(fs.readdir(directory), 'IO_ERROR')
-            Strata.Error.assert(dir.every(file => /^\./.test(file)), 'CREATE_NOT_EMPTY', { directory })
-            await Strata.Error.resolve(fs.mkdir(this._path('instances')), 'IO_ERROR')
-            await Strata.Error.resolve(fs.mkdir(this._path('pages')), 'IO_ERROR')
-            await Strata.Error.resolve(fs.mkdir(this._path('balance')), 'IO_ERROR')
-            this._root = this._create({ id: -1, leaf: false, items: [{ id: '0.0' }] }, [])
-            await Strata.Error.resolve(fs.mkdir(this._path('instances', '0'), { recursive: true }), 'IO_ERROR')
-            await Strata.Error.resolve(fs.mkdir(this._path('page'), { recursive: true }), 'IO_ERROR')
-            await Strata.Error.resolve(fs.mkdir(this._path('balance', '0.0'), { recursive: true }), 'IO_ERROR')
-            await Strata.Error.resolve(fs.mkdir(this._path('balance', '0.1')), 'IO_ERROR')
-            const buffers = [ this._recordify({ length: 1 }), this._recordify({ id: '0.1' }, []) ]
-            await Strata.Error.resolve(fs.writeFile(this._path('balance', '0.0', 'page'), Buffer.concat(buffers), { flags: 'as' }), 'IO_ERROR')
-            const zero = this._recordify({ method: '0.0' })
-            await Strata.Error.resolve(fs.writeFile(this._path('balance', '0.1', '0.0'), zero, { flags: 'as' }), 'IO_ERROR')
-            const one = this._recordify({ method: 'load', page: '0.1', log: '0.0' })
-            await Strata.Error.resolve(fs.writeFile(this._path('balance', '0.1', '0.1'), one, { flags: 'as' }), 'IO_ERROR')
-            const journalist = await Journalist.create(directory)
-            journalist.message({ method: 'done', previous: 'create' })
-            journalist.mkdir('pages/0.0')
-            journalist.mkdir('pages/0.1')
-            journalist.rename('balance/0.0/page', 'pages/0.0/page')
-            journalist.rename('balance/0.1/0.0', 'pages/0.1/0.0')
-            journalist.rename('balance/0.1/0.1', 'pages/0.1/0.1')
-            journalist.rmdir('balance/0.0')
-            journalist.rmdir('balance/0.1')
-            await journalist.prepare()
-            await journalist.commit()
-            await journalist.dispose()
-            this._id++
-            this._id++
-            this._id++
+            await this.storage.create()
             return strata
         })
     }
 
     open (strata) {
+        this._root = this._create({ id: -1, leaf: false, items: [{ id: '0.0' }] }, [])
         return this._destructible.exceptional('open', async () => {
-            // TODO Run commit log on reopen.
-            this._root = this._create({ id: -1, items: [{ id: '0.0' }] }, [])
-            const dir = await Strata.Error.resolve(fs.readdir(this._path('instances')), 'IO_ERROR')
-            const instances = dir
-                .filter(file => /^\d+$/.test(file))
-                .map(file => +file)
-                .sort((left, right) => right - left)
-            this.instance = instances[0] + 1
-            await Strata.Error.resolve(fs.mkdir(this._path('instances', this.instance)), 'IO_ERROR')
-            for (const instance of instances) {
-                await Strata.Error.resolve(fs.rmdir(this._path('instances', instance)), 'IO_ERROR')
-            }
+            await this.storage.open()
             return strata
         })
     }
 
-    async _hashable (id) {
-        const regex = /^[a-z0-9]+$/
-        const dir = await fs.readdir(this._path('pages', id))
-        const files = dir.filter(file => regex.test(file))
-        assert.equal(files.length, 1, `multiple branch page files: ${id}, ${files}`)
-        return files.pop()
-    }
-
-    async _appendable (id) {
-        const dir = await fs.readdir(this._path('pages', id))
-        return dir.filter(file => /^\d+\.\d+$/.test(file)).sort(appendable).pop()
-    }
-
-    async _read (id, log) {
-        const state = { merged: null, split: null, heft: 0 }
-        const page = {
-            id,
-            leaf: true,
-            items: [],
-            key: null,
-            right: null,
-            log: { id: log, page: id, loaded: [], replaceable: false },
-            split: null,
-            merged: null,
-            deletes: 0
-        }
-        const player = new Player(function () { return '0' })
-        const buffer = Buffer.alloc(1024 * 1024)
-        for await (const { entries } of io.player(player, this._path('pages', id, log), buffer)) {
-            for (const entry of entries) {
-                const header = JSON.parse(entry.parts.shift())
-                switch (header.method) {
-                case 'right': {
-                        page.right = this.serializer.key.deserialize(entry.parts)
-                        assert(page.right != null)
-                    }
-                    break
-                case 'load': {
-                        const { page: previous } = await this._read(header.page, header.log)
-                        page.items = previous.items
-                        page.log.loaded.push(previous.log)
-                    }
-                    break
-                case 'split': {
-                        page.items = page.items.slice(header.index, header.length)
-                        if (header.dependent != null) {
-                            state.split = header.dependent
-                        }
-                    }
-                    break
-                case 'replaceable': {
-                        page.log.replaceable = true
-                    }
-                    break
-                case 'merge': {
-                        const { page: right } = await this._read(header.page, header.log)
-                        page.items.push.apply(page.items, right.items)
-                        page.right = right.right
-                        page.log.loaded.push(right.log)
-                    }
-                    break
-                case 'insert': {
-                        const parts = this.serializer.parts.deserialize(entry.parts)
-                        page.items.splice(header.index, 0, {
-                            key: this.extractor(parts),
-                            parts: parts,
-                            heft: entry.sizes.reduce((sum, size) => sum + size, 0)
-                        })
-                    }
-                    break
-                case 'delete': {
-                        page.items.splice(header.index, 1)
-                        // TODO We do not want to vacuum automatically, we want
-                        // it to be optional, possibly delayed. Expecially for
-                        // MVCC where we are creating short-lived trees, we
-                        // don't care that they are slow to load due to splits
-                        // and we don't have deletes.
-                        page.deletes++
-                    }
-                    break
-                case 'merged': {
-                        state.merged = header.page
-                    }
-                    break
-                case 'key': {
-                        page.key = this.serializer.key.deserialize(entry.parts)
-                        break
-                    }
-                    break
-                }
-            }
-        }
-        state.heft = page.items.reduce((sum, record) => sum + record.heft, 1)
-        return { page, ...state }
-    }
-
-    async read (id) {
-        const leaf = +id.split('.')[1] % 2 == 1
-        if (leaf) {
-            const { page, heft } = await this._read(id, await this._appendable(id))
-            assert(page.id == '0.1' ? page.key == null : page.key != null)
-            return { page, heft }
-        }
-        const player = new Player(function () { return '0' })
-        const items = []
-        const buffer = Buffer.alloc(1024 * 1024)
-        const { gathered, size, length } = await io.play(player, this._path('pages', id, 'page'), buffer, (entry, index) => {
-            const header = JSON.parse(entry.parts.shift())
-            if (index == 0) {
-                return { length: header.length }
-            }
-            items.push({
-                id: header.id,
-                key: entry.parts.length != 0 ? this.serializer.key.deserialize(entry.parts) : null
-            })
-        })
-        Strata.Error.assert(length != 0, 'CORRUPT_BRANCH_PAGE')
-        Strata.Error.assert(gathered[0].length == items.length, 'CORRUPT_BRANCH_PAGE')
-        return { page: { id, leaf, items }, heft: length }
+    read (id) {
+        return this.storage.read(id)
     }
 
     // We load the page then check for a race after we've loaded. If a different
@@ -429,26 +280,38 @@ class Sheaf {
             // pivot anyway.
             //
             // You'll struggle to remember this, but it is true...
+
+            //
             if (descent.index != 0) {
-                // The last key we visit is the key for the leaf page, if we're
-                // headed to a leaf. We don't have to have the exact leaf key,
-                // so if housekeeping is queued up in such a way that a leaf
-                // page in the queue is absorbed by a merge prior to its
-                // housekeeping inspection, the descent on that key is not going
-                // to cause a ruckus. Keys are not going to disappear on us when
-                // we're doing branch housekeeping.
+                //
+
+                // The last key we visit is the key for the leaf page for whatever
+                // level we stop at. This holds true even if we fork. We hold onto
+                // the previous pivot and if the left fork is not not the zero index
+                // of the branch page, then the previous pivot is the key for the
+                // leaf of the fork. Note that for balancing, we only fork when we
+                // match the exact key in a brach. We have an approximate fork for
+                // the user in case we eliminate the leaf page with a merge, they
+                // will land in the merged page at the first index less than the
+                // key. The right key tracking will also be correct since we will
+                // immediately pick up a right key when we leave this block.
+
+                //
                 const pivot = descent.pivot
                 descent.pivot = {
                     key: entry.value.items[descent.index].key,
                     level: descent.level - 1
                 }
+                //
+
                 // If we're trying to find siblings we're using an exact key
                 // that is definately above the level sought, we'll see it and
                 // then go left or right if there is a branch in that direction.
                 //
-                // TODO Earlier I had this at KILLROY below. And I adjust the
-                // level, but I don't reference the level, so it's probably fine
-                // here.
+                // Earlier I had this at KILLROY below. And I adjust the level, but
+                // I don't reference the level, so it's probably fine here.
+
+                //
                 if (this.comparator.branch(descent.pivot.key, key) == 0 && fork) {
                     descent.index--
                     rightward = true
@@ -485,20 +348,26 @@ class Sheaf {
                 : key != null
                     ? find(this.comparator.leaf, entry.value.items, key, offset)
                     : entry.value.leaf ? ~0 : 0
+            //
 
             // If the page is a leaf, assert that we're looking for a leaf and
             // return the leaf page.
+
+            //
             if (entry.value.leaf) {
                 descent.found = index >= 0
                 descent.index = index < 0 ? ~index : index
                 assert.equal(level, -1, 'could not find branch')
                 break
             }
+            //
 
             // If the index is less than zero we didn't find the exact key, so
             // we're looking at the bitwise not of the insertion point which is
             // right after the branch we're supposed to descend, so back it up
             // one.
+
+            //
             descent.index = index < 0 ? ~index - 1 : index
 
             // We're trying to reach branch and we've hit the level.
@@ -510,6 +379,18 @@ class Sheaf {
 
             descent.level++
         }
+        //
+
+        // **TODO** What happens when we merge a leaf page so that the key is
+        // gone and then we delete all the values before the key? Essentially,
+        // what is the effect of searching for a key that is not a leaf key
+        // whose value is greater than the leaf key it lands on and less than
+        // the least value in the page? We can test this without branch races.
+        // If it is `-1` that's fine. You're not supposed to fork to find an
+        // insert location. I believe `-1` is a stop for reverse iteration.
+        // Write a test and come back and document this with more confidence.
+
+        //
         if (fork && !rightward) {
             if (approximate) {
                 descent.index--
@@ -520,6 +401,7 @@ class Sheaf {
         }
         return descent
     }
+    //
 
     // We hold onto the entries array for the descent to prevent the unlikely
     // race condition where we cannot descend because we have to load a page,
@@ -548,7 +430,7 @@ class Sheaf {
             const load = this.load(descent.miss)
             const entry = internal
                 ? await load
-                : await this._destructible.exceptional('load', load, true)
+                : await this._destructible.exceptional('load', load)
             entries[0].push(entry)
         }
     }
@@ -560,7 +442,7 @@ class Sheaf {
             if (descent.miss) {
                 trampoline.promised(async () => {
                     try {
-                        entries.push(await this.load(descent.miss))
+                        entries.push(await this._destructible.exceptional('load', this.load(descent.miss)))
                         this.descend2(trampoline, query, found)
                     } finally {
                         entries.forEach(entry => entry.release())
@@ -576,15 +458,6 @@ class Sheaf {
         } catch (error) {
             entries.forEach(entry => entry.release())
             throw error
-        }
-    }
-
-    async _writeLeaf (page, writes) {
-        const cartridge = await this.handles.get(this._path('pages', page.id, page.log.id))
-        try {
-            io.append(cartridge.value, 1024 * 1024, () => writes.shift(), () => Buffer.alloc(0))
-        } finally {
-            cartridge.release()
         }
     }
 
@@ -620,7 +493,7 @@ class Sheaf {
             ) {
                 this._fracture.housekeeper.enqueue('housekeeping').candidates.push(page.key || page.items[0].key)
             }
-            await this._writeLeaf(page, writes)
+            await this.storage.writeLeaf(page, writes)
         } finally {
             cartridge.release()
             latch.unlocked = true
@@ -645,186 +518,36 @@ class Sheaf {
         } while (this._fracture.housekeeper.count != 0)
     }
 
-    _path (...vargs) {
-        vargs.unshift(this.directory)
-        return path.resolve.apply(path, vargs.map(varg => String(varg)))
+    recordify (header, parts = []) {
+        return this._recorder([[ Buffer.from(JSON.stringify(header)) ].concat(parts)])
     }
 
-    _nextId (leaf) {
-        let id
-        do {
-            id = this._id++
-        } while (leaf ? id % 2 == 0 : id % 2 == 1)
-        return String(this.instance) + '.' +  String(id)
+    _unbalanced (page) {
+        return page.leaf
+            ? (
+                page.items.length >= this.leaf.split &&
+                this.comparator.branch(page.items[0].key, page.items[page.items.length - 1].key) != 0
+            )
+            ||
+            (
+                ! (page.id == '0.1' && page.right == null) &&
+                page.items.length <= this.leaf.merge
+            )
+            : (
+                page.items.length >= this.branch.split
+            )
+            ||
+            (
+                page.id == '0.0'
+                    ? +page.items[0].id.split('.')[1] % 2 == 0 && page.items.length == 1
+                    : page.items.length <= this.branch.merge
+            )
     }
 
-    // TODO Why are you using the `_id` for both file names and page ids?
-    _filename (id) {
-        return `${this.instance}.${this._id++}`
-    }
-
-    _serialize (header, parts = []) {
-        return this._recordify(header, parts.length != 0 ? this.serializer.parts.serialize(parts) : [])
-    }
-
-    _recordify (header, parts = []) {
-        return this.$_recorder([[ Buffer.from(JSON.stringify(header)) ].concat(parts)])
-    }
-
-    async _stub (journalist, { log: { id, page }, entries }) {
-        const buffer = Buffer.concat(entries.map(entry => this._recordify(entry.header, entry.parts)))
-        await Strata.Error.resolve(fs.mkdir(this._path('balance', page), { recursive: true }), 'IO_ERROR')
-        await Strata.Error.resolve(fs.writeFile(this._path('balance', page, id), buffer, { flags: 'as' }), 'IO_ERROR')
-        journalist.rename(_path('balance', page, id), _path('pages', page, id))
-    }
-
-    async _writeBranch (journalist, branch, create) {
-        const filename = this._path('balance', branch.page.id, 'page')
-        await Strata.Error.resolve(fs.mkdir(path.dirname(filename), { recursive: true }), 'IO_ERROR')
-        const handle = await Strata.Error.resolve(fs.open(filename, 'ax'), 'IO_ERROR')
-        const heft = await io.append(handle, 1024 * 1024, index => {
-            if (index == branch.page.items.length) {
-                return null
-            }
-            const { id, key } = branch.page.items[index]
-            const parts = key != null ? this.serializer.key.serialize(key) : []
-            return this._recordify({ id }, parts)
-        }, which => {
-            if (which == 'header') {
-                return this._recordify({ length: branch.page.items.length })
-            }
-            return Buffer.alloc(0)
-        })
-        await Strata.Error.resolve(handle.sync(), 'IO_ERROR')
-        await Strata.Error.resolve(handle.close(), 'IO_ERROR')
-        branch.cartridge.heft = heft
-        if (create) {
-            journalist.mkdir(_path('pages', branch.page.id))
-        } else {
-            journalist.unlink(_path('pages', branch.page.id, 'page'))
+    _balanceIf (branch, messages, message) {
+        if (this._unbalanced(branch.page)) {
+            messages.push(message)
         }
-        journalist.rename(_path('balance', branch.page.id, 'page'), _path('pages', branch.page.id, 'page'))
-        journalist.rmdir(_path('balance', branch.page.id))
-    }
-    //
-
-    // Vacuum is performed after split, merge or rotate. Page logs form a linked
-    // list. There is an load instruction at the start of the the log that tells
-    // it to load the previous log file.
-    //
-    // Split, merge and rotate create a new log head. The new log head loads a
-    // place holder log. The place holder log contains a load operation to load
-    // the old log followed by a split operation for split, a merge operation
-    // for merge, or nothing for rotate.
-
-    // Vacuum replaces the place holder with a vacuumed page. The place holder
-    // page is supposed to be short lived and conspicuous. We don't want to
-    // replace the old log directly. First off, we can't in the case of split,
-    // the left and right page share a previous log. Moreover, it just don't
-    // seem right. Seems like it would be harder to diagnose problems. With this
-    // we'll get a clearer picture of where things failed by leaving more of a
-    // trail.
-
-    // We removed dependency tracking from the logs themselves. They used to
-    // make note of who depended upon them and we would reference count. It was
-    // too much. Now I wonder how we would vacuum if things got messed up. We
-    // would probably have to vacuum all the pages, then pass over them for
-    // unlinking of old files.
-
-    // We are going to assert dependencies for now, but they will allow us to
-    // detect broken and repair pages in the future, should this become
-    // necessary. In fact, if we add an instance number we can assert that
-    // dependency has not been allowed to escape the journal.
-
-    // Imagining a recovery utility that would load pages, and then check the
-    // integrity of a vacuum, calling a modified version of this function with
-    // all of the assumptions. That is, explicitly ignore this dependent.
-
-    //
-    async _vacuum (journalist, keys, messages) {
-        //
-        const cartridges = []
-        try {
-            //
-
-            // Obtain the pages so that they are not read while we are rewriting
-            // their log history.
-
-            //
-            const unlinkable = new Set
-
-            function unlink (loaded) {
-                for (const log of loaded) {
-                    unlinkable.add(_path('pages', log.page, log.id))
-                    unlink(log.loaded)
-                }
-            }
-
-            for (const key of keys) {
-                const loaded = (await this.descend({ key }, cartridges)).page.log.loaded
-                //
-
-                // We want the log history of the page.
-
-                //
-                Strata.Error.assert(loaded.length == 1 && loaded[0].replaceable, 'VACUUM_PREVIOUS_NOT_REPLACABLE')
-                const log = loaded[0]
-                //
-
-                // We don't use the cached page. We read the log starting from the
-                // replacable log entry.
-
-                //
-                const { page: page, split } = await this._read(log.page, log.id)
-                Strata.Error.assert(page.log.replaceable, 'STRANGE_VACUUM_STATE')
-                Strata.Error.assert(page.id == log.page, 'STRANGE_VACUUM_STATE')
-                if (page.split != null) {
-                    const dependent = await this._read(page.split, await this._appendable(page.split))
-                    Strata.Error.assert(dependent.log.loaded.length == 0 && !dependent.log.loaded[0].replaceable, 'UNVACUUMED_DEPENDENT')
-                }
-                //
-
-                // Write the entries in order. Any special commands like `'key'`
-                // or `'right'` have been written into the the new head log.
-
-                // Fun fact: if you want an exception you could never catch, an
-                // `fs.WriteStream` with something other than a number a `fd` like a
-                // `string`. You'll see that an assertion is raised where it can
-                // never be caught. We don't use `fs.WriteStream` anymore, though.
-
-                //
-                await Strata.Error.resolve(fs.mkdir(this._path('balance', page.id)), 'IO_ERROR')
-                const handle = await Strata.Error.resolve(fs.open(this._path('balance', page.id, page.log.id), 'a'), 'IO_ERROR')
-                await io.append(handle, 1024 * 1024, index => {
-                    if (index == page.items.length) {
-                        return null
-                    }
-                    const parts = this.serializer.parts.serialize(page.items[index].parts)
-                    return this._recordify({ method: 'insert', index }, parts)
-                }, () => Buffer.alloc(0))
-
-                await Strata.Error.resolve(handle.sync(), 'IO_ERROR')
-                await Strata.Error.resolve(handle.close(), 'IO_ERROR')
-
-                messages.forEach(message => journalist.message(message))
-                journalist.unlink(_path('pages', page.id, page.log.id))
-                journalist.rename(_path('balance', page.id, page.log.id), _path('pages', page.id, page.log.id))
-                journalist.rmdir(_path('balance', page.id))
-
-                unlink(page.log.loaded)
-            }
-
-            for (const unlink of unlinkable) {
-                journalist.unlink(unlink)
-            }
-
-            await journalist.prepare()
-            await journalist.commit()
-        } finally {
-            cartridges.forEach(cartridge => cartridge.release())
-        }
-
-        await this._journal()
     }
 
     // Assume there is nothing to block or worry about with the branch pages.
@@ -856,22 +579,20 @@ class Sheaf {
     // We'd only be duplicating the splices, really.
 
     //
-    async _drainRoot (journalist, key) {
-        const cartridges = []
-
-        const root = await this.descend({ key, level: 0 }, cartridges)
+    async _drainRoot (messages, cartridges) {
+        const root = await this.descend({ key: null, level: 0 }, cartridges)
 
         const partition = Math.floor(root.entry.value.items.length / 2)
 
         const left = this._create({
-            id: this._nextId(false),
+            id: this.storage.nextId(false),
             offset: 1,
             items: root.page.items.slice(0, partition),
             hash: null
         }, cartridges)
 
         const right = this._create({
-            id: this._nextId(false),
+            id: this.storage.nextId(false),
             offset: 1,
             items: root.page.items.slice(partition),
             hash: null
@@ -879,71 +600,52 @@ class Sheaf {
 
         root.page.items = [{
             id: left.page.id,
-            key: null
+            key: null,
+            heft: left.page.items[0].heft
         }, {
             id: right.page.id,
-            key: right.page.items[0].key
+            key: right.page.items[0].key,
+            heft: left.page.items[0].heft
         }]
         right.page.items[0].key = null
+        right.page.items[0].heft = left.page.items[0].heft
 
-        await this._writeBranch(journalist, right, true)
-        await this._writeBranch(journalist, left, true)
-        await this._writeBranch(journalist, root, false)
+        messages.forEach(message => message.level++)
 
-        journalist.message({ method: 'balance', key: key, level: 1 })
-        journalist.message({ method: 'balance', key: right.page.items[0].key, level: 1 })
+        this._balanceIf(left, messages, { method: 'balance', key: null, level: 1 })
+        this._balanceIf(right, messages, { method: 'balance', key: root.page.items[1].key, level: 1 })
 
-        await journalist.prepare()
-        await journalist.commit()
-        await journalist.dispose()
-
-        cartridges.forEach(cartridge => cartridge.release())
-
-        await this._journal()
+        await this.storage.writeDrainRoot({ left, right, root })
     }
 
-    async _balance (journalist, key, level, messages) {
-        messages.forEach(message => journalist.message(message))
-        const cartridges = []
+    async balance (key, level, messages, cartridges) {
         const branch = await this.descend({ key, level }, cartridges)
-        cartridges.forEach(cartridge => cartridge.release())
         const leaves = +branch.page.items[0].id.split('.')[1] % 2 == 1
         if (branch.page.items.length >= this.branch.split) {
             if (branch.page.id == '0.0') {
-                await this._drainRoot(journalist, key, messages)
+                await this._drainRoot(messages, cartridges)
             } else {
-                await this._splitBranch(journalist, key, level, messages)
+                await this._splitBranch(key, level, messages, cartridges)
             }
         } else if (branch.page.items.length <= this.branch.merge) {
             if (branch.page.id != '0.0') {
                 // TODO Have `_selectMerger` manage its own entries.
-                const cartridges = []
                 const merger = await this._selectMerger(key, branch, cartridges)
-                cartridges.forEach(cartridge => cartridge.release())
-                await this._mergeBranch(journalist, merger, messages)
+                await this._mergeBranch(merger, messages, cartridges)
             } else if (! leaves && branch.page.items.length == 1) {
-                await this._fillRoot(journalist, key, messages)
-            } else {
-                await journalist.prepare()
-                await journalist.commit()
-                await this._journal()
+                await this._fillRoot(messages, cartridges)
             }
-        } else  {
-            await journalist.prepare()
-            await journalist.commit()
-            await this._journal()
         }
     }
 
-    async _splitBranch (journalist, key, level) {
-        const cartridges = []
+    async _splitBranch (key, level, messages, cartridges) {
         const left = await this.descend({ key, level }, cartridges)
         const parent = await this.descend({ key, level: level - 1 }, cartridges)
 
         const partition = Math.floor(left.page.items.length / 2)
 
         const right = this._create({
-            id: this._nextId(false),
+            id: this.storage.nextId(false),
             items: left.page.items.splice(partition),
             leaf: false
         }, cartridges)
@@ -951,22 +653,17 @@ class Sheaf {
         const promotion = right.page.items[0].key
         right.page.items[0].key = null
         left.page.items = left.page.items.splice(0, partition)
-        parent.page.items.splice(parent.index + 1, 0, { key: promotion, id: right.page.id })
+        parent.page.items.splice(parent.index + 1, 0, {
+            key: promotion,
+            id: right.page.id,
+            heft: parent.page.items[parent.page.items.length - 1].heft
+        })
 
-        await this._writeBranch(journalist, left, false)
-        await this._writeBranch(journalist, right, true)
-        await this._writeBranch(journalist, parent, false)
+        this._balanceIf(left, messages, { method: 'balance', key: key, level: level })
+        this._balanceIf(right, messages, { method: 'balance', key: promotion, level: level })
+        this._balanceIf(parent, messages, { method: 'balance', key: key, level: level - 1 })
 
-        journalist.message({ method: 'balance', key: key, level: level - 1 })
-        journalist.message({ method: 'balance', key: key, level: level })
-        journalist.message({ method: 'balance', key: right.page.items[0].key, level: level })
-
-        await journalist.prepare()
-        await journalist.commit()
-
-        cartridges.forEach(cartridge => cartridge.release())
-
-        await this._journal()
+        await this.storage.writeSplitBranch({ promotion, left, right, parent })
     }
     //
 
@@ -999,7 +696,7 @@ class Sheaf {
         // descend the tree and start writing. In fact, this is very likely to
         // happen during a batch insert by the user.
         const right = this._create({
-            id: this._nextId(true),
+            id: this.storage.nextId(true),
             leaf: true,
             items: [],
             right: null,
@@ -1008,8 +705,9 @@ class Sheaf {
             log: null
         }, cartridges)
 
+        const messages = []
+
         // Create our journaled tree alterations.
-        const journalist = await Journalist.create(this.directory)
         const pauses = []
         try {
             pauses.push(await this._fracture.appender.pause(left.page.id))
@@ -1059,11 +757,14 @@ class Sheaf {
             // child.entry.heft -= heft - 1
 
             // Insert a reference to the right page in the parent branch page.
+            // Use an approximate heft for writeahead only storage, recalculated
+            // for file system storage.
+
+            //
             parent.page.items.splice(parent.index + 1, 0, {
                 key: right.page.key,
                 id: right.page.id,
-                // TODO For branches, let's always just re-run the sum.
-                heft: 0
+                heft: parent.page.items[parent.page.items.length - 1].heft
             })
 
             // If any of the pages is still larger than the split threshhold, check
@@ -1089,6 +790,8 @@ class Sheaf {
             writes.push.apply(writes)
             //
 
+            this._balanceIf(parent, messages, { method: 'balance', key: key, level: parent.level })
+
             // Once we await our synchronous operations are over. The user can
             // append new writes to the existing queue entry.
             //
@@ -1103,204 +806,7 @@ class Sheaf {
             // are in a hurry to release that lock.
 
             //
-            await this._writeLeaf(left.page, writes)
-            //
-
-            // Create the new page directory in our journal.
-
-            //
-            journalist.mkdir(_path('pages', right.page.id))
-            //
-
-            // Pages are broken up into logs. The logs have a load instruction
-            // that will tell them to load a previous log, essentially a linked
-            // list. They have a split (**TODO** rename) instruction that will
-            // tell them to split the page they loaded. When reading it will
-            // load the new head which will tell it to load the previous page
-            // and split it.
-
-            // Except we don't want to have an indefinate linked list. We vacuum
-            // when we split. We do this by inserting a place holder log between
-            // the old log and the new log. The place holder conatains just the
-            // load and split operation. After these two small files are written
-            // and synced, we can release our pause on writes on the cache page
-            // and move onto vacuum.
-
-            // New writes will go to the head of the log. We will replace our
-            // place-holder with a vacuumed copy of the previous log each page
-            // receiving just its half of the page will all delete operations
-            // removed. When we vacuum we only need to hold a cache reference to
-            // the page so it will not be evicted and re-read while we're
-            // moving the old logs around, so vacuuming can take place in
-            // parallel to all user operations.
-            //
-            // The replacement log will also include an indication of
-            // dependency. It will mark a `split` property in the page for the
-            // left page. During vacuum the we will check the `split` property
-            // of the page created by reading the replacable part of the log. If
-            // it is not null we will assert that the dependent page is vacuumed
-            // exist before we vacuum. This means we must vacuum the right page
-            // befroe we vacuum the left page.
-
-            const replace = {
-                left: {
-                    log: {
-                        id: this._filename(),
-                        page: left.page.id,
-                        loaded: [ left.page.log ],
-                        replaceable: true
-                    },
-                    entries: [{
-                        header: {
-                            method: 'load',
-                            page: left.page.id,
-                            log: left.page.log.id
-                        }
-                    }, {
-                        header: {
-                            method: 'split',
-                            index: 0,
-                            length: partition,
-                            dependent: right.page.id
-                        }
-                    }, {
-                        header: {
-                            method: 'replaceable'
-                        }
-                    }]
-                },
-                right: {
-                    log: {
-                        id: this._filename(),
-                        page: right.page.id,
-                        loaded: [ left.page.log ],
-                        replaceable: true
-                    },
-                    entries: [{
-                        header: {
-                            method: 'load',
-                            page: left.page.id,
-                            log: left.page.log.id
-                        }
-                    }, {
-                        header: {
-                            method: 'split',
-                            index: partition,
-                            length: length,
-                            dependent: null
-                        }
-                    }, {
-                        header: { method: 'replaceable' }
-                    }]
-                }
-            }
-
-            await this._stub(journalist, replace.left)
-            await this._stub(journalist, replace.right)
-            //
-
-            // Write the new log head which loads our soon to be vacuumed place
-            // holder.
-
-            //
-            const stub = {
-                left: {
-                    log: {
-                        id: this._filename(),
-                        page: left.page.id,
-                        loaded: [ replace.left.log ],
-                        replaceable: false
-                    },
-                    entries: [{
-                        header: {
-                            method: 'load',
-                            page: replace.left.log.page,
-                            log: replace.left.log.id
-                        }
-                    }, {
-                        header: { method: 'right' },
-                        parts: this.serializer.key.serialize(right.page.key)
-                    }]
-                },
-                right: {
-                    log: {
-                        id: this._filename(),
-                        page: right.page.id,
-                        loaded: [ replace.right.log ],
-                        replaceable: false
-                    },
-                    entries: [{
-                        header: {
-                            method: 'load',
-                            page: replace.right.log.page,
-                            log: replace.right.log.id
-                        }
-                    }, {
-                        header: { method: 'key' },
-                        parts: this.serializer.key.serialize(right.page.key)
-                    }]
-                }
-            }
-
-            if (left.page.id != '0.1') {
-                stub.left.entries.push({
-                    header: { method: 'key' },
-                    parts: this.serializer.key.serialize(left.page.key)
-                })
-            }
-
-            if (right.page.right != null) {
-                stub.right.entries.push({
-                    header: { method: 'right' },
-                    parts: this.serializer.key.serialize(right.page.right)
-                })
-            }
-
-            await this._stub(journalist, stub.left)
-            await this._stub(journalist, stub.right)
-            //
-
-            // Update the log history. **TODO** Maybe we rename this to log
-            // instead of append?
-
-            //
-            left.page.log = stub.left.log
-            right.page.log = stub.right.log
-            //
-
-            // Update the left page's dependents.
-
-            //
-
-            // We record the new node in our parent branch.
-
-            //
-            await this._writeBranch(journalist, parent, false)
-            //
-
-            // Delete our scrap directories.
-
-            //
-            journalist.rmdir(_path('balance', left.page.id))
-            journalist.rmdir(_path('balance', right.page.id))
-            //
-
-            // Here we add messages to our journal saying what we want to do
-            // next. We run a journal for each step.
-
-            //
-            journalist.message({ method: 'vacuum', keys: [ right.page.key, key ] })
-            journalist.message({ method: 'balance', key: key, level: parent.level })
-            //
-
-            // Run the journal, prepare it and commit it. If prepare fails the
-            // split never happened, we'll split the page the next time we visit
-            // it. If commit fails everything we did above will happen in
-            // recovery.
-
-            //
-            await journalist.prepare()
-            await journalist.commit()
+            await this.storage.writeSplitLeaf({ key, left, right, parent, writes, messages })
             //
         } finally {
             //
@@ -1323,47 +829,8 @@ class Sheaf {
         // We run this function to continue balancing the tree.
 
         //
-        await this._journal()
+        await this.storage.balance()
     }
-
-    async _rmrf (journalist, pages, messages) {
-        for (const id of pages) {
-            const leaf = +id.split('.')[1] % 2 == 1
-            if (leaf) {
-                const { page, merged } = await this._read(id, await this._appendable(id))
-                Strata.Error.assert(merged != null, 'DELETING_UNMERGED_PAGE')
-                await fs.rmdir(this._path('pages', id), { recursive: true })
-            } else {
-                await fs.rmdir(this._path('pages', id), { recursive: true })
-            }
-        }
-        messages.forEach(message => journalist.message(message))
-        await journalist.prepare()
-        await journalist.commit()
-        await this._journal()
-    }
-
-    async _journal () {
-        const journalist = await Journalist.create(this.directory)
-        const messages = journalist.messages.slice(0)
-        console.log(messages)
-        if (messages.length != 0) {
-            const message = messages.shift()
-            switch (message.method) {
-            case 'vacuum':
-                await this._vacuum(journalist, message.keys, messages)
-                break
-            case 'balance':
-                console.log('visit')
-                await this._balance(journalist, message.key, message.level, messages)
-                break
-            case 'rmrf':
-                await this._rmrf(journalist, message.pages, messages)
-                break
-            }
-        }
-    }
-
 
     // **TODO** Something is wrong here. We're using `child.right` to find the a
     // right branch page but the leaf and and it's right sibling can always be
@@ -1453,41 +920,49 @@ class Sheaf {
         return surgery
     }
 
-    async _fillRoot (journalist) {
-        const cartridges = []
+    // **TODO** The way that I'm journaling these balances, I need to ensure
+    // that I am not journaling a page that will be deleted. Something like
+    // right then left then parent, because if we go left to right the left page
+    // may choose to merge with its right sibling deleting it. If the right page
+    // choose to merge with the left sibling it will delete itself. No, no.
+    // We're going by keys, so we're not going to load a deleted page. But, the
+    // descent logic depends on nagivating by the least key in the branch page,
+    // so we need to be sure to check that we hit the correct key.
 
+
+    // Easiest way to keep from having a bunch of tests we have to hit..
+
+    // We check as to whether or not to add the merge, so we're not building up
+    // a great big list, just... If we are going to try to merge this page
+    // again, we will check the parent after we merge again. We have to move
+    // merge selection into branch merge so that if we can't merge, we still
+    // check the parent. For split we can always check the parent and then the
+    // left and right we are only ever adding pages. What about the case where
+    // split and then possibly merge? We should see if we shouldn't spam the
+    // balance queue and then see if don't luck out and hit the cancel
+    // condition.
+
+    // Fill root will delete a child. Plus, we have an ever growing list of
+    // possible balance operations so we have to link about what is already in
+    // the list.
+
+    //
+    async _fillRoot (messages, cartridges) {
         const root = await this.descend({ key: null, level: 0 }, cartridges)
         const child = await this.descend({ key: null, level: 1 }, cartridges)
 
         root.page.items = child.page.items
 
-        // Write the merged page.
-        await this._writeBranch(journalist, root, false)
+        messages.forEach(message => message.level--)
 
-        journalist.unlink(_path('pages', child.page.id, 'page'))
-        journalist.rmdir(_path('pages', child.page.id))
-
-        // Record the commit.
-        await journalist.prepare()
-        await journalist.commit()
-
-        cartridges.forEach(cartridge => cartridge.release())
-
-        await this._journal()
+        await this.storage.writeFillRoot({ root, child, messages })
     }
 
-    async _possibleMerge (surgery, key, branch) {
-        if (surgery.splice.entry.value.items.length <= this.branch.merge) {
-            if (surgery.splice.entry.value.id != '0.0') {
-            } else if (branch && this.branch.merge == 1) {
-                await this._fill(key)
-            }
-        }
-    }
-
-    async _mergeBranch (journalist, { key, level }) {
-        const cartridges = []
-
+    async _mergeBranch ({ key, level }, messages, cartridges) {
+        // **TODO** We don't have to worry. If we go right first, it will have a
+        // pivot and if so it has a left, if not it has no left. EXCEPT we just
+        // got this from merger selection so we know it is good, what is going
+        // on in merger selection?
         const left = await this.descend({ key, level, fork: true }, cartridges)
         const right = await this.descend({ key, level }, cartridges)
 
@@ -1510,49 +985,35 @@ class Sheaf {
         if (surgery.splice.index == 0) {
             surgery.splice.page.items[0].key = null
         }
-
-        // Write the merged page.
-        await this._writeBranch(journalist, left, false)
-
-        // Delete the page merged into the merged page.
-        journalist.unlink(_path('pages', right.page.id, 'page'))
-        journalist.rmdir(_path('pages', right.page.id))
-
-        // If we replaced the key in the pivot, write the pivot.
-        if (surgery.replacement != null) {
-            await this._writeBranch(journalist, pivot, false)
-        }
-
-        // Write the page we spliced.
-        await this._writeBranch(journalist, surgery.splice, false)
-
-        // Delete any removed branches.
-        for (const deletion in surgery.deletions) {
-            throw new Error
-            await commit.unlink(path.join('pages', deletion.entry.value.id))
-        }
         //
 
-        // TODO This needs to be tested.
-
-        console.log('visit')
+        // **TODO** This needs to be tested. With some confidence in the pivot
+        // logic I'm going to use the pivot of the left and the splice to find
+        // them. The key for a branch page that is not the right most path
+        // always going to be the pivot.
 
         //
         if (left.pivot == null) {
-            journalist.message({ method: 'balance', key: null, level: level })
-            journalist.message({ method: 'balance', key: null, level: level - 1 })
+            messages.push({
+                method: 'balance', key: null, level: level
+            })
         } else {
-            journalist.message({ method: 'balance', key: left.pivot.key, level: level })
-            journalist.message({ method: 'balance', key: null, level: level - 1 })
+            messages.push({
+                method: 'balance', key: left.pivot.key, level: level
+            })
         }
 
-        // Record the commit.
-        await journalist.prepare()
-        await journalist.commit()
+        if (surgery.splice.pivot == null) {
+            messages.push({
+                method: 'balance', key: null, level: surgery.splice.level
+            })
+        } else {
+            message.push({
+                method: 'balance', key: surgery.splice.pivot.key, level: surgery.splicelevel
+            })
+        }
 
-        cartridges.forEach(cartridge => cartridge.release())
-
-        await this._journal()
+        await this.storage.writeMergeBranch({ key, left, right, pivot, surgery })
     }
     //
 
@@ -1588,8 +1049,7 @@ class Sheaf {
 
         const surgery = await this._surgery(right, pivot)
 
-        // Create our journaled tree alterations.
-        const journalist = await Journalist.create(this.directory)
+        const messages = [{ method: 'balance', key: key, level: surgery.splice.level }]
 
         const pauses = []
         try {
@@ -1648,138 +1108,15 @@ class Sheaf {
             for (const entry of pauses[1].entries) {
                 writes.right.push.apply(writes.right, entry.writes.splice(0))
             }
-
-            await this._writeLeaf(left.page, writes.left)
-            await this._writeLeaf(right.page, writes.right)
             //
-
-            // We discuss this in detail in `_splitLeaf`. We want a record of
-            // dependents and we probably want that to be in the page directory
-            // of each page if we're going to do some sort of audit that
-            // includes a directory scan looking for orphans.
-
-            // We know that the left page into which we merged already has a
-            // dependent record so we need to add one...
-
-            // Maybe we do not have a dependent record that references the self,
-            // only the other. This makes more sense. It would be easier to test
-            // that dependents are zero. There is only ever one dependent record
-            // and if it the same page as the loaded page it is a merge,
-            // otherwise it is a split.
-
+            await this.storage.writeMergeLeaf({ left, right, surgery, pivot, writes, messages })
             //
-            const terminator = {
-                log: {
-                    id: this._filename(),
-                    page: right.page.id,
-                    loaded: [ right.page.log ],
-                    replaceable: false
-                },
-                entries: [{
-                    header: {
-                        method: 'merged',
-                        page: left.page.id
-                    }
-                }]
-            }
-
-            await this._stub(journalist, terminator)
-
-            const replace = {
-                log: {
-                    id: this._filename(),
-                    page: left.page.id,
-                    loaded: [ left.page.log, right.page.log ],
-                    replaceable: true
-                },
-                entries: [{
-                    header: {
-                        method: 'load',
-                        page: left.page.id,
-                        log: left.page.log.id
-                    }
-                }, {
-                    header: {
-                        method: 'merge',
-                        page: right.page.id,
-                        log: right.page.log.id
-                    }
-                }, {
-                    header: {
-                        method: 'replaceable'
-                    }
-                }]
-            }
-
-            await this._stub(journalist, replace)
-
-            const stub = {
-                log: {
-                    id: this._filename(),
-                    page: left.page.id,
-                    loaded: [ replace.log ],
-                    replaceable: false
-                },
-                entries: [{
-                    header: {
-                        method: 'load',
-                        page: replace.log.page,
-                        log: replace.log.id
-                    }
-                }]
-            }
-
-            if (left.page.id != '0.1') {
-                stub.entries.push({
-                    header: { method: 'key' },
-                    parts: this.serializer.key.serialize(left.page.key)
-                })
-            }
-
-            if (right.page.right != null) {
-                stub.entries.push({
-                    header: { method: 'right' },
-                    parts: this.serializer.key.serialize(right.page.right)
-                })
-            }
-
-            await this._stub(journalist, stub)
-
-            // If we replaced the key in the pivot, write the pivot.
-            if (surgery.replacement != null) {
-                await this._writeBranch(journalist, pivot, false)
-            }
-
-            // Write the page we spliced.
-            await this._writeBranch(journalist, surgery.splice, false)
-
-            left.page.log = stub.log
-            right.page.log = terminator.log
-
-            journalist.message({ method: 'vacuum', keys: [ key ] })
-            journalist.message({
-                method: 'rmrf',
-                pages: surgery.deletions.map(deletion => deletion.page.id).concat(right.page.id)
-            })
-            journalist.message({ method: 'balance', key: left.page.key, level: surgery.splice.level, x: 1 })
-            //
-
-            // Delete our scrap directories.
-
-            //
-            journalist.rmdir(_path('balance', left.page.id))
-            journalist.rmdir(_path('balance', right.page.id))
-            //
-
-            // Record the commit.
-            await journalist.prepare()
-            await journalist.commit()
         } finally {
             pauses.forEach(pause => pause.resume())
             cartridges.forEach(cartridge => cartridge.release())
         }
 
-        await this._journal()
+        await this.storage.balance(messages)
     }
 
     // `copacetic` could go like this...
