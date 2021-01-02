@@ -18,7 +18,7 @@ const Staccato = require('staccato/redux')
 const coalesce = require('extant')
 
 // Wraps a `Promise` in an object to act as a mutex.
-const Future = require('prospective/future')
+//const Future = require('prospective/future')
 
 // An `async`/`await` work queue.
 const Turnstile = require('turnstile')
