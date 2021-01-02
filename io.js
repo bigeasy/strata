@@ -48,7 +48,7 @@ exports.play = async function (player, filename, buffer, consumer) {
     const handle = await Strata.Error.resolve(fs.open(filename), 'IO_ERROR')
     try {
         for (;;) {
-            const { bytesRead } = await Strata.Error.resolve(handle.read({ buffer }), 'IO_ERROR')
+            const { bytesRead } = await Strata.Error.resolve(handle.read(buffer, 0, buffer.length), 'IO_ERROR')
             if (bytesRead == 0) {
                 return { gathered, length: index, size }
             }
@@ -70,7 +70,7 @@ exports.player = async function* (player, filename, buffer) {
     const handle = await Strata.Error.resolve(fs.open(filename), 'IO_ERROR')
     try {
         for (;;) {
-            const { bytesRead } = await Strata.Error.resolve(handle.read({ buffer }), 'IO_ERROR')
+            const { bytesRead } = await Strata.Error.resolve(handle.read(buffer, 0, buffer.length), 'IO_ERROR')
             if (bytesRead == 0) {
                 break
             }
