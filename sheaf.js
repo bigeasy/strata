@@ -11,9 +11,6 @@ const path = require('path')
 const fileSystem = require('fs')
 const fs = require('fs').promises
 
-// Sensible `async`/`await` over Node.js streams.
-const Staccato = require('staccato/redux')
-
 // Return the first non null-like value.
 const coalesce = require('extant')
 
