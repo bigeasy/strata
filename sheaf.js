@@ -44,6 +44,8 @@ const io = require('./io')
 
 const rescue = require('rescue')
 
+const Future = require('perhaps')
+
 // Currently unused.
 function traceIf (condition) {
     if (condition) return function (...vargs) {
@@ -54,12 +56,7 @@ function traceIf (condition) {
 
 // An `Error` type specific to Strata.
 const Strata = { Error: require('./error') }
-
-// A latch.
-function latch () {
-    let capture
-    return { unlocked: false, promise: new Promise(resolve => capture = { resolve }), ...capture }
-}
+//
 
 // Sheaf is the crux of Strata. It exists as a separate object possibly for
 // legacy reasons, and it will stay that way because it makes `Strata` and
@@ -180,7 +177,7 @@ class Sheaf {
                 id: this._operationId = (this._operationId + 1 & 0xffffffff) >>> 0,
                 writes: [],
                 cartridge: this.pages.hold(id),
-                latch: latch()
+                future: new Future
             }), this._append, this),
             housekeeper: new Fracture(destructible.durable($ => $(), 'housekeeper'), options.turnstile, () => ({
                 candidates: []
@@ -473,7 +470,7 @@ class Sheaf {
     // they are written before the split? Must be.
 
     //
-    async _append ({ canceled, key, value: { writes, cartridge, latch } }) {
+    async _append ({ canceled, key, value: { writes, cartridge, future } }) {
         try {
             this._destructible.progress()
             const page = cartridge.value
@@ -493,8 +490,7 @@ class Sheaf {
             await this.storage.writeLeaf(page, writes)
         } finally {
             cartridge.release()
-            latch.unlocked = true
-            latch.resolve.call(null)
+            future.resolve()
         }
     }
 
@@ -504,7 +500,7 @@ class Sheaf {
         const append = this._fracture.appender.enqueue(id)
         append.writes.push(buffer)
         if (writes[append.id] == null) {
-            writes[append.id] = append.latch
+            writes[append.id] = append.future
         }
     }
 
