@@ -27,6 +27,7 @@ class Strata {
         return options.create ? strata._sheaf.create(strata) : strata._sheaf.open(strata)
     }
 
+    // **TODO** Just return `sheaf.options`.
     get pages () {
         return this._sheaf.pages
     }
@@ -47,17 +48,6 @@ class Strata {
         return this._sheaf.checksum
     }
 
-    // What was the lock for? It was to ensure that another strand doesn't
-    // change the location of the index between in time it takes return from the
-    // async call to `Strata.search`.
-    //
-    // TODO A race condition occurred to you. What if the page is deleted in
-    // during some window and the cursor is invalid, but our descent is itself
-    // synchornous, except now we can see below that it isn't, the call to
-    // `Sheaf.descend` introduces the problem we tried to resolve with our lock,
-    // so we ought to move the lock into `Sheaf`.
-
-    //
     search (trampoline, key, ...vargs) {
         const [ fork, found ] = vargs.length == 2 ? vargs : [ false, vargs[0] ]
         const query = key === Strata.MIN

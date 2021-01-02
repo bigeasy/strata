@@ -259,7 +259,6 @@ class Sheaf {
         return { page: cartridge.value, cartridge }
     }
 
-    // TODO If `key` is `null` then just go left.
     _descend (entries, { key, level = -1, fork = false, rightward = false, approximate = false }) {
         const descent = { miss: null, keyed: null, level: 0, index: 0, entry: null,
             pivot: null,
@@ -622,7 +621,6 @@ class Sheaf {
             }
         } else if (branch.page.items.length <= this.branch.merge) {
             if (branch.page.id != '0.0') {
-                // TODO Have `_selectMerger` manage its own entries.
                 const merger = await this._selectMerger(key, branch, cartridges)
                 await this._mergeBranch(merger, messages, cartridges)
             } else if (! leaves && branch.page.items.length == 1) {
@@ -901,7 +899,7 @@ class Sheaf {
                 if (ancestor.page.items.length == 1) {
                     surgery.deletions.push(ancestor)
                 } else {
-                    // TODO Also null out after splice.
+                    // **TODO** Also null out after splice.
                     assert.equal(ancestor.index, 0, 'unexpected ancestor')
                     surgery.replacement = ancestor.page.items[1].key
                     surgery.splice = ancestor
@@ -921,7 +919,6 @@ class Sheaf {
     // We're going by keys, so we're not going to load a deleted page. But, the
     // descent logic depends on nagivating by the least key in the branch page,
     // so we need to be sure to check that we hit the correct key.
-
 
     // Easiest way to keep from having a bunch of tests we have to hit..
 
@@ -1126,7 +1123,8 @@ class Sheaf {
     // Then we can look at the unseen pages and see if any of them reference any
     // of the `merged` files. If not we can delete the merged files.
 
-    // TODO Must wait for housekeeping to finish before closing.
+    // **TODO** Must wait for housekeeping to finish before closing.
+    // **TODO** The above is almost certainly done.
     async _keephouse ({ canceled, value: { candidates } }) {
         this._destructible.progress()
         if (canceled) {

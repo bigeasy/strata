@@ -420,10 +420,6 @@ class FileSystem {
             this.journalist.rename(_path('balance', page.id, page.log.id), _path('pages', page.id, page.log.id))
             this.journalist.rmdir(_path('balance', page.id))
 
-            // **TODO** Shouldn't this be on the next go around? We have a stack
-            // now so we should push onto that stack in order and make vacuum
-            // one at a time. Must be on the next go around because we do page
-            // reads to assert the state.
             this._unlink(page.log.loaded, page.id)
 
             loaded[0].loaded.length = 0
