@@ -43,18 +43,19 @@ class FileSystem {
 
     //
     static HandleCache = class extends Magazine.OpenClose {
-        constructor (magazine, sync = true) {
+        constructor (magazine, strategy = 'O_SYNC') {
             super(magazine)
-            this._sync = sync
+            this.strategy = strategy
         }
         subordinate () {
             return this._subordinate(new HandleCache(this._sync))
         }
         async open (filename) {
-            return await Strata.Error.resolve(fs.open(filename, 'a'), 'IO_ERROR')
+            const flag = this.strategy == 'O_SYNC' ? 'as' : 'a'
+            return await Strata.Error.resolve(fs.open(filename, flag), 'IO_ERROR')
         }
         async close (handle) {
-            if (this._sync) {
+            if (this.strategy == 'fsync') {
                 await Strata.Error.resolve(handle.sync(), 'IO_ERROR')
             }
             await Strata.Error.resolve(handle.close(), 'IO_ERROR')
@@ -171,6 +172,11 @@ class FileSystem {
             const player = new Player(function () { return '0' })
             const items = []
             const buffer = Buffer.alloc(1024 * 1024)
+            // **TODO** Length was there so that a branch page could be
+            // verified, if it was truncated. Let's turn this into a log and
+            // play entries instead of having a different type, so it ends up
+            // looking like writeahead page. We can then push the length instead
+            // of prepending it.
             const { gathered, size, length } = await io.play(player, this._path('pages', id, 'page'), buffer, (entry, index) => {
                 const header = JSON.parse(entry.parts.shift())
                 if (index == 0) {
@@ -272,41 +278,36 @@ class FileSystem {
         }
 
         async writeLeaf (page, writes) {
-            const cartridge = await this.handles.get(this._path('pages', page.id, page.log.id))
-            try {
-                io.append(cartridge.value, 1024 * 1024, () => writes.shift(), () => Buffer.alloc(0))
-            } finally {
-                cartridge.release()
+            if (writes.length != 0) {
+                const filename = this._path('pages', page.id, page.log.id)
+                const cartridge = await this.handles.get(filename)
+                try {
+                    await io.writev(cartridge.value, writes)
+                } finally {
+                    cartridge.release()
+                }
             }
         }
 
         async _stub (journalist, { log: { id, page }, entries }) {
-            const buffer = Buffer.concat(entries.map(entry => this._recordify(entry.header, entry.parts)))
+            const buffers = entries.map(entry => this._recordify(entry.header, entry.parts))
             await Strata.Error.resolve(fs.mkdir(this._path('balance', page), { recursive: true }), 'IO_ERROR')
-            await Strata.Error.resolve(fs.writeFile(this._path('balance', page, id), buffer, { flag: 'as' }), 'IO_ERROR')
+            const filename = this._path('balance', page, id)
+            await io.write(filename, buffers, this.handles.strategy)
             journalist.rename(_path('balance', page, id), _path('pages', page, id))
         }
 
         async _writeBranch (journalist, branch, create) {
             const filename = this._path('balance', branch.page.id, 'page')
             await Strata.Error.resolve(fs.mkdir(path.dirname(filename), { recursive: true }), 'IO_ERROR')
-            const handle = await Strata.Error.resolve(fs.open(filename, 'ax'), 'IO_ERROR')
-            const heft = await io.append(handle, 1024 * 1024, index => {
-                if (index == branch.page.items.length) {
-                    return null
-                }
-                const { id, key } = branch.page.items[index]
+            const buffers = branch.page.items.map((item, index) => {
+                const { id, key } = item
                 const parts = key != null ? this.sheaf.serializer.key.serialize(key) : []
                 return this._recordify({ id }, parts)
-            }, which => {
-                if (which == 'header') {
-                    return this._recordify({ length: branch.page.items.length })
-                }
-                return Buffer.alloc(0)
             })
-            await Strata.Error.resolve(handle.sync(), 'IO_ERROR')
-            await Strata.Error.resolve(handle.close(), 'IO_ERROR')
-            branch.cartridge.heft = heft
+            branch.cartridge.heft = buffers.reduce((sum, buffer) => sum + buffer.length, 0)
+            buffers.unshift(this._recordify({ length: branch.page.items.length }))
+            await io.write(filename, buffers, this.handles.strategy)
             if (create) {
                 journalist.mkdir(_path('pages', branch.page.id))
             } else {
@@ -399,17 +400,12 @@ class FileSystem {
 
             //
             await Strata.Error.resolve(fs.mkdir(this._path('balance', page.id)), 'IO_ERROR')
-            const handle = await Strata.Error.resolve(fs.open(this._path('balance', page.id, page.log.id), 'a'), 'IO_ERROR')
-            await io.append(handle, 1024 * 1024, index => {
-                if (index == page.items.length) {
-                    return null
-                }
-                const parts = this.sheaf.serializer.parts.serialize(page.items[index].parts)
+            const filename = this._path('balance', page.id, page.log.id)
+            const buffers = page.items.map((item, index) => {
+                const parts = this.sheaf.serializer.parts.serialize(item.parts)
                 return this._recordify({ method: 'insert', index }, parts)
-            }, () => Buffer.alloc(0))
-
-            await Strata.Error.resolve(handle.sync(), 'IO_ERROR')
-            await Strata.Error.resolve(handle.close(), 'IO_ERROR')
+            })
+            await io.write(filename, buffers, this.handles.strategy)
 
             /*
             const buffers = page.items.map((item, index) => {

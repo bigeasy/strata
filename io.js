@@ -42,6 +42,42 @@ exports.append = async function (handle, flush, generator, sandwich = null) {
     return size
 }
 
+const writev = exports.writev = async function (handle, buffers, filename) {
+    const expected = buffers.reduce((sum, buffer) => sum + buffer.length, 0)
+    const { bytesWritten } = await Strata.Error.resolve(handle.writev(buffers), 'IO_ERROR', { filename })
+    if (bytesWritten != expected) {
+        throw new Strata.Error('IO_ERROR', { filename })
+        /*
+        const slice = buffers.slice(0)
+        let skipped = 0
+        for (;;) {
+            if (skipped + slice[0].length > bytesWritten) {
+                slice[0] = slice[0].slice(bytesWritten - skipped)
+                break
+            }
+            skipped += slice.shift().length + 1
+        }
+        await writev(handle, slice, filename)
+        */
+    }
+    return expected
+}
+
+exports.write = async function (filename, buffers, strategy) {
+    const flag = strategy == 'O_SYNC' ? 'as' : 'a'
+    const handle = await Strata.Error.resolve(fs.open(filename, flag), 'IO_ERROR', { filename })
+    try {
+        const written = await writev(handle, buffers)
+        if (strategy == 'fsync') {
+            await Strata.Error.resolve(handle.sync(), 'IO_ERROR', { filename })
+        }
+        return written
+    } finally {
+        await Strata.Error.resolve(handle.close(), 'IO_ERROR', { filename })
+    }
+
+}
+
 exports.play = async function (player, filename, buffer, consumer) {
     let size = 0, index = 0
     const gathered = []
