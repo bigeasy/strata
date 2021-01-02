@@ -987,23 +987,15 @@ class Sheaf {
 
         //
         if (left.pivot == null) {
-            messages.push({
-                method: 'balance', key: null, level: level
-            })
+            this._balanceIf(left, messages, { method: 'balance', key: null, level: level })
         } else {
-            messages.push({
-                method: 'balance', key: left.pivot.key, level: level
-            })
+            this._balanceIf(left, messages, { method: 'balance', key: left.pivot.key, level: level })
         }
 
         if (surgery.splice.pivot == null) {
-            messages.push({
-                method: 'balance', key: null, level: surgery.splice.level
-            })
+            this._balanceIf(surgery.splice, messages, { method: 'balance', key: null, level: surgery.splice.level })
         } else {
-            message.push({
-                method: 'balance', key: surgery.splice.pivot.key, level: surgery.splicelevel
-            })
+            this._balanceIf(surgery.splice, messages, { method: 'balance', key: surgery.splice.pivot.key, level: surgery.splice.level })
         }
 
         await this.storage.writeMergeBranch({ key, left, right, pivot, surgery })
