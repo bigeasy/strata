@@ -95,7 +95,6 @@ class WriteAheadOnly {
                     case 'stop': {
                             page.stop = header.stop
                             if (page.stop == stop) {
-                                console.log('did stop!!!!', header, page.stop)
                                 break WAL
                             }
                             page.stop++
@@ -588,7 +587,6 @@ class WriteAheadOnly {
 
         async balance () {
             const cartridges = []
-            let start = 0, previous = null
             for (;;) {
                 cartridges.splice(0).forEach(cartridge => cartridge.release())
                 if (this._write != null) {
@@ -607,10 +605,6 @@ class WriteAheadOnly {
                 if (balanceKey != null) {
                     await wal(this._writeahead, 0, balanceKey, (header, parts) => messages = header.messages)
                 }
-                if (previous != null) {
-                    console.log('loop', previous, Date.now() - start)
-                }
-                start = Date.now()
                 if (messages.length == 0) {
                     break
                 }
@@ -627,7 +621,6 @@ class WriteAheadOnly {
                     }]
                 }
                 const message = messages.shift()
-                previous = message
                 Strata.Error.assert(message.method == 'balance', 'JOURNAL_CORRUPTED')
                 switch (message.method) {
                 case 'balance':

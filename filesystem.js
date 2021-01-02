@@ -1,3 +1,5 @@
+'use strict'
+
 const path = require('path')
 const fs = require('fs').promises
 const assert = require('assert')
@@ -126,7 +128,6 @@ class FileSystem {
                         }
                         break
                     case 'merge': {
-                            console.log(header)
                             const { page: right } = await this.log(header.page, header.log)
                             page.items.push.apply(page.items, right.items)
                             page.right = right.right
@@ -424,8 +425,6 @@ class FileSystem {
 
             loaded[0].loaded.length = 0
             loaded[0].replaceable = false
-
-            console.log(loaded)
         }
 
         async writeDrainRoot ({ left, right, root }) {
@@ -820,7 +819,6 @@ class FileSystem {
         }
 
         async balance () {
-            let start = Date.now(), begin = Date.now(), previous = null
             for (;;) {
                 this.journalist = await Journalist.create(this.directory)
                 if (this.journalist.messages.length == 0) {
@@ -831,11 +829,6 @@ class FileSystem {
                 const messages = this.journalist.messages
                 const message = messages.pop()
                 const cartridges = []
-                if (previous != null) {
-                    console.log('loop', previous, Date.now() - start)
-                }
-                previous = message
-                start = Date.now()
                 switch (message.method) {
                 case 'vacuum':
                     await this._vacuum(message.key, cartridges)
@@ -848,13 +841,9 @@ class FileSystem {
                     break
                 }
                 messages.forEach(message => this.journalist.message(message))
-                let _start = Date.now()
                 await this.journalist.prepare()
                 await this.journalist.commit()
                 cartridges.forEach(cartridge => cartridge.release())
-            }
-            if (previous != null) {
-                console.log('loop', previous, Date.now() - start)
             }
         }
     }

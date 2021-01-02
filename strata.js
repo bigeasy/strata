@@ -18,7 +18,6 @@ class Strata {
         this._sheaf = new Sheaf(destructible, options)
         const { comparator, extractor }  = this._sheaf
         this.compare = function (left, right) { return comparator.leaf(left, right) }
-        console.log('called', this.compare)
         this.extract = function (parts) { return extractor(parts) }
     }
 
