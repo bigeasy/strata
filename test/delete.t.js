@@ -1,4 +1,4 @@
-require('proof')(8, async (okay) => {
+require('proof')(10, async (okay) => {
     const Trampoline = require('reciprocate')
     const Strata = require('../strata')
 
@@ -23,17 +23,13 @@ require('proof')(8, async (okay) => {
                     'insert', 2, 'c'
                 ]]
             },
-            /*
             vivify: {
                 '0.0': [ [ '0.1', null ] ],
                 '0.1': [
-                    [ 'insert', 0, 'a' ],
-                    [ 'insert', 1, 'b' ],
-                    [ 'insert', 2, 'c' ],
-                    [ 'delete', 0 ]
+                    [ 'insert', 0, 'b' ],
+                    [ 'insert', 1, 'c' ]
                 ]
             }
-            */
         })
         await harness($ => $(), 'traverse', async ({ strata, prefix, directory, pages }) => {
             let right = 'a'
