@@ -1,3 +1,10 @@
+// **TODO** Need to ensure partition does not result in endless balance loops.
+// **TODO** Vacuum delete-heavy pages.
+// **TODO** Really for write-ahead, append the block list so you can read it
+// quickly and deserialize it quickly. You can write each block list at a
+// position in the log and write out a map to the position of the block list
+// indexed by key. This takes advantage of scatter-read over sequential write
+// that is now in vogue.
 'use strict'
 
 // Sort function generator.
@@ -35,24 +42,20 @@ const Recorder = require('transcript/recorder')
 // Incrementally read a b-tree page chunk by chunk.
 const Player = require('transcript/player')
 
+// Catch nested exceptions by type, message and properties.
+const rescue = require('rescue')
+
+// A Promise wrapper that captures `resolve` and `reject`.
+const Future = require('perhaps')
+
 // Binary search for a record in a b-tree page.
 const find = require('./find')
 
+// Partition a leaf page according to user's desired groupings.
 const Partition = require('./partition')
 
+// File read and write wrappers.
 const io = require('./io')
-
-const rescue = require('rescue')
-
-const Future = require('perhaps')
-
-// Currently unused.
-function traceIf (condition) {
-    if (condition) return function (...vargs) {
-        console.log.apply(console, vargs)
-    }
-    return function () {}
-}
 
 // An `Error` type specific to Strata.
 const Strata = { Error: require('./error') }
@@ -64,13 +67,6 @@ const Strata = { Error: require('./error') }
 
 //
 class Sheaf {
-    // Used to identify the pages of this instance in the page cache which can
-    // be shared across different Strata. We do not want to pull pages from the
-    // cache based only on the directory path and page id because we may close
-    // and reopen a Strata and we'd pull pages from the previous instance.
-    static _instance = 0
-    static __instance = 0
-
     static options (options) {
         if (options.checksum == null) {
             options.checksum = (() => '0')
@@ -239,6 +235,7 @@ class Sheaf {
     read (id) {
         return this.storage.read(id)
     }
+    //
 
     // We load the page then check for a race after we've loaded. If a different
     // strand beat us to it, we just ignore the result of our read and return
@@ -285,7 +282,7 @@ class Sheaf {
                 // the previous pivot and if the left fork is not not the zero index
                 // of the branch page, then the previous pivot is the key for the
                 // leaf of the fork. Note that for balancing, we only fork when we
-                // match the exact key in a brach. We have an approximate fork for
+                // match the exact key in a branch. We have an approximate fork for
                 // the user in case we eliminate the leaf page with a merge, they
                 // will land in the merged page at the first index less than the
                 // key. The right key tracking will also be correct since we will
@@ -299,9 +296,9 @@ class Sheaf {
                 }
                 //
 
-                // If we're trying to find siblings we're using an exact key
-                // that is definately above the level sought, we'll see it and
-                // then go left or right if there is a branch in that direction.
+                // If we're trying to find siblings we're using an exact key that is
+                // definitely above the level sought, we'll see it and then go left
+                // or right if there is a branch in that direction.
                 //
                 // Earlier I had this at KILLROY below. And I adjust the level, but
                 // I don't reference the level, so it's probably fine here.
@@ -1101,8 +1098,9 @@ class Sheaf {
 
         await this.storage.balance(messages)
     }
+    //
 
-    // `copacetic` could go like this...
+    // **TODO** `copacetic` could go like this...
 
     // We do a flat iteration of the tree from `0.1` following the right page.
     // We first go through every directory and ensure that there is no directory
@@ -1124,8 +1122,7 @@ class Sheaf {
     // Then we can look at the unseen pages and see if any of them reference any
     // of the `merged` files. If not we can delete the merged files.
 
-    // **TODO** Must wait for housekeeping to finish before closing.
-    // **TODO** The above is almost certainly done.
+    //
     async _keephouse ({ canceled, value: { candidates } }) {
         this.deferrable.progress()
         if (canceled) {
