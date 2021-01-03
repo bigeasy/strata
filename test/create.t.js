@@ -3,8 +3,8 @@ require('proof')(12, async (okay) => {
 
     for await (const harness of test('create', okay)) {
         await harness($ => $(), 'create', async ({ strata, prefix }) => {
-            okay(strata.compare('a', 'a'), 0, `${prefix} compare`)
-            okay(strata.extract([ 'a' ]), 'a', `${prefix} extract`)
+            okay(strata.options.comparator.leaf('a', 'a'), 0, `${prefix} compare`)
+            okay(strata.options.extractor([ 'a' ]), 'a', `${prefix} extract`)
         }, {
             create: true,
             vivify: {

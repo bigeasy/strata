@@ -165,7 +165,8 @@ class Sheaf {
         this._root = null
 
         this._id = 0
-        this._destructible = destructible
+
+        this.destructible = destructible
 
         this.deferrable = destructible.durable($ => $(), 'deferrable', 1)
 
@@ -186,19 +187,17 @@ class Sheaf {
             }), this._keephouse, this)
         }
 
-        options.turnstile.deferrable.increment()
-
-        this.closed = false
-        this.destroyed = false
-
+        this._fracture.housekeeper.deferrable.increment()
+        this._fracture.appender.deferrable.increment()
 
         // **TODO** Not yet used, would `mkdir` any pages that need to be
         // inspected for balance.
         this._canceled = new Set
 
-        destructible.destruct(() => {
-            this.destroyed = true
-            destructible.ephemeral('shutdown', async () => {
+        destructible.destruct(() => this.deferrable.decrement())
+
+        this.deferrable.destruct(() => {
+            this.deferrable.ephemeral('shutdown', async () => {
                 // Trying to figure out how to wait for the Turnstile to drain.
                 // We can't terminate the housekeeping turnstile then the
                 // acceptor turnstile because they depend on each other, so
@@ -211,7 +210,8 @@ class Sheaf {
                 // **TODO** Really want to just push keys into a file for
                 // inspection when we reopen for housekeeping.
                 await this.drain()
-                options.turnstile.deferrable.decrement()
+                this._fracture.housekeeper.deferrable.decrement()
+                this._fracture.appender.deferrable.decrement()
                 if (this._root != null) {
                     this._root.cartridge.remove()
                     this._root = null
@@ -222,7 +222,7 @@ class Sheaf {
 
     create (strata) {
         this._root = this._create({ id: -1, leaf: false, items: [{ id: '0.0' }] }, [])
-        return this._destructible.exceptional('create', async () => {
+        return this.destructible.exceptional('create', async () => {
             await this.storage.create()
             return strata
         })
@@ -230,7 +230,7 @@ class Sheaf {
 
     open (strata) {
         this._root = this._create({ id: -1, leaf: false, items: [{ id: '0.0' }] }, [])
-        return this._destructible.exceptional('open', async () => {
+        return this.destructible.exceptional('open', async () => {
             await this.storage.open()
             return strata
         })
@@ -425,7 +425,7 @@ class Sheaf {
             const load = this.load(descent.miss)
             const entry = internal
                 ? await load
-                : await this._destructible.exceptional('load', load)
+                : await this.deferrable.exceptional('load', load)
             entries[0].push(entry)
         }
     }
@@ -437,7 +437,7 @@ class Sheaf {
             if (descent.miss) {
                 trampoline.promised(async () => {
                     try {
-                        entries.push(await this._destructible.exceptional('load', this.load(descent.miss)))
+                        entries.push(await this.deferrable.exceptional('load', this.load(descent.miss)))
                         this.descend2(trampoline, query, found)
                     } finally {
                         entries.forEach(entry => entry.release())
@@ -473,7 +473,7 @@ class Sheaf {
     //
     async _append ({ canceled, key, value: { writes, cartridge, future } }) {
         try {
-            this._destructible.progress()
+            this.deferrable.progress()
             const page = cartridge.value
             if (
                 (
@@ -496,8 +496,7 @@ class Sheaf {
     }
 
     append (id, buffer, writes) {
-        // **TODO** Optional boolean other than `destroyed`.
-        this._destructible.operational()
+        this.deferrable.operational()
         const append = this._fracture.appender.enqueue(id)
         append.writes.push(buffer)
         if (writes[append.id] == null) {
@@ -1128,7 +1127,7 @@ class Sheaf {
     // **TODO** Must wait for housekeeping to finish before closing.
     // **TODO** The above is almost certainly done.
     async _keephouse ({ canceled, value: { candidates } }) {
-        this._destructible.progress()
+        this.deferrable.progress()
         if (canceled) {
             candidates.forEach(candidate => this._canceled.add(candidate))
         } else {
