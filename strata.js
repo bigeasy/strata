@@ -14,7 +14,6 @@ class Strata {
     static Error = require('./error')
 
     constructor (destructible, options) {
-        this.destructible = destructible
         this._sheaf = new Sheaf(destructible, options)
         const { comparator, extractor }  = this._sheaf
         this.compare = function (left, right) { return comparator.leaf(left, right) }
@@ -26,25 +25,16 @@ class Strata {
         return options.create ? strata._sheaf.create(strata) : strata._sheaf.open(strata)
     }
 
-    // **TODO** Just return `sheaf.options`.
-    get pages () {
-        return this._sheaf.pages
+    get options () {
+        return this._sheaf.options
     }
 
-    get handles () {
-        return this._sheaf.handles
+    get destructible () {
+        return this._sheaf.destructible
     }
 
-    get extractor () {
-        return this._sheaf.extractor
-    }
-
-    get serializer () {
-        return this._sheaf.serializer
-    }
-
-    get checksum () {
-        return this._sheaf.checksum
+    get deferrable () {
+        return this._sheaf.deferrable
     }
 
     search (trampoline, key, ...vargs) {
