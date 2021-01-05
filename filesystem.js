@@ -50,7 +50,7 @@ class FileSystem {
             this.strategy = strategy
         }
         subordinate () {
-            return this._subordinate(new HandleCache(this._sync))
+            return this._subordinate(magazine => new FileSystem.HandleCache(magazine, this._sync))
         }
         async open (filename) {
             const flag = this.strategy == 'O_SYNC' ? 'as' : 'a'
