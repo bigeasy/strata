@@ -114,7 +114,7 @@ async function* test (suite, okay, only = [ 'fileSystem', 'writeahead' ]) {
             await utilities.serialize(directory, serialize)
         }
         const FileSystem = require('../filesystem')
-        const destructible = new Destructible(trace, 'create.t')
+        const destructible = new Destructible(5000, trace, 'create.t')
         const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
         const pages = new Magazine
         const handles = new FileSystem.HandleCache(new Magazine)

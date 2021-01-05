@@ -245,7 +245,6 @@ class FileSystem {
             const one = this._recordify({ method: 'load', page: '0.1', log: '0.0' })
             await Strata.Error.resolve(fs.writeFile(this._path('balance', '0.1', '0.1'), one, { flag: 'as' }), 'IO_ERROR')
             const journalist = await Journalist.create(directory)
-            journalist.message({ method: 'done', previous: 'create' })
             journalist.mkdir('pages/0.0')
             journalist.mkdir('pages/0.1')
             journalist.rename('balance/0.0/page', 'pages/0.0/page')
@@ -437,6 +436,20 @@ class FileSystem {
             await this._writeBranch(this.journalist, left, false)
             await this._writeBranch(this.journalist, right, true)
             await this._writeBranch(this.journalist, parent, false)
+        }
+
+        _messages (journalist, messages) {
+            const serialized = []
+            for (const message of messages) {
+                if (message.key != null) {
+                    const key = this.sheaf.serializer.key.serialize(message.key)
+                    serialized.push(Buffer.from(JSON.stringify({ ...message, key: key.length })))
+                    serialized.push.apply(serialized, key)
+                } else {
+                    serialized.push(Buffer.from(JSON.stringify(message)))
+                }
+            }
+            journalist.message(serialized)
         }
 
         async writeSplitLeaf ({ key, left, right, parent, writes, messages }) {
@@ -632,7 +645,7 @@ class FileSystem {
             messages.push({ method: 'vacuum', key: key })
             messages.push({ method: 'vacuum', key: right.page.key })
 
-            messages.forEach(message => journalist.message(message))
+            this._messages(journalist, messages)
 
             // Run the journal, prepare it and commit it. If prepare fails the split
             // never happened, we'll split the page the next time we visit it. If
@@ -803,7 +816,7 @@ class FileSystem {
                 method: 'vacuum', keys: [ key ]
             })
 
-            messages.forEach(message => journalist.message(message))
+            this._messages(journalist, messages)
             //
 
             // Delete our scrap directories.
@@ -826,7 +839,15 @@ class FileSystem {
                     this.journalist = null
                     break
                 }
-                const messages = this.journalist.messages
+                const slice = this.journalist.messages.slice()
+                const messages = []
+                while (slice.length != 0) {
+                    const message = JSON.parse(String(slice.shift()))
+                    if (message.key != null) {
+                        message.key = this.sheaf.serializer.key.deserialize(slice.splice(0, message.key))
+                    }
+                    messages.push(message)
+                }
                 const message = messages.pop()
                 const cartridges = []
                 switch (message.method) {
@@ -840,7 +861,7 @@ class FileSystem {
                     await this.sheaf.balance(message.key, message.level, messages, cartridges)
                     break
                 }
-                messages.forEach(message => this.journalist.message(message))
+                this._messages(this.journalist, messages)
                 await this.journalist.prepare()
                 await this.journalist.commit()
                 cartridges.forEach(cartridge => cartridge.release())

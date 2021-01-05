@@ -182,6 +182,8 @@ class Sheaf {
 
         this._fracture.housekeeper.deferrable.increment()
         this._fracture.appender.deferrable.increment()
+        this._fracture.appender.name = 'appender'
+        this._fracture.housekeeper.name = 'housekeeper'
 
         // **TODO** Not yet used, would `mkdir` any pages that need to be
         // inspected for balance.
@@ -504,6 +506,8 @@ class Sheaf {
             this._fracture.appender.drain()
         ].filter(drain => drain != null)
     }
+
+    _iteration = 0
 
     drain () {
         let drains = this._drain()
