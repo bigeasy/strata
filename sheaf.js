@@ -498,11 +498,26 @@ class Sheaf {
         }
     }
 
-    async drain () {
-        do {
-            await this._fracture.housekeeper.drain()
-            await this._fracture.appender.drain()
-        } while (this._fracture.housekeeper.count != 0)
+    _drain () {
+        return [
+            this._fracture.housekeeper.drain(),
+            this._fracture.appender.drain()
+        ].filter(drain => drain != null)
+    }
+
+    drain () {
+        let drains = this._drain()
+        if (drains.length != 0) {
+            return (async () => {
+                do {
+                    for (const promise of drains) {
+                        await promise
+                    }
+                    drains = this._drain()
+                } while (drains.length != 0)
+            }) ()
+        }
+        return null
     }
 
     recordify (header, parts = []) {
