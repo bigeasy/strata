@@ -1161,7 +1161,7 @@ class Sheaf {
                         await this._mergeLeaf(merger)
                     }
                 } else {
-                    entries.forEach(entry => entry.release())
+                    cartridges.forEach(cartridge => cartridge.release())
                 }
             }
         }
