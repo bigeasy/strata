@@ -56,7 +56,7 @@ async function waserialize (writeahead, directory, files) {
             if (key != null) {
                 writes.push(recordify({ method: 'key' }, key))
             }
-            await writeahead.write([{ keys: [[ 0, id ]], body: Buffer.concat(writes) }])
+            await writeahead.write([{ keys: [[ 0, id ]], buffer: Buffer.concat(writes) }])
         } else {
             const writes = [{
                 header: {
@@ -77,7 +77,7 @@ async function waserialize (writeahead, directory, files) {
                     parts: parts
                 }
             })).map(entry => recordify(entry.header, entry.parts))
-            await writeahead.write([{ keys: [[ 0, id ]], body: Buffer.concat(writes) }])
+            await writeahead.write([{ keys: [[ 0, id ]], buffer: Buffer.concat(writes) }])
         }
     }
     await fs.mkdir(path.resolve(directory, 'instances', String(instance)), { recursive: true })
@@ -144,12 +144,14 @@ async function* test (suite, okay, only = [ 'fileSystem', 'writeahead' ]) {
         }
         await Strata.Error.resolve(fs.mkdir(directories.wal, { recursive: true }), 'IO_ERROR')
         await Strata.Error.resolve(fs.mkdir(directories.tree, { recursive: true }), 'IO_ERROR')
-        const writeahead = await WriteAhead.open({ directory: directories.wal })
-        if (serialize != null) {
-            await waserialize(writeahead, directories.tree, serialize)
-        }
+        const open = await WriteAhead.open({ directory: directories.wal })
+        const writeahead = new WriteAhead(destructible, turnstile, open)
+        writeahead.deferrable.increment()
         const pages = new Magazine
         destructible.rescue(trace, 'test', async () => {
+            if (serialize != null) {
+                await waserialize(writeahead, directories.tree, serialize)
+            }
             const strata = await Strata.open(destructible.durable($ => $(), 'strata'), {
                 pages, storage: new WriteAheadOnly(directories.tree, writeahead, 0), turnstile, create, comparator
             })
@@ -159,6 +161,9 @@ async function* test (suite, okay, only = [ 'fileSystem', 'writeahead' ]) {
                 directory: directories.tree,
                 prefix: [ suite, test, 'writeahead only' ].join(' ')
             })
+            await strata.drain()
+            await writeahead.write([]).promise
+            writeahead.deferrable.decrement()
             destructible.destroy()
         })
         await destructible.promise
@@ -168,7 +173,6 @@ async function* test (suite, okay, only = [ 'fileSystem', 'writeahead' ]) {
             const vivified = await walvivify(writeahead)
             okay(vivified, vivify, `${suite} ${test} writeahead only vivify`)
         }
-        await writeahead.close()
     }
     for (const harness of [ fileSystem, writeahead ]) {
         if (~only.indexOf(harness.name)) {

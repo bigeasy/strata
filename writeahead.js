@@ -217,7 +217,7 @@ class WriteAheadOnly {
             await Strata.Error.resolve(fs.mkdir(this._path('instances', '0'), { recursive: true }), 'IO_ERROR')
             await this._writeahead.write([{
                 keys: [[ this._key, '0.0' ]],
-                body: Buffer.concat([{
+                buffer: Buffer.concat([{
                     header: {
                         method: 'apply',
                         key: '0.0'
@@ -229,7 +229,7 @@ class WriteAheadOnly {
                         id: '0.1'
                     }
                 }].map(entry => this._recordify(entry)))
-            }])
+            }]).promise
             this._id = 2
         }
 
@@ -251,12 +251,12 @@ class WriteAheadOnly {
         }
 
         async append (page, writes) {
-            await this._writeahead.write([{ keys: [ [ this.key, page.id ] ], body: Buffer.concat(writes) }])
+            this._writeahead.write([{ keys: [ [ this.key, page.id ] ], buffer: Buffer.concat(writes) }])
         }
 
         async writeLeaf (page, writes) {
             writes.unshift(this._recordify({ header: { method: 'apply', key: page.id } }))
-            await this._writeahead.write([{ keys: [[ this._key, page.id ]], body: Buffer.concat(writes) }])
+            this._writeahead.write([{ keys: [[ this._key, page.id ]], buffer: Buffer.concat(writes) }])
         }
 
         _startBalance (keys, body, messages) {
@@ -594,10 +594,10 @@ class WriteAheadOnly {
                         keys: this._write.keys
                                 .filter((key, index) => this._write.keys.indexOf(key) == index)
                                 .map(key => [ this._key, key ]),
-                        body: this._recordify.apply(this, this._write.body)
+                        buffer: this._recordify.apply(this, this._write.body)
                     }
                     this._write = null
-                    await this._writeahead.write([ write ])
+                    this._writeahead.write([ write ])
                 }
                 let balanceKey = null
                 await wal(this._writeahead, 0, 'balance', (header, parts) => balanceKey = header.key)

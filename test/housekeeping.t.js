@@ -10,7 +10,7 @@ require('proof')(5, async (okay) => {
     const test = require('./test')
 
     for await (const harness of test('create', okay)) {
-        await harness($ => $(), 'open', async ({ strata, prefix, directory, pages }) => {
+        await harness($ => $(), 'open', async ({ strata, prefix }) => {
             const items = []
             const trampoline = new Trampoline
             strata.search(trampoline, 'e', cursor => {
