@@ -468,27 +468,29 @@ class Sheaf {
 
     //
     async _append ({ canceled, key, value: { writes, cartridge, future } }) {
-        try {
-            this.deferrable.progress()
-            const page = cartridge.value
-            if (
-                (
-                    page.items.length >= this.leaf.split &&
-                    this.comparator.branch(page.items[0].key, page.items[page.items.length - 1].key) != 0
-                )
-                ||
-                (
-                    ! (page.id == '0.1' && page.right == null) &&
-                    page.items.length <= this.leaf.merge
-                )
-            ) {
-                this._fracture.housekeeper.enqueue('housekeeping').candidates.push(page.key || page.items[0].key)
+        await this.destructible.ifNotErrored(async () => {
+            try {
+                this.deferrable.progress()
+                const page = cartridge.value
+                if (
+                    (
+                        page.items.length >= this.leaf.split &&
+                        this.comparator.branch(page.items[0].key, page.items[page.items.length - 1].key) != 0
+                    )
+                    ||
+                    (
+                        ! (page.id == '0.1' && page.right == null) &&
+                        page.items.length <= this.leaf.merge
+                    )
+                ) {
+                    this._fracture.housekeeper.enqueue('housekeeping').candidates.push(page.key || page.items[0].key)
+                }
+                await this.storage.writeLeaf(page, writes)
+            } finally {
+                cartridge.release()
+                future.resolve()
             }
-            await this.storage.writeLeaf(page, writes)
-        } finally {
-            cartridge.release()
-            future.resolve()
-        }
+        })
     }
 
     append (id, buffer, writes) {
