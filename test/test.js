@@ -145,7 +145,7 @@ async function* test (suite, okay, only = [ 'fileSystem', 'writeahead' ]) {
         await Strata.Error.resolve(fs.mkdir(directories.wal, { recursive: true }), 'IO_ERROR')
         await Strata.Error.resolve(fs.mkdir(directories.tree, { recursive: true }), 'IO_ERROR')
         const open = await WriteAhead.open({ directory: directories.wal })
-        const writeahead = new WriteAhead(destructible, turnstile, open)
+        const writeahead = new WriteAhead(destructible, open)
         writeahead.deferrable.increment()
         const pages = new Magazine
         destructible.rescue(trace, 'test', async () => {

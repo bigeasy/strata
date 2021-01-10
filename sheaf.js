@@ -169,15 +169,21 @@ class Sheaf {
         // Concurrency and work queues. One keyed queue for page writes, the
         // other queue will only use a single key for all housekeeping.
         this._fracture = {
-            appender: new Fracture(destructible.durable($ => $(), 'appender'), options.turnstile, id => ({
-                id: this._operationId = (this._operationId + 1 & 0xffffffff) >>> 0,
-                writes: [],
-                cartridge: this.pages.hold(id),
-                future: new Future
-            }), this._append, this),
-            housekeeper: new Fracture(destructible.durable($ => $(), 'housekeeper'), options.turnstile, () => ({
-                candidates: []
-            }), this._keephouse, this)
+            appender: new Fracture(destructible.durable($ => $(), 'appender'), {
+                turnstile: options.turnstile,
+                entry: id => ({
+                    id: this._operationId = (this._operationId + 1 & 0xffffffff) >>> 0,
+                    writes: [],
+                    cartridge: this.pages.hold(id),
+                    future: new Future
+                }),
+                worker: this._append.bind(this)
+            }),
+            housekeeper: new Fracture(destructible.durable($ => $(), 'housekeeper'), {
+                turnstile: options.turnstile,
+                entry: () => ({ candidates: [] }),
+                worker: this._keephouse.bind(this)
+            })
         }
 
         this._fracture.housekeeper.deferrable.increment()
