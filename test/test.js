@@ -16,8 +16,22 @@ function recordify (header, parts) {
     return recorder([[ Buffer.from(JSON.stringify(header)) ].concat(parts)])
 }
 
-async function waserialize (writeahead, directory, files) {
+async function waserialize (writeahead, files) {
     let instance = 0
+    const writes = [{
+        header: {
+            method: 'apply',
+            key: 'instance'
+        },
+        parts: []
+    }, {
+        header: {
+            method: 'instance',
+            instance: 0
+        },
+        parts: []
+    }].map(entry => recordify(entry.header, entry.parts))
+    await writeahead.write([{ keys: [[ 0, 'instance' ]], buffer: Buffer.concat(writes) }]).promise
     for (const id in files) {
         instance = Math.max(+id.split('.')[0], instance)
         if (+id.split('.')[1] % 2 == 1) {
@@ -56,7 +70,7 @@ async function waserialize (writeahead, directory, files) {
             if (key != null) {
                 writes.push(recordify({ method: 'key' }, key))
             }
-            await writeahead.write([{ keys: [[ 0, id ]], buffer: Buffer.concat(writes) }])
+            await writeahead.write([{ keys: [[ 0, id ]], buffer: Buffer.concat(writes) }]).promise
         } else {
             const writes = [{
                 header: {
@@ -77,10 +91,9 @@ async function waserialize (writeahead, directory, files) {
                     parts: parts
                 }
             })).map(entry => recordify(entry.header, entry.parts))
-            await writeahead.write([{ keys: [[ 0, id ]], buffer: Buffer.concat(writes) }])
+            await writeahead.write([{ keys: [[ 0, id ]], buffer: Buffer.concat(writes) }]).promise
         }
     }
-    await fs.mkdir(path.resolve(directory, 'instances', String(instance)), { recursive: true })
 }
 
 const WriteAheadOnly = require('../writeahead')
@@ -96,7 +109,6 @@ async function walvivify (writeahead) {
                 items.push([ 'right', page.right[0] ])
             }
         } else {
-            console.log(page.items)
             const items = vivified[id] = page.items.map(item => [ item.id, item.key == null ? null : item.key[0] ])
             for (const item of items) {
                 await vivify(item[0])
@@ -138,27 +150,21 @@ async function* test (suite, okay, only = [ 'fileSystem', 'writeahead' ]) {
         const WriteAhead = require('writeahead')
         const destructible = new Destructible(trace, 'create.t')
         const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
-        const directories = {
-            wal: path.join(directory, 'wal'),
-            tree: path.join(directory, 'tree')
-        }
-        await Strata.Error.resolve(fs.mkdir(directories.wal, { recursive: true }), 'IO_ERROR')
-        await Strata.Error.resolve(fs.mkdir(directories.tree, { recursive: true }), 'IO_ERROR')
-        const open = await WriteAhead.open({ directory: directories.wal })
+        const open = await WriteAhead.open({ directory })
         const writeahead = new WriteAhead(destructible, open)
         writeahead.deferrable.increment()
         const pages = new Magazine
         destructible.rescue(trace, 'test', async () => {
             if (serialize != null) {
-                await waserialize(writeahead, directories.tree, serialize)
+                await waserialize(writeahead, serialize)
             }
             const strata = await Strata.open(destructible.durable($ => $(), 'strata'), {
-                pages, storage: new WriteAheadOnly(directories.tree, writeahead, 0), turnstile, create, comparator
+                pages, storage: new WriteAheadOnly(writeahead, 0), turnstile, create, comparator
             })
             await f({
                 strata: strata,
                 pages: pages,
-                directory: directories.tree,
+                directory: directory,
                 prefix: [ suite, test, 'writeahead only' ].join(' ')
             })
             await strata.drain()

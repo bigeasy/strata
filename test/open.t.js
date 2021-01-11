@@ -1,4 +1,4 @@
-require('proof')(7, async (okay) => {
+require('proof')(5, async (okay) => {
     const fs = require('fs').promises
     const path = require('path')
 
@@ -6,9 +6,6 @@ require('proof')(7, async (okay) => {
 
     for await (const harness of test('create', okay)) {
         await harness($ => $(), 'open', async ({ strata, prefix, directory, pages }) => {
-            console.log(directory)
-            const instances = await fs.readdir(path.join(directory, 'instances'))
-            okay(instances, [ '1' ], 'instance')
             okay(pages.size, 1, 'cache not empty')
         }, {
             serialize: {

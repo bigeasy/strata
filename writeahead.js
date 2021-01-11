@@ -1,5 +1,7 @@
 'use strict'
 
+const assert = require('assert')
+
 const Sheaf = require('./sheaf')
 const fs = require('fs').promises
 const path = require('path')
@@ -47,14 +49,13 @@ const wal = {
 }
 
 class WriteAheadOnly {
-    constructor (directory, writeahead, key) {
-        this.directory = directory
+    constructor (writeahead, key) {
         this._writeahead = writeahead
         this._key = key
     }
 
     create (sheaf) {
-        return new WriteAheadOnly.Writer(this.directory, this._writeahead, this._key, sheaf)
+        return new WriteAheadOnly.Writer(this._writeahead, this._key, sheaf)
     }
 
     static Reader = class {
@@ -175,8 +176,7 @@ class WriteAheadOnly {
     }
 
     static Writer = class {
-        constructor (directory, writeahead, key, sheaf) {
-            this.directory = directory
+        constructor (writeahead, key, sheaf) {
             this._writeahead = writeahead
             this._key = key
             this._id = 0
@@ -197,11 +197,6 @@ class WriteAheadOnly {
             return String(this.instance) + '.' +  String(id)
         }
 
-        _path (...vargs) {
-            vargs.unshift(this.directory)
-            return path.resolve.apply(path, vargs.map(varg => String(varg)))
-        }
-
         _recordify (...records) {
             const buffers = []
             for (const record of records) {
@@ -211,15 +206,19 @@ class WriteAheadOnly {
         }
 
         async create () {
-            const directory = this.directory
-            const stat = await Strata.Error.resolve(fs.stat(directory), 'IO_ERROR')
-            Strata.Error.assert(stat.isDirectory(), 'CREATE_NOT_DIRECTORY', { directory })
-            const dir = await Strata.Error.resolve(fs.readdir(directory), 'IO_ERROR')
-            Strata.Error.assert(dir.every(file => /^\./.test(file)), 'CREATE_NOT_EMPTY', { directory })
-            await Strata.Error.resolve(fs.mkdir(this._path('instances', '0'), { recursive: true }), 'IO_ERROR')
             await this._writeahead.write([{
-                keys: [[ this._key, '0.0' ]],
+                keys: [[ this._key, '0.0' ], [ this._key, 'instance' ]],
                 buffer: Buffer.concat([{
+                    header: {
+                        method: 'apply',
+                        key: 'instance'
+                    }
+                }, {
+                    header: {
+                        method: 'instance',
+                        instance: 0
+                    }
+                }, {
                     header: {
                         method: 'apply',
                         key: '0.0'
@@ -233,19 +232,25 @@ class WriteAheadOnly {
                 }].map(entry => this._recordify(entry)))
             }]).promise
             this._id = 2
+            this.instance = 0
         }
 
         async open () {
-            const dir = await Strata.Error.resolve(fs.readdir(this._path('instances')), 'IO_ERROR')
-            const instances = dir
-                .filter(file => /^\d+$/.test(file))
-                .map(file => +file)
-                .sort((left, right) => right - left)
-            this.instance = instances[0] + 1
-            await Strata.Error.resolve(fs.mkdir(this._path('instances', this.instance)), 'IO_ERROR')
-            for (const instance of instances) {
-                await Strata.Error.resolve(fs.rmdir(this._path('instances', instance)), 'IO_ERROR')
-            }
+            this.instance = (await wal.last(this._writeahead, this._key, 'instance')).instance
+            await this._writeahead.write([{
+                keys: [[ this._key, 'instance' ]],
+                buffer: Buffer.concat([{
+                    header: {
+                        method: 'apply',
+                        key: 'instance'
+                    }
+                }, {
+                    header: {
+                        method: 'instance',
+                        instance: ++this.instance
+                    }
+                }].map(entry => this._recordify(entry)))
+            }]).promise
         }
 
         read (id) {

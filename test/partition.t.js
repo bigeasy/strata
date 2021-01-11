@@ -53,9 +53,7 @@ require('proof')(21, async okay => {
             strata.search(trampoline, { value: 'a', index: 0 }, cursor => {
                 okay(cursor.page.items.length, 10, `${prefix} unsplit`)
                 const entry = { value: 'b', index: 0 }
-                debugger
                 const { index } = cursor.indexOf(entry)
-                console.log('?', index)
                 cursor.insert(index, entry, [ entry ], writes)
             })
             while (trampoline.seek()) {
