@@ -601,10 +601,10 @@ class WriteAheadOnly {
                     this._write = null
                     this._writeahead.write([ write ])
                 }
-                const balance = await wal.last(this._writeahead, 0, 'balance')
+                const balance = await wal.last(this._writeahead, this._key, 'balance')
                 let messages = []
                 if (balance != null) {
-                    messages = (await wal.last(this._writeahead, 0, balance.key, { messages })).messages
+                    messages = (await wal.last(this._writeahead, this._key, balance.key, { messages })).messages
                 }
                 if (messages.length == 0) {
                     break
