@@ -130,9 +130,9 @@ async function* test (suite, okay, only = [ 'fileSystem', 'writeahead' ]) {
         const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
         const pages = new Magazine
         const handles = new FileSystem.HandleCache(new Magazine)
-        const fileSystem = new FileSystem(directory, handles)
+        const storage = await FileSystem.open({ directory, handles, create })
         destructible.rescue(trace, [ suite, test ], async () => {
-            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), { pages, storage: fileSystem, turnstile, create, comparator  })
+            const strata = new Strata(destructible.durable($ => $(), 'strata'), { pages, storage, turnstile, comparator  })
             await f({ strata, directory, prefix: [ suite, test, 'file system' ].join(' '), pages })
             destructible.destroy()
         })
@@ -147,20 +147,18 @@ async function* test (suite, okay, only = [ 'fileSystem', 'writeahead' ]) {
         }
     }
     async function writeahead (trace, test, f, { create = false, serialize = null, vivify = null, comparator = null } = {}) {
+        const destructible = new Destructible(trace, 'writeahead.t')
         const WriteAhead = require('writeahead')
-        const destructible = new Destructible(trace, 'create.t')
         const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
-        const open = await WriteAhead.open({ directory })
-        const writeahead = new WriteAhead(destructible, open)
+        const writeahead = new WriteAhead(destructible, await WriteAhead.open({ directory }))
+        if (serialize != null) {
+            await waserialize(writeahead, serialize)
+        }
         writeahead.deferrable.increment()
         const pages = new Magazine
+        const storage = await WriteAheadOnly.open({ writeahead, key: 0, create })
         destructible.rescue(trace, 'test', async () => {
-            if (serialize != null) {
-                await waserialize(writeahead, serialize)
-            }
-            const strata = await Strata.open(destructible.durable($ => $(), 'strata'), {
-                pages, storage: new WriteAheadOnly(writeahead, 0), turnstile, create, comparator
-            })
+            const strata = new Strata(destructible.durable($ => $(), 'strata'), { pages, storage, turnstile, comparator })
             await f({
                 strata: strata,
                 pages: pages,

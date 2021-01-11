@@ -6,8 +6,9 @@ const assert = require('assert')
 const Journalist = require('journalist')
 const Magazine = require('magazine')
 
-const Sheaf = require('./sheaf')
+const Recorder = require('transcript/recorder')
 const Strata = { Error: require('./error') }
+const Storage = require('./storage')
 const Player = require('transcript/player')
 const io = require('./io')
 
@@ -19,15 +20,17 @@ function _path (...vargs) {
 const appendable = require('./appendable')
 
 class FileSystem {
-    constructor (directory, handles) {
-        this.directory = directory
-        this.handles = handles
-        this._id = 0
+    static async open (options) {
+        options = Storage.options(options)
+        const writer = new FileSystem.Writer(options)
+        if (options.create) {
+            await writer.create()
+        } else {
+            await writer.open()
+        }
+        return writer
     }
 
-    create (sheaf) {
-        return new FileSystem.Writer(this, sheaf)
-    }
     //
 
     // **TODO** Really need to think of some rules for failure. They may be
@@ -66,7 +69,7 @@ class FileSystem {
 
     static Reader = class {
         constructor (directory, options = {}) {
-            options = Sheaf.options(options)
+            options = Storage.options(options)
             this.directory = directory
             this.serializer = options.serializer
             this.extractor = options.extractor
@@ -195,13 +198,18 @@ class FileSystem {
     }
 
     static Writer = class {
-        constructor (fileSystem, sheaf) {
-            this.directory = fileSystem.directory
-            this.handles = fileSystem.handles
-            this.sheaf = sheaf
+        constructor (options) {
+            this.directory = options.directory
+            this.handles = options.handles
+            this.serializer = options.serializer
             this.instance = 0
             this._id = 0
-            this.reader = new FileSystem.Reader(this.directory, sheaf.options)
+            this._recorder = Recorder.create(() => '0')
+            this.reader = new FileSystem.Reader(this.directory, options)
+        }
+
+        recordify (header, parts = []) {
+            return this._recorder([[ Buffer.from(JSON.stringify(header)) ].concat(parts)])
         }
 
         nextId (leaf) {
@@ -222,7 +230,7 @@ class FileSystem {
         }
 
         _recordify (header, parts = []) {
-            return this.sheaf._recorder([[ Buffer.from(JSON.stringify(header)) ].concat(parts)])
+            return (this._recorder)([[ Buffer.from(JSON.stringify(header)) ].concat(parts)])
         }
 
         async create () {
@@ -302,7 +310,7 @@ class FileSystem {
             await Strata.Error.resolve(fs.mkdir(path.dirname(filename), { recursive: true }), 'IO_ERROR')
             const buffers = branch.page.items.map((item, index) => {
                 const { id, key } = item
-                const parts = key != null ? this.sheaf.serializer.key.serialize(key) : []
+                const parts = key != null ? this.serializer.key.serialize(key) : []
                 return this._recordify({ id }, parts)
             })
             branch.cartridge.heft = buffers.reduce((sum, buffer) => sum + buffer.length, 0)
@@ -360,14 +368,14 @@ class FileSystem {
         // all of the assumptions. That is, explicitly ignore this dependent.
 
         //
-        async _vacuum (key, cartridges) {
+        async _vacuum (sheaf, key, cartridges) {
             //
 
             // Obtain the pages so that they are not read while we are rewriting
             // their log history.
 
             //
-            const loaded = (await this.sheaf.descend({ key }, cartridges)).page.log.loaded
+            const loaded = (await sheaf.descend({ key }, cartridges)).page.log.loaded
             //
 
             // We want the log history of the page.
@@ -402,14 +410,14 @@ class FileSystem {
             await Strata.Error.resolve(fs.mkdir(this._path('balance', page.id)), 'IO_ERROR')
             const filename = this._path('balance', page.id, page.log.id)
             const buffers = page.items.map((item, index) => {
-                const parts = this.sheaf.serializer.parts.serialize(item.parts)
+                const parts = this.serializer.parts.serialize(item.parts)
                 return this._recordify({ method: 'insert', index }, parts)
             })
             await io.write(filename, buffers, this.handles.strategy)
 
             /*
             const buffers = page.items.map((item, index) => {
-                const parts = this.sheaf.serializer.parts.serialize(item.parts)
+                const parts = this.serializer.parts.serialize(item.parts)
                 return this._recordify({ method: 'insert', index }, parts)
             })
 
@@ -442,7 +450,7 @@ class FileSystem {
             const serialized = []
             for (const message of messages) {
                 if (message.key != null) {
-                    const key = this.sheaf.serializer.key.serialize(message.key)
+                    const key = this.serializer.key.serialize(message.key)
                     serialized.push(Buffer.from(JSON.stringify({ ...message, key: key.length })))
                     serialized.push.apply(serialized, key)
                 } else {
@@ -573,7 +581,7 @@ class FileSystem {
                         }
                     }, {
                         header: { method: 'right' },
-                        parts: this.sheaf.serializer.key.serialize(right.page.key)
+                        parts: this.serializer.key.serialize(right.page.key)
                     }]
                 },
                 right: {
@@ -591,7 +599,7 @@ class FileSystem {
                         }
                     }, {
                         header: { method: 'key' },
-                        parts: this.sheaf.serializer.key.serialize(right.page.key)
+                        parts: this.serializer.key.serialize(right.page.key)
                     }]
                 }
             }
@@ -599,14 +607,14 @@ class FileSystem {
             if (left.page.id != '0.1') {
                 stub.left.entries.push({
                     header: { method: 'key' },
-                    parts: this.sheaf.serializer.key.serialize(left.page.key)
+                    parts: this.serializer.key.serialize(left.page.key)
                 })
             }
 
             if (right.page.right != null) {
                 stub.right.entries.push({
                     header: { method: 'right' },
-                    parts: this.sheaf.serializer.key.serialize(right.page.right)
+                    parts: this.serializer.key.serialize(right.page.right)
                 })
             }
 
@@ -792,7 +800,7 @@ class FileSystem {
             if (right.page.right != null) {
                 stub.entries.push({
                     header: { method: 'right' },
-                    parts: this.sheaf.serializer.key.serialize(right.page.right)
+                    parts: this.serializer.key.serialize(right.page.right)
                 })
             }
 
@@ -831,7 +839,7 @@ class FileSystem {
             await journalist.commit()
         }
 
-        async balance () {
+        async balance (sheaf) {
             for (;;) {
                 this.journalist = await Journalist.create(this.directory)
                 if (this.journalist.messages.length == 0) {
@@ -844,7 +852,7 @@ class FileSystem {
                 while (slice.length != 0) {
                     const message = JSON.parse(String(slice.shift()))
                     if (message.key != null) {
-                        message.key = this.sheaf.serializer.key.deserialize(slice.splice(0, message.key))
+                        message.key = this.serializer.key.deserialize(slice.splice(0, message.key))
                     }
                     messages.push(message)
                 }
@@ -852,13 +860,13 @@ class FileSystem {
                 const cartridges = []
                 switch (message.method) {
                 case 'vacuum':
-                    await this._vacuum(message.key, cartridges)
+                    await this._vacuum(sheaf, message.key, cartridges)
                     break
                 case 'rmrf':
                     await this._rmrf(message.pages)
                     break
                 case 'balance':
-                    await this.sheaf.balance(message.key, message.level, messages, cartridges)
+                    await sheaf.balance(message.key, message.level, messages, cartridges)
                     break
                 }
                 this._messages(this.journalist, messages)

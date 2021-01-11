@@ -8,7 +8,7 @@ require('proof')(13, async (okay) => {
 
     const test = require('./test')
 
-    for await (const harness of test('drain', okay, [ 'fileSystem', 'writeahead' ])) {
+    for await (const harness of test('drain', okay)) {
         await harness($ => $(), 'split', async ({ strata }) => {
             const trampoline = new Trampoline, writes = {}
             strata.search(trampoline, leaf[0], cursor => {

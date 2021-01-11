@@ -17,11 +17,6 @@ class Strata {
         this._sheaf = new Sheaf(destructible, options)
     }
 
-    static open (destructible, options) {
-        const strata = new Strata(destructible, options)
-        return options.create ? strata._sheaf.create(strata) : strata._sheaf.open(strata)
-    }
-
     get options () {
         return this._sheaf.options
     }

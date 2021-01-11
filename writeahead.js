@@ -2,11 +2,12 @@
 
 const assert = require('assert')
 
-const Sheaf = require('./sheaf')
 const fs = require('fs').promises
 const path = require('path')
 const Strata = { Error: require('./error') }
+const Storage = require('./storage')
 const Player = require('transcript/player')
+const Recorder = require('transcript/recorder')
 
 const wal = {
     async *iterator (writeahead, qualifier, key) {
@@ -49,20 +50,22 @@ const wal = {
 }
 
 class WriteAheadOnly {
-    constructor (writeahead, key) {
-        this._writeahead = writeahead
-        this._key = key
-    }
-
-    create (sheaf) {
-        return new WriteAheadOnly.Writer(this._writeahead, this._key, sheaf)
+    static async open (options) {
+        options = Storage.options(options)
+        const writer = new WriteAheadOnly.Writer(options)
+        if (options.create) {
+            await writer.create()
+        } else {
+            await writer.open()
+        }
+        return writer
     }
 
     static Reader = class {
         called = 0
 
         constructor (options) {
-            options = Sheaf.options(options)
+            options = Storage.options(options)
             this.writeahead = options.writeahead
             this.key = options.key
             this.serializer = options.serializer
@@ -176,17 +179,18 @@ class WriteAheadOnly {
     }
 
     static Writer = class {
-        constructor (writeahead, key, sheaf) {
-            this._writeahead = writeahead
-            this._key = key
+        constructor (options) {
+            this._writeahead = options.writeahead
+            this._key = options.key
             this._id = 0
-            this.sheaf = sheaf
-            this.reader = new WriteAheadOnly.Reader({
-                writeahead, key,
-                serializer: this.sheaf.serializer,
-                extractor: this.sheaf.extractor,
-                checksum: this.sheaf.checksum
-            })
+            this.instance = 0
+            this.serializer = options.serializer
+            this._recorder = Recorder.create(() => '0')
+            this.reader = new WriteAheadOnly.Reader(options)
+        }
+
+        recordify (header, parts = []) {
+            return this._recorder([[ Buffer.from(JSON.stringify(header)) ].concat(parts)])
         }
 
         nextId (leaf) {
@@ -200,7 +204,7 @@ class WriteAheadOnly {
         _recordify (...records) {
             const buffers = []
             for (const record of records) {
-                buffers.push(this.sheaf._recorder([[ Buffer.from(JSON.stringify(record.header)) ].concat(record.parts || [])]))
+                buffers.push(this._recorder([[ Buffer.from(JSON.stringify(record.header)) ].concat(record.parts || [])]))
             }
             return Buffer.concat(buffers)
         }
@@ -339,7 +343,7 @@ class WriteAheadOnly {
                     index: 1,
                     id: root.page.items[1].id
                 },
-                parts: this.sheaf.serializer.key.serialize(root.page.items[1].key)
+                parts: this.serializer.key.serialize(root.page.items[1].key)
             })
             this._write.body.push({
                 header: {
@@ -428,7 +432,7 @@ class WriteAheadOnly {
                     index: parent.index + 1,
                     id: right.page.id
                 },
-                parts: this.sheaf.serializer.key.serialize(promotion)
+                parts: this.serializer.key.serialize(promotion)
             })
 
         }
@@ -461,7 +465,7 @@ class WriteAheadOnly {
                 header: {
                     method: 'right'
                 },
-                parts: this.sheaf.serializer.key.serialize(right.page.key)
+                parts: this.serializer.key.serialize(right.page.key)
             })
 
             body.push({
@@ -485,7 +489,7 @@ class WriteAheadOnly {
                 header: {
                     method: 'key'
                 },
-                parts: this.sheaf.serializer.key.serialize(right.page.key)
+                parts: this.serializer.key.serialize(right.page.key)
             })
 
             body.push({
@@ -499,7 +503,7 @@ class WriteAheadOnly {
                     index: parent.index + 1,
                     id: right.page.id
                 },
-                parts: this.sheaf.serializer.key.serialize(right.page.items[0].key)
+                parts: this.serializer.key.serialize(right.page.items[0].key)
             })
 
             this._startBalance([ left.page.id, right.page.id, parent.page.id ], body, messages)
@@ -538,7 +542,7 @@ class WriteAheadOnly {
                     method: 'merge',
                     id: right.page.id
                 },
-                parts: left.page.leaf ? [] : this.sheaf.serializer.key.serialize(key)
+                parts: left.page.leaf ? [] : this.serializer.key.serialize(key)
             })
 
             body.push({
@@ -592,7 +596,7 @@ class WriteAheadOnly {
             this._startBalance([ left.page.id, surgery.splice.page.id, pivot.page.id ], body, messages)
         }
 
-        async balance () {
+        async balance (sheaf) {
             const cartridges = []
             for (;;) {
                 cartridges.splice(0).forEach(cartridge => cartridge.release())
@@ -630,7 +634,7 @@ class WriteAheadOnly {
                 Strata.Error.assert(message.method == 'balance', 'JOURNAL_CORRUPTED')
                 switch (message.method) {
                 case 'balance':
-                    await this.sheaf.balance(message.key, message.level, messages, cartridges)
+                    await sheaf.balance(message.key, message.level, messages, cartridges)
                     break
                 }
             }

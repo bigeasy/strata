@@ -152,12 +152,13 @@ class Sheaf {
         this.leaf = options.leaf
         this.branch = options.branch
 
-        this.storage = options.storage.create(this)
+        this.storage = options.storage
 
-        this._recorder = Recorder.create(() => '0')
         this._root = null
 
         this._id = 0
+
+        this._root = this._create({ id: -1, leaf: false, items: [{ id: '0.0' }] }, [])
 
         this.destructible = destructible
 
@@ -214,22 +215,6 @@ class Sheaf {
                     this._root = null
                 }
             })
-        })
-    }
-
-    create (strata) {
-        this._root = this._create({ id: -1, leaf: false, items: [{ id: '0.0' }] }, [])
-        return this.deferrable.destructive('create', async () => {
-            await this.storage.create()
-            return strata
-        })
-    }
-
-    open (strata) {
-        this._root = this._create({ id: -1, leaf: false, items: [{ id: '0.0' }] }, [])
-        return this.deferrable.destructive('open', async () => {
-            await this.storage.open()
-            return strata
         })
     }
 
@@ -503,10 +488,6 @@ class Sheaf {
 
     drain () {
         return this._fracture.drain()
-    }
-
-    recordify (header, parts = []) {
-        return this._recorder([[ Buffer.from(JSON.stringify(header)) ].concat(parts)])
     }
 
     _unbalanced (page) {
@@ -815,7 +796,7 @@ class Sheaf {
         // We run this function to continue balancing the tree.
 
         //
-        await this.storage.balance()
+        await this.storage.balance(this)
     }
 
     // **TODO** Something is wrong here. We're using `child.right` to find the a
@@ -1093,7 +1074,7 @@ class Sheaf {
             cartridges.forEach(cartridge => cartridge.release())
         }
 
-        await this.storage.balance(messages)
+        await this.storage.balance(this)
     }
     //
 
