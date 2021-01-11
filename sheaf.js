@@ -162,7 +162,7 @@ class Sheaf {
 
         this.destructible = destructible
 
-        this.deferrable = destructible.durable($ => $(), 'deferrable', { countdown: 1 })
+        this.deferrable = destructible.durable($ => $(), { countdown: 1 }, 'deferrable')
 
         // **TODO** Do not worry about wrapping anymore.
         // Operation id wraps at 32-bits, cursors should not be open that long.
