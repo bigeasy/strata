@@ -6,41 +6,43 @@ const path = require('path')
 const Strata = { Error: require('./error') }
 const Player = require('transcript/player')
 
-async function* wal2 (writeahead, qualifier, key) {
-    const player = new Player(() => '0')
-    let apply
-    const entries = []
-    for await (const block of writeahead.get([ qualifier, key ])) {
-        for (const entry of player.split(block)) {
-            const header = JSON.parse(String(entry.parts.shift()))
-            if (header.method == 'apply') {
-                apply = header.key == key
-            } else if (apply) {
-                entries.push({ header, parts: entry.parts, sizes: entry.sizes })
+const wal = {
+    async *iterator (writeahead, qualifier, key) {
+        const player = new Player(() => '0')
+        let apply
+        const entries = []
+        for await (const block of writeahead.get([ qualifier, key ])) {
+            for (const entry of player.split(block)) {
+                const header = JSON.parse(String(entry.parts.shift()))
+                if (header.method == 'apply') {
+                    apply = header.key == key
+                } else if (apply) {
+                    entries.push({ header, parts: entry.parts, sizes: entry.sizes })
+                }
+            }
+            if (entries.length != 0) {
+                yield entries
+                entries.length = 0
             }
         }
         if (entries.length != 0) {
             yield entries
-            entries.length = 0
         }
-    }
-    if (entries.length != 0) {
-        yield entries
-    }
-}
-
-async function wal (writeahead, qualifier, key, f) {
-    const player = new Player(() => '0')
-    let apply
-    for await (const block of writeahead.get([ qualifier, key ])) {
-        for (const entry of player.split(block)) {
-            const header = JSON.parse(String(entry.parts.shift()))
-            if (header.method == 'apply') {
-                apply = header.key == key
-            } else if (apply) {
-                f(header, entry.parts)
+    },
+    async last (writeahead, qualifier, key, last = null) {
+        const player = new Player(() => '0')
+        let apply
+        for await (const block of writeahead.get([ qualifier, key ])) {
+            for (const entry of player.split(block)) {
+                const header = JSON.parse(String(entry.parts.shift()))
+                if (header.method == 'apply') {
+                    apply = header.key == key
+                } else if (apply) {
+                    last = header
+                }
             }
         }
+        return last
     }
 }
 
@@ -89,7 +91,7 @@ class WriteAheadOnly {
             }
             let apply = false
             const player = new Player(this.checksum)
-            WAL: for await (const entries of wal2(this.writeahead, this.key, id)) {
+            WAL: for await (const entries of wal.iterator(this.writeahead, this.key, id)) {
                 for (const { header, parts, sizes } of entries) {
                     switch (header.method) {
                     case 'stop': {
@@ -599,20 +601,19 @@ class WriteAheadOnly {
                     this._write = null
                     this._writeahead.write([ write ])
                 }
-                let balanceKey = null
-                await wal(this._writeahead, 0, 'balance', (header, parts) => balanceKey = header.key)
+                const balance = await wal.last(this._writeahead, 0, 'balance')
                 let messages = []
-                if (balanceKey != null) {
-                    await wal(this._writeahead, 0, balanceKey, (header, parts) => messages = header.messages)
+                if (balance != null) {
+                    messages = (await wal.last(this._writeahead, 0, balance.key, { messages })).messages
                 }
                 if (messages.length == 0) {
                     break
                 }
                 this._write = {
-                    keys: [ balanceKey ],
+                    keys: [ balance.key ],
                     body: [{
                         header: {
-                            method: 'apply', key: balanceKey
+                            method: 'apply', key: balance.key
                         }
                     }, {
                         header: {
