@@ -6,6 +6,7 @@ const assert = require('assert')
 const Journalist = require('journalist')
 const Magazine = require('magazine')
 
+const Operation = require('operation')
 const Recorder = require('transcript/recorder')
 const Strata = { Error: require('./error') }
 const Storage = require('./storage')
@@ -103,9 +104,8 @@ class FileSystem {
                 deletes: 0
             }
             const player = new Player(function () { return '0' })
-            const buffer = Buffer.alloc(1024 * 1024)
-            for await (const { entries } of io.player(player, this._path('pages', id, log), buffer)) {
-                for (const entry of entries) {
+            for await (const { buffer } of Operation.reader(this._path('pages', id, log), Buffer.alloc(1024 * 1024))) {
+                for (const entry of player.split(buffer)) {
                     const header = JSON.parse(entry.parts.shift())
                     switch (header.method) {
                     case 'right': {
@@ -181,18 +181,31 @@ class FileSystem {
             // play entries instead of having a different type, so it ends up
             // looking like writeahead page. We can then push the length instead
             // of prepending it.
-            const { gathered, size, length } = await io.play(player, this._path('pages', id, 'page'), buffer, (entry, index) => {
-                const header = JSON.parse(entry.parts.shift())
-                if (index == 0) {
-                    return { length: header.length }
+            let length = 0
+            for await (const { buffer } of Operation.reader(this._path('pages', id, 'page'), Buffer.alloc(1024 * 1024))) {
+                for (const entry of player.split(buffer)) {
+                    const header = JSON.parse(entry.parts.shift())
+                    switch (header.method) {
+                    case 'insert': {
+                            Strata.Error.assert(header.index == items.length, 'CORRUPT_BRANCH_PAGE')
+                            const heft = entry.sizes.reduce((sum, size) => sum + size, 0)
+                            if (entry.parts.length == 0) {
+                                Strata.Error.assert(header.index == 0, 'CORRUPT_BRANCH_PAGE')
+                                items.push({ id: header.id, key: null, heft })
+                            } else {
+                                items.push({ id: header.id, key: this.serializer.key.deserialize(entry.parts), heft })
+                            }
+                        }
+                        break
+                    case 'length': {
+                            length = header.length
+                        }
+                        break
+                    }
                 }
-                items.push({
-                    id: header.id,
-                    key: entry.parts.length != 0 ? this.serializer.key.deserialize(entry.parts) : null
-                })
-            })
+            }
             Strata.Error.assert(length != 0, 'CORRUPT_BRANCH_PAGE')
-            Strata.Error.assert(gathered[0].length == items.length, 'CORRUPT_BRANCH_PAGE')
+            Strata.Error.assert(length == items.length, 'CORRUPT_BRANCH_PAGE')
             return { page: { id, leaf, items }, heft: length }
         }
     }
@@ -247,7 +260,7 @@ class FileSystem {
             await Strata.Error.resolve(fs.mkdir(this._path('page'), { recursive: true }), 'IO_ERROR')
             await Strata.Error.resolve(fs.mkdir(this._path('balance', '0.0'), { recursive: true }), 'IO_ERROR')
             await Strata.Error.resolve(fs.mkdir(this._path('balance', '0.1')), 'IO_ERROR')
-            const buffers = [ this._recordify({ length: 1 }), this._recordify({ id: '0.1' }, []) ]
+            const buffers = [ this._recordify({ method: 'length', length: 1 }), this._recordify({ method: 'insert', index: 0, id: '0.1' }, []) ]
             await Strata.Error.resolve(fs.writeFile(this._path('balance', '0.0', 'page'), Buffer.concat(buffers), { flag: 'as' }), 'IO_ERROR')
             const zero = this._recordify({ method: '0.0' })
             await Strata.Error.resolve(fs.writeFile(this._path('balance', '0.1', '0.0'), zero, { flag: 'as' }), 'IO_ERROR')
@@ -311,10 +324,10 @@ class FileSystem {
             const buffers = branch.page.items.map((item, index) => {
                 const { id, key } = item
                 const parts = key != null ? this.serializer.key.serialize(key) : []
-                return this._recordify({ id }, parts)
+                return this._recordify({ method: 'insert', index, id }, parts)
             })
             branch.cartridge.heft = buffers.reduce((sum, buffer) => sum + buffer.length, 0)
-            buffers.unshift(this._recordify({ length: branch.page.items.length }))
+            buffers.push(this._recordify({ method: 'length', length: branch.page.items.length }))
             await io.write(filename, buffers, this.handles.strategy)
             if (create) {
                 journalist.mkdir(_path('pages', branch.page.id))

@@ -45,12 +45,14 @@ exports.serialize = async function (directory, files) {
         instance = Math.max(+id.split('.')[0], instance)
         await fs.mkdir(path.resolve(directory, 'pages', id), { recursive: true })
         if (+id.split('.')[1] % 2 == 0) {
-            const buffers = files[id].map(record => {
+            const buffers = files[id].map((record, index) => {
                 return recordify({
+                    method: 'insert',
+                    index: index,
                     id: record[0]
                 }, record[1] != null ? [ Buffer.from(JSON.stringify(record[1])) ] : [])
             })
-            buffers.unshift(recordify({ length: files[id].length }, []))
+            buffers.push(recordify({ method: 'length', length: files[id].length }, []))
             const buffer = Buffer.concat(buffers)
             const file = path.resolve(directory, 'pages', id, 'page')
             await fs.writeFile(file, buffer)
