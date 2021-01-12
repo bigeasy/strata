@@ -122,17 +122,17 @@ async function walvivify (writeahead) {
 
 async function* test (suite, okay, only = [ 'fileSystem', 'writeahead' ]) {
     const directory = path.join(utilities.directory, suite)
-    async function fileSystem (trace, test, f, { create = false, serialize = null, vivify = null, comparator = null } = {}) {
+    async function fileSystem ($trace, test, f, { create = false, serialize = null, vivify = null, comparator = null } = {}) {
         if (serialize != null) {
             await utilities.serialize(directory, serialize)
         }
         const FileSystem = require('../filesystem')
-        const destructible = new Destructible(5000, trace, 'create.t')
+        const destructible = new Destructible({ $trace }, 'create.t')
         const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
         const pages = new Magazine
         const handles = new Operation.Cache(new Magazine)
         const storage = await FileSystem.open({ directory, handles, create })
-        destructible.rescue(trace, [ suite, test ], async () => {
+        destructible.ephemeral($ => $(), `${suite}.${test}.fs`, async () => {
             const strata = new Strata(destructible.durable($ => $(), 'strata'), { pages, storage, turnstile, comparator  })
             await f({ strata, directory, prefix: [ suite, test, 'file system' ].join(' '), pages })
             destructible.destroy()
@@ -147,8 +147,8 @@ async function* test (suite, okay, only = [ 'fileSystem', 'writeahead' ]) {
             okay(vivified, vivify, `${suite} ${test} file system vivify`)
         }
     }
-    async function writeahead (trace, test, f, { create = false, serialize = null, vivify = null, comparator = null } = {}) {
-        const destructible = new Destructible(trace, 'writeahead.t')
+    async function writeahead ($trace, test, f, { create = false, serialize = null, vivify = null, comparator = null } = {}) {
+        const destructible = new Destructible({ $trace }, 'writeahead.t')
         const WriteAhead = require('writeahead')
         const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
         const writeahead = new WriteAhead(destructible, await WriteAhead.open({ directory }))
@@ -158,7 +158,7 @@ async function* test (suite, okay, only = [ 'fileSystem', 'writeahead' ]) {
         writeahead.deferrable.increment()
         const pages = new Magazine
         const storage = await WriteAheadOnly.open({ writeahead, key: 0, create })
-        await destructible.rescue(trace, 'test', async () => {
+        await destructible.ephemeral($ => $(), `${suite}.${test}.writeahead`, async () => {
             const strata = new Strata(destructible.durable($ => $(), 'strata'), { pages, storage, turnstile, comparator })
             await f({
                 strata: strata,
