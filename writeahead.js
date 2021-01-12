@@ -46,12 +46,6 @@ const wal = {
             }
         }
         return last
-    },
-    Serializer: class {
-        constructor (qualifier) {
-            this._qualifier = qualifier
-            this._records = records
-        }
     }
 }
 
@@ -71,7 +65,7 @@ class WriteAheadOnly {
 
     static Serializer = class {
         constructor (writeahead, qualifier) {
-            this._writehead = writeahead
+            this._writeahead = writeahead
             this._qualifier = qualifier
             this._records = {}
         }
@@ -90,18 +84,16 @@ class WriteAheadOnly {
             }
             return body
         }
-        get keys_ () {
+        get keys () {
             return Object.keys(this._records).map(key => [ this._qualifier, key ])
         }
-        serialize (writeahead) {
-            const keys = [], buffers = []
-            for (const key of this._records) {
-                keys.push([ this._qualifier, key ])
-                for (const record of this._records[key]) {
-                }
+        serialize () {
+            return {
+                keys: this.keys,
+                buffer: this._writeahead._recordify.apply(this._writeahead, this.body)
             }
-            return [{ keys: keys, buffer: Buffer.concat(buffers) }]
         }
+
     }
 
     static Reader = class {
@@ -571,10 +563,7 @@ class WriteAheadOnly {
             for (;;) {
                 cartridges.splice(0).forEach(cartridge => cartridge.release())
                 if (this._write != null) {
-                    const write = {
-                        keys: this._write.keys_,
-                        buffer: this._recordify.apply(this, this._write.body)
-                    }
+                    const write = this._write.serialize()
                     this._write = null
                     this._writeahead.write([ write ])
                 }
