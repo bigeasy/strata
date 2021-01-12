@@ -51,9 +51,6 @@ const find = require('./find')
 // Partition a leaf page according to user's desired groupings.
 const Partition = require('./partition')
 
-// File read and write wrappers.
-const io = require('./io')
-
 // An `Error` type specific to Strata.
 const Strata = { Error: require('./error') }
 //

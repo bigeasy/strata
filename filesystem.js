@@ -11,7 +11,6 @@ const Recorder = require('transcript/recorder')
 const Strata = { Error: require('./error') }
 const Storage = require('./storage')
 const Player = require('transcript/player')
-const io = require('./io')
 
 function _path (...vargs) {
     return path.join.apply(path, vargs.map(varg => String(varg)))
@@ -283,7 +282,7 @@ class FileSystem {
                 const filename = this._path('pages', page.id, page.log.id)
                 const cartridge = await this.handles.get(filename)
                 try {
-                    await Operation.writev({ handle: cartridge.value, properties: { filename } }, writes)
+                    await Operation.writev(cartridge.value, writes)
                 } finally {
                     cartridge.release()
                 }
@@ -294,7 +293,7 @@ class FileSystem {
             const buffers = entries.map(entry => this._recordify(entry.header, entry.parts))
             await Strata.Error.resolve(fs.mkdir(this._path('balance', page), { recursive: true }), 'IO_ERROR')
             const filename = this._path('balance', page, id)
-            await io.appendv(filename, buffers, this.handles.sync)
+            await Operation.appendv(filename, buffers, this.handles.sync)
             journalist.rename(_path('balance', page, id), _path('pages', page, id))
         }
 
@@ -308,7 +307,7 @@ class FileSystem {
             })
             branch.cartridge.heft = buffers.reduce((sum, buffer) => sum + buffer.length, 0)
             buffers.push(this._recordify({ method: 'length', length: branch.page.items.length }))
-            await io.appendv(filename, buffers, this.handles.sync)
+            await Operation.appendv(filename, buffers, this.handles.sync)
             if (create) {
                 journalist.mkdir(_path('pages', branch.page.id))
             } else {
@@ -406,7 +405,7 @@ class FileSystem {
                 const parts = this.serializer.parts.serialize(item.parts)
                 return this._recordify({ method: 'insert', index }, parts)
             })
-            await io.appendv(filename, buffers, this.handles.sync)
+            await Operation.appendv(filename, buffers, this.handles.sync)
 
             /*
             const buffers = page.items.map((item, index) => {
