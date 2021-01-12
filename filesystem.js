@@ -48,26 +48,6 @@ class FileSystem {
     // can be shared.
 
     //
-    static HandleCache = class extends Magazine.OpenClose {
-        constructor (magazine, strategy = 'O_SYNC') {
-            super(magazine)
-            this.strategy = strategy
-        }
-        subordinate () {
-            return this._subordinate(magazine => new FileSystem.HandleCache(magazine, this._sync))
-        }
-        async open (filename) {
-            const flag = this.strategy == 'O_SYNC' ? 'as' : 'a'
-            return await Strata.Error.resolve(fs.open(filename, flag), 'IO_ERROR')
-        }
-        async close (handle) {
-            if (this.strategy == 'fsync') {
-                await Strata.Error.resolve(handle.sync(), 'IO_ERROR')
-            }
-            await Strata.Error.resolve(handle.close(), 'IO_ERROR')
-        }
-    }
-
     static Reader = class {
         constructor (directory, options = {}) {
             options = Storage.options(options)
@@ -303,7 +283,7 @@ class FileSystem {
                 const filename = this._path('pages', page.id, page.log.id)
                 const cartridge = await this.handles.get(filename)
                 try {
-                    await io.writev(cartridge.value, writes)
+                    await Operation.writev({ handle: cartridge.value, properties: { filename } }, writes)
                 } finally {
                     cartridge.release()
                 }
@@ -314,7 +294,7 @@ class FileSystem {
             const buffers = entries.map(entry => this._recordify(entry.header, entry.parts))
             await Strata.Error.resolve(fs.mkdir(this._path('balance', page), { recursive: true }), 'IO_ERROR')
             const filename = this._path('balance', page, id)
-            await io.write(filename, buffers, this.handles.strategy)
+            await io.appendv(filename, buffers, this.handles.sync)
             journalist.rename(_path('balance', page, id), _path('pages', page, id))
         }
 
@@ -328,7 +308,7 @@ class FileSystem {
             })
             branch.cartridge.heft = buffers.reduce((sum, buffer) => sum + buffer.length, 0)
             buffers.push(this._recordify({ method: 'length', length: branch.page.items.length }))
-            await io.write(filename, buffers, this.handles.strategy)
+            await io.appendv(filename, buffers, this.handles.sync)
             if (create) {
                 journalist.mkdir(_path('pages', branch.page.id))
             } else {
@@ -426,7 +406,7 @@ class FileSystem {
                 const parts = this.serializer.parts.serialize(item.parts)
                 return this._recordify({ method: 'insert', index }, parts)
             })
-            await io.write(filename, buffers, this.handles.strategy)
+            await io.appendv(filename, buffers, this.handles.sync)
 
             /*
             const buffers = page.items.map((item, index) => {

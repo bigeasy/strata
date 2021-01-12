@@ -6,6 +6,7 @@ const Turnstile = require('turnstile')
 const Strata = require('../strata')
 const Magazine = require('magazine')
 const Player = require('transcript/player')
+const Operation = require('operation')
 
 const utilities = require('../utilities')
 const path = require('path')
@@ -129,7 +130,7 @@ async function* test (suite, okay, only = [ 'fileSystem', 'writeahead' ]) {
         const destructible = new Destructible(5000, trace, 'create.t')
         const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
         const pages = new Magazine
-        const handles = new FileSystem.HandleCache(new Magazine)
+        const handles = new Operation.Cache(new Magazine)
         const storage = await FileSystem.open({ directory, handles, create })
         destructible.rescue(trace, [ suite, test ], async () => {
             const strata = new Strata(destructible.durable($ => $(), 'strata'), { pages, storage, turnstile, comparator  })
