@@ -15,7 +15,7 @@ const wal = {
         let apply
         const entries = []
         for await (const block of writeahead.get([ qualifier, key ])) {
-            for (const entry of player.split(block)) {
+           for (const entry of player.split(block)) {
                 const header = JSON.parse(String(entry.parts.shift()))
                 if (header.method == 'apply') {
                     apply = header.key == key
@@ -46,10 +46,18 @@ const wal = {
             }
         }
         return last
+    },
+    Serializer: class {
+        constructor (qualifier) {
+            this._qualifier = qualifier
+            this._records = records
+        }
     }
 }
 
 class WriteAheadOnly {
+    static wal = wal
+
     static async open (options) {
         options = Storage.options(options)
         const writer = new WriteAheadOnly.Writer(options)
@@ -59,6 +67,41 @@ class WriteAheadOnly {
             await writer.open()
         }
         return writer
+    }
+
+    static Serializer = class {
+        constructor (writeahead, qualifier) {
+            this._writehead = writeahead
+            this._qualifier = qualifier
+            this._records = {}
+        }
+        push (key, ...records) {
+            if (this._records[key] == null) {
+                this._records[key] = [{
+                    header: { method: 'apply', key: key }
+                }]
+            }
+            this._records[key].push.apply(this._records[key], records)
+        }
+        get body () {
+            const body = []
+            for (const key in this._records) {
+                body.push.apply(body, this._records[key])
+            }
+            return body
+        }
+        get keys_ () {
+            return Object.keys(this._records).map(key => [ this._qualifier, key ])
+        }
+        serialize (writeahead) {
+            const keys = [], buffers = []
+            for (const key of this._records) {
+                keys.push([ this._qualifier, key ])
+                for (const record of this._records[key]) {
+                }
+            }
+            return [{ keys: keys, buffer: Buffer.concat(buffers) }]
+        }
     }
 
     static Reader = class {
@@ -99,11 +142,13 @@ class WriteAheadOnly {
                 for (const { header, parts, sizes } of entries) {
                     switch (header.method) {
                     case 'stop': {
+                            assert(! isNaN(header.stop))
                             page.stop = header.stop
                             if (page.stop == stop) {
                                 break WAL
                             }
                             page.stop++
+                            assert(! isNaN(header.stop))
                         }
                         break
                     case 'clear': {
@@ -266,44 +311,31 @@ class WriteAheadOnly {
             this._writeahead.write([{ keys: [ [ this.key, page.id ] ], buffer: Buffer.concat(writes) }])
         }
 
-        async writeLeaf (page, writes) {
+        writeLeaf (page, writes) {
             writes.unshift(this._recordify({ header: { method: 'apply', key: page.id } }))
             this._writeahead.write([{ keys: [[ this._key, page.id ]], buffer: Buffer.concat(writes) }])
         }
 
-        _startBalance (keys, body, messages) {
+        //
+        _startBalance (serializer, messages) {
             const id = [ 'balance', this.instance, this._id++ ].join('.')
 
-            body.push({
-                header: {
-                    method: 'apply',
-                    key: 'balance'
-                }
-            }, {
+            serializer.push('balance', {
                 header: {
                     method: 'balance',
                     key: id
                 }
             })
 
-            body.push({
-                header: {
-                    method: 'apply',
-                    key: id
-                }
-            }, {
+            serializer.push(id, {
                 header: {
                     method: 'messages',
                     messages: messages
                 }
             })
 
-            this._write = {
-                keys: keys.concat(id, 'balance'),
-                body: body
-            }
+            this._write = serializer
         }
-        //
 
         // Even more approixmate than usual because we're not accounting for
         // keys that were set to `null` or set to a value from `null`.
@@ -318,12 +350,7 @@ class WriteAheadOnly {
         writeDrainRoot ({ left, right, root }) {
             this._setHeft(left, right, root)
             const stop = root.page.stop++
-            this._write.body.push({
-                header: {
-                    method: 'apply',
-                    key: root.page.id
-                }
-            }, {
+            this._write.push(root.page.id, {
                 header: {
                     method: 'stop',
                     stop: stop
@@ -346,12 +373,7 @@ class WriteAheadOnly {
                 },
                 parts: this.serializer.key.serialize(root.page.items[1].key)
             })
-            this._write.body.push({
-                header: {
-                    method: 'apply',
-                    key: left.page.id
-                }
-            }, {
+            this._write.push(left.page.id, {
                 header: {
                     method: 'load',
                     id: root.page.id,
@@ -364,12 +386,7 @@ class WriteAheadOnly {
                     length: left.page.items.length
                 }
             })
-            this._write.body.push({
-                header: {
-                    method: 'apply',
-                    key: right.page.id
-                }
-            }, {
+            this._write.push(right.page.id, {
                 header: {
                     method: 'load',
                     id: root.page.id,
@@ -387,32 +404,9 @@ class WriteAheadOnly {
         writeSplitBranch ({ promotion, left, right, parent }) {
             this._setHeft(left, right, parent)
             const stop = left.page.stop++
-            this._write.body.push({
-                header: {
-                    method: 'apply',
-                    key: left.page.id
-                }
-            }, {
+            this._write.push(left.page.id, {
                 header: {
                     method: 'stop',
-                    stop: stop
-                }
-            }, {
-                header: {
-                    method: 'split',
-                    index: 0,
-                    id: left.page.items.length
-                }
-            })
-            this._write.body.push({
-                header: {
-                    method: 'apply',
-                    key: right.page.id
-                }
-            }, {
-                header: {
-                    method: 'load',
-                    id: left.page.id,
                     stop: stop
                 }
             }, {
@@ -422,12 +416,20 @@ class WriteAheadOnly {
                     length: left.page.items.length
                 }
             })
-            this._write.body.push({
+            this._write.push(right.page.id, {
                 header: {
-                    method: 'apply',
-                    key: parent.page.id
+                    method: 'load',
+                    id: left.page.id,
+                    stop: stop
                 }
             }, {
+                header: {
+                    method: 'split',
+                    index: left.page.items.length,
+                    length: left.page.items.length + right.page.items.length
+                }
+            })
+            this._write.push(parent.page.id, {
                 header: {
                     method: 'insert',
                     index: parent.index + 1,
@@ -446,12 +448,9 @@ class WriteAheadOnly {
 
             const body = []
 
-            body.push({
-                header: {
-                    method: 'apply',
-                    key: left.page.id
-                }
-            }, {
+            const serializer = new WriteAheadOnly.Serializer(this, this._key)
+
+            serializer.push(left.page.id, {
                 header: {
                     method: 'stop',
                     stop: left.page.stop++
@@ -469,12 +468,7 @@ class WriteAheadOnly {
                 parts: this.serializer.key.serialize(right.page.key)
             })
 
-            body.push({
-                header: {
-                    method: 'apply',
-                    key: right.page.id
-                }
-            }, {
+            serializer.push(right.page.id, {
                 header: {
                     method: 'load',
                     id: left.page.id,
@@ -493,12 +487,7 @@ class WriteAheadOnly {
                 parts: this.serializer.key.serialize(right.page.key)
             })
 
-            body.push({
-                header: {
-                    method: 'apply',
-                    key: parent.page.id
-                }
-            }, {
+            serializer.push(parent.page.id, {
                 header: {
                     method: 'insert',
                     index: parent.index + 1,
@@ -507,17 +496,12 @@ class WriteAheadOnly {
                 parts: this.serializer.key.serialize(right.page.items[0].key)
             })
 
-            this._startBalance([ left.page.id, right.page.id, parent.page.id ], body, messages)
+            this._startBalance(serializer, messages)
         }
 
         writeFillRoot({ root, child }) {
             this._setHeft(root)
-            this._write.body.push({
-                header: {
-                    method: 'apply',
-                    key: root.page.id
-                }
-            }, {
+            this._write.push(root.page.id, {
                 header: {
                     method: 'clear'
                 }
@@ -528,17 +512,11 @@ class WriteAheadOnly {
                     stop: child.page.stop
                 }
             })
-            this._write.keys.push(root.page.id)
         }
 
-        writeMerge ({ key, body, left, right, surgery, pivot }) {
+        writeMerge ({ key, serializer, left, right, surgery, pivot }) {
             this._setHeft(left, pivot, surgery.splice)
-            body.push({
-                header: {
-                    method: 'apply',
-                    key: left.page.id
-                }
-            }, {
+            serializer.push(left.page.id, {
                 header: {
                     method: 'merge',
                     id: right.page.id
@@ -546,12 +524,7 @@ class WriteAheadOnly {
                 parts: left.page.leaf ? [] : this.serializer.key.serialize(key)
             })
 
-            body.push({
-                header: {
-                    method: 'apply',
-                    key: surgery.splice.page.id
-                }
-            }, {
+            serializer.push(surgery.splice.page.id, {
                 header: {
                     method: 'delete',
                     index: surgery.splice.index
@@ -559,7 +532,7 @@ class WriteAheadOnly {
             })
 
             if (surgery.splice.index == 0) {
-                body.push({
+                serializer.push(surgery.splice.page.id, {
                     header: {
                         method: 'key',
                         index: 0
@@ -568,10 +541,7 @@ class WriteAheadOnly {
             }
 
             if (surgery.replacement != null) {
-                body.push({
-                    method: 'apply',
-                    key: pivot.page.id
-                }, {
+                serializer.push(pivot.page.id, {
                     header: {
                         method: 'key',
                         index: pivot.index
@@ -582,19 +552,18 @@ class WriteAheadOnly {
         }
 
         writeMergeBranch ({ key, left, right, surgery, pivot }) {
-            this.writeMerge({ key, body: this._write.body, left, right, surgery, pivot })
-            this._write.keys.push.apply(this._write.keys, [ left.page.id, surgery.splice.page.id, pivot.page.id ])
+            this.writeMerge({ key, serializer: this._write, left, right, surgery, pivot })
         }
 
         async writeMergeLeaf ({ left, right, surgery, pivot, writes, messages }) {
             await this.writeLeaf(left.page, writes.left)
             await this.writeLeaf(right.page, writes.right)
 
-            const body = []
+            const serializer = new WriteAheadOnly.Serializer(this, this._key)
 
-            this.writeMerge({ body, left, right, surgery, pivot })
+            this.writeMerge({ serializer, left, right, surgery, pivot })
 
-            this._startBalance([ left.page.id, surgery.splice.page.id, pivot.page.id ], body, messages)
+            this._startBalance(serializer, messages)
         }
 
         async balance (sheaf) {
@@ -603,9 +572,7 @@ class WriteAheadOnly {
                 cartridges.splice(0).forEach(cartridge => cartridge.release())
                 if (this._write != null) {
                     const write = {
-                        keys: this._write.keys
-                                .filter((key, index) => this._write.keys.indexOf(key) == index)
-                                .map(key => [ this._key, key ]),
+                        keys: this._write.keys_,
                         buffer: this._recordify.apply(this, this._write.body)
                     }
                     this._write = null
@@ -619,18 +586,12 @@ class WriteAheadOnly {
                 if (messages.length == 0) {
                     break
                 }
-                this._write = {
-                    keys: [ balance.key ],
-                    body: [{
-                        header: {
-                            method: 'apply', key: balance.key
-                        }
-                    }, {
-                        header: {
-                            method: 'messages', messages: messages
-                        }
-                    }]
-                }
+                this._write = new WriteAheadOnly.Serializer(this, this._key)
+                this._write.push(balance.key, {
+                    header: {
+                        method: 'messages', messages: messages
+                    }
+                })
                 const message = messages.shift()
                 Strata.Error.assert(message.method == 'balance', 'JOURNAL_CORRUPTED')
                 switch (message.method) {

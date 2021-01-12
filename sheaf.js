@@ -556,14 +556,16 @@ class Sheaf {
             id: this.storage.nextId(false),
             offset: 1,
             items: root.page.items.slice(0, partition),
-            hash: null
+            hash: null,
+            stop: 0
         }, cartridges)
 
         const right = this._create({
             id: this.storage.nextId(false),
             offset: 1,
             items: root.page.items.slice(partition),
-            hash: null
+            hash: null,
+            stop: 0
         }, cartridges)
 
         root.page.items = [{
@@ -614,7 +616,8 @@ class Sheaf {
         const right = this._create({
             id: this.storage.nextId(false),
             items: left.page.items.splice(partition),
-            leaf: false
+            leaf: false,
+            stop: 0
         }, cartridges)
 
         const promotion = right.page.items[0].key
@@ -669,7 +672,8 @@ class Sheaf {
             right: null,
             dependents: {},
             key: null,
-            log: null
+            log: null,
+            stop: 0
         }, cartridges)
 
         const messages = []
