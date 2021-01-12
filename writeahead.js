@@ -56,7 +56,7 @@ class WriteAheadOnly {
         options = Storage.options(options)
         const writer = new WriteAheadOnly.Writer(options)
         if (options.create) {
-            await writer.create()
+            await writer.create(options.create)
         } else {
             await writer.open()
         }
@@ -247,9 +247,9 @@ class WriteAheadOnly {
             return Buffer.concat(buffers)
         }
 
-        async create () {
+        async create (create) {
             await this._writeahead.write([{
-                keys: [[ this._key, '0.0' ], [ this._key, 'instance' ]],
+                keys: [[ this._key, '0.0' ], [ this._key, 'instance' ], create ],
                 buffer: Buffer.concat([{
                     header: {
                         method: 'apply',
@@ -270,6 +270,16 @@ class WriteAheadOnly {
                         method: 'insert',
                         index: 0,
                         id: '0.1'
+                    }
+                }, {
+                    header: {
+                        method: 'apply',
+                        key: create[1]
+                    }
+                }, {
+                    header: {
+                        method: 'locate',
+                        value: this._key
                     }
                 }].map(entry => this._recordify(entry)))
             }]).promise

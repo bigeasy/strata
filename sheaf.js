@@ -205,6 +205,9 @@ class Sheaf {
                 //
                 // **TODO** Really want to just push keys into a file for
                 // inspection when we reopen for housekeeping.
+                //
+                // **TODO** This is why we finally block cartridge release. We get
+                // remove error here if we don't.
                 await this.drain()
                 this._fracture.deferrable.decrement()
                 if (this._root != null) {

@@ -157,7 +157,7 @@ async function* test (suite, okay, only = [ 'fileSystem', 'writeahead' ]) {
         }
         writeahead.deferrable.increment()
         const pages = new Magazine
-        const storage = await WriteAheadOnly.open({ writeahead, key: 0, create })
+        const storage = await WriteAheadOnly.open({ writeahead, key: 0, create: create ? [ 'x', 'x' ] : null })
         await destructible.ephemeral($ => $(), `${suite}.${test}.writeahead`, async () => {
             const strata = new Strata(destructible.durable($ => $(), 'strata'), { pages, storage, turnstile, comparator })
             await f({
