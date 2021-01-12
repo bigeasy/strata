@@ -183,6 +183,7 @@ class WriteAheadOnly {
             this._writeahead = options.writeahead
             this._key = options.key
             this._id = 0
+            this._pageId = 0
             this.instance = 0
             this.serializer = options.serializer
             this._recorder = Recorder.create(() => '0')
@@ -196,7 +197,7 @@ class WriteAheadOnly {
         nextId (leaf) {
             let id
             do {
-                id = this._id++
+                id = this._pageId++
             } while (leaf ? id % 2 == 0 : id % 2 == 1)
             return String(this.instance) + '.' +  String(id)
         }
@@ -235,7 +236,7 @@ class WriteAheadOnly {
                     }
                 }].map(entry => this._recordify(entry)))
             }]).promise
-            this._id = 2
+            this._pageId = 2
             this.instance = 0
         }
 

@@ -203,6 +203,7 @@ class FileSystem {
             this.handles = options.handles
             this.serializer = options.serializer
             this.instance = 0
+            this._pageId = 0
             this._id = 0
             this._recorder = Recorder.create(() => '0')
             this.reader = new FileSystem.Reader(this.directory, options)
@@ -215,7 +216,7 @@ class FileSystem {
         nextId (leaf) {
             let id
             do {
-                id = this._id++
+                id = this._pageId++
             } while (leaf ? id % 2 == 0 : id % 2 == 1)
             return String(this.instance) + '.' +  String(id)
         }
@@ -263,8 +264,7 @@ class FileSystem {
             await journalist.prepare()
             await journalist.commit()
             await journalist.dispose()
-            this._id++
-            this._id++
+            this._id = 2
         }
 
         async open () {
