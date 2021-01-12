@@ -106,7 +106,7 @@ async function walvivify (writeahead) {
         if (page.leaf) {
             const items = vivified[id] = page.items.map((item, index) => [ 'insert', index, item.parts[0] ])
             if (page.right) {
-                items.push([ 'right', page.right[0] ])
+                items.push([ 'right', page.right ])
             }
         } else {
             const items = vivified[id] = page.items.map(item => [ item.id, item.key == null ? null : item.key[0] ])
@@ -157,7 +157,7 @@ async function* test (suite, okay, only = [ 'fileSystem', 'writeahead' ]) {
         writeahead.deferrable.increment()
         const pages = new Magazine
         const storage = await WriteAheadOnly.open({ writeahead, key: 0, create })
-        destructible.rescue(trace, 'test', async () => {
+        await destructible.rescue(trace, 'test', async () => {
             const strata = new Strata(destructible.durable($ => $(), 'strata'), { pages, storage, turnstile, comparator })
             await f({
                 strata: strata,

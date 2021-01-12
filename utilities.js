@@ -26,10 +26,10 @@ exports.vivify = async function (directory) {
         if (page.leaf) {
             const items = vivified[id] = page.items.map((item, index) => [ 'insert', index, item.parts[0] ])
             if (page.right) {
-                items.push([ 'right', page.right[0] ])
+                items.push([ 'right', page.right ])
             }
         } else {
-            const items = vivified[id] = page.items.map(item => [ item.id, item.key == null ? null : item.key[0] ])
+            const items = vivified[id] = page.items.map(item => [ item.id, item.key == null ? null : item.key ])
             for (const item of items) {
                 await vivify(item[0])
             }
