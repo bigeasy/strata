@@ -194,6 +194,7 @@ class FileSystem {
             this.directory = options.directory
             this.handles = options.handles
             this.serializer = options.serializer
+            this.extractor = options.extractor
             this.instance = 0
             this._pageId = 0
             this._id = 0

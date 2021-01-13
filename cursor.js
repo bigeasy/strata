@@ -59,7 +59,7 @@ class Cursor {
 
     //
     serialize (parts) {
-        return this._sheaf.serializer.parts.serialize(parts)
+        return this._sheaf.storage.serializer.parts.serialize(parts)
     }
 
     // Insert a record into the b-tree. Parts is an array of objects in their

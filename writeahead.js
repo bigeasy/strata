@@ -222,6 +222,7 @@ class WriteAheadOnly {
             this._id = 0
             this._pageId = 0
             this.instance = 0
+            this.extractor = options.extractor
             this.serializer = options.serializer
             this._recorder = Recorder.create(() => '0')
             this.reader = new WriteAheadOnly.Reader(options)

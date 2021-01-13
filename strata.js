@@ -17,6 +17,10 @@ class Strata {
         this._sheaf = new Sheaf(destructible, options)
     }
 
+    get storage () {
+        return this._sheaf.storage
+    }
+
     get options () {
         return this._sheaf.options
     }
