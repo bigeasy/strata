@@ -100,6 +100,7 @@ class Sheaf {
         this.branch = options.branch
 
         this.storage = options.storage
+        this.storage.deferrable.increment()
 
         this._root = null
 
@@ -161,6 +162,10 @@ class Sheaf {
                 await this.drain()
                 this.track = true
                 this._fracture.deferrable.decrement()
+                this.storage.deferrable.decrement()
+                if (this.storage._writeahead) {
+                    this.storage._writeahead.deferrable.decrement()
+                }
                 if (this._root != null) {
                     this._root.cartridge.remove()
                     this._root = null
@@ -432,6 +437,8 @@ class Sheaf {
         this.deferrable.operational()
         const append = this._fracture.enqueue(id)
         append.writes.push(buffer)
+        // TODO This is broken now for write-ahead since it is synchronous. You
+        // would have to wait on a flush of the write-ahead log.
         if (writes[append.id] == null) {
             writes[append.id] = append.future
         }

@@ -12,6 +12,10 @@ const Strata = { Error: require('./error') }
 const Storage = require('./storage')
 const Player = require('transcript/player')
 
+function _recordify (recorder, header, parts = []) {
+    return recorder([[ Buffer.from(JSON.stringify(header)) ].concat(parts)])
+}
+
 function _path (...vargs) {
     return path.join.apply(path, vargs.map(varg => String(varg)))
 }
@@ -21,14 +25,55 @@ const appendable = require('./appendable')
 
 class FileSystem {
     static async open (options) {
-        options = Storage.options(options)
-        const writer = new FileSystem.Writer(options)
-        if (options.create) {
-            await writer.create()
-        } else {
-            await writer.open()
+        const { directory, handles, serializer, extractor, checksum } = Storage.options(options)
+        const recorder = Recorder.create(checksum)
+        function _path (...vargs) {
+            vargs.unshift(directory)
+            return path.resolve.apply(path, vargs.map(varg => String(varg)))
         }
-        return writer
+        if (options.create) {
+            const stat = await Strata.Error.resolve(fs.stat(directory), 'IO_ERROR')
+            Strata.Error.assert(stat.isDirectory(), 'CREATE_NOT_DIRECTORY', { directory })
+            const dir = await Strata.Error.resolve(fs.readdir(directory), 'IO_ERROR')
+            Strata.Error.assert(dir.every(file => /^\./.test(file)), 'CREATE_NOT_EMPTY', { directory })
+            await Strata.Error.resolve(fs.mkdir(_path('instances')), 'IO_ERROR')
+            await Strata.Error.resolve(fs.mkdir(_path('pages')), 'IO_ERROR')
+            await Strata.Error.resolve(fs.mkdir(_path('balance')), 'IO_ERROR')
+            await Strata.Error.resolve(fs.mkdir(_path('instances', '0'), { recursive: true }), 'IO_ERROR')
+            await Strata.Error.resolve(fs.mkdir(_path('page'), { recursive: true }), 'IO_ERROR')
+            await Strata.Error.resolve(fs.mkdir(_path('balance', '0.0'), { recursive: true }), 'IO_ERROR')
+            await Strata.Error.resolve(fs.mkdir(_path('balance', '0.1')), 'IO_ERROR')
+            const buffers = [ _recordify(recorder, { method: 'length', length: 1 }), _recordify(recorder, { method: 'insert', index: 0, id: '0.1' }, []) ]
+            await Strata.Error.resolve(fs.writeFile(_path('balance', '0.0', 'page'), Buffer.concat(buffers), { flag: 'as' }), 'IO_ERROR')
+            const zero = _recordify(recorder, { method: '0.0' })
+            await Strata.Error.resolve(fs.writeFile(_path('balance', '0.1', '0.0'), zero, { flag: 'as' }), 'IO_ERROR')
+            const one = _recordify(recorder, { method: 'load', page: '0.1', log: '0.0' })
+            await Strata.Error.resolve(fs.writeFile(_path('balance', '0.1', '0.1'), one, { flag: 'as' }), 'IO_ERROR')
+            const journalist = await Journalist.create(directory)
+            journalist.mkdir('pages/0.0')
+            journalist.mkdir('pages/0.1')
+            journalist.rename('balance/0.0/page', 'pages/0.0/page')
+            journalist.rename('balance/0.1/0.0', 'pages/0.1/0.0')
+            journalist.rename('balance/0.1/0.1', 'pages/0.1/0.1')
+            journalist.rmdir('balance/0.0')
+            journalist.rmdir('balance/0.1')
+            await journalist.prepare()
+            await journalist.commit()
+            await journalist.dispose()
+            return { handles, recorder, directory, instance: 0, extractor, serializer, checksum, pageId: 2 }
+        }
+        // **TODO** Run commit log on reopen.
+        const dir = await Strata.Error.resolve(fs.readdir(_path('instances')), 'IO_ERROR')
+        const instances = dir
+            .filter(file => /^\d+$/.test(file))
+            .map(file => +file)
+            .sort((left, right) => right - left)
+        const instance = instances[0] + 1
+        await Strata.Error.resolve(fs.mkdir(_path('instances', instance)), 'IO_ERROR')
+        for (const instance of instances) {
+            await Strata.Error.resolve(fs.rmdir(_path('instances', instance)), 'IO_ERROR')
+        }
+        return { handles, recorder, directory, instance, extractor, serializer, checksum, pageId: 0 }
     }
 
     //
@@ -190,16 +235,19 @@ class FileSystem {
     }
 
     static Writer = class {
-        constructor (options) {
-            this.directory = options.directory
-            this.handles = options.handles
-            this.serializer = options.serializer
-            this.extractor = options.extractor
-            this.instance = 0
-            this._pageId = 0
+        constructor (destructible, { handles, recorder, directory, serializer, extractor, checksum, instance, pageId }) {
+            this.destructible = destructible
+            this.deferrable = destructible.durable($ => $(), { countdown: 1 }, 'deferrable')
+            this.destructible.destruct(() => this.deferrable.decrement())
+            this.directory = directory
+            this.handles = handles
+            this.serializer = serializer
+            this.extractor = extractor
+            this.instance = instance
+            this._pageId = pageId
             this._id = 0
-            this._recorder = Recorder.create(() => '0')
-            this.reader = new FileSystem.Reader(this.directory, options)
+            this._recorder = recorder
+            this.reader = new FileSystem.Reader(this.directory, { serializer, extractor, checksum })
         }
 
         recordify (header, parts = []) {
@@ -224,54 +272,7 @@ class FileSystem {
         }
 
         _recordify (header, parts = []) {
-            return (this._recorder)([[ Buffer.from(JSON.stringify(header)) ].concat(parts)])
-        }
-
-        async create () {
-            const directory = this.directory
-            const stat = await Strata.Error.resolve(fs.stat(directory), 'IO_ERROR')
-            Strata.Error.assert(stat.isDirectory(), 'CREATE_NOT_DIRECTORY', { directory })
-            const dir = await Strata.Error.resolve(fs.readdir(directory), 'IO_ERROR')
-            Strata.Error.assert(dir.every(file => /^\./.test(file)), 'CREATE_NOT_EMPTY', { directory })
-            await Strata.Error.resolve(fs.mkdir(this._path('instances')), 'IO_ERROR')
-            await Strata.Error.resolve(fs.mkdir(this._path('pages')), 'IO_ERROR')
-            await Strata.Error.resolve(fs.mkdir(this._path('balance')), 'IO_ERROR')
-            await Strata.Error.resolve(fs.mkdir(this._path('instances', '0'), { recursive: true }), 'IO_ERROR')
-            await Strata.Error.resolve(fs.mkdir(this._path('page'), { recursive: true }), 'IO_ERROR')
-            await Strata.Error.resolve(fs.mkdir(this._path('balance', '0.0'), { recursive: true }), 'IO_ERROR')
-            await Strata.Error.resolve(fs.mkdir(this._path('balance', '0.1')), 'IO_ERROR')
-            const buffers = [ this._recordify({ method: 'length', length: 1 }), this._recordify({ method: 'insert', index: 0, id: '0.1' }, []) ]
-            await Strata.Error.resolve(fs.writeFile(this._path('balance', '0.0', 'page'), Buffer.concat(buffers), { flag: 'as' }), 'IO_ERROR')
-            const zero = this._recordify({ method: '0.0' })
-            await Strata.Error.resolve(fs.writeFile(this._path('balance', '0.1', '0.0'), zero, { flag: 'as' }), 'IO_ERROR')
-            const one = this._recordify({ method: 'load', page: '0.1', log: '0.0' })
-            await Strata.Error.resolve(fs.writeFile(this._path('balance', '0.1', '0.1'), one, { flag: 'as' }), 'IO_ERROR')
-            const journalist = await Journalist.create(directory)
-            journalist.mkdir('pages/0.0')
-            journalist.mkdir('pages/0.1')
-            journalist.rename('balance/0.0/page', 'pages/0.0/page')
-            journalist.rename('balance/0.1/0.0', 'pages/0.1/0.0')
-            journalist.rename('balance/0.1/0.1', 'pages/0.1/0.1')
-            journalist.rmdir('balance/0.0')
-            journalist.rmdir('balance/0.1')
-            await journalist.prepare()
-            await journalist.commit()
-            await journalist.dispose()
-            this._id = 2
-        }
-
-        async open () {
-            // **TODO** Run commit log on reopen.
-            const dir = await Strata.Error.resolve(fs.readdir(this._path('instances')), 'IO_ERROR')
-            const instances = dir
-                .filter(file => /^\d+$/.test(file))
-                .map(file => +file)
-                .sort((left, right) => right - left)
-            this.instance = instances[0] + 1
-            await Strata.Error.resolve(fs.mkdir(this._path('instances', this.instance)), 'IO_ERROR')
-            for (const instance of instances) {
-                await Strata.Error.resolve(fs.rmdir(this._path('instances', instance)), 'IO_ERROR')
-            }
+            return _recordify(this._recorder, header, parts)
         }
 
         read (id) {

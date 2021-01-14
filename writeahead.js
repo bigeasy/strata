@@ -9,6 +9,12 @@ const Storage = require('./storage')
 const Player = require('transcript/player')
 const Recorder = require('transcript/recorder')
 
+function _recordify (recorder, records) {
+    return Buffer.concat(records.map(record => {
+        return recorder([[ Buffer.from(JSON.stringify(record.header)) ].concat(record.parts || [])])
+    }))
+}
+
 const wal = {
     async *iterator (writeahead, qualifier, key) {
         const player = new Player(() => '0')
@@ -54,13 +60,63 @@ class WriteAheadOnly {
 
     static async open (options) {
         options = Storage.options(options)
-        const writer = new WriteAheadOnly.Writer(options)
+        const recorder = Recorder.create(() => '0')
         if (options.create) {
-            await writer.create(options.create)
-        } else {
-            await writer.open()
+            const { create, key, writeahead } = options
+            await options.writeahead.write([{
+                keys: [[ key, '0.0' ], [ key, 'instance' ], create ],
+                buffer: _recordify(recorder, [{
+                    header: {
+                        method: 'apply',
+                        key: 'instance'
+                    }
+                }, {
+                    header: {
+                        method: 'instance',
+                        instance: 0
+                    }
+                }, {
+                    header: {
+                        method: 'apply',
+                        key: '0.0'
+                    }
+                }, {
+                    header: {
+                        method: 'insert',
+                        index: 0,
+                        id: '0.1'
+                    }
+                }, {
+                    header: {
+                        method: 'apply',
+                        key: create[1]
+                    }
+                }, {
+                    header: {
+                        method: 'locate',
+                        value: key
+                    }
+                }])
+            }]).promise
+            return { ...options, instance: 0, pageId: 2, recorder, pageId: 2 }
         }
-        return writer
+        const { key, writeahead } = options
+        const instance = (await wal.last(writeahead, key, 'instance')).instance + 1
+        await options.writeahead.write([{
+            keys: [[ key, 'instance' ]],
+            buffer: _recordify(recorder, [{
+                header: {
+                    method: 'apply',
+                    key: 'instance'
+                }
+            }, {
+                header: {
+                    method: 'instance',
+                    instance: instance
+                }
+            }])
+        }]).promise
+        return { ...options, instance, pageId: 0, recorder, pageId: 0 }
     }
 
     static Serializer = class {
@@ -90,7 +146,7 @@ class WriteAheadOnly {
         serialize () {
             return {
                 keys: this.keys,
-                buffer: this._writeahead._recordify.apply(this._writeahead, this.body)
+                buffer: _recordify(this._writeahead._recorder, this.body)
             }
         }
 
@@ -129,7 +185,7 @@ class WriteAheadOnly {
                 leaf: false
             }
             let apply = false
-            const player = new Player(this.checksum)
+            const player = new Player(() => '0')
             WAL: for await (const entries of wal.iterator(this.writeahead, this.key, id)) {
                 for (const { header, parts, sizes } of entries) {
                     switch (header.method) {
@@ -216,16 +272,21 @@ class WriteAheadOnly {
     }
 
     static Writer = class {
-        constructor (options) {
-            this._writeahead = options.writeahead
-            this._key = options.key
+        constructor (destructible, { writeahead, key, recorder, extractor, serializer, instance, pageId }) {
+            this.destructible = destructible
+            this.deferrable = destructible.durable($ => $(), { countdown: 1 }, 'deferrable')
+            this.destructible.destruct(() => this.deferrable.decrement())
+            this._writeahead = writeahead
+            this.deferrable.destruct(() => this._writeahead.deferrable.decrement())
+            this._writeahead.deferrable.increment()
+            this._key = key
             this._id = 0
-            this._pageId = 0
-            this.instance = 0
-            this.extractor = options.extractor
-            this.serializer = options.serializer
-            this._recorder = Recorder.create(() => '0')
-            this.reader = new WriteAheadOnly.Reader(options)
+            this._pageId = pageId
+            this.instance = instance
+            this.extractor = extractor
+            this.serializer = serializer
+            this._recorder = recorder
+            this.reader = new WriteAheadOnly.Reader({ writeahead, key, extractor, serializer })
         }
 
         recordify (header, parts = []) {
@@ -240,82 +301,16 @@ class WriteAheadOnly {
             return String(this.instance) + '.' +  String(id)
         }
 
-        _recordify (...records) {
-            const buffers = []
-            for (const record of records) {
-                buffers.push(this._recorder([[ Buffer.from(JSON.stringify(record.header)) ].concat(record.parts || [])]))
-            }
-            return Buffer.concat(buffers)
-        }
-
-        async create (create) {
-            await this._writeahead.write([{
-                keys: [[ this._key, '0.0' ], [ this._key, 'instance' ], create ],
-                buffer: Buffer.concat([{
-                    header: {
-                        method: 'apply',
-                        key: 'instance'
-                    }
-                }, {
-                    header: {
-                        method: 'instance',
-                        instance: 0
-                    }
-                }, {
-                    header: {
-                        method: 'apply',
-                        key: '0.0'
-                    }
-                }, {
-                    header: {
-                        method: 'insert',
-                        index: 0,
-                        id: '0.1'
-                    }
-                }, {
-                    header: {
-                        method: 'apply',
-                        key: create[1]
-                    }
-                }, {
-                    header: {
-                        method: 'locate',
-                        value: this._key
-                    }
-                }].map(entry => this._recordify(entry)))
-            }]).promise
-            this._pageId = 2
-            this.instance = 0
-        }
-
-        async open () {
-            this.instance = (await wal.last(this._writeahead, this._key, 'instance')).instance
-            await this._writeahead.write([{
-                keys: [[ this._key, 'instance' ]],
-                buffer: Buffer.concat([{
-                    header: {
-                        method: 'apply',
-                        key: 'instance'
-                    }
-                }, {
-                    header: {
-                        method: 'instance',
-                        instance: ++this.instance
-                    }
-                }].map(entry => this._recordify(entry)))
-            }]).promise
-        }
-
         read (id) {
             return this.reader.page(id)
         }
 
         async append (page, writes) {
-            this._writeahead.write([{ keys: [ [ this.key, page.id ] ], buffer: Buffer.concat(writes) }])
+            this.writeahead.write([{ keys: [ [ this.key, page.id ] ], buffer: Buffer.concat(writes) }])
         }
 
         writeLeaf (page, writes) {
-            writes.unshift(this._recordify({ header: { method: 'apply', key: page.id } }))
+            writes.unshift(_recordify(this._recorder, [{ header: { method: 'apply', key: page.id } }]))
             this._writeahead.write([{ keys: [[ this._key, page.id ]], buffer: Buffer.concat(writes) }])
         }
 

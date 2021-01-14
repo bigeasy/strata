@@ -5,7 +5,7 @@ require('proof')(5, async (okay) => {
     const test = require('./test')
 
     for await (const harness of test('insert', okay)) {
-        await harness($ => $(), 'insert', async ({ strata, prefix, directory, pages }) => {
+        await harness($ => $(), 'insert', async ({ strata }) => {
             const writes = {}
 
             const trampoline = new Trampoline
