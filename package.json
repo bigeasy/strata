@@ -46,7 +46,7 @@
     {
                             "destructible":                 "7.0.0-alpha.39",
                             "proof":                        "^9.0.2",
-                            "reciprocate":                  "0.0.5"
+                            "reciprocate":                  "0.0.6"
     },
     "main":                 "strata.js",
     "scripts":
