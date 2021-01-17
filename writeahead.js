@@ -1,20 +1,51 @@
+// # WriteAhead
+
+// A write-ahead only storage strategy for Strata. We use the `writeahead`
+// module to perform synchronous writes to the in-memory `writeahead` queue
+// which will be occasionally flushed by a background thread.
+
+//
 'use strict'
+//
 
+// Node.js API.
 const assert = require('assert')
-
 const fs = require('fs').promises
 const path = require('path')
+//
+
+// Buffer serialization.
+const { Player, Recorder } = require('transcript')
+//
+
+// Strata modules.
 const Strata = { Error: require('./error') }
 const Storage = require('./storage')
-const Player = require('transcript/player')
-const Recorder = require('transcript/recorder')
+//
 
+// Convert an array of records into a single serialized buffer.
+
+//
 function _recordify (recorder, records) {
     return Buffer.concat(records.map(record => {
         return recorder([[ Buffer.from(JSON.stringify(record.header)) ].concat(record.parts || [])])
     }))
 }
+//
 
+// Our write-ahead log assocates a block with a set of keys. These keys are used
+// to find blocks within the write-ahead log and return them as a series of
+// buffers as if they were a single file. We'll store a series of log update
+// records in the blocks. Because the records in the series may apply apply to
+// different pages, group the records by the page id they apply to and prepend
+// an `'apply'` record that indicates two which page the following records
+// apply.
+
+// We have two iterators. An `async` iterator that returns each record we
+// extract from the log and one that returns invokes a callback with last record
+// we extract from the log.
+
+//
 const wal = {
     async *iterator (writeahead, qualifier, key) {
         const player = new Player(() => '0')
@@ -305,7 +336,7 @@ class WriteAheadOnly {
             return this.reader.page(id)
         }
 
-        async append (page, writes) {
+        append (page, writes) {
             this.writeahead.write([{ keys: [ [ this.key, page.id ] ], buffer: Buffer.concat(writes) }])
         }
 
@@ -438,8 +469,8 @@ class WriteAheadOnly {
 
         }
 
-        async writeSplitLeaf({ left, right, parent, writes, messages }) {
-            await this.writeLeaf(left.page, writes)
+        writeSplitLeaf({ left, right, parent, writes, messages }) {
+            this.writeLeaf(left.page, writes)
 
             const partition = left.page.items.length
             const length = left.page.items.length + right.page.items.length
@@ -553,9 +584,9 @@ class WriteAheadOnly {
             this.writeMerge({ key, serializer: this._write, left, right, surgery, pivot })
         }
 
-        async writeMergeLeaf ({ left, right, surgery, pivot, writes, messages }) {
-            await this.writeLeaf(left.page, writes.left)
-            await this.writeLeaf(right.page, writes.right)
+        writeMergeLeaf ({ left, right, surgery, pivot, writes, messages }) {
+            this.writeLeaf(left.page, writes.left)
+            this.writeLeaf(right.page, writes.right)
 
             const serializer = new WriteAheadOnly.Serializer(this, this._key)
 
