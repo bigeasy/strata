@@ -14,14 +14,14 @@ require('proof')(5, async (okay) => {
             const items = []
             const trampoline = new Trampoline
             strata.search(trampoline, 'e', cursor => {
-                cursor.insert(cursor.index, 'e', [ 'e' ], {})
+                cursor.insert(cursor.index, 'e', [ 'e' ])
             })
             while (trampoline.seek()) {
                 await trampoline.shift()
             }
             await null
             strata.search(trampoline, 'e', cursor => {
-                cursor.remove(cursor.index, {})
+                cursor.remove(cursor.index)
             })
             while (trampoline.seek()) {
                 await trampoline.shift()

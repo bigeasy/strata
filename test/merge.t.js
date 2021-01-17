@@ -1,5 +1,6 @@
 require('proof')(13, async (okay) => {
     const Trampoline = require('reciprocate')
+    const Fracture = require('fracture')
     const Strata = require('../strata')
 
     const test = require('./test')
@@ -7,22 +8,14 @@ require('proof')(13, async (okay) => {
     for await (const harness of test('merge', okay, [ 'fileSystem', 'writeahead' ])) {
         await harness($ => $(), 'merge', async ({ strata, prefix }) => {
             console.log('called', prefix)
-            const trampoline = new Trampoline, writes = {}
+            const trampoline = new Trampoline, writes = new Fracture.CompletionSet
             strata.search(trampoline, 'e', cursor => {
                 cursor.remove(cursor.index, writes)
             })
             while (trampoline.seek()) {
                 await trampoline.shift()
             }
-            await Strata.flush(writes)
-            // TODO (This is now very old.) Come back and insert an error into
-            // `remove`. Then attempt to resolve that error somehow into
-            // `flush`. Implies that Turnstile propagates an error. Essentially,
-            // how do you get the foreground to surrender when the background
-            // has failed. `flush` could be waiting on a promise when the
-            // background fails and hang indefinately. Any one error, like a
-            // `shutdown` error would stop it.
-            await Strata.flush(writes)
+            await writes.clear()
             await strata.drain()
         }, {
             serialize: {

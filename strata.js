@@ -53,15 +53,6 @@ class Strata {
     drain () {
         return this._sheaf.drain()
     }
-
-    static async flush (writes) {
-        for (const id in writes) {
-            const future = writes[id]
-            if (!future.fulfilled) {
-                await future.promise
-            }
-        }
-    }
 }
 
 module.exports = Strata

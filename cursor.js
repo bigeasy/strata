@@ -1,5 +1,7 @@
 const assert = require('assert')
 
+const Fracture = require('fracture')
+
 const find = require('./find')
 
 class Cursor {
@@ -72,7 +74,8 @@ class Cursor {
     // `null`.
 
     //
-    insert (index, key, parts, writes, buffers = this.serialize(parts)) {
+    insert (index, key, parts, writes = new Fracture.CompletionSet, buffers = this.serialize(parts)) {
+        assert(writes instanceof Fracture.CompletionSet)
         const header = { method: 'insert', index: index }
         const buffer = this._sheaf.storage.recordify(header, buffers)
         const record = { key: key, parts: parts, heft: buffer.length }
@@ -86,7 +89,8 @@ class Cursor {
         return record.heft
     }
 
-    remove (index, writes) {
+    remove (index, writes = new Fracture.CompletionSet) {
+        assert(writes instanceof Fracture.CompletionSet)
         const header = { method: 'delete', index: index }
         const buffer = this._sheaf.storage.recordify(header, [])
 

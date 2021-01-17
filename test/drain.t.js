@@ -1,6 +1,7 @@
 require('proof')(15, async (okay) => {
     const Trampoline = require('reciprocate')
     const Strata = require('../strata')
+    const Fracture = require('fracture')
 
     const utilities = require('../utilities')
 
@@ -10,14 +11,14 @@ require('proof')(15, async (okay) => {
 
     for await (const harness of test('drain', okay)) {
         await harness($ => $(), 'split', async ({ strata }) => {
-            const trampoline = new Trampoline, writes = {}
+            const trampoline = new Trampoline, writes = new Fracture.CompletionSet
             strata.search(trampoline, leaf[0], cursor => {
                 cursor.insert(cursor.index, leaf[0], leaf, writes)
             })
             while (trampoline.seek()) {
                 await trampoline.shift()
             }
-            await Strata.flush(writes)
+            await writes.clear()
             await strata.drain()
         }, {
             serialize: {
