@@ -571,7 +571,7 @@ class WriteAheadOnly {
                 if (this._write != null) {
                     const write = this._write.serialize()
                     this._write = null
-                    this._writeahead.write([ write ])
+                    await this._writeahead.write([ write ]).promise
                 }
                 const balance = await wal.last(this._writeahead, this._key, 'balance')
                 let messages = []
