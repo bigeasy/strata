@@ -132,7 +132,12 @@ class Sheaf {
                     }
                 }
             },
-            worker: this._fractured.bind(this)
+            worker: this._fractured.bind(this),
+            cancel: ({ key, value }) => {
+                if (key == 'append') {
+                    value.cartridge.release()
+                }
+            }
         })
 
         this._fracture.deferrable.increment()
