@@ -752,7 +752,6 @@ class Sheaf {
 
             //
             pauses.forEach(pause => pause.resume())
-            cartridges.forEach(cartridge => cartridge.release())
             //
         }
         //
@@ -961,9 +960,7 @@ class Sheaf {
     // this.
 
     //
-    async _mergeLeaf (pause, { key, level }) {
-        const cartridges = []
-
+    async _mergeLeaf (pause, { key, level }, cartridges) {
         const left = await this.descend({ key, level, fork: true }, cartridges)
         const right = await this.descend({ key, level }, cartridges)
 
@@ -1035,7 +1032,6 @@ class Sheaf {
             //
         } finally {
             pauses.forEach(pause => pause.resume())
-            cartridges.forEach(cartridge => cartridge.release())
         }
 
         await this.storage.balance(this)
@@ -1073,21 +1069,22 @@ class Sheaf {
             } else {
                 for (const key of candidates) {
                     const cartridges = []
-                    const child = await this.descend({ key }, cartridges)
-                    if (child.entry.value.items.length >= this.leaf.split) {
-                        await this._splitLeaf(pause, key, child, cartridges)
-                    } else if (
-                        ! (
-                            child.entry.value.id == '0.1' && child.entry.value.right == null
-                        ) &&
-                        child.entry.value.items.length <= this.leaf.merge
-                    ) {
-                        const merger = await this._selectMerger(key, child, cartridges)
-                        cartridges.forEach(cartridge => cartridge.release())
-                        if (merger != null) {
-                            await this._mergeLeaf(pause, merger)
+                    try {
+                        const child = await this.descend({ key }, cartridges)
+                        if (child.entry.value.items.length >= this.leaf.split) {
+                            await this._splitLeaf(pause, key, child, cartridges)
+                        } else if (
+                            ! (
+                                child.entry.value.id == '0.1' && child.entry.value.right == null
+                            ) &&
+                            child.entry.value.items.length <= this.leaf.merge
+                        ) {
+                            const merger = await this._selectMerger(key, child, cartridges)
+                            if (merger != null) {
+                                await this._mergeLeaf(pause, merger, cartridges)
+                            }
                         }
-                    } else {
+                    } finally {
                         cartridges.forEach(cartridge => cartridge.release())
                     }
                 }
