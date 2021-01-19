@@ -423,7 +423,7 @@ class Sheaf {
                         page.items.length <= this.leaf.merge
                     )
                 ) {
-                    this._fracture.enqueue('keephouse').entry.candidates.push(page.key || page.items[0].key)
+                    this._fracture.enqueue('keephouse').work.candidates.push(page.key || page.items[0].key)
                 }
                 await this.storage.writeLeaf(page, writes)
             } finally {
@@ -436,7 +436,7 @@ class Sheaf {
     append (id, buffer, writes) {
         this.deferrable.operational()
         const append = this._fracture.enqueue(id)
-        append.entry.writes.push(buffer)
+        append.work.writes.push(buffer)
         // **TODO** This is broken now for write-ahead since it is synchronous.
         // You would have to wait on a flush of the write-ahead log.
         // **TODO** So it would appear that the fractures should move somehow
@@ -705,7 +705,7 @@ class Sheaf {
                     page.items.length >= this.leaf.split &&
                     this.comparator.branch(page.items[0].key, page.items[page.items.length - 1].key) != 0
                 ) {
-                    this._fracture.enqueue('keephouse').entry.candidates.push(page.key || page.items[0].key)
+                    this._fracture.enqueue('keephouse').work.candidates.push(page.key || page.items[0].key)
                 }
             }
             //
@@ -1095,12 +1095,12 @@ class Sheaf {
         })
     }
 
-    _fractured ({ pause, canceled, key, entry }) {
+    _fractured ({ pause, canceled, key, work }) {
         switch (key) {
         case 'keephouse':
-            return this._keephouse(pause, canceled, entry)
+            return this._keephouse(pause, canceled, work)
         default:
-            return this._append(canceled, key, entry)
+            return this._append(canceled, key, work)
         }
     }
 }
