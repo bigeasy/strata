@@ -119,7 +119,7 @@ class Sheaf {
         // other queue will only use a single key for all housekeeping.
         this._fracture = new Fracture(destructible.durable($ => $(), 'appender'), {
             turnstile: options.turnstile,
-            entry: key => {
+            work: key => {
                 switch (key) {
                 case 'keephouse':
                     return { candidates: [] }
