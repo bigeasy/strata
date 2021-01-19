@@ -119,7 +119,7 @@ class Sheaf {
         // other queue will only use a single key for all housekeeping.
         this._fracture = new Fracture(destructible.durable($ => $(), 'appender'), {
             turnstile: options.turnstile,
-            work: key => {
+            value: key => {
                 switch (key) {
                 case 'keephouse':
                     return { candidates: [] }
@@ -423,7 +423,7 @@ class Sheaf {
                         page.items.length <= this.leaf.merge
                     )
                 ) {
-                    this._fracture.enqueue('keephouse').work.candidates.push(page.key || page.items[0].key)
+                    this._fracture.enqueue('keephouse').value.candidates.push(page.key || page.items[0].key)
                 }
                 await this.storage.writeLeaf(page, writes)
             } finally {
@@ -436,7 +436,7 @@ class Sheaf {
     append (id, buffer, writes) {
         this.deferrable.operational()
         const append = this._fracture.enqueue(id)
-        append.work.writes.push(buffer)
+        append.value.writes.push(buffer)
         // **TODO** This is broken now for write-ahead since it is synchronous.
         // You would have to wait on a flush of the write-ahead log.
         // **TODO** So it would appear that the fractures should move somehow
@@ -705,7 +705,7 @@ class Sheaf {
                     page.items.length >= this.leaf.split &&
                     this.comparator.branch(page.items[0].key, page.items[page.items.length - 1].key) != 0
                 ) {
-                    this._fracture.enqueue('keephouse').work.candidates.push(page.key || page.items[0].key)
+                    this._fracture.enqueue('keephouse').value.candidates.push(page.key || page.items[0].key)
                 }
             }
             //
@@ -1092,12 +1092,12 @@ class Sheaf {
         })
     }
 
-    _fractured ({ pause, canceled, key, work }) {
+    _fractured ({ pause, canceled, key, value }) {
         switch (key) {
         case 'keephouse':
-            return this._keephouse(pause, canceled, work)
+            return this._keephouse(pause, canceled, value)
         default:
-            return this._append(canceled, key, work)
+            return this._append(canceled, key, value)
         }
     }
 }
