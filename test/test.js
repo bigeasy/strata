@@ -7,6 +7,7 @@ const Strata = require('../strata')
 const Magazine = require('magazine')
 const Player = require('transcript/player')
 const Operation = require('operation')
+const WriteAhead = require('writeahead')
 
 const utilities = require('../utilities')
 const path = require('path')
@@ -128,7 +129,7 @@ async function* test (suite, okay, only = [ 'fileSystem', 'writeahead' ]) {
         }
         const FileSystem = require('../filesystem')
         const destructible = new Destructible({ $trace }, 'create.t')
-        const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
+        const turnstile = new Turnstile(destructible.durable($ => $(), { isolated: true }, 'turnstile'))
         const pages = new Magazine
         const handles = new Operation.Cache(new Magazine)
         const storage = new FileSystem.Writer(destructible.durable($ => $(), 'filesystem'), await FileSystem.open({ directory, handles, create }))
@@ -149,9 +150,8 @@ async function* test (suite, okay, only = [ 'fileSystem', 'writeahead' ]) {
     }
     async function writeahead ($trace, test, f, { create = false, serialize = null, vivify = null, comparator = null } = {}) {
         const destructible = new Destructible({ $trace }, 'writeahead.t')
-        const WriteAhead = require('writeahead')
-        const turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
-        const writeahead = new WriteAhead(destructible, await WriteAhead.open({ directory }))
+        const turnstile = new Turnstile(destructible.durable($ => $(), { isolated: true }, 'turnstile'))
+        const writeahead = new WriteAhead(destructible, turnstile, await WriteAhead.open({ directory }))
         if (serialize != null) {
             await waserialize(writeahead, serialize)
         }

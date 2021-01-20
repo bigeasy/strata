@@ -621,7 +621,7 @@ class Sheaf {
     // append log.
 
     //
-    async _splitLeaf (pause, key, left, cartridges) {
+    async _splitLeaf (pause, key, left, cartridges, displace) {
         // Descend to the parent branch page.
         const parent = await this.descend({ key, level: left.level - 1 }, cartridges)
 
@@ -764,7 +764,7 @@ class Sheaf {
         // We run this function to continue balancing the tree.
 
         //
-        await this.storage.balance(this)
+        await this.storage.balance(this, displace)
     }
 
     // **TODO** Something is wrong here. We're using `child.right` to find the a
@@ -965,7 +965,7 @@ class Sheaf {
     // this.
 
     //
-    async _mergeLeaf (pause, { key, level }, cartridges) {
+    async _mergeLeaf (pause, { key, level }, cartridges, displace) {
         const left = await this.descend({ key, level, fork: true }, cartridges)
         const right = await this.descend({ key, level }, cartridges)
 
@@ -1039,7 +1039,7 @@ class Sheaf {
             pauses.forEach(pause => pause.resume())
         }
 
-        await this.storage.balance(this)
+        await this.storage.balance(this, displace)
     }
     //
 
@@ -1066,7 +1066,7 @@ class Sheaf {
     // of the `merged` files. If not we can delete the merged files.
 
     //
-    async _keephouse (pause, canceled, { candidates }) {
+    async _keephouse (pause, canceled, { candidates }, displace) {
         await this.deferrable.copacetic($ => $(), 'append', null, async () => {
             this.deferrable.progress()
             if (canceled) {
@@ -1077,7 +1077,7 @@ class Sheaf {
                     try {
                         const child = await this.descend({ key }, cartridges)
                         if (child.entry.value.items.length >= this.leaf.split) {
-                            await this._splitLeaf(pause, key, child, cartridges)
+                            await this._splitLeaf(pause, key, child, cartridges, displace)
                         } else if (
                             ! (
                                 child.entry.value.id == '0.1' && child.entry.value.right == null
@@ -1086,7 +1086,7 @@ class Sheaf {
                         ) {
                             const merger = await this._selectMerger(key, child, cartridges)
                             if (merger != null) {
-                                await this._mergeLeaf(pause, merger, cartridges)
+                                await this._mergeLeaf(pause, merger, cartridges, displace)
                             }
                         }
                     } finally {
@@ -1097,10 +1097,10 @@ class Sheaf {
         })
     }
 
-    _fractured ({ pause, canceled, key, value }) {
+    _fractured ({ pause, canceled, key, value, displace }) {
         switch (key) {
         case 'keephouse':
-            return this._keephouse(pause, canceled, value)
+            return this._keephouse(pause, canceled, value, displace)
         default:
             return this._append(canceled, key, value)
         }

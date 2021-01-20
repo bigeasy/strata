@@ -595,14 +595,14 @@ class WriteAheadOnly {
             this._startBalance(serializer, messages)
         }
 
-        async balance (sheaf) {
+        async balance (sheaf, displace) {
             const cartridges = []
             for (;;) {
                 cartridges.splice(0).forEach(cartridge => cartridge.release())
                 if (this._write != null) {
                     const write = this._write.serialize()
                     this._write = null
-                    await this._writeahead.write([ write ]).promise
+                    await displace(this._writeahead.write([ write ]).promise)
                 }
                 const balance = await wal.last(this._writeahead, this._key, 'balance')
                 let messages = []
