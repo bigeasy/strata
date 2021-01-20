@@ -32,7 +32,7 @@ require('proof')(21, async okay => {
 
     for await (const harness of test('partition', okay)) {
         await harness($ => $(), 'create', async ({ strata, prefix }) => {
-            const trampoline = new Trampoline, writes = new Fracture.CompletionSet
+            const trampoline = new Trampoline, writes = new Fracture.FutureSet
             strata.search(trampoline, { value: 'a', index: 0 }, cursor => {
                 for (let i = 0; i < 10; i++) {
                     const entry = { value: 'a', index: i }
@@ -43,13 +43,13 @@ require('proof')(21, async okay => {
             while (trampoline.seek()) {
                 await trampoline.shift()
             }
-            await writes.clear()
+            await writes.join()
         }, {
             create: true,
             comparator: comparator
         })
         await harness($ => $(), 'unsplit', async ({ strata, prefix }) => {
-            const trampoline = new Trampoline, writes = new Fracture.CompletionSet
+            const trampoline = new Trampoline, writes = new Fracture.FutureSet
             strata.search(trampoline, { value: 'a', index: 0 }, cursor => {
                 okay(cursor.page.items.length, 10, `${prefix} unsplit`)
                 const entry = { value: 'b', index: 0 }
@@ -59,7 +59,7 @@ require('proof')(21, async okay => {
             while (trampoline.seek()) {
                 await trampoline.shift()
             }
-            await writes.clear()
+            await writes.join()
         }, {
             comparator: comparator
         })

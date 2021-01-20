@@ -11,14 +11,14 @@ require('proof')(15, async (okay) => {
 
     for await (const harness of test('drain', okay)) {
         await harness($ => $(), 'split', async ({ strata }) => {
-            const trampoline = new Trampoline, writes = new Fracture.CompletionSet
+            const trampoline = new Trampoline, writes = new Fracture.FutureSet
             strata.search(trampoline, leaf[0], cursor => {
                 cursor.insert(cursor.index, leaf[0], leaf, writes)
             })
             while (trampoline.seek()) {
                 await trampoline.shift()
             }
-            await writes.clear()
+            await writes.join()
             await strata.drain()
         }, {
             serialize: {

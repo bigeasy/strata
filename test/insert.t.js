@@ -7,7 +7,7 @@ require('proof')(5, async (okay) => {
 
     for await (const harness of test('insert', okay)) {
         await harness($ => $(), 'insert', async ({ strata }) => {
-            const writes = new Fracture.CompletionSet
+            const writes = new Fracture.FutureSet
 
             const trampoline = new Trampoline
             strata.search(trampoline, 'a', cursor => {
@@ -18,7 +18,7 @@ require('proof')(5, async (okay) => {
                 await trampoline.shift()
             }
 
-            await writes.clear()
+            await writes.join()
         }, {
             create: true,
             vivify: {
