@@ -372,6 +372,7 @@ class Sheaf {
     }
 
     descend2 (trampoline, query, found) {
+        this.deferrable.operational()
         const entries = []
         try {
             const descent = this._descend(entries, query)
