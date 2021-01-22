@@ -370,7 +370,14 @@ class Sheaf {
             entries[0].push(entry)
         }
     }
+    //
 
+    // You keep trying to make the catch block a finally block but then notice
+    // that the release of the entries is conditional not not missing. That is,
+    // if you miss you don't want to release the entries, but a finally block
+    // always releases the entries.
+
+    //
     descend2 (trampoline, query, found) {
         this.deferrable.operational()
         const entries = []
@@ -390,6 +397,7 @@ class Sheaf {
                     descent.entry = entries.pop()
                 }
                 entries.forEach(entry => entry.release())
+                entries.length = 0
                 found(descent)
             }
         } catch (error) {
