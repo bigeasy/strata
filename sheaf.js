@@ -168,9 +168,6 @@ class Sheaf {
                 this.track = true
                 this._fracture.deferrable.decrement()
                 this.storage.deferrable.decrement()
-                if (this.storage._writeahead) {
-                    this.storage._writeahead.deferrable.decrement()
-                }
                 if (this._root != null) {
                     this._root.cartridge.remove()
                     this._root = null
