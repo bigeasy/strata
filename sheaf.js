@@ -102,11 +102,10 @@ class Sheaf {
         this.storage = options.storage
         this.storage.deferrable.increment()
 
-        this._root = null
-
         this._id = 0
 
         this._root = this._create({ id: -1, leaf: false, items: [{ id: '0.0' }] }, [])
+        this._root.cartridge.heft = 1
 
         this.destructible = destructible
 
@@ -147,7 +146,13 @@ class Sheaf {
         this._canceled = new Set
 
         destructible.destruct(() => this.deferrable.decrement())
-
+        // This used to remove the root page but we have a race with reads which
+        // are not tracked with Destructible nor Fracture so we have no way to
+        // wait for reads to drain and we've always imagined that maybe reads
+        // could be considered entirely independent of writes, continuing after
+        // write failure, or maybe having a read-only tree, so we don't fight
+        // this one. In applications we can assert that the cache is zero after
+        // everything that could be reading has shut down.
         this.deferrable.destruct(() => {
             this.deferrable.ephemeral('shutdown', async () => {
                 // Trying to figure out how to wait for the Turnstile to drain.
@@ -169,7 +174,7 @@ class Sheaf {
                 this._fracture.deferrable.decrement()
                 this.storage.deferrable.decrement()
                 if (this._root != null) {
-                    this._root.cartridge.remove()
+                    this._root.cartridge.release()
                     this._root = null
                 }
             })
