@@ -1,4 +1,4 @@
-const Interrupt = require('interrupt')
+const { Interrupt } = require('interrupt')
 
 module.exports = Interrupt.create('Strata.Error', {
     BRANCH_BAD_HASH: 'branch load failed hash validation',

@@ -1,4 +1,4 @@
-const coalesce = require('extant')
+const { coalesce } = require('extant')
 
 class Storage {
     static options (options) {

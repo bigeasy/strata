@@ -19,7 +19,7 @@ const fileSystem = require('fs')
 const fs = require('fs').promises
 
 // Return the first non null-like value.
-const coalesce = require('extant')
+const { coalesce } = require('extant')
 
 // An `async`/`await` work queue.
 const Turnstile = require('turnstile')
