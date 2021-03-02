@@ -336,10 +336,6 @@ class WriteAheadOnly {
             return this.reader.page(id)
         }
 
-        append (page, writes) {
-            this.writeahead.write([{ keys: [ [ this.key, page.id ] ], buffer: Buffer.concat(writes) }])
-        }
-
         writeLeaf (page, writes) {
             writes.unshift(_recordify(this._recorder, [{ header: { method: 'apply', key: page.id } }]))
             this._writeahead.write([{ keys: [[ this._key, page.id ]], buffer: Buffer.concat(writes) }])
