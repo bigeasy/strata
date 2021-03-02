@@ -280,7 +280,7 @@ class WriteAheadOnly {
                                 })
                             } else {
                                 const key = parts.length != 0
-                                    ? this.serializer.parts.deserialize(parts)
+                                    ? this.serializer.key.deserialize(parts)
                                     : null
                                 page.items.splice(header.index, 0, {
                                     id: header.id,

@@ -111,7 +111,7 @@ async function walvivify (writeahead) {
                 items.push([ 'right', page.right ])
             }
         } else {
-            const items = vivified[id] = page.items.map(item => [ item.id, item.key == null ? null : item.key[0] ])
+            const items = vivified[id] = page.items.map(item => [ item.id, item.key == null ? null : item.key ])
             for (const item of items) {
                 await vivify(item[0])
             }
