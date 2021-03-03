@@ -308,8 +308,8 @@ class WriteAheadOnly {
             this.deferrable = destructible.durable($ => $(), { countdown: 1 }, 'deferrable')
             this.destructible.destruct(() => this.deferrable.decrement())
             this._writeahead = writeahead
-            this.deferrable.destruct(() => this._writeahead.deferrable.decrement())
             this._writeahead.deferrable.increment()
+            this.deferrable.destruct(() => this._writeahead.deferrable.decrement())
             this._key = key
             this._id = 0
             this._pageId = pageId
