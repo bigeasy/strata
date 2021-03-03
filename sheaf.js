@@ -89,7 +89,6 @@ class Sheaf {
     // Sheaf accepts the destructible and user options passed to `new Strata`
     constructor (destructible, options) {
         Strata.Error.assert(options.turnstile != null, 'OPTION_REQUIRED', { _option: 'turnstile' })
-        assert(destructible.isDestroyedIfDestroyed(options.turnstile.destructible))
 
         this.options = Sheaf.options(options)
 
