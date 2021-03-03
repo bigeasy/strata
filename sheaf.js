@@ -452,13 +452,7 @@ class Sheaf {
         this.deferrable.operational()
         const append = this._fracture.enqueue(id)
         append.value.writes.push(buffer)
-        // **TODO** This is broken now for write-ahead since it is synchronous.
-        // You would have to wait on a flush of the write-ahead log.
-        // **TODO** So it would appear that the fractures should move somehow
-        // into filesystem.
-        if (writes[append.id] == null) {
-            writes[append.id] = append.completed
-        }
+        writes.add(append.future)
     }
 
     drain () {
