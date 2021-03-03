@@ -44,7 +44,7 @@
     },
     "devDependencies":
     {
-                            "destructible":                 "7.0.0-alpha.49",
+                            "destructible":                 "7.0.0-alpha.50",
                             "proof":                        "^9.0.2",
                             "reciprocate":                  "0.0.6"
     },
