@@ -21,26 +21,11 @@ const fs = require('fs').promises
 // Return the first non null-like value.
 const { coalesce } = require('extant')
 
-// An `async`/`await` work queue.
-const Turnstile = require('turnstile')
-
-// Journaled file system operations for tree rebalancing.
-const Journalist = require('journalist')
-
 // A pausable service work queue that shares a common application work queue.
 const Fracture = require('fracture')
 
 // A non-crypographic (fast) 32-bit hash for record integrity.
 // const fnv = require('./fnv')
-
-// Serialize a single b-tree record.
-const Recorder = require('transcript/recorder')
-
-// Incrementally read a b-tree page chunk by chunk.
-const Player = require('transcript/player')
-
-// Catch nested exceptions by type, message and properties.
-const rescue = require('rescue')
 
 // A Promise wrapper that captures `resolve` and `reject`.
 const Future = require('perhaps')
