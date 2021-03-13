@@ -40,7 +40,7 @@
                             "transcript":                   "0.1.4",
                             "turnstile":                    "6.0.0-alpha.65",
                             "whittle":                      "0.0.1",
-                            "writeahead":                   "0.0.29"
+                            "writeahead":                   "0.0.30"
     },
     "devDependencies":
     {
