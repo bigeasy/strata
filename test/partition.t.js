@@ -32,34 +32,38 @@ require('proof')(21, async okay => {
 
     for await (const harness of test('partition', okay)) {
         await harness($ => $(), 'create', async ({ strata, prefix }) => {
-            const trampoline = new Trampoline, writes = new Fracture.FutureSet
+            const trampoline = new Trampoline, promises = []
             strata.search(trampoline, { value: 'a', index: 0 }, cursor => {
                 for (let i = 0; i < 10; i++) {
                     const entry = { value: 'a', index: i }
                     const { index } = cursor.indexOf(entry)
-                    cursor.insert(index, entry, [ entry ], writes)
+                    promises.push(cursor.insert(Fracture.stack(), index, entry, [ entry ]))
                 }
             })
             while (trampoline.seek()) {
                 await trampoline.shift()
             }
-            await writes.join()
+            for (const promise of promises) {
+                await promise
+            }
         }, {
             create: true,
             comparator: comparator
         })
         await harness($ => $(), 'unsplit', async ({ strata, prefix }) => {
-            const trampoline = new Trampoline, writes = new Fracture.FutureSet
+            const trampoline = new Trampoline, promises = []
             strata.search(trampoline, { value: 'a', index: 0 }, cursor => {
                 okay(cursor.page.items.length, 10, `${prefix} unsplit`)
                 const entry = { value: 'b', index: 0 }
                 const { index } = cursor.indexOf(entry)
-                cursor.insert(index, entry, [ entry ], writes)
+                promises.push(cursor.insert(Fracture.stack(), index, entry, [ entry ]))
             })
             while (trampoline.seek()) {
                 await trampoline.shift()
             }
-            await writes.join()
+            for (const promise of promises) {
+                await promise
+            }
         }, {
             comparator: comparator
         })

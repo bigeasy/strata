@@ -7,18 +7,17 @@ require('proof')(5, async (okay) => {
 
     for await (const harness of test('insert', okay)) {
         await harness($ => $(), 'insert', async ({ strata }) => {
-            const writes = new Fracture.FutureSet
-
-            const trampoline = new Trampoline
+            const trampoline = new Trampoline, promises = []
             strata.search(trampoline, 'a', cursor => {
-                cursor.insert(cursor.index, 'a', [ 'a' ], writes)
-                cursor.insert(cursor.indexOf('b', cursor.index).index, 'B', [ 'b' ], writes)
+                promises.push(cursor.insert(Fracture.stack(), cursor.index, 'a', [ 'a' ]))
+                promises.push(cursor.insert(Fracture.stack(), cursor.indexOf('b', cursor.index).index, 'B', [ 'b' ]))
             })
             while (trampoline.seek()) {
                 await trampoline.shift()
             }
-
-            await writes.join()
+            for (const promise of promises) {
+                await promise
+            }
         }, {
             create: true,
             vivify: {

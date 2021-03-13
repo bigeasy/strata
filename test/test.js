@@ -3,6 +3,7 @@
 const Destructible = require('destructible')
 const Turnstile = require('turnstile')
 
+const Fracture = require('fracture')
 const Strata = require('../strata')
 const Magazine = require('magazine')
 const Player = require('transcript/player')
@@ -33,7 +34,7 @@ async function waserialize (writeahead, files) {
         },
         parts: []
     }].map(entry => recordify(entry.header, entry.parts))
-    await writeahead.write([{ keys: [[ 0, 'instance' ]], buffer: Buffer.concat(writes) }]).promise
+    await writeahead.write(Fracture.stack(), [{ keys: [[ 0, 'instance' ]], buffer: Buffer.concat(writes) }])
     for (const id in files) {
         instance = Math.max(+id.split('.')[0], instance)
         if (+id.split('.')[1] % 2 == 1) {
@@ -72,7 +73,7 @@ async function waserialize (writeahead, files) {
             if (key != null) {
                 writes.push(recordify({ method: 'key' }, key))
             }
-            await writeahead.write([{ keys: [[ 0, id ]], buffer: Buffer.concat(writes) }]).promise
+            await writeahead.write(Fracture.stack(), [{ keys: [[ 0, id ]], buffer: Buffer.concat(writes) }])
         } else {
             const writes = [{
                 header: {
@@ -93,7 +94,7 @@ async function waserialize (writeahead, files) {
                     parts: parts
                 }
             })).map(entry => recordify(entry.header, entry.parts))
-            await writeahead.write([{ keys: [[ 0, id ]], buffer: Buffer.concat(writes) }]).promise
+            await writeahead.write(Fracture.stack(), [{ keys: [[ 0, id ]], buffer: Buffer.concat(writes) }])
         }
     }
 }
@@ -157,7 +158,7 @@ async function* test (suite, okay, only = [ 'fileSystem', 'writeahead' ]) {
         }
         writeahead.deferrable.increment()
         const pages = new Magazine
-        const storage = new WriteAheadOnly.Writer(destructible.durable($ => $(), 'storage'), await WriteAheadOnly.open({ writeahead, key: 0, create: create ? [ 'x', 'x' ] : null }))
+        const storage = new WriteAheadOnly.Writer(destructible.durable($ => $(), 'storage'), await WriteAheadOnly.open(Fracture.stack(), { writeahead, key: 0, create: create ? [ 'x', 'x' ] : null }))
         await destructible.ephemeral($ => $(), `${suite}.${test}.writeahead`, async () => {
             const strata = new Strata(destructible.durable($ => $(), 'strata'), { pages, storage, turnstile, comparator })
             await f({
@@ -167,7 +168,7 @@ async function* test (suite, okay, only = [ 'fileSystem', 'writeahead' ]) {
                 prefix: [ suite, test, 'writeahead only' ].join(' ')
             })
             await strata.drain()
-            await writeahead.write([]).promise
+            await writeahead.write(Fracture.stack(), [])
             writeahead.deferrable.decrement()
             destructible.destroy()
         })

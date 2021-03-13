@@ -407,7 +407,7 @@ class Sheaf {
     // they are written before the split? Must be.
 
     //
-    async _append (canceled, key, { writes, cartridge, future }) {
+    async _append (stack, canceled, key, { writes, cartridge, future }) {
         await this.deferrable.copacetic($ => $(), 'append', null, async () => {
             try {
                 this.deferrable.progress()
@@ -423,9 +423,9 @@ class Sheaf {
                         page.items.length <= this.leaf.merge
                     )
                 ) {
-                    this._fracture.enqueue('keephouse').value.candidates.push(page.key || page.items[0].key)
+                    this._fracture.enqueue(Fracture.stack(), 'keephouse', value => value.candidates.push(page.key || page.items[0].key))
                 }
-                await this.storage.writeLeaf(page, writes)
+                await this.storage.writeLeaf(stack, page, writes)
             } finally {
                 cartridge.release()
                 future.resolve()
@@ -433,11 +433,9 @@ class Sheaf {
         })
     }
 
-    append (id, buffer, writes) {
+    append (stack, id, buffer) {
         this.deferrable.operational()
-        const append = this._fracture.enqueue(id)
-        append.value.writes.push(buffer)
-        writes.add(append.future)
+        return this._fracture.enqueue(stack, id, value => value.writes.push(buffer))
     }
 
     drain () {
@@ -610,7 +608,7 @@ class Sheaf {
     // append log.
 
     //
-    async _splitLeaf (pause, key, left, cartridges, displace) {
+    async _splitLeaf (stack, pause, key, left, cartridges) {
         // Descend to the parent branch page.
         const parent = await this.descend({ key, level: left.level - 1 }, cartridges)
 
@@ -699,7 +697,7 @@ class Sheaf {
                     page.items.length >= this.leaf.split &&
                     this.comparator.branch(page.items[0].key, page.items[page.items.length - 1].key) != 0
                 ) {
-                    this._fracture.enqueue('keephouse').value.candidates.push(page.key || page.items[0].key)
+                    this._fracture.enqueue(Fracture.stack(), 'keephouse', value => value.candidates.push(page.key || page.items[0].key))
                 }
             }
             //
@@ -709,8 +707,8 @@ class Sheaf {
 
             //
             const writes = []
-            for (const entries of pauses[0].entries) {
-                writes.push.apply(writes, entries.writes.splice(0))
+            for (const value of pauses[0].values) {
+                writes.push.apply(writes, value.writes.splice(0))
             }
             writes.push.apply(writes)
             //
@@ -731,7 +729,7 @@ class Sheaf {
             // are in a hurry to release that lock.
 
             //
-            await this.storage.writeSplitLeaf({ key, left, right, parent, writes, messages })
+            await this.storage.writeSplitLeaf({ stack, key, left, right, parent, writes, messages })
             //
         } finally {
             //
@@ -753,7 +751,7 @@ class Sheaf {
         // We run this function to continue balancing the tree.
 
         //
-        await this.storage.balance(this, displace)
+        await this.storage.balance(stack, this)
     }
 
     // **TODO** Something is wrong here. We're using `child.right` to find the a
@@ -954,7 +952,8 @@ class Sheaf {
     // this.
 
     //
-    async _mergeLeaf (pause, { key, level }, cartridges, displace) {
+    async _mergeLeaf (stack, pause, { key, level }, cartridges) {
+        assert(stack instanceof Fracture.Stack)
         const left = await this.descend({ key, level, fork: true }, cartridges)
         const right = await this.descend({ key, level }, cartridges)
 
@@ -1014,21 +1013,21 @@ class Sheaf {
             //
             const writes = { left: [], right: [] }
 
-            for (const entry of pauses[0].entries) {
-                writes.left.push.apply(writes.left, entry.writes.splice(0))
+            for (const value of pauses[0].values) {
+                writes.left.push.apply(writes.left, value.writes.splice(0))
             }
 
-            for (const entry of pauses[1].entries) {
-                writes.right.push.apply(writes.right, entry.writes.splice(0))
+            for (const value of pauses[1].values) {
+                writes.right.push.apply(writes.right, value.writes.splice(0))
             }
             //
-            await this.storage.writeMergeLeaf({ left, right, surgery, pivot, writes, messages })
+            await this.storage.writeMergeLeaf({ stack, left, right, surgery, pivot, writes, messages })
             //
         } finally {
             pauses.forEach(pause => pause.resume())
         }
 
-        await this.storage.balance(this, displace)
+        await this.storage.balance(stack, this)
     }
     //
 
@@ -1055,7 +1054,7 @@ class Sheaf {
     // of the `merged` files. If not we can delete the merged files.
 
     //
-    async _keephouse (pause, canceled, { candidates }, displace) {
+    async _keephouse (stack, pause, canceled, { candidates }) {
         await this.deferrable.copacetic($ => $(), 'append', null, async () => {
             this.deferrable.progress()
             if (canceled) {
@@ -1066,7 +1065,8 @@ class Sheaf {
                     try {
                         const child = await this.descend({ key }, cartridges)
                         if (child.entry.value.items.length >= this.leaf.split) {
-                            await this._splitLeaf(pause, key, child, cartridges, displace)
+                            const count = this.splitteded++
+                            await this._splitLeaf(stack, pause, key, child, cartridges)
                         } else if (
                             ! (
                                 child.entry.value.id == '0.1' && child.entry.value.right == null
@@ -1075,7 +1075,7 @@ class Sheaf {
                         ) {
                             const merger = await this._selectMerger(key, child, cartridges)
                             if (merger != null) {
-                                await this._mergeLeaf(pause, merger, cartridges, displace)
+                                await this._mergeLeaf(stack, pause, merger, cartridges)
                             }
                         }
                     } finally {
@@ -1086,14 +1086,18 @@ class Sheaf {
         })
     }
 
-    _fractured ({ pause, canceled, key, value, displace }) {
+    async _fractured ({ stack, pause, canceled, key, value }) {
         switch (key) {
         case 'keephouse':
-            return this._keephouse(pause, canceled, value, displace)
+            await this._keephouse(stack, pause, canceled, value)
+            break
         default:
-            return this._append(canceled, key, value)
+            await this._append(stack, canceled, key, value)
+            break
         }
+        return null
     }
+    splitteded = 0
 }
 
 module.exports = Sheaf

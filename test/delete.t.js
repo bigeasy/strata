@@ -7,12 +7,14 @@ require('proof')(10, async (okay) => {
 
     for await (const harness of test('delete', okay)) {
         await harness($ => $(), 'delete', async ({ strata, prefix, directory, pages }) => {
-            const trampoline = new Trampoline, writes = new Fracture.FutureSet
-            strata.search(trampoline, 'a', cursor => cursor.remove(cursor.index, writes))
+            const trampoline = new Trampoline, promises = []
+            strata.search(trampoline, 'a', cursor => promises.push(cursor.remove(Fracture.stack(), cursor.index)))
             while (trampoline.seek()) {
                 await trampoline.shift()
             }
-            await writes.join()
+            for (const promise of promises) {
+                await promise
+            }
         }, {
             serialize: {
                 '0.0': [[ '0.1', null ]],

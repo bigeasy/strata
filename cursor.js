@@ -64,6 +64,12 @@ class Cursor {
         return this._sheaf.storage.serializer.parts.serialize(parts)
     }
 
+    /* Maybe this instead.
+    record (key, parts) {
+        return { key: key, parts: parts, buffers = this.serialize(parts) }
+    }
+    */
+
     // Insert a record into the b-tree. Parts is an array of objects in their
     // deserialized form that will be serialized using the parts serializer. The
     // key for the record will be obtained using the key extractor.
@@ -74,8 +80,8 @@ class Cursor {
     // `null`.
 
     //
-    insert (index, key, parts, writes = Fracture.NULL_FUTURE_SET, buffers = this.serialize(parts)) {
-        assert(writes instanceof Fracture.FutureSet)
+    insert (stack, index, key, parts, buffers = this.serialize(parts)) {
+        assert(stack instanceof Fracture.Stack)
         const header = { method: 'insert', index: index }
         const buffer = this._sheaf.storage.recordify(header, buffers)
         const record = { key: key, parts: parts, heft: buffer.length }
@@ -84,24 +90,20 @@ class Cursor {
 
         this.page.items.splice(index, 0, record)
 
-        this._sheaf.append(this.page.id, buffer, writes)
-
-        return record.heft
+        return this._sheaf.append(stack, this.page.id, buffer)
     }
 
-    remove (index, writes = Fracture.NULL_FUTURE_SET) {
-        assert(writes instanceof Fracture.FutureSet)
+    remove (stack, index) {
+        assert(stack instanceof Fracture.Stack)
         const header = { method: 'delete', index: index }
         const buffer = this._sheaf.storage.recordify(header, [])
-
-        this._sheaf.append(this.page.id, buffer, writes)
 
         const [ spliced ] = this.page.items.splice(index, 1)
         this._entry.heft -= spliced.heft
 
         this.page.deletes++
 
-        return -spliced.heft
+        return this._sheaf.append(stack, this.page.id, buffer)
     }
 
     // **TODO** The user no longer releases the cursor.

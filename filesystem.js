@@ -279,7 +279,7 @@ class FileSystem {
             return this.reader.page(id)
         }
 
-        async writeLeaf (page, writes) {
+        async writeLeaf (stack, page, writes) {
             if (writes.length != 0) {
                 const filename = this._path('pages', page.id, page.log.id)
                 const cartridge = await this.handles.get(filename)
@@ -454,13 +454,13 @@ class FileSystem {
             journalist.message(serialized)
         }
 
-        async writeSplitLeaf ({ key, left, right, parent, writes, messages }) {
+        async writeSplitLeaf ({ stack, key, left, right, parent, writes, messages }) {
             const journalist = await Journalist.create(this.directory)
 
             const partition = left.page.items.length
             const length = left.page.items.length + right.page.items.length
 
-            await this.writeLeaf(left.page, writes)
+            await this.writeLeaf(stack, left.page, writes)
             //
 
             // Create the new page directory in our journal.
@@ -701,11 +701,11 @@ class FileSystem {
             }
         }
 
-        async writeMergeLeaf({ key, left, right, surgery, pivot, writes, messages }) {
+        async writeMergeLeaf({ stack, key, left, right, surgery, pivot, writes, messages }) {
             const journalist = await Journalist.create(this.directory)
 
-            await this.writeLeaf(left.page, writes.left)
-            await this.writeLeaf(right.page, writes.right)
+            await this.writeLeaf(stack, left.page, writes.left)
+            await this.writeLeaf(stack, right.page, writes.right)
             //
 
             // We discuss this in detail in `_splitLeaf`. We want a record of
@@ -833,7 +833,7 @@ class FileSystem {
             await journalist.commit()
         }
 
-        async balance (sheaf) {
+        async balance (stack, sheaf) {
             for (;;) {
                 this.journalist = await Journalist.create(this.directory)
                 if (this.journalist.messages.length == 0) {

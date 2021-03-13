@@ -7,15 +7,16 @@ require('proof')(13, async (okay) => {
 
     for await (const harness of test('merge', okay, [ 'fileSystem', 'writeahead' ])) {
         await harness($ => $(), 'merge', async ({ strata, prefix }) => {
-            console.log('called', prefix)
-            const trampoline = new Trampoline, writes = new Fracture.FutureSet
+            const trampoline = new Trampoline, promises = []
             strata.search(trampoline, 'e', cursor => {
-                cursor.remove(cursor.index, writes)
+                promises.push(cursor.remove(Fracture.stack(), cursor.index))
             })
             while (trampoline.seek()) {
                 await trampoline.shift()
             }
-            await writes.join()
+            for (const promise of promises) {
+                await promise
+            }
             await strata.drain()
         }, {
             serialize: {

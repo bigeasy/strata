@@ -23,6 +23,8 @@ const Strata = { Error: require('./error') }
 const Storage = require('./storage')
 //
 
+const Fracture = require('fracture')
+
 // Convert an array of records into a single serialized buffer.
 
 //
@@ -89,12 +91,13 @@ const wal = {
 class WriteAheadOnly {
     static wal = wal
 
-    static async open (options) {
+    static async open (stack, options) {
+        assert(stack instanceof Fracture.Stack)
         options = Storage.options(options)
         const recorder = Recorder.create(() => '0')
         if (options.create) {
             const { create, key, writeahead } = options
-            await options.writeahead.write([{
+            await options.writeahead.write(stack, [{
                 keys: [[ key, '0.0' ], [ key, 'instance' ], create ],
                 buffer: _recordify(recorder, [{
                     header: {
@@ -128,12 +131,12 @@ class WriteAheadOnly {
                         value: key
                     }
                 }])
-            }]).promise
+            }])
             return { ...options, instance: 0, pageId: 2, recorder, pageId: 2 }
         }
         const { key, writeahead } = options
         const instance = (await wal.last(writeahead, key, 'instance')).instance + 1
-        await options.writeahead.write([{
+        await options.writeahead.write(stack, [{
             keys: [[ key, 'instance' ]],
             buffer: _recordify(recorder, [{
                 header: {
@@ -146,7 +149,7 @@ class WriteAheadOnly {
                     instance: instance
                 }
             }])
-        }]).promise
+        }])
         return { ...options, instance, pageId: 0, recorder, pageId: 0 }
     }
 
@@ -336,9 +339,9 @@ class WriteAheadOnly {
             return this.reader.page(id)
         }
 
-        writeLeaf (page, writes) {
+        writeLeaf (stack, page, writes) {
             writes.unshift(_recordify(this._recorder, [{ header: { method: 'apply', key: page.id } }]))
-            this._writeahead.write([{ keys: [[ this._key, page.id ]], buffer: Buffer.concat(writes) }])
+            this._writeahead.write(stack, [{ keys: [[ this._key, page.id ]], buffer: Buffer.concat(writes) }])
         }
 
         //
@@ -465,8 +468,8 @@ class WriteAheadOnly {
 
         }
 
-        writeSplitLeaf({ left, right, parent, writes, messages }) {
-            this.writeLeaf(left.page, writes)
+        writeSplitLeaf({ stack, left, right, parent, writes, messages }) {
+            this.writeLeaf(stack, left.page, writes)
 
             const partition = left.page.items.length
             const length = left.page.items.length + right.page.items.length
@@ -580,9 +583,9 @@ class WriteAheadOnly {
             this.writeMerge({ key, serializer: this._write, left, right, surgery, pivot })
         }
 
-        writeMergeLeaf ({ left, right, surgery, pivot, writes, messages }) {
-            this.writeLeaf(left.page, writes.left)
-            this.writeLeaf(right.page, writes.right)
+        writeMergeLeaf ({ stack, left, right, surgery, pivot, writes, messages }) {
+            this.writeLeaf(stack, left.page, writes.left)
+            this.writeLeaf(stack, right.page, writes.right)
 
             const serializer = new WriteAheadOnly.Serializer(this, this._key)
 
@@ -591,14 +594,14 @@ class WriteAheadOnly {
             this._startBalance(serializer, messages)
         }
 
-        async balance (sheaf, displace) {
+        async balance (stack, sheaf) {
             const cartridges = []
             for (;;) {
                 cartridges.splice(0).forEach(cartridge => cartridge.release())
                 if (this._write != null) {
                     const write = this._write.serialize()
                     this._write = null
-                    await displace(this._writeahead.write([ write ]).promise)
+                    await this._writeahead.write(stack, [ write ])
                 }
                 const balance = await wal.last(this._writeahead, this._key, 'balance')
                 let messages = []

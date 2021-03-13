@@ -7,14 +7,16 @@ require('proof')(23, async (okay) => {
 
     for await (const harness of test('split', okay, [ 'fileSystem', 'writeahead' ])) {
         await harness($ => $(), 'split', async ({ strata }) => {
-            const trampoline = new Trampoline, writes = new Fracture.FutureSet
+            const trampoline = new Trampoline, promises = []
             strata.search(trampoline, 'f', cursor => {
-                cursor.insert(cursor.index, 'f', [ 'f' ], writes)
+                cursor.insert(Fracture.stack(), cursor.index, 'f', [ 'f' ])
             })
             while (trampoline.seek()) {
                 await trampoline.shift()
             }
-            await writes.join()
+            for (const promise of promises) {
+                await promise
+            }
             await strata.drain()
         }, {
             serialize: {

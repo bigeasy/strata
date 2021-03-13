@@ -6,6 +6,7 @@
 require('proof')(5, async (okay) => {
     const Trampoline = require('reciprocate')
     const Strata = require('..')
+    const Fracture = require('fracture')
 
     const test = require('./test')
 
@@ -14,14 +15,14 @@ require('proof')(5, async (okay) => {
             const items = []
             const trampoline = new Trampoline
             strata.search(trampoline, 'e', cursor => {
-                cursor.insert(cursor.index, 'e', [ 'e' ])
+                cursor.insert(Fracture.stack(), cursor.index, 'e', [ 'e' ])
             })
             while (trampoline.seek()) {
                 await trampoline.shift()
             }
             await null
             strata.search(trampoline, 'e', cursor => {
-                cursor.remove(cursor.index)
+                cursor.remove(Fracture.stack(), cursor.index)
             })
             while (trampoline.seek()) {
                 await trampoline.shift()
