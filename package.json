@@ -38,7 +38,7 @@
                             "perhaps":                      "0.0.6",
                             "rescue":                       "7.0.0-alpha.13",
                             "transcript":                   "0.1.4",
-                            "turnstile":                    "6.0.0-alpha.65",
+                            "turnstile":                    "6.0.0-alpha.69",
                             "whittle":                      "0.0.1",
                             "writeahead":                   "0.0.33"
     },
