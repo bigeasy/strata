@@ -29,7 +29,7 @@
     {
                             "ascension":                    "^3.0.0-alpha.0",
                             "extant":                       "^2.0.0-alpha.0",
-                            "fracture":                     "0.3.0-alpha.58",
+                            "fracture":                     "0.3.0-alpha.59",
                             "hash.fnv":                     "^1.0.5",
                             "interrupt":                    "11.0.0-alpha.20",
                             "journalist":                   "0.1.23",
