@@ -18,6 +18,8 @@ const path = require('path')
 const fileSystem = require('fs')
 const fs = require('fs').promises
 
+const Destructible = require('destructible')
+
 // Return the first non null-like value.
 const { coalesce } = require('extant')
 
@@ -372,7 +374,7 @@ class Sheaf {
             if (descent.miss) {
                 trampoline.promised(async () => {
                     try {
-                        entries.push(await this.deferrable.destructive('load', this.load(descent.miss)))
+                        entries.push(await this.deferrable.ephemeral('load', this.load(descent.miss), Destructible.Error.DESTROYED))
                         this.descend2(trampoline, query, found)
                     } finally {
                         entries.forEach(entry => entry.release())
@@ -408,29 +410,27 @@ class Sheaf {
 
     //
     async _append (stack, canceled, key, { writes, cartridge, future }) {
-        await this.deferrable.copacetic($ => $(), 'append', null, async () => {
-            try {
-                this.deferrable.progress()
-                const page = cartridge.value
-                if (
-                    (
-                        page.items.length >= this.leaf.split &&
-                        this.comparator.branch(page.items[0].key, page.items[page.items.length - 1].key) != 0
-                    )
-                    ||
-                    (
-                        ! (page.id == '0.1' && page.right == null) &&
-                        page.items.length <= this.leaf.merge
-                    )
-                ) {
-                    this._fracture.enqueue(Fracture.stack(), 'keephouse', value => value.candidates.push(page.key || page.items[0].key))
-                }
-                await this.storage.writeLeaf(stack, page, writes)
-            } finally {
-                cartridge.release()
-                future.resolve()
+        try {
+            this.deferrable.progress()
+            const page = cartridge.value
+            if (
+                (
+                    page.items.length >= this.leaf.split &&
+                    this.comparator.branch(page.items[0].key, page.items[page.items.length - 1].key) != 0
+                )
+                ||
+                (
+                    ! (page.id == '0.1' && page.right == null) &&
+                    page.items.length <= this.leaf.merge
+                )
+            ) {
+                this._fracture.enqueue(Fracture.stack(), 'keephouse', value => value.candidates.push(page.key || page.items[0].key))
             }
-        })
+            await this.storage.writeLeaf(stack, page, writes)
+        } finally {
+            cartridge.release()
+            future.resolve()
+        }
     }
 
     append (stack, id, buffer) {
@@ -1055,35 +1055,33 @@ class Sheaf {
 
     //
     async _keephouse (stack, pause, canceled, { candidates }) {
-        await this.deferrable.copacetic($ => $(), 'append', null, async () => {
-            this.deferrable.progress()
-            if (canceled) {
-                candidates.forEach(candidate => this._canceled.add(candidate))
-            } else {
-                for (const key of candidates) {
-                    const cartridges = []
-                    try {
-                        const child = await this.descend({ key }, cartridges)
-                        if (child.entry.value.items.length >= this.leaf.split) {
-                            const count = this.splitteded++
-                            await this._splitLeaf(stack, pause, key, child, cartridges)
-                        } else if (
-                            ! (
-                                child.entry.value.id == '0.1' && child.entry.value.right == null
-                            ) &&
-                            child.entry.value.items.length <= this.leaf.merge
-                        ) {
-                            const merger = await this._selectMerger(key, child, cartridges)
-                            if (merger != null) {
-                                await this._mergeLeaf(stack, pause, merger, cartridges)
-                            }
+        this.deferrable.progress()
+        if (canceled) {
+            candidates.forEach(candidate => this._canceled.add(candidate))
+        } else {
+            for (const key of candidates) {
+                const cartridges = []
+                try {
+                    const child = await this.descend({ key }, cartridges)
+                    if (child.entry.value.items.length >= this.leaf.split) {
+                        const count = this.splitteded++
+                        await this._splitLeaf(stack, pause, key, child, cartridges)
+                    } else if (
+                        ! (
+                            child.entry.value.id == '0.1' && child.entry.value.right == null
+                        ) &&
+                        child.entry.value.items.length <= this.leaf.merge
+                    ) {
+                        const merger = await this._selectMerger(key, child, cartridges)
+                        if (merger != null) {
+                            await this._mergeLeaf(stack, pause, merger, cartridges)
                         }
-                    } finally {
-                        cartridges.forEach(cartridge => cartridge.release())
                     }
+                } finally {
+                    cartridges.forEach(cartridge => cartridge.release())
                 }
             }
-        })
+        }
     }
 
     async _fractured ({ stack, pause, canceled, key, value }) {
