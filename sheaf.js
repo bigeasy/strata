@@ -30,7 +30,7 @@ const Fracture = require('fracture')
 // const fnv = require('./fnv')
 
 // A Promise wrapper that captures `resolve` and `reject`.
-const Future = require('perhaps')
+const { Future } = require('perhaps')
 
 // Binary search for a record in a b-tree page.
 const find = require('./find')
