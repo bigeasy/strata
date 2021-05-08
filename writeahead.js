@@ -35,8 +35,8 @@ function _recordify (recorder, records) {
 }
 //
 
-// Our write-ahead log assocates a block with a set of keys. These keys are used
-// to find blocks within the write-ahead log and return them as a series of
+// Our write-ahead log associates a block with a set of keys. These keys are
+// used to find blocks within the write-ahead log and return them as a series of
 // buffers as if they were a single file. We'll store a series of log update
 // records in the blocks. Because the records in the series may apply apply to
 // different pages, group the records by the page id they apply to and prepend
@@ -365,7 +365,7 @@ class WriteAheadOnly {
             this._write = serializer
         }
 
-        // Even more approixmate than usual because we're not accounting for
+        // Even more approximate than usual because we're not accounting for
         // keys that were set to `null` or set to a value from `null`.
 
         //

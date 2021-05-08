@@ -26,7 +26,7 @@ const { coalesce } = require('extant')
 // A pausable service work queue that shares a common application work queue.
 const Fracture = require('fracture')
 
-// A non-crypographic (fast) 32-bit hash for record integrity.
+// A non-cryptographic (fast) 32-bit hash for record integrity.
 // const fnv = require('./fnv')
 
 // A Promise wrapper that captures `resolve` and `reject`.
@@ -642,7 +642,7 @@ class Sheaf {
             //
             // Notice that all the page manipulation takes place before the first
             // write. Recall that the page manipulation is done to the page in
-            // memory which is offical, the page writes are lagging.
+            // memory which is official, the page writes are lagging.
 
             // Split page creating a right page.
             const length = left.page.items.length
@@ -690,7 +690,7 @@ class Sheaf {
                 heft: parent.page.items[parent.page.items.length - 1].heft
             })
 
-            // If any of the pages is still larger than the split threshhold, check
+            // If any of the pages is still larger than the split threshold, check
             // the split again.
             for (const page of [ left.page, right.page ]) {
                 if (
@@ -754,9 +754,9 @@ class Sheaf {
         await this.storage.balance(stack, this)
     }
 
-    // **TODO** Something is wrong here. We're using `child.right` to find the a
-    // right branch page but the leaf and and it's right sibling can always be
-    // under the same branch. How do we really go right?
+    // **TODO** Something is wrong here. We're using `child.right` to find the
+    // right branch page but the leaf and it's right sibling can always be under
+    // the same branch. How do we really go right?
     //
     // **TODO** The above is a major problem. This is super broken. We may end
     // up merging a page into nothing.
@@ -848,7 +848,7 @@ class Sheaf {
     // may choose to merge with its right sibling deleting it. If the right page
     // choose to merge with the left sibling it will delete itself. No, no.
     // We're going by keys, so we're not going to load a deleted page. But, the
-    // descent logic depends on nagivating by the least key in the branch page,
+    // descent logic depends on navigating by the least key in the branch page,
     // so we need to be sure to check that we hit the correct key.
 
     // Easiest way to keep from having a bunch of tests we have to hit..

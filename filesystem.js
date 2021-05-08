@@ -330,36 +330,37 @@ class FileSystem {
         //
 
         // Vacuum is performed after split, merge or rotate. Page logs form a linked
-        // list. There is an load instruction at the start of the the log that tells
+        // list. There is an load instruction at the start of the log that tells
         // it to load the previous log file.
         //
-        // Split, merge and rotate create a new log head. The new log head loads a
-        // place holder log. The place holder log contains a load operation to load
-        // the old log followed by a split operation for split, a merge operation
-        // for merge, or nothing for rotate.
+        // Split, merge and rotate create a new log head. The new log head loads
+        // a place holder log. The place holder log contains a load operation to
+        // load the old log followed by a split operation for split, a merge
+        // operation for merge, or nothing for rotate.
 
-        // Vacuum replaces the place holder with a vacuumed page. The place holder
-        // page is supposed to be short lived and conspicuous. We don't want to
-        // replace the old log directly. First off, we can't in the case of split,
-        // the left and right page share a previous log. Moreover, it just don't
-        // seem right. Seems like it would be harder to diagnose problems. With this
-        // we'll get a clearer picture of where things failed by leaving more of a
-        // trail.
+        // Vacuum replaces the place holder with a vacuumed page. The place
+        // holder page is supposed to be short lived and conspicuous. We don't
+        // want to replace the old log directly. First off, we can't in the case
+        // of split, the left and right page share a previous log. Moreover, it
+        // just don't seem right. Seems like it would be harder to diagnose
+        // problems. With this we'll get a clearer picture of where things
+        // failed by leaving more of a trail.
 
         // We removed dependency tracking from the logs themselves. They used to
-        // make note of who depended upon them and we would reference count. It was
-        // too much. Now I wonder how we would vacuum if things got messed up. We
-        // would probably have to vacuum all the pages, then pass over them for
-        // unlinking of old files.
+        // make note of who depended upon them and we would reference count. It
+        // was too much. Now I wonder how we would vacuum if things got messed
+        // up. We would probably have to vacuum all the pages, then pass over
+        // them for unlinking of old files.
 
-        // We are going to assert dependencies for now, but they will allow us to
-        // detect broken and repair pages in the future, should this become
+        // We are going to assert dependencies for now, but they will allow us
+        // to detect broken and repair pages in the future, should this become
         // necessary. In fact, if we add an instance number we can assert that
         // dependency has not been allowed to escape the journal.
 
-        // Imagining a recovery utility that would load pages, and then check the
-        // integrity of a vacuum, calling a modified version of this function with
-        // all of the assumptions. That is, explicitly ignore this dependent.
+        // Imagining a recovery utility that would load pages, and then check
+        // the integrity of a vacuum, calling a modified version of this
+        // function with all of the assumptions. That is, explicitly ignore this
+        // dependent.
 
         //
         async _vacuum (sheaf, key, cartridges) {
@@ -380,7 +381,7 @@ class FileSystem {
             //
 
             // We don't use the cached page. We read the log starting from the
-            // replacable log entry.
+            // replaceable log entry.
 
             //
             const { page: page, split } = await this.reader.log(log.page, log.id)
@@ -393,7 +394,7 @@ class FileSystem {
             //
 
             // Write the entries in order. Any special commands like `'key'`
-            // or `'right'` have been written into the the new head log.
+            // or `'right'` have been written into the new head log.
 
             // Fun fact: if you want an exception you could never catch, an
             // `fs.WriteStream` with something other than a number a `fd` like a
@@ -471,32 +472,32 @@ class FileSystem {
 
             // Pages are broken up into logs. The logs have a load instruction
             // that will tell them to load a previous log, essentially a linked
-            // list. They have a split instruction that will tell them to split the
-            // page they loaded. When reading it will load the new head which will
-            // tell it to load the previous page and split it.
+            // list. They have a split instruction that will tell them to split
+            // the page they loaded. When reading it will load the new head
+            // which will tell it to load the previous page and split it.
 
-            // Except we don't want to have an indefinate linked list. We vacuum
-            // when we split. We do this by inserting a place holder log between the
-            // old log and the new log. The place holder conatains just the load and
-            // split operation. After these two small files are written and synced,
-            // we can release our pause on writes on the cache page and move onto
-            // vacuum.
+            // Except we don't want to have an indefinite linked list. We vacuum
+            // when we split. We do this by inserting a place holder log between
+            // the old log and the new log. The place holder contains just the
+            // load and split operation. After these two small files are written
+            // and synced, we can release our pause on writes on the cache page
+            // and move onto vacuum.
 
             // New writes will go to the head of the log. We will replace our
             // place-holder with a vacuumed copy of the previous log each page
             // receiving just its half of the page will all delete operations
-            // removed. When we vacuum we only need to hold a cache reference to the
-            // page so it will not be evicted and re-read while we're moving the old
-            // logs around, so vacuuming can take place in parallel to all user
-            // operations.
+            // removed. When we vacuum we only need to hold a cache reference to
+            // the page so it will not be evicted and re-read while we're moving
+            // the old logs around, so vacuuming can take place in parallel to
+            // all user operations.
             //
-            // The replacement log will also include an indication of dependency. It
-            // will mark a `split` property in the page for the left page. During
-            // vacuum the we will check the `split` property of the page created by
-            // reading the replacable part of the log. If it is not null we will
-            // assert that the dependent page is vacuumed exist before we vacuum.
-            // This means we must vacuum the right page befroe we vacuum the left
-            // page.
+            // The replacement log will also include an indication of
+            // dependency. It will mark a `split` property in the page for the
+            // left page. During vacuum the we will check the `split` property
+            // of the page created by reading the replaceable part of the log.
+            // If it is not null we will assert that the dependent page is
+            // vacuumed exist before we vacuum. This means we must vacuum the
+            // right page before we vacuum the left page.
 
             const replace = {
                 left: {
