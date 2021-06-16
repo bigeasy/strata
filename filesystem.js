@@ -40,11 +40,16 @@ class FileSystem {
             await Strata.Error.resolve(fs.mkdir(_path('pages')), 'IO_ERROR')
             await Strata.Error.resolve(fs.mkdir(_path('balance')), 'IO_ERROR')
             await Strata.Error.resolve(fs.mkdir(_path('instances', '0'), { recursive: true }), 'IO_ERROR')
+
+            // **TODO** Unused?
             await Strata.Error.resolve(fs.mkdir(_path('page'), { recursive: true }), 'IO_ERROR')
             await Strata.Error.resolve(fs.mkdir(_path('balance', '0.0'), { recursive: true }), 'IO_ERROR')
             await Strata.Error.resolve(fs.mkdir(_path('balance', '0.1')), 'IO_ERROR')
             const buffers = [ _recordify(recorder, { method: 'length', length: 1 }), _recordify(recorder, { method: 'insert', index: 0, id: '0.1' }, []) ]
             await Strata.Error.resolve(fs.writeFile(_path('balance', '0.0', 'page'), Buffer.concat(buffers), { flag: 'as' }), 'IO_ERROR')
+            // **TODO** IIRC a stub page that means nothing, but could we have a
+            // better method name so it doesn't look like a formatting error in
+            // the files? Like `"ignore"`?
             const zero = _recordify(recorder, { method: '0.0' })
             await Strata.Error.resolve(fs.writeFile(_path('balance', '0.1', '0.0'), zero, { flag: 'as' }), 'IO_ERROR')
             const one = _recordify(recorder, { method: 'load', page: '0.1', log: '0.0' })
@@ -60,6 +65,7 @@ class FileSystem {
             await journalist.prepare()
             await journalist.commit()
             await journalist.dispose()
+            this._id = 999
             return { handles, recorder, directory, instance: 0, extractor, serializer, checksum, pageId: 2 }
         }
         // **TODO** Run commit log on reopen.
@@ -245,7 +251,7 @@ class FileSystem {
             this.extractor = extractor
             this.instance = instance
             this._pageId = pageId
-            this._id = 0
+            this._id = 999
             this._recorder = recorder
             this.reader = new FileSystem.Reader(this.directory, { serializer, extractor, checksum })
         }
@@ -267,8 +273,13 @@ class FileSystem {
             return path.resolve.apply(path, vargs.map(varg => String(varg)))
         }
 
-        _filename (id) {
-            return `${this.instance}.${this._id++}`
+        _filename () {
+            const id = `${this.instance}.${this._id++}`
+                console.log('yup', id)
+            if (id == '0.0') {
+                console.log('yup')
+            }
+            return id
         }
 
         _recordify (header, parts = []) {
