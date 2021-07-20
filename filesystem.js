@@ -39,7 +39,7 @@ class FileSystem {
             await Strata.Error.resolve(fs.mkdir(_path('instances')), 'IO_ERROR')
             await Strata.Error.resolve(fs.mkdir(_path('pages')), 'IO_ERROR')
             await Strata.Error.resolve(fs.mkdir(_path('balance')), 'IO_ERROR')
-            await Strata.Error.resolve(fs.mkdir(_path('instances', '0'), { recursive: true }), 'IO_ERROR')
+            await Strata.Error.resolve(fs.mkdir(_path('instances', '1'), { recursive: true }), 'IO_ERROR')
             await Strata.Error.resolve(fs.mkdir(_path('page'), { recursive: true }), 'IO_ERROR')
             await Strata.Error.resolve(fs.mkdir(_path('balance', '0.0'), { recursive: true }), 'IO_ERROR')
             await Strata.Error.resolve(fs.mkdir(_path('balance', '0.1')), 'IO_ERROR')
@@ -60,7 +60,7 @@ class FileSystem {
             await journalist.prepare()
             await journalist.commit()
             await journalist.dispose()
-            return { handles, recorder, directory, instance: 0, extractor, serializer, checksum, pageId: 2 }
+            return { handles, recorder, directory, instance: 1, extractor, serializer, checksum, pageId: 2 }
         }
         // **TODO** Run commit log on reopen.
         const dir = await Strata.Error.resolve(fs.readdir(_path('instances')), 'IO_ERROR')
