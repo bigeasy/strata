@@ -3,6 +3,8 @@ const fileSystem = require('fs')
 const fs = require('fs').promises
 const recorder = require('transcript/recorder').create(() => '0')
 
+const { coalesce } = require('extant')
+
 const FileSystem = require('./filesystem')
 
 function recordify (header, parts) {
@@ -14,7 +16,7 @@ const appendable = require('./appendable')
 exports.directory = path.resolve(__dirname, './test/tmp')
 
 exports.reset = async function (directory) {
-    await fs.rmdir(directory, { recursive: true })
+    await coalesce(fs.rm, fs.rmdir).call(fs, directory, { recursive: true })
     await fs.mkdir(directory, { recursive: true })
 }
 

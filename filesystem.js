@@ -6,6 +6,8 @@ const assert = require('assert')
 const Journalist = require('journalist')
 const Magazine = require('magazine')
 
+const { coalesce } = require('extant')
+
 const Operation = require('operation')
 const Recorder = require('transcript/recorder')
 const Strata = { Error: require('./error') }
@@ -71,7 +73,7 @@ class FileSystem {
         const instance = instances[0] + 1
         await Strata.Error.resolve(fs.mkdir(_path('instances', instance)), 'IO_ERROR')
         for (const instance of instances) {
-            await Strata.Error.resolve(fs.rmdir(_path('instances', instance)), 'IO_ERROR')
+            await Strata.Error.resolve(coalesce(fs.rm, fs.rmdir).call(fs, _path('instances', instance), { recursive: true }), 'IO_ERROR')
         }
         return { handles, recorder, directory, instance, extractor, serializer, checksum, pageId: 0 }
     }
@@ -695,9 +697,9 @@ class FileSystem {
                 if (leaf) {
                     const { page, merged } = await this.reader.log(id)
                     Strata.Error.assert(merged != null, 'DELETING_UNMERGED_PAGE')
-                    await fs.rmdir(this._path('pages', id), { recursive: true })
+                    await coalesce(fs.rm, fs.rmdir).call(fs, this._path('pages', id), { recursive: true })
                 } else {
-                    await fs.rmdir(this._path('pages', id), { recursive: true })
+                    await coalesce(fs.rm, fs.rmdir).call(fs, this._path('pages', id), { recursive: true })
                 }
             }
         }
