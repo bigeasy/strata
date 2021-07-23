@@ -16,7 +16,7 @@ const appendable = require('./appendable')
 exports.directory = path.resolve(__dirname, './test/tmp')
 
 exports.reset = async function (directory) {
-    await coalesce(fs.rm, fs.rmdir).call(fs, directory, { recursive: true })
+    await coalesce(fs.rm, fs.rmdir).call(fs, directory, { force: true, recursive: true })
     await fs.mkdir(directory, { recursive: true })
 }
 
