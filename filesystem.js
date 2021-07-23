@@ -73,7 +73,7 @@ class FileSystem {
         const instance = instances[0] + 1
         await Strata.Error.resolve(fs.mkdir(_path('instances', instance)), 'IO_ERROR')
         for (const instance of instances) {
-            await Strata.Error.resolve(coalesce(fs.rm, fs.rmdir).call(fs, _path('instances', instance), { recursive: true }), 'IO_ERROR')
+            await Strata.Error.resolve(fs.rmdir(_path('instances', instance)), 'IO_ERROR')
         }
         return { handles, recorder, directory, instance, extractor, serializer, checksum, pageId: 0 }
     }
