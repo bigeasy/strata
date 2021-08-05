@@ -697,7 +697,7 @@ class Sheaf {
                     page.items.length >= this.leaf.split &&
                     this.comparator.branch(page.items[0].key, page.items[page.items.length - 1].key) != 0
                 ) {
-                    this._fracture.enqueue(Fracture.stack(), 'keephouse', value => value.candidates.push(page.key || page.items[0].key))
+                    this._fracture.enqueue(stack, 'keephouse', value => value.candidates.push(page.key || page.items[0].key))
                 }
             }
             //
@@ -990,7 +990,9 @@ class Sheaf {
 
             // See if the merged page needs to split or merge further.
             if (this._isDirty(left.page, this.leaf)) {
-                this._fracture.enqueue('keephouse').candidates.push(left.entry.value.items[0].key)
+                this._fracture.enqueue(stack, 'keephouse', value => {
+                    value.candidates.push(left.entry.value.items[0].key)
+                })
             }
 
             // Replace the key of the pivot if necessary.
