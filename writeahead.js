@@ -73,7 +73,7 @@ const wal = {
     },
     async last (writeahead, qualifier, key, last = null) {
         const player = new Player(() => '0')
-        let apply
+        let apply = false
         for await (const block of writeahead.get([ qualifier, key ])) {
             for (const entry of player.split(block)) {
                 const header = JSON.parse(String(entry.parts.shift()))
@@ -85,6 +85,22 @@ const wal = {
             }
         }
         return last
+    },
+    async last2 (writeahead, qualifier, key, missing = null) {
+        const player = new Player(() => '0')
+        let apply = false
+        let last = null
+        for await (const block of writeahead.get([ qualifier, key ])) {
+            for (const entry of player.split(block)) {
+                const header = JSON.parse(String(entry.parts.shift()))
+                if (header.method == 'apply') {
+                    apply = header.key == key
+                } else if (apply) {
+                    last = { header, parts: entry.parts }
+                }
+            }
+        }
+        return last || missing
     }
 }
 
@@ -135,7 +151,7 @@ class WriteAheadOnly {
             return { ...options, instance: 0, pageId: 2, recorder, pageId: 2 }
         }
         const { key, writeahead } = options
-        const instance = (await wal.last(writeahead, key, 'instance')).instance + 1
+        const instance = (await wal.last2(writeahead, key, 'instance')).header.instance + 1
         await options.writeahead.write(stack, [{
             keys: [[ key, 'instance' ]],
             buffer: _recordify(recorder, [{
@@ -344,6 +360,11 @@ class WriteAheadOnly {
             this._writeahead.write(stack, [{ keys: [[ this._key, page.id ]], buffer: Buffer.concat(writes) }])
         }
 
+        _serializeMessages (messages) {
+            console.log(messages)
+            return messages
+        }
+
         //
         _startBalance (serializer, messages) {
             const id = [ 'balance', this.instance, this._id++ ].join('.')
@@ -355,11 +376,15 @@ class WriteAheadOnly {
                 }
             })
 
+            const serialized = []
+            this._serialize(messages, serialized)
+
             serializer.push(id, {
                 header: {
                     method: 'messages',
                     messages: messages
-                }
+                },
+                parts: serialized
             })
 
             this._write = serializer
@@ -603,28 +628,48 @@ class WriteAheadOnly {
                     this._write = null
                     await this._writeahead.write(stack, [ write ])
                 }
-                const balance = await wal.last(this._writeahead, this._key, 'balance')
-                let messages = []
-                if (balance != null) {
-                    messages = (await wal.last(this._writeahead, this._key, balance.key, { messages })).messages
-                }
+                const { header: balance } = await wal.last2(this._writeahead, this._key, 'balance')
+                const { header: { messages }, parts: serialized } = await wal.last2(this._writeahead, this._key, balance.key)
                 if (messages.length == 0) {
                     break
                 }
                 this._write = new WriteAheadOnly.Serializer(this, this._key)
+                const message = messages.shift()
+                Strata.Error.assert(message.method == 'balance', 'JOURNAL_CORRUPTED')
+                const append = []
+                switch (message.method) {
+                case 'balance':
+                    if (message.key == 0) {
+                        message.key = null
+                    } else {
+                        message.key = this.serializer.key.deserialize(serialized.splice(0, message.key))
+                    }
+                    await sheaf.balance(message.key, message.level, append, cartridges)
+                    break
+                }
+                this._serialize(append, serialized)
+                messages.push.apply(messages, append)
                 this._write.push(balance.key, {
                     header: {
                         method: 'messages', messages: messages
-                    }
+                    },
+                    parts: serialized
                 })
-                const message = messages.shift()
-                Strata.Error.assert(message.method == 'balance', 'JOURNAL_CORRUPTED')
-                switch (message.method) {
-                case 'balance':
-                    await sheaf.balance(message.key, message.level, messages, cartridges)
-                    break
+            }
+        }
+
+        _serialize (append, serialized) {
+            for (const message of append) {
+                assert.equal(message.method, 'balance')
+                if (message.key == null) {
+                    message.key = 0
+                } else {
+                    const parts = this.serializer.key.serialize(message.key)
+                    message.key = parts.length
+                    serialized.push.apply(serialized, parts)
                 }
             }
+            return serialized
         }
     }
 }
