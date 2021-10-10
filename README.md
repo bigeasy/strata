@@ -19,8 +19,11 @@ A comparator function builder.
 npm install b-tree
 ```
 
-height="481" alt="&quot;The Wave&quot;"></a><br>
-The Wave by [Rick Z.](http://www.flickr.com/people/rickz/).
+<a href="http://www.flickr.com/photos/rickz/2207171252/" title="&quot;The
+Wave&quot; by rickz, on Flickr"><img
+src="http://farm3.staticflickr.com/2363/2207171252_4bb23fba1e_o.jpg" width="722"
+height="481" alt="&quot;The Wave&quot;"></a><br>The Wave by [Rick
+Z.](http://www.flickr.com/people/rickz/).
 
 An Evented I/O B-tree for Node.js.
 
