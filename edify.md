@@ -14,7 +14,9 @@ An persistent, `async`/`await` B-tree for Node.js.
 | Coverage:     | https://codecov.io/gh/bigeasy/strata          |
 | License:      | MIT                                           |
 
+
 ```text
+//{ "mode": "text" }
 npm install b-tree
 ```
 
@@ -28,6 +30,7 @@ Z.](http://www.flickr.com/people/rickz/).
 Ascension installs from NPM.
 
 ```
+//{ "mode": "text" }
 npm install b-tree
 ```
 
@@ -39,18 +42,26 @@ Proof `okay` function to assert out statements in the readme. A Proof unit test
 generally looks like this.
 
 ```javascript
-require('proof')(4, okay => {
-    okay('always okay')
-    okay(true, 'okay if true')
-    okay(1, 1, 'okay if equal')
-    okay({ value: 1 }, { value: 1 }, 'okay if deep strict equal')
+//{ "code": { "tests": 1 }, "text": { "tests": 4  } }
+require('proof')(%(tests)d, okay => {
+    //{ "include": "test", "mode": "code" }
+    //{ "include": "proof" }
 })
+```
+
+```javascript
+//{ "name": "proof", "mode": "text" }
+okay('always okay')
+okay(true, 'okay if true')
+okay(1, 1, 'okay if equal')
+okay({ value: 1 }, { value: 1 }, 'okay if deep strict equal')
 ```
 
 You can run this unit test yourself to see the output from the various
 code sections of the readme.
 
 ```text
+//{ "mode": "text" }
 git clone git@github.com:bigeasy/b-tree.git
 cd ascension
 npm install --no-package-lock --no-save
@@ -58,5 +69,6 @@ node test/readme.t.js
 ```
 
 ```javascript
+//{ "name": "test" }
 okay('TODO')
 ```
