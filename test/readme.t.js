@@ -30,7 +30,7 @@
 // Proof `okay` function to assert out statements in the readme. A Proof unit test
 // generally looks like this.
 
-require('proof')(1, async okay => {
+require('proof')(4, async okay => {
     // ## Overview
 
     // This will not appear in `README.md`.
@@ -161,6 +161,131 @@ require('proof')(1, async okay => {
         })
 
         await destructible.promise
+    }
+
+    // ## Custom Comparators
+    //
+    // Well, all the comparators are custom, aren't they?
+    //
+    // Somewhere above we're talked about how Strata is really being used with compound
+    // keys and MVCC.
+    //
+    // In order always arrive at the value that is one greater than the last record to
+    // match the partial key, we provide the search function with a special comparator.
+    //
+    // This comparator will never match exactly. The partial key is compared normally,
+    // if the values present in the partial key are not equal to the corresponding
+    // values in the record key the less than or greater than result is returned. If
+    // they values present in the partial key are equal to the partial key matches it
+    // returns `1` indicating that it is greater than the sought.
+    //
+    // In order to create this special comparator we can use the default leaf
+    // comparator and wrap it in a function that will whittle the record key down to
+    // the length of the sought key.
+    //
+    // TODO Okay. Looks like I put this together without having to get too crazy, and
+    // it looks like I want to remove `search` and have different functions.
+
+    {
+        const path = require('path')
+        const fs = require('fs').promises
+
+        const whittle = require('whittle')
+        const ascension = require('ascension')
+
+        const directory = path.join(__dirname, 'tmp', 'readme', 'partial')
+
+        await fs.mkdir(directory, { recursive: true })
+
+        const comparator = ascension([ String, Number ])
+
+        const destructible = new Destructible('strata.simple.t')
+        const turnstile = new Turnstile(destructible.durable('turnstile'))
+        const pages = new Magazine
+        const handles = new Operation.Cache(new Magazine)
+        const storage = new FileSystem.Writer(destructible.durable('filesystem'), await FileSystem.open({ directory, handles, create: true }))
+        const strata = new Strata(destructible.durable($ => $(), 'strata'), {
+            pages, storage, turnstile, comparator
+        })
+
+        const assert = require('assert')
+
+        // Create a trampoline.
+        const trampoline = new Trampoline
+
+        const values = [[
+            'a', 1
+        ], [
+            'a', 2
+        ], [
+            'b', 1
+        ], [
+            'b', 2
+        ], [
+            'c', 1
+        ], [
+            'c', 2
+        ]]
+
+
+        // Invoke search for `'a'`.
+        strata.search(trampoline, values[0], cursor => {
+            // Because we searched for `'a'` and we know the value does not exist, we
+            // can insert the value using the cursor index.
+            cursor.insert(Fracture.stack(), cursor.index, values[0], [ values[0] ])
+
+            let index = cursor.index
+            for (const value of values.slice(1)) {
+                index = cursor.indexOf(value, index).index
+                assert(index != null)
+                cursor.insert(Fracture.stack(), index, value, [ value ])
+            }
+        })
+
+        // Run the trampoline.
+        while (trampoline.seek()) {
+            await trampoline.shift()
+        }
+
+        async function partial (key) {
+            const trampoline = new Trampoline
+            const whittled = whittle(comparator, left => left, right => right.slice(0, key.length))
+            const padded = key.concat(null)
+            const gathered = []
+            strata.descend(trampoline, whittled, padded, cursor => {
+                // TODO Are we still using ghosts?
+                for (let i = cursor.index - 1; i > -1; i--) {
+                    gathered.push(cursor.page.items[i].key)
+                }
+            })
+            while (trampoline.seek()) {
+                await trampoline.shift()
+            }
+            return gathered
+        }
+
+        okay(await partial([ 'a' ]), [[
+            'a', 2
+        ], [
+            'a', 1
+        ]], 'gathered all "a"s')
+
+        okay(await partial([ 'a', 2 ]), [[
+            'a', 2
+        ], [
+            'a', 1
+        ]], 'still gathered all "a"s')
+
+        okay(await partial([ 'b', 1 ]), [[
+            'b', 1
+        ], [
+            'a', 2
+        ], [
+            'a', 1
+        ]], 'still gathered all "a"s and one "b"')
+
+        const length = 2
+        const whittled = whittle(comparator, left => left, right => right.slice(0, length))
     }
 })
 

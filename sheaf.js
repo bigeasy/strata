@@ -193,7 +193,7 @@ class Sheaf {
         return { page: cartridge.value, cartridge }
     }
 
-    _descend (entries, { key, level = -1, fork = false, rightward = false, approximate = false }) {
+    _descend (entries, { comparator = this.comparator, key, level = -1, fork = false, rightward = false, approximate = false }) {
         const descent = { miss: null, keyed: null, level: 0, index: 0, entry: null,
             pivot: null,
             cartridge: null,
@@ -239,7 +239,7 @@ class Sheaf {
                 // I don't reference the level, so it's probably fine here.
 
                 //
-                if (this.comparator.branch(descent.pivot.key, key) == 0 && fork) {
+                if (comparator.branch(descent.pivot.key, key) == 0 && fork) {
                     descent.index--
                     rightward = true
                     descent.pivot = descent.index != 0
@@ -273,7 +273,7 @@ class Sheaf {
             const index = rightward
                 ? entry.value.leaf ? ~(entry.value.items.length - 1) : entry.value.items.length - 1
                 : key != null
-                    ? find(this.comparator.leaf, entry.value.items, key, offset)
+                    ? find(comparator.leaf, entry.value.items, key, offset)
                     : entry.value.leaf ? ~0 : 0
             //
 
@@ -366,7 +366,7 @@ class Sheaf {
     // always releases the entries.
 
     //
-    descend2 (trampoline, query, found) {
+    search (trampoline, query, found) {
         this.deferrable.operational()
         const entries = []
         try {
@@ -375,7 +375,7 @@ class Sheaf {
                 trampoline.promised(async () => {
                     try {
                         entries.push(await this.deferrable.ephemeral('load', this.load(descent.miss), Destructible.Error.DESTROYED))
-                        this.descend2(trampoline, query, found)
+                        this.search(trampoline, query, found)
                     } finally {
                         entries.forEach(entry => entry.release())
                     }
