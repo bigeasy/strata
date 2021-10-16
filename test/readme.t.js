@@ -68,7 +68,7 @@ require('proof')(4, async okay => {
     const Turnstile = require('turnstile')
     const Magazine = require('magazine')
     const Operation = require('operation')
-    const Trampoline = require('reciprocate')
+    const { Trampoline } = require('reciprocate')
     const Fracture = require('fracture')
 
     // For our `README.md` examples we'll need to create some file paths.

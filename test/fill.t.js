@@ -1,6 +1,6 @@
 require('proof')(15, async (okay) => {
     const Fracture = require('fracture')
-    const Trampoline = require('reciprocate')
+    const { Trampoline } = require('reciprocate')
     const Strata = require('../strata')
 
     const utilities = require('../utilities')

@@ -5,7 +5,7 @@ require('proof')(25, async (okay) => {
     // TODO Does approimate fork of last item of tree work as expected?
     // TODO Does approimate fork of item past end of tree work?
     // Options are `-1` or `null`.
-    const Trampoline = require('reciprocate')
+    const { Trampoline } = require('reciprocate')
     const Strata = require('..')
 
     const test = require('./test')

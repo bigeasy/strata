@@ -1,6 +1,6 @@
 require('proof')(10, async (okay) => {
     const expected = [ 'a', 'b', 'c', 'd', 'e', 'f', 'h', 'i' ]
-    const Trampoline = require('reciprocate')
+    const { Trampoline } = require('reciprocate')
     const Strata = require('..')
 
     const test = require('./test')

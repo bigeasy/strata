@@ -24,7 +24,7 @@ require('proof')(21, async okay => {
         branch: whittle(ascension([ String ]), object => [ object.value ])
     }
 
-    const Trampoline = require('reciprocate')
+    const { Trampoline } = require('reciprocate')
     const Fracture = require('fracture')
     const Strata = require('..')
 
