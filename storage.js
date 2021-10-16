@@ -6,7 +6,7 @@ class Storage {
             options.checksum = (() => '0')
         }
         if (options.extractor == null) {
-            options.extractor = parts => parts[0]
+            options.extractor = parts => [ parts[0] ]
         }
         options.serializer = function () {
             const serializer = coalesce(options.serializer, 'json')

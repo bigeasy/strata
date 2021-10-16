@@ -239,7 +239,7 @@ class Sheaf {
                 // I don't reference the level, so it's probably fine here.
 
                 //
-                if (comparator.branch(descent.pivot.key, key) == 0 && fork) {
+                if (fork && comparator.branch(descent.pivot.key, key) == 0) {
                     descent.index--
                     rightward = true
                     descent.pivot = descent.index != 0

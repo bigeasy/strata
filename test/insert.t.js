@@ -9,8 +9,8 @@ require('proof')(5, async (okay) => {
         await harness($ => $(), 'insert', async ({ strata }) => {
             const trampoline = new Trampoline, promises = []
             strata.search(trampoline, 'a', cursor => {
-                promises.push(cursor.insert(Fracture.stack(), cursor.index, 'a', [ 'a' ]))
-                promises.push(cursor.insert(Fracture.stack(), cursor.indexOf('b', cursor.index).index, 'b', [ 'b' ]))
+                promises.push(cursor.insert(Fracture.stack(), cursor.index, [ 'a' ], [ 'a' ]))
+                promises.push(cursor.insert(Fracture.stack(), cursor.indexOf([ 'b' ], cursor.index).index, [ 'b' ], [ 'b' ]))
             })
             while (trampoline.seek()) {
                 await trampoline.shift()

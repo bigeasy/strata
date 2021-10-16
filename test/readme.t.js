@@ -109,16 +109,16 @@ require('proof')(4, async okay => {
             const trampoline = new Trampoline
 
             // Invoke search for `'a'`.
-            strata.search(trampoline, 'a', cursor => {
+            strata.search(trampoline, [ 'a' ], cursor => {
                 // Because we searched for `'a'` and we know the value does not exist, we
                 // can insert the value using the cursor index.
-                cursor.insert(Fracture.stack(), cursor.index, 'a', [ 'a' ])
+                cursor.insert(Fracture.stack(), cursor.index, [ 'a' ], [ 'a' ])
 
                 // If we want to attempt to insert another value while we're here, we should
                 // check to make sure this is the correct page for the value.
-                const { index } = cursor.indexOf('b', cursor.index)
+                const { index } = cursor.indexOf([ 'b' ], cursor.index)
                 if (index != null) {
-                    cursor.insert(Fracture.stack(), index, 'b', [ 'b' ])
+                    cursor.insert(Fracture.stack(), index, [ 'b' ], [ 'b' ])
                 }
             })
 
@@ -138,7 +138,7 @@ require('proof')(4, async okay => {
 
             // Invoke search for `'a'`.
             const gathered = []
-            strata.search(trampoline, 'a', cursor => {
+            strata.search(trampoline, [ 'a' ], cursor => {
                 for (let index = cursor.index; index < cursor.page.items.length; index++) {
                     gathered.push(cursor.page.items[index])
                 }
@@ -150,9 +150,9 @@ require('proof')(4, async okay => {
             }
 
             okay(gathered, [{
-                key: 'a', parts: [ 'a' ], heft: 53
+                key: [ 'a' ], parts: [ 'a' ], heft: 53
             }, {
-                key: 'b', parts: [ 'b' ], heft: 53
+                key: [ 'b' ], parts: [ 'b' ], heft: 53
             }], 'gathered values')
 
             destructible.destroy()

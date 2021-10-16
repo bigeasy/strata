@@ -8,7 +8,7 @@ require('proof')(13, async (okay) => {
     for await (const harness of test('merge', okay, [ 'fileSystem', 'writeahead' ])) {
         await harness($ => $(), 'merge', async ({ strata, prefix }) => {
             const trampoline = new Trampoline, promises = []
-            strata.search(trampoline, 'e', cursor => {
+            strata.search(trampoline, [ 'e' ], cursor => {
                 promises.push(cursor.remove(Fracture.stack(), cursor.index))
             })
             while (trampoline.seek()) {
@@ -39,7 +39,7 @@ require('proof')(13, async (okay) => {
         })
         await harness($ => $(), 'reopen', async ({ strata, prefix }) => {
             const trampoline = new Trampoline
-            strata.search(trampoline, 'd', cursor => {
+            strata.search(trampoline, [ 'd' ], cursor => {
                 okay(cursor.page.items[cursor.index].parts[0], 'd', `${prefix} found`)
             })
             while (trampoline.seek()) {
@@ -47,7 +47,7 @@ require('proof')(13, async (okay) => {
             }
         })
         await harness($ => $(), 'traverse', async ({ strata, prefix }) => {
-            let right = 'a'
+            let right = [ 'a' ]
             const items = []
             do {
                 const trampoline = new Trampoline

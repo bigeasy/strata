@@ -10,7 +10,7 @@ require('proof')(15, async (okay) => {
     for await (const harness of test('fill', okay, [ 'fileSystem', 'writeahead' ])) {
         await harness($ => $(), 'merge', async ({ strata }) => {
             const trampoline = new Trampoline, promises = []
-            await strata.search(trampoline, 'b', cursor => {
+            await strata.search(trampoline, [ 'b' ], cursor => {
                 promises.push(cursor.remove(Fracture.stack(), cursor.index))
             })
             while (trampoline.seek()) {
@@ -82,7 +82,7 @@ require('proof')(15, async (okay) => {
         })
         await harness($ => $(), 'reopen', async ({ strata, prefix }) => {
             const trampoline = new Trampoline
-            strata.search(trampoline, 'c', cursor => {
+            strata.search(trampoline, [ 'c' ], cursor => {
                 okay(cursor.page.items[cursor.index].parts[0], 'c', `${prefix} found`)
             })
             while (trampoline.seek()) {
@@ -90,7 +90,7 @@ require('proof')(15, async (okay) => {
             }
         })
         await harness($ => $(), 'traverse', async ({ strata, prefix }) => {
-            let right = 'a'
+            let right = [ 'a' ]
             const items = [], trampoline = new Trampoline
             do {
                 strata.search(trampoline, right, cursor => {

@@ -81,6 +81,7 @@ class Cursor {
 
     //
     insert (stack, index, key, parts, buffers = this.serialize(parts)) {
+        assert(Array.isArray(key))
         assert(stack instanceof Fracture.Stack)
         const header = { method: 'insert', index: index }
         const buffer = this._sheaf.storage.recordify(header, buffers)

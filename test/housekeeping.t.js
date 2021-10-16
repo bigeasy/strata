@@ -14,14 +14,14 @@ require('proof')(5, async (okay) => {
         await harness($ => $(), 'open', async ({ strata, prefix }) => {
             const items = []
             const trampoline = new Trampoline
-            strata.search(trampoline, 'e', cursor => {
-                cursor.insert(Fracture.stack(), cursor.index, 'e', [ 'e' ])
+            strata.search(trampoline, [ 'e' ], cursor => {
+                cursor.insert(Fracture.stack(), cursor.index, [ 'e' ], [ 'e' ])
             })
             while (trampoline.seek()) {
                 await trampoline.shift()
             }
             await null
-            strata.search(trampoline, 'e', cursor => {
+            strata.search(trampoline, [ 'e' ], cursor => {
                 cursor.remove(Fracture.stack(), cursor.index)
             })
             while (trampoline.seek()) {

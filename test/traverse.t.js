@@ -43,7 +43,6 @@ require('proof')(10, async (okay) => {
                         items.push(cursor.page.items[i].parts[0])
                     }
                     left = cursor.page.key
-                    console.log('>>>', left)
                     fork = true
                     id = cursor.page.id
                 })

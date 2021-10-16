@@ -34,7 +34,7 @@ require('proof')(25, async (okay) => {
             }
             {
                 const trampoline = new Trampoline
-                strata.search(trampoline, 'd', cursor => {
+                strata.search(trampoline, [ 'd' ], cursor => {
                     okay({
                         id: cursor.page.id,
                         index: cursor.index,
@@ -51,7 +51,7 @@ require('proof')(25, async (okay) => {
             }
             {
                 const trampoline = new Trampoline
-                strata.search(trampoline, 'd', true, cursor => {
+                strata.search(trampoline, [ 'd' ], true, cursor => {
                     okay({
                         id: cursor.page.id,
                         index: cursor.index,
@@ -68,12 +68,12 @@ require('proof')(25, async (okay) => {
             }
             {
                 const trampoline = new Trampoline
-                strata.search(trampoline, 'e', true, cursor => {
+                strata.search(trampoline, [ 'e' ], true, cursor => {
                     okay({
                         id: cursor.page.id,
                         index: cursor.index,
                         found: cursor.found,
-                        item: cursor.page.items[cursor.index].key
+                        item: cursor.page.items[cursor.index].key[0]
                     }, {
                         id: '1.1',
                         index: 0,
@@ -87,12 +87,12 @@ require('proof')(25, async (okay) => {
             }
             {
                 const trampoline = new Trampoline
-                strata.search(trampoline, 'j', true, cursor => {
+                strata.search(trampoline, [ 'j' ], true, cursor => {
                     okay({
                         id: cursor.page.id,
                         index: cursor.index,
                         found: cursor.found,
-                        item: cursor.page.items[cursor.index].key
+                        item: cursor.page.items[cursor.index].key[0]
                     }, {
                         id: '1.3',
                         index: 0,
@@ -106,12 +106,12 @@ require('proof')(25, async (okay) => {
             }
             {
                 const trampoline = new Trampoline
-                strata.search(trampoline, 'g', true, cursor => {
+                strata.search(trampoline, [ 'g' ], true, cursor => {
                     okay({
                         id: cursor.page.id,
                         index: cursor.index,
                         found: cursor.found,
-                        item: cursor.page.items[cursor.index].key
+                        item: cursor.page.items[cursor.index].key[0]
                     }, {
                         id: '1.1',
                         index: 2,
@@ -125,12 +125,12 @@ require('proof')(25, async (okay) => {
             }
             {
                 const trampoline = new Trampoline
-                strata.search(trampoline, 'h', cursor => {
+                strata.search(trampoline, [ 'h' ], cursor => {
                     okay({
                         id: cursor.page.id,
                         index: cursor.index,
                         found: cursor.found,
-                        item: cursor.page.items[cursor.index].key
+                        item: cursor.page.items[cursor.index].key[0]
                     }, {
                         id: '1.3',
                         index: 0,
@@ -144,7 +144,7 @@ require('proof')(25, async (okay) => {
             }
             {
                 const trampoline = new Trampoline
-                strata.search(trampoline, 'i', true, cursor => {
+                strata.search(trampoline, [ 'i' ], true, cursor => {
                     okay({
                         id: cursor.page.id,
                         index: cursor.index,

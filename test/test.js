@@ -3,6 +3,8 @@
 const Destructible = require('destructible')
 const Turnstile = require('turnstile')
 
+const { coalesce } = require('extant')
+const ascension = require('ascension')
 const Fracture = require('fracture')
 const Strata = require('../strata')
 const Magazine = require('magazine')
@@ -109,10 +111,10 @@ async function walvivify (writeahead) {
         if (page.leaf) {
             const items = vivified[id] = page.items.map((item, index) => [ 'insert', index, item.parts[0] ])
             if (page.right) {
-                items.push([ 'right', page.right ])
+                items.push([ 'right', page.right[0] ])
             }
         } else {
-            const items = vivified[id] = page.items.map(item => [ item.id, item.key == null ? null : item.key ])
+            const items = vivified[id] = page.items.map(item => [ item.id, item.key == null ? null : item.key[0] ])
             for (const item of items) {
                 await vivify(item[0])
             }
@@ -122,9 +124,14 @@ async function walvivify (writeahead) {
     return vivified
 }
 
+function extractor (parts) {
+    return [ parts[0] ]
+}
+
 async function* test (suite, okay, only = [ 'fileSystem', 'writeahead' ]) {
     const directory = path.join(utilities.directory, suite)
     async function fileSystem ($trace, test, f, { create = false, serialize = null, vivify = null, comparator = null } = {}) {
+        comparator ??= ascension([ String ])
         if (serialize != null) {
             await utilities.serialize(directory, serialize)
         }
@@ -135,7 +142,7 @@ async function* test (suite, okay, only = [ 'fileSystem', 'writeahead' ]) {
         const handles = new Operation.Cache(new Magazine)
         const storage = new FileSystem.Writer(destructible.durable($ => $(), 'filesystem'), await FileSystem.open({ directory, handles, create }))
         destructible.ephemeral($ => $(), `${suite}.${test}.fs`, async () => {
-            const strata = new Strata(destructible.durable($ => $(), 'strata'), { pages, storage, turnstile, comparator  })
+            const strata = new Strata(destructible.durable($ => $(), 'strata'), { pages, storage, turnstile, comparator, extractor })
             await f({ strata, directory, prefix: [ suite, test, 'file system' ].join(' '), pages })
             destructible.destroy()
         })

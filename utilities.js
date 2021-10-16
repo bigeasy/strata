@@ -28,10 +28,10 @@ exports.vivify = async function (directory) {
         if (page.leaf) {
             const items = vivified[id] = page.items.map((item, index) => [ 'insert', index, item.parts[0] ])
             if (page.right) {
-                items.push([ 'right', page.right ])
+                items.push([ 'right', page.right[0] ])
             }
         } else {
-            const items = vivified[id] = page.items.map(item => [ item.id, item.key == null ? null : item.key ])
+            const items = vivified[id] = page.items.map(item => [ item.id, item.key == null ? null : item.key[0] ])
             for (const item of items) {
                 await vivify(item[0])
             }
@@ -52,7 +52,7 @@ exports.serialize = async function (directory, files) {
                     method: 'insert',
                     index: index,
                     id: record[0]
-                }, record[1] != null ? [ Buffer.from(JSON.stringify(record[1])) ] : [])
+                }, record[1] != null ? [ Buffer.from(JSON.stringify([ record[1] ])) ] : [])
             })
             buffers.push(recordify({ method: 'length', length: files[id].length }, []))
             const buffer = Buffer.concat(buffers)
@@ -65,11 +65,11 @@ exports.serialize = async function (directory, files) {
                 case 'right':
                     return {
                         header: { method: 'right' },
-                        parts: [ Buffer.from(JSON.stringify(record[1])) ]
+                        parts: [ Buffer.from(JSON.stringify([ record[1] ])) ]
                     }
                 case 'insert':
                     if (record[1] == 0 && id != '0.1') {
-                        key = [ Buffer.from(JSON.stringify(record[2])) ]
+                        key = [ Buffer.from(JSON.stringify([ record[2] ])) ]
                     }
                     return {
                         header: { method: 'insert', index: record[1] },
