@@ -59,13 +59,13 @@ class Sheaf {
             split: coalesce(branch.split, 5),
             merge: coalesce(branch.merge, 1)
         }
+        options.partition = coalesce(options.partition, Number.MAX_SAFE_INTEGER)
         options.comparator = function () {
-            const zero = object => object
             if (options.comparator == null) {
                 const comparator = whittle(ascension([ String ]), value => [ value ])
-                return { leaf: comparator, branch: comparator, zero }
+                return { leaf: comparator, branch: comparator }
             } else if (typeof options.comparator == 'function') {
-                return { leaf: options.comparator, branch: options.comparator, zero }
+                return { leaf: options.comparator, branch: options.comparator }
             } else {
                 return options.comparator
             }
@@ -81,6 +81,7 @@ class Sheaf {
 
         this.pages = options.pages
 
+        this.partition = options.partition
         this.comparator = options.comparator
         this.leaf = options.leaf
         this.branch = options.branch
@@ -416,7 +417,7 @@ class Sheaf {
             if (
                 (
                     page.items.length >= this.leaf.split &&
-                    this.comparator.branch(page.items[0].key, page.items[page.items.length - 1].key) != 0
+                    this.comparator.leaf(page.items[0].key.slice(0, this.partition), page.items[page.items.length - 1].key.slice(0, this.partition)) != 0
                 )
                 ||
                 (
@@ -646,7 +647,7 @@ class Sheaf {
 
             // Split page creating a right page.
             const length = left.page.items.length
-            const partition = Partition(this.comparator.branch, left.page.items)
+            const partition = Partition(this.comparator.leaf, this.partition, left.page.items)
             // If we cannot partition because the leaf and branch have different
             // partition comparators and the branch comparator considers all keys
             // identical, we give up and return. We will have gone through the
@@ -663,12 +664,13 @@ class Sheaf {
             // 100s of updates to one key that occur before the stage can merge
             // before start to his this early exit.
             if (partition == null) {
+                process.exit()
                 cartridges.forEach(cartridge => cartridge.release())
                 right.cartridge.remove()
                 return
             }
             const items = left.page.items.splice(partition)
-            right.page.key = this.comparator.zero(items[0].key)
+            right.page.key = items[0].key.slice(0, this.partition)
             right.page.items = items
             right.page.right = left.page.right
             right.cartridge.heft = items.reduce((sum, item) => sum + item.heft, 1)
@@ -695,7 +697,7 @@ class Sheaf {
             for (const page of [ left.page, right.page ]) {
                 if (
                     page.items.length >= this.leaf.split &&
-                    this.comparator.branch(page.items[0].key, page.items[page.items.length - 1].key) != 0
+                    this.comparator.leaf(page.items[0].key.slice(0, this.partition), page.items[page.items.length - 1].key.slice(0, this.partition)) != 0
                 ) {
                     this._fracture.enqueue(stack, 'keephouse', value => value.candidates.push(page.key || page.items[0].key))
                 }

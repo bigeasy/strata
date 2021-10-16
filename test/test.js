@@ -124,14 +124,15 @@ async function walvivify (writeahead) {
     return vivified
 }
 
-function extractor (parts) {
+function _extractor (parts) {
     return [ parts[0] ]
 }
 
 async function* test (suite, okay, only = [ 'fileSystem', 'writeahead' ]) {
     const directory = path.join(utilities.directory, suite)
-    async function fileSystem ($trace, test, f, { create = false, serialize = null, vivify = null, comparator = null } = {}) {
+    async function fileSystem ($trace, test, f, { create = false, serialize = null, vivify = null, comparator = null, partition = null, extractor = null } = {}) {
         comparator ??= ascension([ String ])
+        extractor = coalesce(extractor, _extractor)
         if (serialize != null) {
             await utilities.serialize(directory, serialize)
         }
@@ -140,9 +141,9 @@ async function* test (suite, okay, only = [ 'fileSystem', 'writeahead' ]) {
         const turnstile = new Turnstile(destructible.durable($ => $(), { isolated: true }, 'turnstile'))
         const pages = new Magazine
         const handles = new Operation.Cache(new Magazine)
-        const storage = new FileSystem.Writer(destructible.durable($ => $(), 'filesystem'), await FileSystem.open({ directory, handles, create }))
+        const storage = new FileSystem.Writer(destructible.durable($ => $(), 'filesystem'), await FileSystem.open({ directory, handles, create, extractor }))
         destructible.ephemeral($ => $(), `${suite}.${test}.fs`, async () => {
-            const strata = new Strata(destructible.durable($ => $(), 'strata'), { pages, storage, turnstile, comparator, extractor })
+            const strata = new Strata(destructible.durable($ => $(), 'strata'), { pages, storage, turnstile, comparator, extractor, partition })
             await f({ strata, directory, prefix: [ suite, test, 'file system' ].join(' '), pages })
             destructible.destroy()
         })
@@ -156,7 +157,8 @@ async function* test (suite, okay, only = [ 'fileSystem', 'writeahead' ]) {
             okay(vivified, vivify, `${suite} ${test} file system vivify`)
         }
     }
-    async function writeahead ($trace, test, f, { create = false, serialize = null, vivify = null, comparator = null } = {}) {
+    async function writeahead ($trace, test, f, { create = false, serialize = null, vivify = null, comparator = null, extractor = null, partition = null } = {}) {
+        extractor = coalesce(extractor, _extractor)
         const destructible = new Destructible({ $trace }, 'writeahead.t')
         const turnstile = new Turnstile(destructible.durable($ => $(), { isolated: true }, 'turnstile'))
         const writeahead = new WriteAhead(destructible, turnstile, await WriteAhead.open({ directory }))
@@ -165,9 +167,9 @@ async function* test (suite, okay, only = [ 'fileSystem', 'writeahead' ]) {
         }
         writeahead.deferrable.increment()
         const pages = new Magazine
-        const storage = new WriteAheadOnly.Writer(destructible.durable($ => $(), 'storage'), await WriteAheadOnly.open(Fracture.stack(), { writeahead, key: 0, create: create ? [ 'x', 'x' ] : null }))
+        const storage = new WriteAheadOnly.Writer(destructible.durable($ => $(), 'storage'), await WriteAheadOnly.open(Fracture.stack(), { writeahead, key: 0, create: create ? [ 'x', 'x' ] : null, extractor }))
         await destructible.ephemeral($ => $(), `${suite}.${test}.writeahead`, async () => {
-            const strata = new Strata(destructible.durable($ => $(), 'strata'), { pages, storage, turnstile, comparator })
+            const strata = new Strata(destructible.durable($ => $(), 'strata'), { pages, storage, turnstile, comparator, partition })
             await f({
                 strata: strata,
                 pages: pages,
