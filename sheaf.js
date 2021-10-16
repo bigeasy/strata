@@ -796,8 +796,12 @@ class Sheaf {
                 level: level
             })
         }
-        return mergers
-            .filter(merger => this.comparator.branch(merger.items[0].key, merger.items[merger.items.length - 1].key) != 0)
+        // Do not merge with a sibling who is full up of the same value because
+        // of paritioning. Or maybe do still if it is less than split size.
+        const filtered = child.entry.value.leaf
+            ? mergers.filter(merger => this.comparator.branch(merger.items[0].key, merger.items[merger.items.length - 1].key) != 0)
+            : mergers
+        return filtered
             .sort((left, right) => left.items.length - right.items.length)
             .shift()
     }
