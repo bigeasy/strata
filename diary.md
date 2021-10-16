@@ -1,3 +1,44 @@
+## Sat Oct 16 03:23:25 CDT 2021
+
+Have it in my head that all keys should be composite, the should be arrays,
+since all the downstream applications use them only as arrays, since the first
+downstream application is Amalgamate and Memento and Locket are based on
+Amalgmate while IndexedDB is based on Memento.
+
+Then things like partitioning can be based on a slice of the key, not on a set
+of functions that do one thing or another, but I'd still have to think it all
+through to get it to work. Well, I could transition slowly allowing something
+like partitioning continue to be opaque functions, not changing the code, but
+starting to change other things into parameters.
+
+It would be significant change and I wouldn't feel it until I worked through the
+dependencies. I'd want to walk things back out if it didn't make things
+significantly easier to understand and document.
+
+But, it feels like the sort of change I'm going to think about for a couple
+months before I finally break down and do it and then forget it was every any
+other way. It may seem like a lot of work now, but there is already so much
+cruft, like the `branch` versus `leaf` comparators, and I don't know of any
+other way to make those work yet, no other application has arrisen outside of
+composite keys, while new uses of the compside keys keep presenting themselves.
+
+If I were more intelligent I'd reason about it, and when I've made the change
+the reasons will be obvious. What's the word for this? Epistimic? I don't know
+until I see it in the code.
+
+Anyway, insisting on compound keys means rewriting all the tests. It is a lot of
+work and I can't see all the implications for the downstream applications form
+here.
+
+## Sat Oct 16 03:12:02 CDT 2021
+
+Starting to wish I'd avoided the parallel writes since I believe the
+Fracture/Turnstile logic to be unnecessarily expensive. In the downstream
+applications, when we are writing out the user writes we are writing to the
+write-ahead log, which is always just a single append. When we are writing to
+the filesystem it is in the background. Probably faster to do the writes in a
+simpler single queue somehow.
+
 ## Sat Nov 21 17:15:15 CST 2020
 
 Before this is over, I'm going to want some way to share turnstiles.
