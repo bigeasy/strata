@@ -60,6 +60,7 @@ class Sheaf {
             merge: coalesce(branch.merge, 1)
         }
         options.partition = coalesce(options.partition, Number.MAX_SAFE_INTEGER)
+        assert(options.comparator)
         options.comparator = function () {
             if (options.comparator == null) {
                 const comparator = whittle(ascension([ String ]), value => [ value ])
@@ -275,7 +276,7 @@ class Sheaf {
             const index = rightward
                 ? entry.value.leaf ? ~(entry.value.items.length - 1) : entry.value.items.length - 1
                 : key != null
-                    ? find(comparator.leaf, entry.value.items, key, offset)
+                    ? find(comparator.leaf, entry.value.items, key, offset, length)
                     : entry.value.leaf ? ~0 : 0
             //
 

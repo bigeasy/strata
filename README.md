@@ -14,9 +14,6 @@ An persistent, `async`/`await` B-tree for Node.js.
 | Coverage:     | https://codecov.io/gh/bigeasy/strata          |
 | License:      | MIT                                           |
 
-```text
-npm install b-tree
-```
 
 <a href="http://www.flickr.com/photos/rickz/2207171252/" title="&quot;The
 Wave&quot; by rickz, on Flickr"><img
@@ -25,7 +22,7 @@ height="481" alt="&quot;The Wave&quot;"></a><br>The Wave by [Rick
 Z.](http://www.flickr.com/people/rickz/).
 
 
-Ascension installs from NPM.
+Strata installs from NPM as the `b-tree` module.
 
 ```
 npm install b-tree
@@ -74,18 +71,128 @@ system. Let's start with the file system.
 const FileSystem = require('b-tree/filesystem')
 ```
 
+We'll be introducing different modules as needed in the final draft, but let's
+dump them all into the `README.md` for now.
+
 ```javascript
 const Destructible = require('destructible')
 const Turnstile = require('turnstile')
 const Magazine = require('magazine')
 const Operation = require('operation')
-const Trampoline = require('reciprocate')
+```
+
+```javascript
+const { Trampoline } = require('reciprocate')
 const Fracture = require('fracture')
 ```
 
 For our `README.md` examples we'll need to create some file paths.
 
+When you create a Strata b-tree you need to provide functions that will
+convert the objects you want to store to and from `Buffer`s. Strata will writes
+those buffers to the file system or write-ahead log.
+
+You will need one serializer and deserializer pair for keys and one serializer
+and deserialiser pair for records.
+
+Records are inserted into Strata as an array of objects. This allows you to
+store an array that contains both JSON serializable (or otherwise serializalbe)
+objects and `Buffer`s. We call this a parts array.  WHen you serialize a record
+you will be given an array of parts and you must return an array of buffers. The
+length of the array of `Buffers` does not need to match the length of the array
+of parts.
+
 ```javascript
+function serializeRecord (parts) {
+    return parts.map(part => Buffer.from(JSON.stringify(part)))
+}
+```
+
+Similarly, to deserialize a record you provide a function that receives an array
+of buffers and returns an array of parts, that is an array of JavaScript objects
+that are maaningful to your application.
+
+```javascript
+function deserializeRecord (parts) {
+    return parts.map(part => JSON.parse(part.toString()))
+}
+```
+
+Key serializers... write about this, please.
+
+```javascript
+function serializeKey (key) {
+    return [ Buffer.from(JSON.stringify(key)) ]
+}
+
+function deserializeKey (parts) {
+    return JSON.parse(key.toString())
+}
+```
+
+When you create a Strata b-tree you need to provide two functions that will
+define how the tree indexed.
+
+The first function is an extractor. This function extracts a key from the stored
+record.
+
+Strata is not a key/value store, it is a record store. The key for a record in
+the store is extracted from the stored record. To extract the record you provide
+an extractor function.
+
+Strata works with compound keys. These compound keys are represented as arrays.
+All Strata keys are arrays. Your extractor must return an array that contains
+the values of the compound key. The array returned must always be the same
+length.
+
+```
+function extractor (parts) {
+    return [ parts[0].value ]
+}
+```
+
+WHen you insert data into a Strata b-tree you insert an array of JavaScript
+objects. The `extractor` function takes this array of objects and extracts the
+key values into an array that creates a compound key. Our initial example
+extractor merely returns a single element array, a compound key with one
+component.
+
+To complete the index we need to provide a comparator. A comparator should
+compare two arrays and return less than zero if the first array is less than the
+second, greater than zero if the first array is greater than the second and zero
+if they are equal.
+
+The arrays are equal if they are of equal length and the array element for each
+index in the array are equal. The first element in the first array that is less
+than or greater than the correspondding element in the second array makes the
+first array less than the second array. If one array is shorter than the other
+array and elements of the shorter array are equal to the correspondding elements
+in the longer array, then the shorter array is less than the longer array.
+
+With this sort function we can perform forward and reverse inclusive and
+exclusive searches against the compound keys our b-tree using whole or partial
+keys.
+
+To create a comparator I use Addendum which prvoides a comparator builder
+function that builds a comparator according to the aforementioned algorithm.
+
+```
+const ascension = require('ascension')
+
+const comparator = ascension([ String ])
+```
+
+In the above we have created a comparator that compares ...
+
+Strata stores data as an array of buffers. Deserialization converts that array
+of buffers into an array of object. Serialization converts that array into an
+array of objects.
+
+The extractor function accepts an array of parts. The parts are also user
+defined.
+
+```javascript
+const path = require('path')
 const fs = require('fs').promises
 
 const directory = path.join(__dirname, 'tmp', 'readme', 'simple')
@@ -96,8 +203,14 @@ const destructible = new Destructible('strata.simple.t')
 const turnstile = new Turnstile(destructible.durable('turnstile'))
 const pages = new Magazine
 const handles = new Operation.Cache(new Magazine)
-const storage = new FileSystem.Writer(destructible.durable('filesystem'), await FileSystem.open({ directory, handles, create: true }))
-const strata = new Strata(destructible.durable($ => $(), 'strata'), { pages, storage, turnstile })
+const opening = await FileSystem.open({
+    directory, handles, create: true,
+    extractor,
+    serlializer: 'json'
+})
+const storage = new FileSystem.Writer(destructible.durable('filesystem'), opening)
+const strata = new Strata(destructible.durable($ => $(), 'strata'), { pages, storage, turnstile, comparator })
+
 ```
 
 To both insert into and retrieve objects from the tree, we must first search the
@@ -121,16 +234,16 @@ outside of the synchronous callback function.
 const trampoline = new Trampoline
 
 // Invoke search for `'a'`.
-strata.search(trampoline, 'a', cursor => {
+strata.search(trampoline, [ 'a' ], cursor => {
     // Because we searched for `'a'` and we know the value does not exist, we
     // can insert the value using the cursor index.
-    cursor.insert(Fracture.stack(), cursor.index, 'a', [ 'a' ])
+    cursor.insert(Fracture.stack(), cursor.index, [ 'a' ], [{ value: 'a' }])
 
     // If we want to attempt to insert another value while we're here, we should
     // check to make sure this is the correct page for the value.
-    const { index } = cursor.indexOf('b', cursor.index)
+    const { index } = cursor.indexOf([ 'b' ], cursor.index)
     if (index != null) {
-        cursor.insert(Fracture.stack(), index, 'b', [ 'b' ])
+        cursor.insert(Fracture.stack(), index, [ 'b' ], [{ value: 'b' }])
     }
 })
 
@@ -152,7 +265,7 @@ page for use when the function returns.
 ```javascript
 // Invoke search for `'a'`.
 const gathered = []
-strata.search(trampoline, 'a', cursor => {
+strata.search(trampoline, [ 'a' ], cursor => {
     for (let index = cursor.index; index < cursor.page.items.length; index++) {
         gathered.push(cursor.page.items[index])
     }
@@ -164,9 +277,9 @@ while (trampoline.seek()) {
 }
 
 okay(gathered, [{
-    key: 'a', parts: [ 'a' ], heft: 53
+    key: [ 'a' ], parts: [{ value: 'a' }], heft: 64
 }, {
-    key: 'b', parts: [ 'b' ], heft: 53
+    key: [ 'b' ], parts: [{ value: 'b' }], heft: 64
 }], 'gathered values')
 ```
 
@@ -215,13 +328,17 @@ const directory = path.join(__dirname, 'tmp', 'readme', 'partial')
 
 await fs.mkdir(directory, { recursive: true })
 
+const extractor = function (parts) {
+    return [ parts[0] ]
+}
 const comparator = ascension([ String, Number ])
 
 const destructible = new Destructible('strata.simple.t')
 const turnstile = new Turnstile(destructible.durable('turnstile'))
 const pages = new Magazine
 const handles = new Operation.Cache(new Magazine)
-const storage = new FileSystem.Writer(destructible.durable('filesystem'), await FileSystem.open({ directory, handles, create: true }))
+const opening = await FileSystem.open({ directory, handles, create: true, extractor })
+const storage = new FileSystem.Writer(destructible.durable('filesystem'), opening)
 const strata = new Strata(destructible.durable($ => $(), 'strata'), {
     pages, storage, turnstile, comparator
 })
@@ -270,7 +387,7 @@ async function partial (key) {
     const whittled = whittle(comparator, left => left, right => right.slice(0, key.length))
     const padded = key.concat(null)
     const gathered = []
-    strata.descend(trampoline, whittled, padded, cursor => {
+    strata.search(trampoline, padded, key.length, cursor => {
         // TODO Are we still using ghosts?
         for (let i = cursor.index - 1; i > -1; i--) {
             gathered.push(cursor.page.items[i].key)
@@ -288,7 +405,7 @@ okay(await partial([ 'a' ]), [[
     'a', 1
 ]], 'gathered all "a"s')
 
-okay(await partial([ 'a', 2 ]), [[
+okay(await partial([ 'a', 3 ]), [[
     'a', 2
 ], [
     'a', 1

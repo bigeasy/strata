@@ -21,7 +21,7 @@ exports.reset = async function (directory) {
 }
 
 exports.vivify = async function (directory) {
-    const reader = new FileSystem.Reader(directory)
+    const reader = new FileSystem.Reader(directory, { extractor: parts => [ parts[0] ] })
     const vivified = {}
     async function vivify (id) {
         const { page } = await reader.page(id)

@@ -104,7 +104,7 @@ async function waserialize (writeahead, files) {
 const WriteAheadOnly = require('../writeahead')
 
 async function walvivify (writeahead) {
-    const reader = new WriteAheadOnly.Reader({ writeahead: writeahead, key: 0 })
+    const reader = new WriteAheadOnly.Reader({ writeahead: writeahead, key: 0, extractor: _extractor })
     const vivified = {}
     async function vivify (id) {
         const { page } = await reader.page(id)

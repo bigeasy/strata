@@ -1,13 +1,12 @@
 const { coalesce } = require('extant')
+const assert = require('assert')
 
 class Storage {
     static options (options) {
         if (options.checksum == null) {
             options.checksum = (() => '0')
         }
-        if (options.extractor == null) {
-            options.extractor = parts => [ parts[0] ]
-        }
+        assert(options.extractor != null)
         options.serializer = function () {
             const serializer = coalesce(options.serializer, 'json')
             switch (serializer) {

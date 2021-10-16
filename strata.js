@@ -60,7 +60,7 @@ class Strata {
             key: key === Strata.MIN ? null : key,
             rightward: key === Strata.MAX,
             fork: fork,
-            partial: partial,
+            length: partial,
             approximate: true
         }
         this._sheaf.search(trampoline, query, descent => {
