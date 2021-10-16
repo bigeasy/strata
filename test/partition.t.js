@@ -19,14 +19,7 @@ require('proof')(21, async okay => {
     const ascension = require('ascension')
     const whittle = require('whittle')
 
-    const cmp = ascension([ String, Number ])
-
-    const comparator = {
-        zero: object => { throw new Error },
-        partition: 1,
-        leaf: cmp,
-        branch: cmp
-    }
+    const comparator = ascension([ String, Number ])
 
     function extractor (parts) {
         return parts[0]

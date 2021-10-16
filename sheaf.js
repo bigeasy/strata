@@ -61,17 +61,6 @@ class Sheaf {
         }
         options.partition = coalesce(options.partition, Number.MAX_SAFE_INTEGER)
         assert(options.comparator)
-        options.comparator = function () {
-            if (options.comparator == null) {
-                const comparator = whittle(ascension([ String ]), value => [ value ])
-                return { leaf: comparator }
-            } else if (typeof options.comparator == 'function') {
-                return { leaf: options.comparator }
-            } else {
-                delete options.comparator.branch
-                return options.comparator
-            }
-        } ()
         return options
     }
 
@@ -196,7 +185,9 @@ class Sheaf {
         return { page: cartridge.value, cartridge }
     }
 
-    _descend (entries, { length = Number.MAX_SAFE_INTEGER, comparator = this.comparator, key, level = -1, fork = false, rightward = false, approximate = false }) {
+    _descend (entries, {
+        length = Number.MAX_SAFE_INTEGER, comparator = this.comparator, key, level = -1, fork = false, rightward = false, approximate = false
+    }) {
         const descent = { miss: null, keyed: null, level: 0, index: 0, entry: null,
             pivot: null,
             cartridge: null,
@@ -242,7 +233,7 @@ class Sheaf {
                 // I don't reference the level, so it's probably fine here.
 
                 //
-                if (fork && comparator.leaf(descent.pivot.key, key) == 0) {
+                if (fork && comparator(descent.pivot.key, key) == 0) {
                     descent.index--
                     rightward = true
                     descent.pivot = descent.index != 0
@@ -276,7 +267,7 @@ class Sheaf {
             const index = rightward
                 ? entry.value.leaf ? ~(entry.value.items.length - 1) : entry.value.items.length - 1
                 : key != null
-                    ? find(comparator.leaf, entry.value.items, key, offset, length)
+                    ? find(comparator, entry.value.items, key, offset, length)
                     : entry.value.leaf ? ~0 : 0
             //
 
@@ -419,7 +410,7 @@ class Sheaf {
             if (
                 (
                     page.items.length >= this.leaf.split &&
-                    this.comparator.leaf(page.items[0].key.slice(0, this.partition), page.items[page.items.length - 1].key.slice(0, this.partition)) != 0
+                    this.comparator(page.items[0].key.slice(0, this.partition), page.items[page.items.length - 1].key.slice(0, this.partition)) != 0
                 )
                 ||
                 (
@@ -449,7 +440,7 @@ class Sheaf {
         return page.leaf
             ? (
                 page.items.length >= this.leaf.split &&
-                this.comparator.leaf(page.items[0].key, page.items[page.items.length - 1].key) != 0
+                this.comparator(page.items[0].key, page.items[page.items.length - 1].key) != 0
             )
             ||
             (
@@ -649,7 +640,7 @@ class Sheaf {
 
             // Split page creating a right page.
             const length = left.page.items.length
-            const partition = Partition(this.comparator.leaf, this.partition, left.page.items)
+            const partition = Partition(this.comparator, this.partition, left.page.items)
             // If we cannot partition because the leaf and branch have different
             // partition comparators and the branch comparator considers all keys
             // identical, we give up and return. We will have gone through the
@@ -699,7 +690,7 @@ class Sheaf {
             for (const page of [ left.page, right.page ]) {
                 if (
                     page.items.length >= this.leaf.split &&
-                    this.comparator.leaf(page.items[0].key.slice(0, this.partition), page.items[page.items.length - 1].key.slice(0, this.partition)) != 0
+                    this.comparator(page.items[0].key.slice(0, this.partition), page.items[page.items.length - 1].key.slice(0, this.partition)) != 0
                 ) {
                     this._fracture.enqueue(stack, 'keephouse', value => value.candidates.push(page.key || page.items[0].key))
                 }
@@ -803,7 +794,7 @@ class Sheaf {
         // Do not merge with a sibling who is full up of the same value because
         // of paritioning. Or maybe do still if it is less than split size.
         const filtered = child.entry.value.leaf
-            ? mergers.filter(merger => this.comparator.leaf(merger.items[0].key, merger.items[merger.items.length - 1].key) != 0)
+            ? mergers.filter(merger => this.comparator(merger.items[0].key, merger.items[merger.items.length - 1].key) != 0)
             : mergers
         return filtered
             .sort((left, right) => left.items.length - right.items.length)
@@ -813,7 +804,7 @@ class Sheaf {
     _isDirty (page, sizes) {
         return (
             page.items.length >= sizes.split &&
-            this.comparator.leaf(page.items[0].key, page.items[page.items.length - 1].key) != 0
+            this.comparator(page.items[0].key, page.items[page.items.length - 1].key) != 0
         )
         ||
         (

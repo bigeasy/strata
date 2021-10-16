@@ -25,8 +25,8 @@ class Cursor {
         if (this.page.deleted) {
             return { index: null, found: false }
         }
-        const comparator = this._sheaf.comparator.leaf
-        let index = find(comparator, this.page.items, key, offset)
+        const comparator = this._sheaf.comparator
+        let index = find(comparator, this.page.items, key, offset, Number.MAX_SAFE_INTEGER)
         // Unambiguous if we actually found it.
         if (-1 < index) {
             return { index: index, found: true }
