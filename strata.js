@@ -42,13 +42,27 @@ class Strata {
         }, found)
     }
 
-    search (trampoline, key, ...vargs) {
-        const [ fork, found ] = vargs.length == 2 ? vargs : [ false, vargs[0] ]
-        const query = key === Strata.MIN
-            ? { key: null, rightward: false, fork: false }
-            : key === Strata.MAX
-                ? { key: null, rightward: true, fork: false }
-                : { key, rightward: false, fork: fork, approximate: true }
+    search (trampoline, ...vargs) {
+        const key = vargs.shift()
+        const found = vargs.pop()
+        let partial = Number.MAX_SAFE_INTEGER, fork = false
+        while (vargs.length != 0) {
+            switch (typeof vargs[0]) {
+            case 'boolean':
+                fork = vargs.shift()
+                break
+            case 'number':
+                partial = vargs.shift()
+                break
+            }
+        }
+        const query = {
+            key: key === Strata.MIN ? null : key,
+            rightward: key === Strata.MAX,
+            fork: fork,
+            partial: partial,
+            approximate: true
+        }
         this._sheaf.search(trampoline, query, descent => {
             const cursor = new Cursor(this._sheaf, descent, key)
             try {
@@ -78,12 +92,17 @@ class Strata {
         this._search(trampoline, { key: null, rightward: true, fork: false }, found)
     }
 
-    find (trampoline, key) {
-        this._search(trampoline, { key, rightward: false, fork: false }, found)
+    find (trampoline, key, found) {
+        this._search(trampoline, { key, rightward: false, fork: false, approximate: true }, found)
     }
 
-    fork (trampoline, found) {
-        this._search(trampoline, { key: null, rightward: false, fork: true }, found)
+    fork (trampoline, key, found) {
+        this._search(trampoline, { key, rightward: false, fork: true, approximate: true }, found)
+    }
+
+    after (trampoline, key, partial, found) {
+        key = key.concat(null)
+        this._search(trampoline, { key, partial: key.length - 1, rightward: false, fork: false, approximate: true }, found)
     }
 
     drain () {

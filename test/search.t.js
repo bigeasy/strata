@@ -1,4 +1,4 @@
-require('proof')(25, async (okay) => {
+require('proof')(27, async (okay) => {
     const expected = [ 'a', 'b', 'c', 'd', 'e', 'f', 'h', 'i' ]
 
     // TODO What to do if we approimate fork the first item in the tree?
@@ -153,6 +153,25 @@ require('proof')(25, async (okay) => {
                         id: '1.3',
                         index: -1,
                         found: false
+                    }, 'fork at zero index')
+                })
+                while (trampoline.seek()) {
+                    await trampoline.shift()
+                }
+            }
+            {
+                const trampoline = new Trampoline
+                strata.after(trampoline, [ 'i', null ], 1, cursor => {
+                    okay({
+                        id: cursor.page.id,
+                        index: cursor.index,
+                        found: cursor.found,
+                        item: cursor.page.items[cursor.index].key[0]
+                    }, {
+                        id: '1.3',
+                        index: 1,
+                        found: false,
+                        item: 'k'
                     }, 'fork at zero index')
                 })
                 while (trampoline.seek()) {

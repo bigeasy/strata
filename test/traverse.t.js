@@ -16,6 +16,7 @@ require('proof')(10, async (okay) => {
                         items.push(cursor.page.items[i].parts[0])
                     }
                     right = cursor.page.right
+                    console.log('>>>', right)
                 })
                 while (trampoline.seek()) {
                     await trampoline.shift()

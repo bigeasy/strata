@@ -52,11 +52,11 @@ async function waserialize (writeahead, files) {
                 case 'right':
                     return {
                         header: { method: 'right' },
-                        parts: [ Buffer.from(JSON.stringify(record[1])) ]
+                        parts: [ Buffer.from(JSON.stringify([ record[1] ])) ]
                     }
                 case 'insert':
                     if (record[1] == 0 && id != '0.1') {
-                        key = [ Buffer.from(JSON.stringify(record[2])) ]
+                        key = [ Buffer.from(JSON.stringify([ record[2] ])) ]
                     }
                     return {
                         header: { method: 'insert', index: record[1] },
@@ -85,7 +85,7 @@ async function waserialize (writeahead, files) {
                 parts: []
             }].concat(files[id].map((record, index) => {
                 const parts = index != 0
-                    ? [ Buffer.from(JSON.stringify(record[1])) ]
+                    ? [ Buffer.from(JSON.stringify([ record[1] ])) ]
                     : []
                 return {
                     header: {
@@ -131,8 +131,8 @@ function _extractor (parts) {
 async function* test (suite, okay, only = [ 'fileSystem', 'writeahead' ]) {
     const directory = path.join(utilities.directory, suite)
     async function fileSystem ($trace, test, f, { create = false, serialize = null, vivify = null, comparator = null, partition = null, extractor = null } = {}) {
-        comparator ??= ascension([ String ])
         extractor = coalesce(extractor, _extractor)
+        comparator = coalesce(comparator, ascension([ String ]))
         if (serialize != null) {
             await utilities.serialize(directory, serialize)
         }
@@ -159,6 +159,7 @@ async function* test (suite, okay, only = [ 'fileSystem', 'writeahead' ]) {
     }
     async function writeahead ($trace, test, f, { create = false, serialize = null, vivify = null, comparator = null, extractor = null, partition = null } = {}) {
         extractor = coalesce(extractor, _extractor)
+        comparator = coalesce(comparator, ascension([ String ]))
         const destructible = new Destructible({ $trace }, 'writeahead.t')
         const turnstile = new Turnstile(destructible.durable($ => $(), { isolated: true }, 'turnstile'))
         const writeahead = new WriteAhead(destructible, turnstile, await WriteAhead.open({ directory }))
