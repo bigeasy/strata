@@ -52,7 +52,7 @@ async function waserialize (writeahead, files) {
                 case 'right':
                     return {
                         header: { method: 'right' },
-                        parts: [ Buffer.from(JSON.stringify([ record[1] ])) ]
+                        parts: [ Buffer.from(JSON.stringify(record[1])) ]
                     }
                 case 'insert':
                     if (record[1] == 0 && id != '0.1') {
@@ -85,7 +85,7 @@ async function waserialize (writeahead, files) {
                 parts: []
             }].concat(files[id].map((record, index) => {
                 const parts = index != 0
-                    ? [ Buffer.from(JSON.stringify([ record[1] ])) ]
+                    ? [ Buffer.from(JSON.stringify(record[1])) ]
                     : []
                 return {
                     header: {
@@ -111,10 +111,10 @@ async function walvivify (writeahead) {
         if (page.leaf) {
             const items = vivified[id] = page.items.map((item, index) => [ 'insert', index, item.parts[0] ])
             if (page.right) {
-                items.push([ 'right', page.right[0] ])
+                items.push([ 'right', page.right ])
             }
         } else {
-            const items = vivified[id] = page.items.map(item => [ item.id, item.key == null ? null : item.key[0] ])
+            const items = vivified[id] = page.items.map(item => [ item.id, item.key == null ? null : item.key ])
             for (const item of items) {
                 await vivify(item[0])
             }

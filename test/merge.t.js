@@ -20,9 +20,9 @@ require('proof')(13, async (okay) => {
             await strata.drain()
         }, {
             serialize: {
-                '0.0': [[ '0.1', null ], [ '0.3', 'd' ]],
+                '0.0': [[ '0.1', null ], [ '0.3', [ 'd' ] ]],
                 '0.1': [[
-                    'right', '0.3'
+                    'right', [ 'd' ]
                 ], [
                     'insert', 0, 'a'
                 ], [

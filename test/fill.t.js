@@ -7,7 +7,7 @@ require('proof')(15, async (okay) => {
 
     const test = require('./test')
 
-    for await (const harness of test('fill', okay, [ 'fileSystem', 'writeahead' ])) {
+    for await (const harness of test('fill', okay)) {
         await harness($ => $(), 'merge', async ({ strata }) => {
             const trampoline = new Trampoline, promises = []
             await strata.search(trampoline, [ 'b' ], cursor => {
@@ -22,18 +22,18 @@ require('proof')(15, async (okay) => {
             await strata.drain()
         }, {
             serialize: {
-                '0.0': [[ '0.2', null ], [ '0.4', 'f' ]],
-                '0.2': [[ '0.1', null ], [ '0.3', 'c' ]],
-                '0.4': [[ '0.5', null ], [ '0.7', 'i' ]],
+                '0.0': [[ '0.2', null ], [ '0.4', [ 'f' ] ]],
+                '0.2': [[ '0.1', null ], [ '0.3', [ 'c' ] ]],
+                '0.4': [[ '0.5', null ], [ '0.7', [ 'i' ] ]],
                 '0.1': [[
-                    'right', 'c'
+                    'right', [ 'c' ]
                 ], [
                     'insert', 0, 'a'
                 ], [
                     'insert', 1, 'b'
                 ]],
                 '0.3': [[
-                    'right', 'f'
+                    'right', [ 'f' ]
                 ], [
                     'insert', 0, 'c'
                 ], [
@@ -42,7 +42,7 @@ require('proof')(15, async (okay) => {
                     'insert', 2, 'e'
                 ]],
                 '0.5': [[
-                    'right', 'i'
+                    'right', [ 'i' ]
                 ], [
                     'insert', 0, 'f'
                 ], [
@@ -59,19 +59,19 @@ require('proof')(15, async (okay) => {
                 ]]
             },
             vivify: {
-                '0.0': [[ '0.1', null ], [ '0.5', 'f' ], [ '0.7', 'i' ] ],
+                '0.0': [[ '0.1', null ], [ '0.5', [ 'f' ] ], [ '0.7', [ 'i' ] ] ],
                 '0.1': [
                     [ 'insert', 0, 'a' ],
                     [ 'insert', 1, 'c' ],
                     [ 'insert', 2, 'd' ],
                     [ 'insert', 3, 'e' ],
-                    [ 'right', 'f' ]
+                    [ 'right', [ 'f' ] ]
                 ],
                 '0.5': [
                     [ 'insert', 0, 'f' ],
                     [ 'insert', 1, 'g' ],
                     [ 'insert', 2, 'h' ],
-                    [ 'right', 'i' ]
+                    [ 'right', [ 'i' ] ]
                 ],
                 '0.7': [
                     [ 'insert', 0, 'i' ],

@@ -180,9 +180,9 @@ require('proof')(27, async (okay) => {
             }
         }, {
             serialize: {
-                '0.0': [[ '0.1', null ], [ '1.1', 'd' ], [ '1.3', 'h' ]],
-                '0.1': [[ 'right', 'd' ], [ 'insert', 0, 'a' ], [ 'insert', 1, 'b' ], [ 'insert', 2, 'c' ]],
-                '1.1': [[ 'right', 'h' ], [ 'insert', 0, 'd' ], [ 'insert', 1, 'e' ], [ 'insert', 2, 'f' ]],
+                '0.0': [[ '0.1', null ], [ '1.1', [ 'd' ] ], [ '1.3', [ 'h' ] ]],
+                '0.1': [[ 'right', [ 'd' ] ], [ 'insert', 0, 'a' ], [ 'insert', 1, 'b' ], [ 'insert', 2, 'c' ]],
+                '1.1': [[ 'right', [ 'h' ] ], [ 'insert', 0, 'd' ], [ 'insert', 1, 'e' ], [ 'insert', 2, 'f' ]],
                 '1.3': [
                     [ 'insert', 0, 'h' ], [ 'insert', 1, 'i' ], [ 'insert', 2, 'k' ], [ 'insert', 3, 'l' ],
                     [ 'delete', 0 ], [ 'delete', 2 ]
