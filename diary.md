@@ -1,3 +1,40 @@
+## Sun Oct 17 12:24:24 CDT 2021
+
+All keys are composite not. Thought I'd had it all figured out for real, I
+swear, but not I realize that in the downstream modules I'm using nested
+comparators, which means that I can't have a single parition number passed into
+search that will truncate the record key. WHich record key? How does that record
+key get passed into a nested comparator?
+
+For the downstream, I could work to flatten the indexes, so that the versioning
+information of Amamgamate is appeneded to an Ascension definition. This would
+work for IndexedDB because I could pass in an Ascension definition with the one
+or two IndexedDB comparator functions. It would work for Memento becasue I
+define the user specified comparators using Ascension. It works for Locket
+because there really is no partial reverse that isn't an exact key match so I
+can continue to just use fork (I believe.)
+
+Alternatively, I can create wrapper comparators that take a specialized key that
+has a partial number, a length to slice, and slices before giving to the
+Ascension comparator. This is fiddly, of course.
+
+Finally, I can update Ascension so that it generates both sort comparators and
+binary search comparators with an option to reverse the value of a partial
+search, done by passing in a multipler. If the option really bothers me, in the
+sense that it means that Ascension has a special third parameter and extra work
+it performs when what I really do want is a sort, I can make it an optional
+property and generate the functions it generates now. If it bothers me that this
+makes the module slightly larger then I'm going to have to get just over it,
+because this is what I'm leaning toward.
+
+An initial pass would add the feature and see how it ripples through the
+downstream dependencies, do any of the dependencies break? What changes are
+necessary to partitioning? How much more convoluted does the documentation
+become? It couldn't be any more convoluted than documenting wrapping comparators
+and specifying custom comparators. We're only providing Ascension comparators
+designed to work with Strata, so we can simply add the multipler to `search` and
+we have a place to document how it works. It remains recursive.
+
 ## Sat Oct 16 03:23:25 CDT 2021
 
 Have it in my head that all keys should be composite, the should be arrays,
