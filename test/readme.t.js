@@ -274,7 +274,7 @@ require('proof')(4, async okay => {
         const extractor = function (parts) {
             return [ parts[0] ]
         }
-        const comparator = ascension([ String, Number ])
+        const comparator = ascension([ String, Number ], true)
 
         const destructible = new Destructible('strata.simple.t')
         const turnstile = new Turnstile(destructible.durable('turnstile'))
@@ -329,7 +329,7 @@ require('proof')(4, async okay => {
             const trampoline = new Trampoline
             const gathered = []
             strata.search(trampoline, key, -1, cursor => {
-                // TODO Are we still using ghosts?
+                // TODO Are we still using ghosts? No.
                 for (let i = cursor.index - 1; i > -1; i--) {
                     gathered.push(cursor.page.items[i].key)
                 }
@@ -395,7 +395,7 @@ require('proof')(4, async okay => {
 
 const ascension = require('ascension')
 
-const comparator = ascension([ String ])
+const comparator = ascension([ String ], true)
 
 // More to come...
 //
