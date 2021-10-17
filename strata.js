@@ -45,14 +45,14 @@ class Strata {
     search (trampoline, ...vargs) {
         const key = vargs.shift()
         const found = vargs.pop()
-        let partial = Number.MAX_SAFE_INTEGER, fork = false
+        let fork = false, reversal = 1
         while (vargs.length != 0) {
             switch (typeof vargs[0]) {
             case 'boolean':
                 fork = vargs.shift()
                 break
             case 'number':
-                partial = vargs.shift()
+                reversal = vargs.shift()
                 break
             }
         }
@@ -60,7 +60,7 @@ class Strata {
             key: key === Strata.MIN ? null : key,
             rightward: key === Strata.MAX,
             fork: fork,
-            length: partial,
+            reversal: reversal,
             approximate: true
         }
         this._sheaf.search(trampoline, query, descent => {

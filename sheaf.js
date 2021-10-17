@@ -186,7 +186,7 @@ class Sheaf {
     }
 
     _descend (entries, {
-        length = Number.MAX_SAFE_INTEGER, comparator = this.comparator, key, level = -1, fork = false, rightward = false, approximate = false
+        reversal = 1, comparator = this.comparator, key, level = -1, fork = false, rightward = false, approximate = false
     }) {
         const descent = { miss: null, keyed: null, level: 0, index: 0, entry: null,
             pivot: null,
@@ -267,7 +267,7 @@ class Sheaf {
             const index = rightward
                 ? entry.value.leaf ? ~(entry.value.items.length - 1) : entry.value.items.length - 1
                 : key != null
-                    ? find(comparator, entry.value.items, key, offset, length)
+                    ? find(comparator, entry.value.items, key, offset, reversal)
                     : entry.value.leaf ? ~0 : 0
             //
 

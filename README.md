@@ -384,10 +384,8 @@ while (trampoline.seek()) {
 
 async function partial (key) {
     const trampoline = new Trampoline
-    const whittled = whittle(comparator, left => left, right => right.slice(0, key.length))
-    const padded = key.concat(null)
     const gathered = []
-    strata.search(trampoline, padded, key.length, cursor => {
+    strata.search(trampoline, key, -1, cursor => {
         // TODO Are we still using ghosts?
         for (let i = cursor.index - 1; i > -1; i--) {
             gathered.push(cursor.page.items[i].key)

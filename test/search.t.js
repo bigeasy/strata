@@ -161,7 +161,7 @@ require('proof')(27, async (okay) => {
             }
             {
                 const trampoline = new Trampoline
-                strata.after(trampoline, [ 'i', null ], 1, cursor => {
+                strata.search(trampoline, [ 'i' ], -1, cursor => {
                     okay({
                         id: cursor.page.id,
                         index: cursor.index,

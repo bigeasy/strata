@@ -19,7 +19,7 @@ require('proof')(21, async okay => {
     const ascension = require('ascension')
     const whittle = require('whittle')
 
-    const comparator = ascension([ String, Number ])
+    const comparator = ascension([ String, Number ], true)
 
     function extractor (parts) {
         return parts[0]

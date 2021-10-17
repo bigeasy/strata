@@ -132,7 +132,7 @@ async function* test (suite, okay, only = [ 'fileSystem', 'writeahead' ]) {
     const directory = path.join(utilities.directory, suite)
     async function fileSystem ($trace, test, f, { create = false, serialize = null, vivify = null, comparator = null, partition = null, extractor = null } = {}) {
         extractor = coalesce(extractor, _extractor)
-        comparator = coalesce(comparator, ascension([ String ]))
+        comparator = coalesce(comparator, ascension([ String ], true))
         if (serialize != null) {
             await utilities.serialize(directory, serialize)
         }
@@ -159,7 +159,7 @@ async function* test (suite, okay, only = [ 'fileSystem', 'writeahead' ]) {
     }
     async function writeahead ($trace, test, f, { create = false, serialize = null, vivify = null, comparator = null, extractor = null, partition = null } = {}) {
         extractor = coalesce(extractor, _extractor)
-        comparator = coalesce(comparator, ascension([ String ]))
+        comparator = coalesce(comparator, ascension([ String ], true))
         const destructible = new Destructible({ $trace }, 'writeahead.t')
         const turnstile = new Turnstile(destructible.durable($ => $(), { isolated: true }, 'turnstile'))
         const writeahead = new WriteAhead(destructible, turnstile, await WriteAhead.open({ directory }))
