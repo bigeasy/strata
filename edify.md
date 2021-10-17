@@ -1,5 +1,5 @@
-[![Actions Status](https://github.com/bigeasy/ascension/workflows/Node%20CI/badge.svg)](https://github.com/bigeasy/ascension/actions)
-[![codecov](https://codecov.io/gh/bigeasy/ascension/branch/master/graph/badge.svg)](https://codecov.io/gh/bigeasy/ascension)
+[![Actions Status](https://github.com/bigeasy/b-tree/workflows/Node%20CI/badge.svg)](https://github.com/bigeasy/b-tree/actions)
+[![codecov](https://codecov.io/gh/bigeasy/b-tree/branch/master/graph/badge.svg)](https://codecov.io/gh/bigeasy/b-tree)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 An persistent, `async`/`await` B-tree for Node.js.
@@ -58,7 +58,7 @@ code sections of the readme.
 ```text
 //{ "mode": "text" }
 git clone git@github.com:bigeasy/b-tree.git
-cd ascension
+cd b-tree
 npm install --no-package-lock --no-save
 node test/readme.t.js
 ```
