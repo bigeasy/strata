@@ -26,7 +26,7 @@ class Cursor {
             return { index: null, found: false }
         }
         const comparator = this._sheaf.comparator
-        let index = find(comparator, this.page.items, key, offset, Number.MAX_SAFE_INTEGER)
+        let index = find(comparator, this.page.items, key, offset, 1)
         // Unambiguous if we actually found it.
         if (-1 < index) {
             return { index: index, found: true }
