@@ -9,8 +9,6 @@
 
 // Sort function generator.
 const ascension = require('ascension')
-// Comparator decorator that extracts the sorted fields from an object.
-const whittle = require('whittle')
 
 // Node.js API.
 const assert = require('assert')
