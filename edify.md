@@ -1,5 +1,5 @@
-[![Actions Status](https://github.com/bigeasy/b-tree/workflows/Node%20CI/badge.svg)](https://github.com/bigeasy/b-tree/actions)
-[![codecov](https://codecov.io/gh/bigeasy/b-tree/branch/master/graph/badge.svg)](https://codecov.io/gh/bigeasy/b-tree)
+[![Actions Status](https://github.com/bigeasy/strata/workflows/Node%20CI/badge.svg)](https://github.com/bigeasy/strata/actions)
+[![codecov](https://codecov.io/gh/bigeasy/strata/branch/master/graph/badge.svg)](https://codecov.io/gh/bigeasy/strata)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 An persistent, `async`/`await` B-tree for Node.js.
