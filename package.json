@@ -27,7 +27,7 @@
     },
     "dependencies":
     {
-                            "ascension":                    "^3.0.0-alpha.11",
+                            "ascension":                    "^3.0.0-alpha.12",
                             "extant":                       "^2.0.0-alpha.4",
                             "fracture":                     "0.3.0-alpha.73",
                             "hash.fnv":                     "^1.0.5",
